@@ -57,3 +57,14 @@ if its capability criterion passes **and** all applicable sentinels are healthy.
   *epistemic* (not raw) surprise in ADR-0002; **posterior collapse** applies only if a
   stochastic latent with a KL term is used, in which case add free-bits / KL-balancing
   at that time.
+
+## Note (2026-07-02) — external evidence: prefer compressed-real-data replay
+A sibling project (OmniLatent) evaluated generative replay directly and **rejected it**
+as a default: rehearsing on the model's own dreams "drifts (mode collapse over many
+iterations); LGQ-compressed real data is strictly better than synthetic replay here."
+This is empirical support for the generative-replay-collapse failure mode above. We
+strengthen the decision accordingly: the **default rehearsal substrate is
+compressed *real* experience** (the ADR-0008 replay buffer), and **generative replay is
+opt-in behind the `replay-fidelity` sentinel** — never the default, and never on dreams
+alone. The `replay-fidelity` criterion (real-data anchor + lineage cap + uncertainty-
+gated dreams) is unchanged; this note fixes the default.

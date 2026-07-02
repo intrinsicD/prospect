@@ -10,9 +10,9 @@ find its seam, its rationale, and its acceptance test from this table.
 | R2 | Hierarchical planning | planning.py | 0003 | P5 |
 | R3 | Use violation of expectation to test whether an action is learned | voe.py | 0002 | P3 |
 | R4 | Identify the right patterns in the input | world_model.py (latent), codec.py | 0001 | P1 |
-| R5 | Use the right learned patterns correctly | skills.py | 0002, 0003 | P4 |
+| R5 | Use the right learned patterns correctly | skills.py | 0002, 0003, 0009 | P4 |
 | R6 | Process any kind of input, produce any kind of output | codec.py | 0001 | P6 |
-| R7 | Improve over time | memory.py, voe.py | 0002, 0005 | P7 |
+| R7 | Improve over time | memory.py, voe.py | 0002, 0005, 0007, 0008, 0009 | P7 |
 | R8 | Use different knowledge bases (internal and external) for any use case | memory.py, knowledge.py | 0004 | P8 |
 
 ## Notes
@@ -25,3 +25,12 @@ find its seam, its rationale, and its acceptance test from this table.
 - Collapse prevention (ADR-0006) is not a separate requirement — it protects the shared
   latent and the calibrated uncertainty signal that R1, R3, R4 and R7 all read. It is
   enforced by integrity **sentinels** in `bench/gates.py`, which gate every phase.
+- The **quality floor** (ADR-0007) is likewise cross-cutting, not a separate
+  requirement: a frozen-probe + vault + rollback mechanism that gives the ADR-0006
+  sentinels an *actuator*. It is enforced by a `quality-floor` **floor** check in
+  `bench/gates.py` (a third leg of the composite gate, alongside capability and
+  sentinels), active from P1.
+- R7's *mechanism* is the continual-learning defense-in-depth stack (ADR-0008); its
+  *growth* mechanism (shared with R5) is additive isolatable units triggered by a VoE
+  learning-progress plateau (ADR-0009). Both live in the harness; the core exposes only
+  the VoE-derived signals (`learning_progress`, `Competence`) they read.

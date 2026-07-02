@@ -23,3 +23,17 @@ violated). Start with **two levels**.
 - (−) Inter-level nonstationarity: as the worker improves, subgoal meaning drifts.
   Mitigate with off-policy relabelling or a fixed goal-latent; pick one deliberately.
 - A hierarchical *policy* without the jumpy *model* is reactive control, not planning.
+
+## Note (2026-07-02) — external evidence for simulate-to-select over a learned router
+A sibling project (OmniLatent) built the obvious alternative to simulate-to-select — a
+**learned key-matching router** over an expert registry with sparse top-k gating — and
+measured it honestly (`docs/routing_ablation.md` there). Result: **routing did not beat
+firing all experts** ("always-on") at their scale; the win was at best efficiency, not
+quality, because attention-injected experts are already input-conditioned, making an
+explicit router redundant *for quality*. We take this as evidence to keep skill
+selection **grounded in the world model** (simulate the option-model, pick by predicted
+outcome under uncertainty, gate by VoE) rather than adopting a separately-learned
+router. We keep only the router's *abstention* idea — low confidence ⇒ gather evidence
+(retrieve / read memory) instead of forcing a skill — which Prospect already expresses
+as uncertainty-gated retrieval (ADR-0004). This note records a mechanism we chose
+**not** to import and why.
