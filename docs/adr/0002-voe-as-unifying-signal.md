@@ -1,0 +1,24 @@
+# ADR-0002 — Prediction error (VoE) as the single unifying signal
+
+**Status:** Accepted
+
+## Context
+We need to test whether an action has been *learned* (R3). Raw error cannot: a large
+error may mean the dynamics are unlearned (epistemic, reducible) or the environment
+is stochastic (aleatoric, irreducible). Several other needs (curriculum, skill trust,
+re-planning, forgetting, retrieval) also reduce to "how surprised am I?".
+
+## Decision
+Compute surprise as **negative log-likelihood of the observation under a predicted
+distribution**, and always **decompose uncertainty into epistemic and aleatoric**
+(e.g. ensemble disagreement vs. within-member spread). Define "learned" as *low
+epistemic uncertainty plus flattened learning progress*. Reuse this one signal for
+all six jobs listed in `docs/architecture.md`.
+
+## Consequences
+- (+) One backbone; new requirements plug in rather than spawning bespoke modules.
+- (+) A mastery **test** and a curiosity **curriculum** come from the same quantity.
+- (−) Everything depends on calibrated uncertainty; calibration degrades
+  off-distribution and must be monitored (a P7 concern).
+- **Contract:** the world model returns `types.Prediction` (mean + epistemic +
+  aleatoric), never a bare float. Downstream code must not bypass this.

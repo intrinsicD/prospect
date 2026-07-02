@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prospect"
+version = "0.0.1"
+description = "Research scaffold for a predictive-world-model agent (surprise-driven, hierarchical, memory-augmented)."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+# Learning backends are pulled in by the implementation, kept OUT of the core:
+learn = ["numpy", "torch"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prospect"]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "UP"]
