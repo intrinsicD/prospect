@@ -1,14 +1,18 @@
-"""Benchmark-gated delivery with collapse sentinels (ADR-0005, ADR-0006).
+"""Benchmark-gated delivery with collapse sentinels and a quality floor
+(ADR-0005, ADR-0006, ADR-0007).
 
 A phase ships only when (a) its **capability** gate passes AND (b) every applicable
-integrity **sentinel** is healthy. Capability gates ask "did the model reach the
-bar?"; sentinels ask "did it stay healthy while doing so?" — because collapse
-(representation, uncertainty, generative-replay, option) is typically invisible in
-the training loss: the trivial solution has low loss.
+integrity **sentinel** is healthy AND (c) the **quality floor** is satisfied.
+Capability gates ask "did the model reach the bar?"; sentinels ask "did it stay
+healthy while doing so?" — because collapse (representation, uncertainty,
+generative-replay, option) is typically invisible in the training loss: the trivial
+solution has low loss. The floor asks a third, different question: "did capability
+*regress* against a frozen probe — and if so, did we roll back?" A sentinel only
+*detects*; the floor is the *actuator* the sentinels lack (ADR-0007).
 
-Each gate/sentinel has a *precise* criterion and a `check()` returning a result
+Each gate/sentinel/floor has a *precise* criterion and a `check()` returning a result
 object. Until the eval body exists, `check()` returns a PENDING (not-passed /
-not-healthy) result and does not raise, so `make gate` prints cleanly.
+not-healthy / not-satisfied) result and does not raise, so `make gate` prints cleanly.
 """
 from __future__ import annotations
 
@@ -190,17 +194,85 @@ def run_sentinels(phase: str) -> list[SentinelResult]:
 
 
 # --------------------------------------------------------------------------- #
-# Composite: a phase gate = capability AND all applicable sentinels healthy.
+# Quality floor: did capability regress against a frozen probe? (ADR-0007)
+# A sentinel *detects* collapse and reports health; a floor *measures regression
+# against a frozen, held-out probe and acts* (restore the best-known checkpoint
+# from the vault). It is the actuator the sentinels lack, and the enabling
+# guarantee for continual improvement (R7). Active from P1 — put the floor down
+# before the system starts changing itself.
+# --------------------------------------------------------------------------- #
+@dataclass
+class FloorResult:
+    name: str
+    satisfied: bool
+    metric: float
+    detail: str = ""
+
+
+@dataclass
+class Floor:
+    name: str
+    guards: str  # the silent regression / failure this floor prevents
+    applies_from: str  # phase from which the floor is enforced
+    criterion: str  # the precise "satisfied" condition
+    check: Callable[[], FloorResult]
+
+
+def _pending_floor(name: str, criterion: str) -> Callable[[], FloorResult]:
+    def _check() -> FloorResult:
+        return FloorResult(name=name, satisfied=False, metric=nan, detail=f"PENDING — {criterion}")
+
+    return _check
+
+
+FLOORS: dict[str, Floor] = {}
+
+
+def _register_floor(name: str, guards: str, applies_from: str, criterion: str) -> None:
+    FLOORS[name] = Floor(name, guards, applies_from, criterion, _pending_floor(name, criterion))
+
+
+_register_floor(
+    "quality-floor",
+    "silent regression on a frozen probe (a self-improving loop optimizing a failure)",
+    "P1",
+    "Every eval, the component is scored on a FROZEN, hashed, never-trained-on probe "
+    "with >=2 uncorrelated metrics (at least one calibrated NLL — no single gameable "
+    "number). Best-so-far weights + auxiliary state are stored content-addressed in a "
+    "vault; a regression beyond a per-metric tolerance on ANY metric restores the best "
+    "checkpoint and lowers the LR. A checkpoint is floor-eligible ONLY if its ADR-0006 "
+    "sentinels are healthy, so a collapsed-but-low-loss model can never be promoted. A "
+    "phase passes only if the current best has not regressed.",
+)
+
+
+def applicable_floors(phase: str) -> list[Floor]:
+    """The quality floors enforced by `phase` (those whose applies_from <= phase)."""
+    return [f for f in FLOORS.values() if _phase_at_least(phase, f.applies_from)]
+
+
+def run_floors(phase: str) -> list[FloorResult]:
+    return [f.check() for f in applicable_floors(phase)]
+
+
+# --------------------------------------------------------------------------- #
+# Composite: a phase gate = capability AND all applicable sentinels healthy AND
+# the quality floor satisfied (ADR-0005, ADR-0006, ADR-0007).
 # --------------------------------------------------------------------------- #
 @dataclass
 class GateReport:
     phase: str
     capability: GateResult
     sentinels: list[SentinelResult] = field(default_factory=list)
+    floors: list[FloorResult] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
-        return self.capability.passed and all(s.healthy for s in self.sentinels)
+        return (
+            self.capability.passed
+            and all(s.healthy for s in self.sentinels)
+            and all(f.satisfied for f in self.floors)
+        )
 
     def __str__(self) -> str:
         head = f"[{self.phase}] {'PASS' if self.passed else 'BLOCKED'}"
@@ -209,13 +281,21 @@ class GateReport:
         for s in self.sentinels:
             state = "healthy" if s.healthy else "NOT HEALTHY"
             lines.append(f"  sentinel[{s.name}]: {state} — {s.detail}")
+        for fl in self.floors:
+            state = "satisfied" if fl.satisfied else "NOT SATISFIED"
+            lines.append(f"  floor[{fl.name}]: {state} — {fl.detail}")
         return "\n".join(lines)
 
 
 def run_gate(phase: str) -> GateReport:
-    """Run a phase's kill-gate: capability + all applicable integrity sentinels.
+    """Run a phase's kill-gate: capability + applicable integrity sentinels + floor.
 
     The phase passes only if capability passes AND every applicable sentinel is
-    healthy. Raises KeyError for an unknown phase.
+    healthy AND the quality floor is satisfied. Raises KeyError for an unknown phase.
     """
-    return GateReport(phase=phase, capability=GATES[phase].check(), sentinels=run_sentinels(phase))
+    return GateReport(
+        phase=phase,
+        capability=GATES[phase].check(),
+        sentinels=run_sentinels(phase),
+        floors=run_floors(phase),
+    )

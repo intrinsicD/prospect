@@ -30,3 +30,14 @@ criteria precise even while the eval body is a TODO.
   uncertainty-reliability (active from P1), replay-fidelity (from P3) and
   option-diversity (from P5) are healthy. Collapse hides in a good loss, so integrity
   is measured, not assumed.
+- **Every phase gate also enforces the quality floor** (ADR-0007), active **from P1**:
+  a frozen held-out probe (≥2 uncorrelated metrics, one being calibrated NLL) + a
+  content-addressed vault + rollback-on-regression. Put the floor down *before* the
+  system changes itself — it is the actuator the sentinels lack, and the enabling
+  guarantee for P7. A composite gate is now **capability AND sentinels AND floor**.
+- **R7's mechanism is a defense-in-depth stack introduced gate-by-gate** (ADR-0008):
+  compressed-real-data replay + EMA teacher (from P3), online EWC/SI (from P7),
+  parameter isolation (from P4/P7), A-GEM (opt-in), rollback (always). Not built ahead.
+- **Growth is additive and VoE-triggered** (ADR-0009): new capacity is an additive,
+  isolatable unit (gate≈0 ⇒ exact recovery) added when VoE learning-progress plateaus,
+  and kept only if it clears the floor. Options grow at P4; continual growth at P7.

@@ -75,16 +75,29 @@ def test_all_sentinels_registered() -> None:
         assert sentinel.applies_from in bench.gates.PHASE_ORDER
 
 
+def test_all_floors_registered() -> None:
+    expected = {"quality-floor"}
+    assert set(bench.FLOORS) == expected
+    for floor in bench.FLOORS.values():
+        assert floor.criterion
+        assert floor.guards
+        assert floor.applies_from in bench.gates.PHASE_ORDER
+
+
 def test_phase_gate_is_composite_and_pending() -> None:
     report = bench.run_gate("P5")
     assert isinstance(report, bench.GateReport)
-    # pending capability + pending sentinels => phase is not passable yet
+    # pending capability + pending sentinels + pending floor => not passable yet
     assert report.passed is False
     assert "PENDING" in report.capability.detail
     names = {s.name for s in report.sentinels}
     # by P5, the P1 and P3 sentinels are still active, plus the P5 option sentinel
     assert {"representation-integrity", "uncertainty-reliability", "replay-fidelity",
             "option-diversity"} <= names
+    # the quality floor (ADR-0007) is the third leg of the composite, active from P1
+    floor_names = {f.name for f in report.floors}
+    assert "quality-floor" in floor_names
+    assert all(not f.satisfied for f in report.floors)
 
 
 def test_sentinels_activate_by_phase() -> None:
@@ -93,3 +106,9 @@ def test_sentinels_activate_by_phase() -> None:
     assert "uncertainty-reliability" in p1
     assert "replay-fidelity" not in p1  # generative replay arrives at P3
     assert "option-diversity" not in p1  # options arrive at P5
+
+
+def test_quality_floor_active_from_p1() -> None:
+    # the floor goes down before the system starts changing itself (ADR-0007)
+    p1_floors = {f.name for f in bench.run_gate("P1").floors}
+    assert "quality-floor" in p1_floors
