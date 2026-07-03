@@ -1,10 +1,12 @@
 # P1-001 — Flat latent world model + calibrated uncertainty
 
-- **Status:** ready
+- **Status:** blocked (P0 contract hardening — see Depends on)
 - **Phase:** P1
 - **Requirements:** R1, R4
 - **ADRs:** ADR-0001, ADR-0002, ADR-0006
-- **Depends on:** none
+- **Depends on:** P0-001 (`Prediction` distribution contract), P0-003 (`Learner`
+  training seam), P0-004 (`Environment` protocol for the toy task), P0-005 (run-metrics
+  artifact the sentinels read), P0-006 (gate/sentinel check registration)
 - **Phase gate:** `bench/gates.py::GATES["P1"]`
 
 ## Goal
