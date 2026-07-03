@@ -38,6 +38,20 @@ class WorldModel(Protocol):
 
 
 @runtime_checkable
+class Learner(Protocol):
+    """A component the harness can train (P0-003) — the uniform training seam.
+
+    `update()` consumes a batch of transitions and returns a metrics dict (loss
+    terms + integrity stats); the harness logs these to the run-metrics artifact
+    (P0-005) that the ADR-0006 sentinels read. Kept separate from the inference
+    contracts so consumers like the planner keep a narrow view. Expected to be
+    satisfied, alongside their primary contract, by: the world model (P1), the
+    option model (P5), the codec (P6)."""
+
+    def update(self, batch: Sequence[Transition]) -> dict[str, float]: ...
+
+
+@runtime_checkable
 class OptionModel(Protocol):
     """Temporally-abstract 'jumpy' model (R2, ADR-0003): the outcome of committing to
     an option — landing latent, cumulative discounted reward, duration, uncertainty.

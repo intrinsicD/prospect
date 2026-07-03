@@ -53,7 +53,9 @@ design's health is that additions plug into this backbone.
 - **knowledge.py** — internal/external knowledge sources and tools as
   uncertainty-gated actions, each item carrying provenance/trust (R8).
 - **types.py / interfaces.py** — shared types and the `Protocol` contracts every
-  component satisfies.
+  component satisfies. Components that learn additionally satisfy `Learner`
+  (`update(batch) -> metrics dict`) — the uniform training seam the harness drives,
+  and the channel through which sentinel metrics leave the training loop (P0-003).
 
 ## Hierarchy (R2), in one line
 Hierarchical *planning* = a jumpy, option-conditioned world model + planning at each

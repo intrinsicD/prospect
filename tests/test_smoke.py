@@ -30,6 +30,7 @@ def test_types_instantiate() -> None:
 def test_skeletons_satisfy_protocols() -> None:
     # runtime_checkable protocols verify method presence (structural typing).
     assert isinstance(FlatWorldModel(), interfaces.WorldModel)
+    assert isinstance(FlatWorldModel(), interfaces.Learner)  # the training seam (P0-003)
     assert isinstance(FlatPlanner(), interfaces.Planner)
     assert isinstance(SurpriseCompetenceMonitor(), interfaces.CompetenceMonitor)
     assert isinstance(SkillRouter(), interfaces.SkillLibrary)

@@ -1,6 +1,6 @@
 # P0-003 — A learning seam: `Learner` protocol
 
-- **Status:** ready
+- **Status:** done
 - **Phase:** P0
 - **Requirements:** R1, R7
 - **ADRs:** ADR-0001, ADR-0005 (the harness must be able to drive training generically)
@@ -42,21 +42,34 @@ New `interfaces.Learner` protocol; the `FlatWorldModel` skeleton grows a matchin
   run-log (P0-005) — training metrics flow out through the same call that trains.
 
 ## Acceptance criteria
-- [ ] `interfaces.Learner` exists, `runtime_checkable`, with the docstring above.
-- [ ] `FlatWorldModel` skeleton satisfies `Learner` structurally (smoke-tested).
-- [ ] `tasks/P1-001` updated: `FlatWorldModel` must satisfy `WorldModel` **and**
-      `Learner`.
-- [ ] `make test` green, `make lint` clean.
+- [x] `interfaces.Learner` exists, `runtime_checkable`, with the docstring above.
+- [x] `FlatWorldModel` skeleton satisfies `Learner` structurally (smoke-tested).
+- [x] `tasks/P1-001` updated: `FlatWorldModel` must satisfy `WorldModel` **and**
+      `Learner` (interface section + acceptance criterion).
+- [x] `make test` green, `make lint` clean.
 
 ## Test plan
 - Smoke: `isinstance(FlatWorldModel(), interfaces.Learner)`; protocol registered in
   the conformance test alongside the others.
 
 ## Docs-sync checklist
-- [ ] Task Status updated; gate result recorded below.
-- [ ] `docs/architecture.md` components section notes the training seam.
-- [ ] `tasks/P1-001` interface section updated.
-- [ ] Requirement rows R1/R7 still accurate.
+- [x] Task Status updated; gate result recorded below.
+- [x] `docs/architecture.md` components section notes the training seam
+      (types.py / interfaces.py bullet).
+- [x] `tasks/P1-001` interface section updated.
+- [x] Requirement rows R1/R7 still accurate (verified — module mapping unchanged;
+      the seam lives in interfaces.py, which the table does not enumerate per-row).
 
 ## Gate result
-_not run yet_
+The P0 gate is not yet registered in `bench/gates.py` (that arrives with P0-006), so
+the P0 criterion from the roadmap was applied directly:
+
+```
+imports clean, smoke tests green
+make test : 19 passed (Learner conformance added to the smoke protocol checks)
+make lint : All checks passed!
+```
+
+Result: **PASS** (P0 criterion met). Note: `runtime_checkable` verifies method
+*presence* only — `Learner` membership by signature (batch in, metrics dict out)
+becomes machine-checked when P0-009 adds mypy conformance assertions.

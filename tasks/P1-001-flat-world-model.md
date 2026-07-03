@@ -20,11 +20,13 @@ aleatoric. This is the substrate everything else hangs off — build it first.
 - No multi-modality — a single toy modality (low-dim state) is enough for the gate.
 
 ## Interface to satisfy
-`prospect.interfaces.WorldModel` — implement in `prospect/world_model.py`
-(replace the `FlatWorldModel` skeleton). `predict()` returns `types.Prediction`
-with real `mean`, per-dimension `var`, `epistemic`, `aleatoric`, `reward`.
-`log_prob` is concrete on `Prediction` (diagonal Gaussian, P0-001) — subclass
-only to vectorize for a tensor backend, keeping the same definition.
+`prospect.interfaces.WorldModel` **and** `prospect.interfaces.Learner` — implement in
+`prospect/world_model.py` (replace the `FlatWorldModel` skeleton). `predict()` returns
+`types.Prediction` with real `mean`, per-dimension `var`, `epistemic`, `aleatoric`,
+`reward`. `log_prob` is concrete on `Prediction` (diagonal Gaussian, P0-001) —
+subclass only to vectorize for a tensor backend, keeping the same definition.
+`update(batch)` trains from transitions and returns the metrics dict (losses +
+integrity stats) the harness logs for the sentinels (P0-003, P0-005).
 
 ## Approach (brief)
 - Encode to a latent, learn a probabilistic transition head (e.g. Gaussian) for
@@ -38,7 +40,8 @@ only to vectorize for a tensor backend, keeping the same definition.
   knobs beyond what the gate needs.
 
 ## Acceptance criteria
-- [ ] Implements `interfaces.WorldModel`; `predict` returns a proper `Prediction`.
+- [ ] Implements `interfaces.WorldModel` and `interfaces.Learner`; `predict` returns
+      a proper `Prediction`; `update` returns the training-metrics dict.
 - [ ] `surprise = -log_prob(observed)` is finite and calibrated on held-out data.
 - [ ] **Gate P1:** latent 1-step prediction beats a persistence/linear baseline,
       AND on a stochastic variant epistemic uncertainty **falls with more data**
