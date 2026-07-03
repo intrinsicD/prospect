@@ -14,6 +14,7 @@ from .types import (
     Option,
     Prediction,
     Subgoal,
+    Surprise,
     Transition,
 )
 
@@ -64,9 +65,13 @@ class HierarchicalPlanner(Protocol):
 @runtime_checkable
 class CompetenceMonitor(Protocol):
     """Violation of expectation as the unifying signal (R3, R7, ADR-0002).
-    One object, many jobs: surprise, mastery, forgetting."""
+    One object, many jobs: surprise, mastery, forgetting.
 
-    def surprise(self, prediction: Prediction, observed: LatentState) -> float: ...
+    surprise() returns a decomposed `Surprise` — never a bare float (P0-002):
+    consumers gate on `.epistemic`, not the undecomposed total. Transitions
+    collected under a skill carry `Transition.option` for per-skill attribution."""
+
+    def surprise(self, prediction: Prediction, observed: LatentState) -> Surprise: ...
     def update(self, transition: Transition) -> None: ...
     def competence(self, skill: str) -> Competence: ...
     def is_mastered(self, skill: str) -> bool: ...

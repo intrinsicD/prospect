@@ -14,8 +14,8 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > with anything.
 
 - **P0-001** · `done` · R1,R3,R4 · — · `Prediction` parameterizes a real distribution: per-dim `var`, concrete `log_prob`, `duration` for option outcomes.
-- **P0-002** · `ready` · R3,R5,R7 · Decomposed `Surprise` type (no bare-float VoE) + `Transition.option` for per-skill attribution. **(start here)**
-- **P0-003** · `ready` · R1,R7 · `Learner` protocol — the uniform training seam the harness drives (P1 trains through it; P7's gate depends on it).
+- **P0-002** · `done` · R3,R5,R7 · Decomposed `Surprise` type (no bare-float VoE) + `Transition.option` for per-skill attribution.
+- **P0-003** · `ready` · R1,R7 · `Learner` protocol — the uniform training seam the harness drives (P1 trains through it; P7's gate depends on it). **(start here)**
 - **P0-004** · `ready` · R1 · `Environment` protocol in `bench/` (harness-owned; core never imports the harness).
 - **P0-005** · `ready` · — · Run-metrics artifact (JSONL run log) — the data zero-arg sentinel `check()`s read to verify "throughout training" (ADR-0006).
 - **P0-006** · `ready` · — · Gate wiring: `@gate_check`/`@sentinel_check` registration, `metrics: dict`, persisted gate reports, register the P0 gate, friendly errors, explicit seed policy.
@@ -38,7 +38,7 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **P3-003** · `blocked (P1-001)` · R7 · Episodic replay buffer + generative replay (rehearsal from the model). Enforce `replay-fidelity`: real-data anchor + lineage cap + uncertainty-gated dreams (ADR-0006). Retain raw observations so experience stays re-encodable under a future codec (P0-011).
 
 ## Phase 4 — skills
-- **P4-001** · `blocked (P3-001)` · R5 · Skill library with predictive preconditions + simulate-to-select router (competence-gated). Promote the precondition to a **typed field** on `Option` when this lands — no metadata-dict convention.
+- **P4-001** · `blocked (P3-001)` · R5 · Skill library with predictive preconditions + simulate-to-select router (competence-gated). Promote the precondition to a **typed field** on `Option` when this lands — no metadata-dict convention. Executors set `Transition.option` so competence attribution works (P0-002).
 
 ## Phase 5 — hierarchy
 - **P5-001** · `blocked (P4-001)` · R2 · Abstraction map φ + jumpy option-model (landing latent, cumulative reward, duration, uncertainty).

@@ -20,7 +20,9 @@ distractors (that is requirement R4).
 ## The one signal, many jobs
 Surprise is computed as the negative log-likelihood of the observed outcome under
 the predicted distribution (never raw L2), with epistemic isolated from aleatoric.
-The same quantity is reused as:
+In code the signal is `types.Surprise` — the total NLL carrying its
+epistemic/aleatoric attribution (P0-002); consumers gate on `.epistemic`, never on
+the undecomposed total. The same quantity is reused as:
 
 | # | Job | Requirement | Lives in |
 |---|-----|-------------|----------|

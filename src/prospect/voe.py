@@ -3,22 +3,23 @@ Tasks: P3-001 (mastery test), P7-001 (forgetting detection).
 """
 from __future__ import annotations
 
-from .types import Competence, LatentState, Prediction, Transition
+from .types import Competence, LatentState, Prediction, Surprise, Transition
 
 
 class SurpriseCompetenceMonitor:
     """Computes calibrated surprise and tracks per-skill competence.
 
     Discipline (ADR-0002): surprise is -log_prob under the predicted *distribution*,
-    and EPISTEMIC uncertainty (reducible) is tracked separately from aleatoric
-    (noise). A skill is 'mastered' when epistemic is low and learning progress has
-    flattened; 'forgetting' is epistemic rising again on a mastered skill -> trigger
-    rehearsal (generative replay).
+    returned as a decomposed `Surprise` (P0-002) — EPISTEMIC (reducible) attributed
+    separately from aleatoric (noise), never a bare float. A skill is 'mastered' when
+    epistemic is low and learning progress has flattened; 'forgetting' is epistemic
+    rising again on a mastered skill -> trigger rehearsal (generative replay).
+    Per-skill attribution comes from `Transition.option`.
 
     Contract: interfaces.CompetenceMonitor.
     """
 
-    def surprise(self, prediction: Prediction, observed: LatentState) -> float:
+    def surprise(self, prediction: Prediction, observed: LatentState) -> Surprise:
         raise NotImplementedError("P3-001")
 
     def update(self, transition: Transition) -> None:

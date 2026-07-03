@@ -103,12 +103,29 @@ class Prediction:
 
 
 @dataclass(frozen=True)
+class Surprise:
+    """Decomposed violation of expectation (ADR-0002) — never a bare float.
+
+    `total` is the negative log-likelihood of the observed outcome under the
+    predicted distribution. Its attribution matters as much as its size: consumers
+    that gate on "is this reducible?" read `epistemic` (mastery test, curiosity
+    curriculum, retrieval trigger); `aleatoric` is the share explained by
+    environment noise and must not drive learning — rewarding epistemic (not raw)
+    surprise is the noisy-TV defense (ADR-0006).
+    """
+    total: float
+    epistemic: float
+    aleatoric: float
+
+
+@dataclass(frozen=True)
 class Transition:
     state: LatentState
     action: Action
     next_state: LatentState
     reward: float
     prediction: Prediction | None = None  # what the model expected (for VoE)
+    option: Option | None = None  # the skill this was collected under (per-skill competence, P0-002)
 
 
 @dataclass(frozen=True)

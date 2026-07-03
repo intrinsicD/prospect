@@ -26,3 +26,8 @@ all six jobs listed in `docs/architecture.md`.
   must not bypass this. *(Amended by P0-001: `var` and a working `log_prob` are part
   of the contract, so surprise is computable from any `Prediction` without
   subclassing.)*
+- **Contract:** the surprise signal itself is `types.Surprise` — total NLL plus its
+  epistemic/aleatoric attribution — never a bare float; consumers gate on
+  `.epistemic`, not the undecomposed total (the same rule as `Prediction`, one level
+  up). Transitions collected while executing a skill set `Transition.option`, so
+  competence is attributable per skill. *(Amended by P0-002.)*
