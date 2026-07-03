@@ -23,10 +23,12 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **P0-008** · `done` · R8 · One query path into knowledge (`SemanticMemory` read-side *is* a `KnowledgeSource`), `route() -> KnowledgeSource | None` (None = parametric), provenance-`None` convention documented.
 - **P0-009** · `done` · — · Enforce typing: mypy in CI, typed protocol-conformance assertions, ruff `I`, CI matrix 3.11–3.13.
 - **P0-010** · `done` · R1,R3,R7 · ADR-0007: arbitration of the epistemic signal — curiosity seeks it, planning penalizes it; mode chosen by the curriculum. Plus shift-disambiguation note in ADR-0002. *(docs)*
-- **P0-011** · `ready` · R6 · Roadmap/ADR-0001 amendment: the P6 codec swap is a representation change — distill-first, retrain-fallback; replay keeps raw obs re-encodable. *(docs)* **(start here)**
+- **P0-011** · `done` · R6 · Roadmap/ADR-0001 amendment: the P6 codec swap is a representation change — distill-first, retrain-fallback; replay keeps raw obs re-encodable. *(docs)*
+
+> **Phase 0 complete** — all eleven contract & harness hardening tasks are `done`.
 
 ## Phase 1 — predictive core
-- **P1-001** · `ready` · R1,R4 · Flat latent world model + calibrated uncertainty. **(fully specified; unblocked — all P0 dependencies done)**
+- **P1-001** · `ready` · R1,R4 · Flat latent world model + calibrated uncertainty. **(start here — fully specified; all P0 dependencies done)**
 
 ## Phase 2 — planning
 - **P2-001** · `blocked (P1-001)` · R1 · MPC/CEM planning in imagination; beat model-free at equal budget. Uncertainty-penalty sign per ADR-0007 (P0-010).
@@ -45,7 +47,7 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **P5-002** · `blocked (P5-001)` · R2 · Hierarchical manager (search over option-model) + VoE-triggered early termination. Gate: 2-level > flat at equal compute. Enforce `option-diversity` (ADR-0006).
 
 ## Phase 6 — any-to-any
-- **P6-001** · `blocked (P2-001)` · R6 · Universal codec (Perceiver-IO-style) wrapper; swap preserves core-loop performance.
+- **P6-001** · `blocked (P2-001)` · R6 · Universal codec (Perceiver-IO-style) wrapper; swap preserves core-loop performance. Migration per P0-011: **distill into the incumbent latent space first**; budgeted full-stack retrain only as fallback (ADR-0001).
 
 ## Phase 7 — continual improvement
 - **P7-001** · `blocked (P3-003)` · R7 · Forgetting/plasticity metrics + consolidation policy; retention + plasticity gate.

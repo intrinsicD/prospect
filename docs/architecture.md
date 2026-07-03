@@ -80,7 +80,9 @@ retrieval and tool-use as actions the planner selects, gated by uncertainty. See
 - Compounding rollout error (bounded by hierarchy) — the main limiter on R1.
 - Causal vs. spurious features (shortcut learning) — mitigated by acting = intervening.
 - Skill composition beyond a flat menu.
-- The generality tax of any-to-any I/O.
+- The generality tax of any-to-any I/O — including the P6 migration: a codec swap
+  is a *representation* change, because everything downstream couples to the latent
+  distribution (distill-first, retrain-fallback; ADR-0001, P0-011).
 - Calibration under distribution shift — the whole VoE story rests on it.
 - **Collapse of the shared latent** (constant / low-rank encoder) — because latent
   prediction is collapse-prone and everything reads this latent (ADR-0006).

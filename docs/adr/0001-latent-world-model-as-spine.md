@@ -17,6 +17,11 @@ uncertainty, skills and knowledge all attach to this latent.
 - (+) Predicting latents forces the representation to keep controllable,
   outcome-relevant structure and drop distractors — this *is* R4, for free.
 - (+) One latent hub makes any-to-any I/O (R6) an encoder/decoder swap, not a rewrite.
+- The shared latent is a *contract*: downstream components couple to its
+  **distribution**, not just its shape. Replacing the encoder (P6) therefore
+  requires distribution-matching — distill the new codec into the incumbent latent
+  space — or a budgeted retrain of everything downstream. The swap typechecks
+  either way; only distillation makes it cheap. *(Amended by P0-011.)*
 - (−) Long imagined rollouts compound error (see ADR-0003 for the mitigation).
 - (−) Latent-space prediction is collapse-prone (a constant / low-rank encoder makes
   prediction error — and therefore the whole VoE signal — meaningless); representation
