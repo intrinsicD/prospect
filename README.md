@@ -42,6 +42,6 @@ docs/                architecture, requirements, roadmap
 docs/adr/            locked architecture decisions
 tasks/               backlog, task template, specified tasks
 src/prospect/        task-unspecific CORE (interfaces + one file per component)
-bench/               task-specific HARNESS: the kill-gates (the fitness function)
+bench/               task-specific HARNESS: kill-gates (the fitness function) + the Environment seam
 tests/               smoke tests
 ```

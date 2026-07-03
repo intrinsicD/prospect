@@ -55,7 +55,8 @@ integrity stats) the harness logs for the sentinels (P0-003, P0-005).
 
 ## Test plan
 - Unit: shapes/dtypes of `Prediction`; `log_prob` sane on a known Gaussian.
-- Eval (harness, in `bench/`): baseline comparison + the epistemic/aleatoric
+- Eval (harness, in `bench/`): the toy control task implements `bench.Environment`
+  (P0-004, seeded resets); baseline comparison + the epistemic/aleatoric
   separation experiment; wire the result into `GATES["P1"].check`.
 
 ## Docs-sync checklist
