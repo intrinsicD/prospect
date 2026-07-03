@@ -2,6 +2,8 @@
 from commit one; real behaviour tests arrive with each task."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import bench
 import prospect
 from prospect import interfaces, types
@@ -81,7 +83,7 @@ def test_all_sentinels_registered() -> None:
         assert sentinel.applies_from in bench.gates.PHASE_ORDER
 
 
-def test_phase_gate_is_composite_and_pending(tmp_path) -> None:
+def test_phase_gate_is_composite_and_pending(tmp_path: Path) -> None:
     report = bench.run_gate("P5", results_dir=tmp_path)
     assert isinstance(report, bench.GateReport)
     # pending capability + pending sentinels => phase is not passable yet
@@ -93,7 +95,7 @@ def test_phase_gate_is_composite_and_pending(tmp_path) -> None:
             "option-diversity"} <= names
 
 
-def test_sentinels_activate_by_phase(tmp_path) -> None:
+def test_sentinels_activate_by_phase(tmp_path: Path) -> None:
     p1 = {s.name for s in bench.run_gate("P1", results_dir=tmp_path).sentinels}
     assert "representation-integrity" in p1
     assert "uncertainty-reliability" in p1

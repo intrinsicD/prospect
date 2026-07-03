@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10"]
 # Learning backends are pulled in by the implementation, kept OUT of the core:
 learn = ["numpy", "torch"]
 
@@ -26,4 +26,15 @@ line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "B", "UP"]
+select = ["E", "F", "B", "UP", "I"]
+
+# The typing rule (CLAUDE.md) is enforced, not hoped for (P0-009): protocol
+# conformance is verified statically via tests/test_conformance.py.
+[tool.mypy]
+files = ["src/prospect", "bench", "tests"]
+mypy_path = "src"
+python_version = "3.11"
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_return_any = true
+no_implicit_optional = true

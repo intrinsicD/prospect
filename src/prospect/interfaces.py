@@ -2,8 +2,8 @@
 typing — implementations need not inherit). These are the seams an agent fills in."""
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
 from collections.abc import Sequence
+from typing import Protocol, runtime_checkable
 
 from .types import (
     Action,

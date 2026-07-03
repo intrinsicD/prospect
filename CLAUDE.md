@@ -51,14 +51,18 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 - **docs-sync** — Update whatever you invalidated: the requirement traceability row,
   the task status, an ADR's status, the architecture doc. **Code and docs must not
   drift.** A change to behaviour that leaves docs stale is incomplete.
-- **core conventions** — Python ≥3.11, full type hints, `ruff` clean, tests green.
-  New public surface satisfies a `Protocol` in `interfaces.py`.
+- **core conventions** — Python ≥3.11, full type hints (enforced: `make typecheck`
+  must be clean), `ruff` clean, tests green. New public surface satisfies a
+  `Protocol` in `interfaces.py` and gets a typed conformance assertion in
+  `tests/test_conformance.py`.
 
 ## Commands
 - `make install`         editable install with dev tools
 - `make test`            pytest (must stay green)
 - `make lint`            ruff
+- `make typecheck`       mypy (must stay clean)
 - `make gate PHASE=P1`   run a phase kill-gate
+- `make gate-all`        re-run every shipped gate (the regression ratchet)
 - `make tree`            list the project files
 
 ## Repo map
@@ -73,7 +77,7 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 ## Definition of done
 - [ ] Satisfies the task's interface (a `Protocol` in `interfaces.py`).
 - [ ] Meets every acceptance criterion in the task file.
-- [ ] `make test` green; `make lint` clean.
+- [ ] `make test` green; `make lint` clean; `make typecheck` clean.
 - [ ] Phase gate run; result recorded in the task file. If the gate newly passes,
       the phase is appended to `bench/SHIPPED` in the same commit (the CI ratchet
       re-runs every shipped gate).

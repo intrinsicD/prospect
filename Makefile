@@ -1,5 +1,5 @@
 .RECIPEPREFIX = >
-.PHONY: install test lint fmt gate gate-all tree
+.PHONY: install test lint fmt typecheck gate gate-all tree
 
 install:
 > pip install -e ".[dev]" --break-system-packages
@@ -12,6 +12,10 @@ lint:
 
 fmt:
 > ruff format .
+
+# full type hints are enforced (P0-009); protocol conformance is checked statically
+typecheck:
+> mypy
 
 # usage: make gate PHASE=P1
 gate:
