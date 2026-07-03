@@ -70,6 +70,8 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 - `src/prospect/types.py` — shared types; `Prediction` is the important one.
 - `src/prospect/{codec,world_model,planning,voe,skills,memory,knowledge}.py` — one
   component each; skeletons raise `NotImplementedError("<task-id>")`.
+- `src/prospect/agent.py` — the composition root: the act–observe loop the
+  components plug into (don't re-invent wiring in evals; extend this).
 - `bench/gates.py` — the kill-gates (the project's fitness function).
 - `tasks/` — backlog, template, and specified tasks.
 - `docs/` — architecture, requirements, roadmap, ADRs.

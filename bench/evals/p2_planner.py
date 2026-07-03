@@ -19,12 +19,14 @@ from collections.abc import Callable
 
 import numpy as np
 
+from prospect.agent import Agent
 from prospect.planning import FlatPlanner
 from prospect.types import Action, Observation
 from prospect.world_model import FlatWorldModel
 
 from ..envs import Pendulum
 from ..gates import GateResult, gate_check
+from ..loop import run_episode
 from ..runlog import RUNS_DIR, RunLog
 from .p1_world_model import SEED_STEP_OFFSET, STEPS, _make_probe, _rollout, _train
 
@@ -37,19 +39,25 @@ POP, GENS, ES_ELITES, PARAMS = 10, 4, 3, 81  # tanh-MLP policy: (3->16->1)
 Policy = Callable[[Observation], Action]
 
 
-def _episode_return(env: Pendulum, policy: Policy, seed: int) -> float:
-    obs = env.reset(seed=seed)
-    total = 0.0
-    for _ in range(EP_LEN):
-        obs, reward, _ = env.step(policy(obs))
-        total += reward
-    return total
+class _PolicyAgent:
+    """Adapter: a plain (stateless) policy as an `Acting` agent for `run_episode`."""
+
+    def __init__(self, policy: Policy) -> None:
+        self._policy = policy
+
+    def act(self, obs: Observation) -> Action:
+        return self._policy(obs)
+
+    def reset(self) -> None:
+        return None
 
 
 def _eval_policy(policy: Policy, seed: int) -> float:
     """Mean return over the shared fresh evaluation episodes (same for all agents)."""
+    agent = _PolicyAgent(policy)
     return float(np.mean([
-        _episode_return(Pendulum(), policy, 9000 + seed * 50 + e) for e in range(EVAL_EPISODES)
+        run_episode(Pendulum(), agent, EP_LEN, 9000 + seed * 50 + e)[0]
+        for e in range(EVAL_EPISODES)
     ]))
 
 
@@ -82,15 +90,17 @@ def _es_baseline(seed: int) -> tuple[Policy, int]:
         population = mean + std * rng.normal(size=(POP, PARAMS))
         fitness = []
         for candidate in population:  # common start state per generation (CRN)
-            fitness.append(_episode_return(env, _mlp_policy(candidate), seed * 991 + gen))
+            agent = _PolicyAgent(_mlp_policy(candidate))
+            fitness.append(run_episode(env, agent, EP_LEN, seed * 991 + gen)[0])
             used += EP_LEN
         elite = population[np.argsort(fitness)[-ES_ELITES:]]
         mean, std = elite.mean(axis=0), elite.std(axis=0) + 0.05
     return _mlp_policy(mean), used
 
 
-def _mpc_agent(seed: int, log: RunLog) -> Policy:
-    """World model from BUDGET random steps, then CEM planning in imagination."""
+def _mpc_agent(seed: int, log: RunLog) -> Agent:
+    """World model from BUDGET random steps, then CEM planning via the composition
+    root: `Agent` wires the encode seam to the planner (P2-002)."""
     train = _rollout(Pendulum(), BUDGET, seed)
     heldout = _rollout(Pendulum(), 256, seed + 500)
     ood = _rollout(Pendulum(init_omega=14.0, omega_max=16.0), 256, seed + 900)
@@ -99,20 +109,14 @@ def _mpc_agent(seed: int, log: RunLog) -> Policy:
            probe=_make_probe(heldout, heldout + ood, seed), log=log,
            step_offset=seed * SEED_STEP_OFFSET)
     planner = FlatPlanner(model, seed=seed)
-
-    def act(obs: Observation) -> Action:
-        return planner.plan(model.encode(obs.data))
-
-    act.reset = planner.reset  # type: ignore[attr-defined]  # clear warm start per episode
-    return act
+    return Agent(encode=lambda obs: model.encode(obs.data), planner=planner)
 
 
-def _eval_planner(policy: Policy, seed: int) -> float:
-    returns = []
-    for e in range(EVAL_EPISODES):
-        policy.reset()  # type: ignore[attr-defined]
-        returns.append(_episode_return(Pendulum(), policy, 9000 + seed * 50 + e))
-    return float(np.mean(returns))
+def _eval_planner(agent: Agent, seed: int) -> float:
+    return float(np.mean([
+        run_episode(Pendulum(), agent, EP_LEN, 9000 + seed * 50 + e)[0]
+        for e in range(EVAL_EPISODES)
+    ]))
 
 
 @gate_check("P2")

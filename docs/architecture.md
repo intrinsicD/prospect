@@ -42,6 +42,9 @@ If a new requirement needs a brand-new bespoke signal, treat that as a smell: th
 design's health is that additions plug into this backbone.
 
 ## Components (one file each, in `src/prospect/`)
+- **agent.py** — the composition root (P2-002): the act–observe loop where the
+  components meet — encode → plan → act; the monitor (P3), replay (P3) and
+  retrieval-as-action (P8) plug into this one loop instead of re-inventing wiring.
 - **codec.py** — universal encode/decode: any input → shared latent, latent → any
   output (R6). Retrieved knowledge enters through the *same* encoder (knowledge as
   tokens).

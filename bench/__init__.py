@@ -23,4 +23,5 @@ from .gates import (  # noqa: F401
     sentinel_check,
     shipped_phases,
 )
+from .loop import Acting, run_episode  # noqa: F401
 from .runlog import Record, RunLog, latest_run, read_run  # noqa: F401

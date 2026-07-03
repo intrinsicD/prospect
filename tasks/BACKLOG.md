@@ -34,10 +34,10 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 
 ## Phase 2 — planning
 - **P2-001** · `done` · R1 · MPC/CEM planning in imagination; beat model-free at equal budget. Gate **P2 PASS** on every seed (shipped; see task file).
-- **P2-002** · `ready` · R1 · Composition root: `agent.py` act–observe–learn loop (env + world model + planner + monitor) — one place the components meet, so gate evals stop re-inventing wiring. **(start here)**
+- **P2-002** · `done` · R1 · Composition root: `agent.py` act–observe loop + `bench.loop.run_episode` — one place the components meet; P2 gate reproduced byte-identically through it.
 
 ## Phase 3 — VoE, curriculum, replay
-- **P3-001** · `ready` · R3 · Calibrated surprise + epistemic/aleatoric decomposition + mastery test. Returns `types.Surprise` (P0-002), never a bare float.
+- **P3-001** · `ready` · R3 · Calibrated surprise + epistemic/aleatoric decomposition + mastery test. Returns `types.Surprise` (P0-002), never a bare float. **(start here)**
 - **P3-002** · `blocked (P3-001)` · R3 · Curiosity/intrinsic-motivation curriculum (learning-progress driven). Owns the explore/exploit mode flag per ADR-0007 (P0-010).
 - **P3-003** · `ready` · R7 · Episodic replay buffer + generative replay (rehearsal from the model). Enforce `replay-fidelity`: real-data anchor + lineage cap + uncertainty-gated dreams (ADR-0006). Retain raw observations so experience stays re-encodable under a future codec (P0-011).
 
