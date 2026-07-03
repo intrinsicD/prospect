@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
+from math import log, tau
 from typing import Any
 
 # Intentionally untyped to keep the CORE dependency-free. Implementations may back
@@ -54,22 +55,51 @@ class Action:
     data: Array
 
 
+# A prediction may be confident, never infinitely so: variances are floored here so
+# log_prob stays finite even when an implementation reports (near-)zero variance.
+_VAR_FLOOR = 1e-12
+
+
 @dataclass(frozen=True)
 class Prediction:
     """A *distribution* over an outcome — never a bare point estimate (ADR-0002).
 
-    Splitting uncertainty is mandatory: `epistemic` is reducible by learning (drives
-    the curriculum, mastery test, and retrieval); `aleatoric` is irreducible noise
-    and must not be mistaken for ignorance.
+    The distribution is a diagonal Gaussian: `mean` and per-dimension `var`
+    parameterize it, so `log_prob` is computable from the fields alone (P0-001).
+
+    Splitting uncertainty is mandatory: `epistemic` (scalar summary, e.g. ensemble
+    disagreement) is reducible by learning and drives the curriculum, mastery test
+    and retrieval; `aleatoric` (scalar summary of `var`) is irreducible noise and
+    must not be mistaken for ignorance.
+
+    `duration` is 1.0 for flat one-step predictions; option-models (ADR-0003) predict
+    a whole option's outcome — landing latent, cumulative `reward`, and `duration`.
     """
     mean: Array
+    var: Array
     epistemic: float
     aleatoric: float
     reward: float = 0.0
+    duration: float = 1.0
 
     def log_prob(self, observed: Array) -> float:
-        """Surprise = -log_prob(observed) under this distribution. Override in impls."""
-        raise NotImplementedError
+        """Diagonal-Gaussian log-likelihood; surprise = -log_prob(observed).
+
+        The default treats `mean`, `var` and `observed` as equal-length sequences of
+        floats and stays dependency-free. Tensor-backed implementations may subclass
+        to vectorize, but must agree with this definition.
+        """
+        means = [float(m) for m in self.mean]
+        variances = [max(float(v), _VAR_FLOOR) for v in self.var]
+        values = [float(x) for x in observed]
+        if not (len(means) == len(variances) == len(values)):
+            raise ValueError(
+                f"length mismatch: mean={len(means)}, var={len(variances)}, observed={len(values)}"
+            )
+        return -0.5 * sum(
+            (x - m) ** 2 / v + log(tau * v)
+            for x, m, v in zip(values, means, variances, strict=True)
+        )
 
 
 @dataclass(frozen=True)

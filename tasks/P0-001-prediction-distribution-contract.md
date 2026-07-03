@@ -1,6 +1,6 @@
 # P0-001 — `Prediction` parameterizes a real distribution
 
-- **Status:** ready
+- **Status:** done
 - **Phase:** P0
 - **Requirements:** R1, R3, R4 (every consumer of the one signal reads this type)
 - **ADRs:** ADR-0002 (amend contract consequence), ADR-0003 (option outcomes carry duration)
@@ -42,13 +42,13 @@ ADR-0003 requires.
   add a one-line consequence to ADR-0003 (duration lives on `Prediction`).
 
 ## Acceptance criteria
-- [ ] `Prediction` has `mean`, `var`, `epistemic`, `aleatoric`, `reward`, `duration`.
-- [ ] `log_prob` is concrete and correct for a diagonal Gaussian: unit-tested against
+- [x] `Prediction` has `mean`, `var`, `epistemic`, `aleatoric`, `reward`, `duration`.
+- [x] `log_prob` is concrete and correct for a diagonal Gaussian: unit-tested against
       hand-computed values; higher near the mean; finite even at `var → 0` (floor).
-- [ ] `surprise = -log_prob(observed)` is directly usable — no subclass required.
-- [ ] ADR-0002 and ADR-0003 consequences amended; `tasks/P1-001` interface section
+- [x] `surprise = -log_prob(observed)` is directly usable — no subclass required.
+- [x] ADR-0002 and ADR-0003 consequences amended; `tasks/P1-001` interface section
       updated to the new fields.
-- [ ] `make test` green, `make lint` clean.
+- [x] `make test` green, `make lint` clean.
 
 ## Test plan
 - Unit: `log_prob` vs a hand-computed Gaussian NLL (two dims, known values);
@@ -56,10 +56,23 @@ ADR-0003 requires.
   frozen immutability; `duration` defaults to 1.0.
 
 ## Docs-sync checklist
-- [ ] Task Status updated; gate result recorded below.
-- [ ] ADR-0002 contract consequence amended; ADR-0003 duration consequence added.
-- [ ] `docs/architecture.md` component note for types.py still accurate.
-- [ ] `tasks/P1-001` "Interface to satisfy" updated (real `var`, concrete `log_prob`).
+- [x] Task Status updated; gate result recorded below.
+- [x] ADR-0002 contract consequence amended; ADR-0003 duration consequence added.
+- [x] `docs/architecture.md` component note for types.py still accurate (verified —
+      no change needed; it names `Prediction` as the important shared type, which holds).
+- [x] `tasks/P1-001` "Interface to satisfy" updated (real `var`, concrete `log_prob`).
 
 ## Gate result
-_not run yet_
+The P0 gate is not yet registered in `bench/gates.py` (that arrives with P0-006), so
+the P0 criterion from the roadmap was applied directly:
+
+```
+imports clean, smoke tests green
+make test : 15 passed (8 smoke + 7 new Prediction unit tests)
+make lint : All checks passed!
+```
+
+Result: **PASS** (P0 criterion met). Tests covering this task:
+`tests/test_prediction.py` — hand-computed diagonal-Gaussian NLL (2 cases),
+monotonicity near the mean, variance-floor finiteness at `var=0`, length-mismatch
+`ValueError`, frozen immutability, `duration` default.

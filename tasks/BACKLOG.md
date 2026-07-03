@@ -13,8 +13,8 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > have full task files. The two docs tasks (P0-010, P0-011) can run in parallel
 > with anything.
 
-- **P0-001** · `ready` · R1,R3,R4 · — · `Prediction` parameterizes a real distribution: per-dim `var`, concrete `log_prob`, `duration` for option outcomes. **(start here)**
-- **P0-002** · `blocked (P0-001)` · R3,R5,R7 · Decomposed `Surprise` type (no bare-float VoE) + `Transition.option` for per-skill attribution.
+- **P0-001** · `done` · R1,R3,R4 · — · `Prediction` parameterizes a real distribution: per-dim `var`, concrete `log_prob`, `duration` for option outcomes.
+- **P0-002** · `ready` · R3,R5,R7 · Decomposed `Surprise` type (no bare-float VoE) + `Transition.option` for per-skill attribution. **(start here)**
 - **P0-003** · `ready` · R1,R7 · `Learner` protocol — the uniform training seam the harness drives (P1 trains through it; P7's gate depends on it).
 - **P0-004** · `ready` · R1 · `Environment` protocol in `bench/` (harness-owned; core never imports the harness).
 - **P0-005** · `ready` · — · Run-metrics artifact (JSONL run log) — the data zero-arg sentinel `check()`s read to verify "throughout training" (ADR-0006).

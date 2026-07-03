@@ -36,6 +36,10 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 ## Workflow (one loop per unit of work)
 - **task-workflow** — Take the top *unblocked* item in `tasks/BACKLOG.md`. Open its
   task file. Your job is exactly its interface + acceptance criteria — no more.
+  Drive the Status lifecycle explicitly: set it to `in-progress` when you pick the
+  task up, and retire it to `done` — acceptance boxes ticked, gate result recorded
+  in the task file, backlog row updated (unblocking dependents) — before you finish.
+  One focused commit per task.
 - **method** — Follow `docs/architecture.md` and the ADRs the task links. If the
   right move contradicts an ADR, do not just do it: add or amend an ADR first
   (a 15-line ADR is cheaper than silent architectural drift).

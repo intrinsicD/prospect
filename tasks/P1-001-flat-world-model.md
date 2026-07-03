@@ -22,7 +22,9 @@ aleatoric. This is the substrate everything else hangs off — build it first.
 ## Interface to satisfy
 `prospect.interfaces.WorldModel` — implement in `prospect/world_model.py`
 (replace the `FlatWorldModel` skeleton). `predict()` returns `types.Prediction`
-with real `mean`, `epistemic`, `aleatoric`, `reward`, and a working `log_prob`.
+with real `mean`, per-dimension `var`, `epistemic`, `aleatoric`, `reward`.
+`log_prob` is concrete on `Prediction` (diagonal Gaussian, P0-001) — subclass
+only to vectorize for a tensor backend, keeping the same definition.
 
 ## Approach (brief)
 - Encode to a latent, learn a probabilistic transition head (e.g. Gaussian) for

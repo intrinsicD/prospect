@@ -23,3 +23,6 @@ violated). Start with **two levels**.
 - (−) Inter-level nonstationarity: as the worker improves, subgoal meaning drifts.
   Mitigate with off-policy relabelling or a fixed goal-latent; pick one deliberately.
 - A hierarchical *policy* without the jumpy *model* is reactive control, not planning.
+- The jumpy outcome rides on `types.Prediction`: cumulative `reward` and `duration`
+  are first-class fields (added in P0-001), so `OptionModel.predict_option` needs no
+  bespoke return type.

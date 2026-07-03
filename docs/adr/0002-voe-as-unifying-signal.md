@@ -20,5 +20,9 @@ all six jobs listed in `docs/architecture.md`.
 - (+) A mastery **test** and a curiosity **curriculum** come from the same quantity.
 - (−) Everything depends on calibrated uncertainty; calibration degrades
   off-distribution and must be monitored (a P7 concern).
-- **Contract:** the world model returns `types.Prediction` (mean + epistemic +
-  aleatoric), never a bare float. Downstream code must not bypass this.
+- **Contract:** the world model returns `types.Prediction` — a diagonal Gaussian
+  (`mean` + per-dimension `var`) with the epistemic/aleatoric split and a **concrete**
+  `log_prob` — never a bare float or an unimplemented distribution. Downstream code
+  must not bypass this. *(Amended by P0-001: `var` and a working `log_prob` are part
+  of the contract, so surprise is computable from any `Prediction` without
+  subclassing.)*
