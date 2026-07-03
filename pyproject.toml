@@ -11,8 +11,10 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10"]
-# Learning backends are pulled in by the implementation, kept OUT of the core:
-learn = ["numpy", "torch"]
+# Learning backends are pulled in by the implementation, kept OUT of the core's
+# required deps. numpy since P1-001; heavier backends (torch) only when an
+# implementation actually needs them (minimal rule).
+learn = ["numpy>=1.26"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/prospect"]

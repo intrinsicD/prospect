@@ -73,10 +73,12 @@ class Prediction:
     The distribution is a diagonal Gaussian: `mean` and per-dimension `var`
     parameterize it, so `log_prob` is computable from the fields alone (P0-001).
 
-    Splitting uncertainty is mandatory: `epistemic` (scalar summary, e.g. ensemble
-    disagreement) is reducible by learning and drives the curriculum, mastery test
-    and retrieval; `aleatoric` (scalar summary of `var`) is irreducible noise and
-    must not be mistaken for ignorance.
+    `var` is the **total** predictive variance (for an ensemble: moment-matched
+    aleatoric + epistemic), so `log_prob` is calibrated. Splitting uncertainty is
+    mandatory: `epistemic` (scalar summary, e.g. ensemble disagreement) is reducible
+    by learning and drives the curriculum, mastery test and retrieval; `aleatoric`
+    (scalar summary of the within-member spread) is irreducible noise and must not
+    be mistaken for ignorance.
 
     `duration` is 1.0 for flat one-step predictions; option-models (ADR-0003) predict
     a whole option's outcome — landing latent, cumulative `reward`, and `duration`.

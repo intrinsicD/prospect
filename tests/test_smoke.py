@@ -95,8 +95,9 @@ def test_phase_gate_is_composite_and_pending(tmp_path: Path) -> None:
             "option-diversity"} <= names
 
 
-def test_sentinels_activate_by_phase(tmp_path: Path) -> None:
-    p1 = {s.name for s in bench.run_gate("P1", results_dir=tmp_path).sentinels}
+def test_sentinels_activate_by_phase() -> None:
+    # applicable_sentinels, not run_gate: P1's capability check trains real models.
+    p1 = {s.name for s in bench.applicable_sentinels("P1")}
     assert "representation-integrity" in p1
     assert "uncertainty-reliability" in p1
     assert "replay-fidelity" not in p1  # generative replay arrives at P3

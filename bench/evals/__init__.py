@@ -6,4 +6,4 @@ Add an import below when a new eval module lands.
 """
 from __future__ import annotations
 
-from . import p0_scaffold  # noqa: F401
+from . import p0_scaffold, p1_world_model  # noqa: F401

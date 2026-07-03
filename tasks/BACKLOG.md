@@ -28,16 +28,18 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > **Phase 0 complete** — all eleven contract & harness hardening tasks are `done`.
 
 ## Phase 1 — predictive core
-- **P1-001** · `ready` · R1,R4 · Flat latent world model + calibrated uncertainty. **(start here — fully specified; all P0 dependencies done)**
+- **P1-001** · `done` · R1,R4 · Flat latent world model + calibrated uncertainty. Gate **P1 PASS** (shipped; see task file for the report and the collapse-fighting lessons).
+
+> **Phase 1 shipped** — `bench/SHIPPED` now ratchets P0 + P1.
 
 ## Phase 2 — planning
-- **P2-001** · `blocked (P1-001)` · R1 · MPC/CEM planning in imagination; beat model-free at equal budget. Uncertainty-penalty sign per ADR-0007 (P0-010).
+- **P2-001** · `ready` · R1 · MPC/CEM planning in imagination; beat model-free at equal budget. Uncertainty-penalty sign per ADR-0007 (P0-010). **(start here)**
 - **P2-002** · `blocked (P2-001)` · R1 · Composition root: `agent.py` act–observe–learn loop (env + world model + planner + monitor) — one place the components meet, so gate evals stop re-inventing wiring.
 
 ## Phase 3 — VoE, curriculum, replay
-- **P3-001** · `blocked (P1-001, P0-002)` · R3 · Calibrated surprise + epistemic/aleatoric decomposition + mastery test. Returns `types.Surprise` (P0-002), never a bare float.
+- **P3-001** · `ready` · R3 · Calibrated surprise + epistemic/aleatoric decomposition + mastery test. Returns `types.Surprise` (P0-002), never a bare float.
 - **P3-002** · `blocked (P3-001)` · R3 · Curiosity/intrinsic-motivation curriculum (learning-progress driven). Owns the explore/exploit mode flag per ADR-0007 (P0-010).
-- **P3-003** · `blocked (P1-001)` · R7 · Episodic replay buffer + generative replay (rehearsal from the model). Enforce `replay-fidelity`: real-data anchor + lineage cap + uncertainty-gated dreams (ADR-0006). Retain raw observations so experience stays re-encodable under a future codec (P0-011).
+- **P3-003** · `ready` · R7 · Episodic replay buffer + generative replay (rehearsal from the model). Enforce `replay-fidelity`: real-data anchor + lineage cap + uncertainty-gated dreams (ADR-0006). Retain raw observations so experience stays re-encodable under a future codec (P0-011).
 
 ## Phase 4 — skills
 - **P4-001** · `blocked (P3-001)` · R5 · Skill library with predictive preconditions + simulate-to-select router (competence-gated). Promote the precondition to a **typed field** on `Option` when this lands — no metadata-dict convention. Executors set `Transition.option` so competence attribution works (P0-002).

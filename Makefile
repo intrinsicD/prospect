@@ -2,7 +2,7 @@
 .PHONY: install test lint fmt typecheck gate gate-all tree
 
 install:
-> pip install -e ".[dev]" --break-system-packages
+> pip install -e ".[dev,learn]" --break-system-packages
 
 test:
 > pytest -q

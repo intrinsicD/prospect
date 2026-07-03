@@ -1,0 +1,60 @@
+{
+  "phase": "P1",
+  "passed": true,
+  "run_id": null,
+  "written_at": "20260703T160422Z",
+  "capability": {
+    "criterion": "Latent 1-step prediction beats a persistence/linear baseline, AND on a stochastic variant epistemic uncertainty falls with more data while aleatoric persists (the two are separable).",
+    "passed": true,
+    "metrics": {
+      "model_mse_s0": 0.012123246903927364,
+      "persistence_mse_s0": 0.27883669427118773,
+      "linear_mse_s0": 0.18003626548277393,
+      "epistemic_ratio_s0": 0.19953342983967753,
+      "aleatoric_ratio_s0": 4.258493070556928,
+      "model_mse_s1": 0.011400507501154969,
+      "persistence_mse_s1": 0.2824920111626621,
+      "linear_mse_s1": 0.24206912792002452,
+      "epistemic_ratio_s1": 1.0417485853999602,
+      "aleatoric_ratio_s1": 1.357693585757883,
+      "model_mse_s2": 0.04926680426279267,
+      "persistence_mse_s2": 0.20443550868632915,
+      "linear_mse_s2": 0.2994019396112023,
+      "epistemic_ratio_s2": 0.28522176628500345,
+      "aleatoric_ratio_s2": 0.4996024927667707,
+      "model_mse_median": 0.012123246903927364,
+      "persistence_mse_median": 0.27883669427118773,
+      "linear_mse_median": 0.24206912792002452,
+      "epistemic_ratio_median": 0.28522176628500345,
+      "aleatoric_ratio_median": 1.357693585757883
+    },
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "detail": "median held-out latent MSE 0.0121 vs persistence 0.2788 / linear 0.2421; epistemic ratio 0.29 (must be < 0.7), aleatoric ratio 1.36 (must stay in (0.5, 2.0))"
+  },
+  "sentinels": [
+    {
+      "name": "representation-integrity",
+      "criterion": "Latent per-dimension std stays above a floor AND effective rank (participation ratio of the latent covariance) stays above a threshold on held-out data throughout training \u2014 not only at the capability checkpoint.",
+      "healthy": true,
+      "metrics": {
+        "min_latent_std": 0.867748900349471,
+        "min_effective_rank": 2.1752100442338858
+      },
+      "detail": "across 39 held-out probes (warm-up 300 steps): min per-dim std 0.868 (floor 0.3), min effective rank 2.18 (floor 2.0)"
+    },
+    {
+      "name": "uncertainty-reliability",
+      "criterion": "Predicted epistemic uncertainty is rank-correlated with held-out prediction error above a threshold, and ensemble-member disagreement does not decay to ~0 in regions where error is high.",
+      "healthy": true,
+      "metrics": {
+        "min_final_rank_corr": 0.791334429109303,
+        "min_high_error_disagreement_ratio": 21.008590217860633
+      },
+      "detail": "worst seed at end of training: disagreement-vs-error rank corr 0.79 (min 0.3), high-error-decile disagreement 21.01x median (min 1.0) on a mixed in-dist + OOD probe set"
+    }
+  ]
+}
