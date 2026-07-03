@@ -31,8 +31,9 @@ make tree        # see the layout
 ## Where to start (as a human or an agent)
 1. Read `CLAUDE.md` — how work is done here.
 2. Read `docs/architecture.md`, `docs/requirements.md`, `docs/roadmap.md`.
-3. Take the top unblocked task in `tasks/BACKLOG.md`. The first one,
-   `tasks/P1-001-flat-world-model.md`, is fully specified as the worked example.
+3. Take the top unblocked task in `tasks/BACKLOG.md`. The Phase-0 contract-hardening
+   tasks (`tasks/P0-001` … `P0-011`) come first and are fully specified;
+   `tasks/P1-001-flat-world-model.md` is the worked example for implementation phases.
 
 ## Layout
 ```
