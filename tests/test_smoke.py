@@ -35,6 +35,11 @@ def test_skeletons_satisfy_protocols() -> None:
     assert isinstance(SurpriseCompetenceMonitor(), interfaces.CompetenceMonitor)
     assert isinstance(SkillRouter(), interfaces.SkillLibrary)
     assert isinstance(ReplayBuffer(), interfaces.EpisodicMemory)
+    # one query verb into every knowledge tier (P0-008)
+    assert isinstance(SemanticStore(), interfaces.SemanticMemory)
+    assert isinstance(SemanticStore(), interfaces.KnowledgeSource)
+    assert isinstance(InternalKnowledgeSource(), interfaces.KnowledgeSource)
+    assert isinstance(UncertaintyMemoryRouter(), interfaces.MemoryRouter)
 
 
 def test_all_skeletons_instantiate() -> None:

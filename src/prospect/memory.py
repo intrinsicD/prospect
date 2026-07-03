@@ -26,21 +26,26 @@ class ReplayBuffer:
 
 
 class SemanticStore:
-    """Distilled facts consolidated from experience. Contract: interfaces.SemanticMemory."""
+    """Distilled facts consolidated from experience. Its read side is a
+    `KnowledgeSource` (one query verb into every tier, P0-008); `write` is the
+    consolidation surface. Contract: interfaces.SemanticMemory."""
+
+    name = "semantic"
 
     def write(self, item: KnowledgeItem) -> None:
         raise NotImplementedError("P8-001")
 
-    def read(self, query: object) -> list[KnowledgeItem]:
+    def query(self, query: object) -> list[KnowledgeItem]:
         raise NotImplementedError("P8-001")
 
 
 class UncertaintyMemoryRouter:
     """Route a query to a tier by current epistemic uncertainty: answer from the model
-    when confident, retrieve when uncertain (retrieval-as-action).
+    when confident — `route()` returns `None`, the parametric tier (P0-008) — and
+    retrieve when uncertain (retrieval-as-action).
 
     Contract: interfaces.MemoryRouter.
     """
 
-    def route(self, query: object, epistemic: float) -> KnowledgeSource:
+    def route(self, query: object, epistemic: float) -> KnowledgeSource | None:
         raise NotImplementedError("P8-001")

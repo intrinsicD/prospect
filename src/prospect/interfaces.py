@@ -111,14 +111,6 @@ class EpisodicMemory(Protocol):
 
 
 @runtime_checkable
-class SemanticMemory(Protocol):
-    """Distilled, queryable facts consolidated from experience (R7, R8)."""
-
-    def write(self, item: KnowledgeItem) -> None: ...
-    def read(self, query: object) -> list[KnowledgeItem]: ...
-
-
-@runtime_checkable
 class KnowledgeSource(Protocol):
     """Internal or external knowledge / tools (R8, ADR-0004). Querying is an *action*
     the planner selects, gated by uncertainty; every item carries provenance/trust."""
@@ -129,8 +121,22 @@ class KnowledgeSource(Protocol):
 
 
 @runtime_checkable
+class SemanticMemory(KnowledgeSource, Protocol):
+    """Distilled facts consolidated from experience (R7, R8). The read side *is* a
+    `KnowledgeSource` (P0-008): one query verb into every knowledge tier, so the
+    router selects the semantic store like any other source — no parallel query
+    path. `write` is its separate consolidation surface."""
+
+    def write(self, item: KnowledgeItem) -> None: ...
+
+
+@runtime_checkable
 class MemoryRouter(Protocol):
     """Chooses which tier to consult (parametric / internal / external) given the
-    query and current epistemic uncertainty (R8, ADR-0004)."""
+    query and current epistemic uncertainty (R8, ADR-0004).
 
-    def route(self, query: object, epistemic: float) -> KnowledgeSource: ...
+    Returning `None` means: confident — answer parametrically (from the model's
+    weights), do not retrieve (P0-008). At P8 the router's decision surfaces to the
+    planner as retrieval *options* (retrieval-as-action, ADR-0004 rule 2)."""
+
+    def route(self, query: object, epistemic: float) -> KnowledgeSource | None: ...

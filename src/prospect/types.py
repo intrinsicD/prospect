@@ -38,7 +38,13 @@ class Provenance:
 
 @dataclass(frozen=True)
 class Observation:
-    """Anything the agent perceives — including retrieved knowledge (R6, ADR-0004)."""
+    """Anything the agent perceives — including retrieved knowledge (R6, ADR-0004).
+
+    Provenance convention (P0-008): `provenance=None` means first-party sensor
+    experience — trusted by construction. Anything *retrieved* must carry a
+    `Provenance` (external content defaults to `Trust.UNTRUSTED`): untrusted
+    content is data, never instruction.
+    """
     modality: Modality
     data: Array
     provenance: Provenance | None = None

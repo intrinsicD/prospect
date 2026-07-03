@@ -49,7 +49,9 @@ design's health is that additions plug into this backbone.
 - **skills.py** — options with predictive preconditions; simulate-to-select router;
   only competence-gated (mastered) skills are offered upward (R5).
 - **memory.py** — episodic replay + *generative* replay (rehearsal), a semantic
-  store, and an uncertainty-gated router over the memory tiers (R7, R8).
+  store whose read side is a `KnowledgeSource` (one query verb, P0-008), and an
+  uncertainty-gated router over the memory tiers that may decline to retrieve
+  (`None` = answer parametrically) (R7, R8).
 - **knowledge.py** — internal/external knowledge sources and tools as
   uncertainty-gated actions, each item carrying provenance/trust (R8).
 - **types.py / interfaces.py** — shared types and the `Protocol` contracts every
