@@ -36,6 +36,10 @@ integrity stats) the harness logs for the sentinels (P0-003, P0-005).
   integrity sentinels: EMA target encoder + variance–covariance regularization +
   inverse-dynamics and reward auxiliary heads; independent ensemble inits with
   decorrelated data order.
+- Log per-step sentinel metrics (latent std / effective rank, ensemble-disagreement
+  vs held-out error) to the run log (`bench.runlog.RunLog`, P0-005) from
+  `update()`'s returned dict + held-out probes; the P1 sentinel `check()`s read the
+  run back.
 - Keep it minimal — smallest model that clears the gate (sentinels included). No config
   knobs beyond what the gate needs.
 

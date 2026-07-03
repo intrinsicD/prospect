@@ -9,6 +9,13 @@ the training loss: the trivial solution has low loss.
 Each gate/sentinel has a *precise* criterion and a `check()` returning a result
 object. Until the eval body exists, `check()` returns a PENDING (not-passed /
 not-healthy) result and does not raise, so `make gate` prints cleanly.
+
+Sentinel data contract (P0-005): training loops write per-step metrics to
+`bench/runs/<run-id>/metrics.jsonl` via `bench.runlog.RunLog` — the keys come from
+what `Learner.update()` returns plus held-out probes. A zero-argument sentinel
+`check()` reads the run back (`bench.runlog.read_run`, default `latest_run()`) to
+verify its criterion throughout training, not only at the capability checkpoint.
+Each sentinel's criterion names the metric keys it requires.
 """
 from __future__ import annotations
 
