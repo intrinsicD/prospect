@@ -1,6 +1,6 @@
 # P1-001 — Flat latent world model + calibrated uncertainty
 
-- **Status:** blocked (P0 contract hardening — see Depends on)
+- **Status:** ready (all P0 dependencies done)
 - **Phase:** P1
 - **Requirements:** R1, R4
 - **ADRs:** ADR-0001, ADR-0002, ADR-0006
@@ -61,7 +61,9 @@ integrity stats) the harness logs for the sentinels (P0-003, P0-005).
 - Unit: shapes/dtypes of `Prediction`; `log_prob` sane on a known Gaussian.
 - Eval (harness, in `bench/`): the toy control task implements `bench.Environment`
   (P0-004, seeded resets); baseline comparison + the epistemic/aleatoric
-  separation experiment; wire the result into `GATES["P1"].check`.
+  separation experiment. Register the eval in `bench/evals/` via `@gate_check("P1")`
+  and the two P1 sentinel bodies via `@sentinel_check(...)` (P0-006); record the
+  seed list in `GateResult.seeds`.
 
 ## Docs-sync checklist
 - [ ] This Status → `done`; paste the P1 `GateReport` (capability + sentinels) below.

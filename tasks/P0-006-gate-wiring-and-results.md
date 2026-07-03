@@ -1,6 +1,6 @@
 # P0-006 — Gate wiring, persisted results, the P0 gate, and a seed policy
 
-- **Status:** ready
+- **Status:** done
 - **Phase:** P0
 - **Requirements:** — (delivery infrastructure; enforces ADR-0005 for every requirement)
 - **ADRs:** ADR-0005
@@ -47,15 +47,15 @@ multi-criterion gates aren't forced through a single `metric: float`.
   have an owner for N.
 
 ## Acceptance criteria
-- [ ] `make gate PHASE=P0` runs and **passes** (smoke green).
-- [ ] `make gate` (no PHASE) and `make gate PHASE=P9` print a friendly message and
-      exit nonzero — no traceback.
-- [ ] A dummy check registered via `@gate_check` in a test replaces PENDING and its
+- [x] `make gate PHASE=P0` runs and **passes** (smoke green).
+- [x] `make gate` (no PHASE) and `make gate PHASE=P9` print a friendly message and
+      exit nonzero (2) — no traceback (verified manually; CLI covered by unit test).
+- [x] A dummy check registered via `@gate_check` in a test replaces PENDING and its
       metrics appear in the persisted JSON.
-- [ ] `GateResult`/`SentinelResult` carry `metrics: dict[str, float]`; smoke tests
+- [x] `GateResult`/`SentinelResult` carry `metrics: dict[str, float]`; smoke tests
       updated.
-- [ ] Report JSON written on every `run_gate` and includes criterion, metrics, seeds.
-- [ ] `make test` green, `make lint` clean.
+- [x] Report JSON written on every `run_gate` and includes criterion, metrics, seeds.
+- [x] `make test` green, `make lint` clean.
 
 ## Test plan
 - Unit: decorator replaces pending check; unknown-phase error path; report JSON
@@ -63,10 +63,22 @@ multi-criterion gates aren't forced through a single `metric: float`.
 - Manual: the three `make gate` invocations above.
 
 ## Docs-sync checklist
-- [ ] Task Status updated; **paste the first passing P0 GateReport below**.
-- [ ] ADR-0005 consequence notes results are persisted artifacts.
-- [ ] `docs/roadmap.md` P0 row references the now-registered gate.
-- [ ] `tasks/P1-001` eval section points at `bench/evals/` + `@gate_check`.
+- [x] Task Status updated; **first passing P0 GateReport pasted below**.
+- [x] ADR-0005 consequence notes results are persisted artifacts.
+- [x] `docs/roadmap.md` P0 row references the now-registered gate.
+- [x] `tasks/P1-001` eval section points at `bench/evals/` + `@gate_check`; P1-001
+      unblocked (all five P0 dependencies done) in the task file and backlog.
 
 ## Gate result
-_not run yet_
+First passing gate of the project — `make gate PHASE=P0`:
+
+```
+[P0] PASS
+  capability: ok — 30 passed, 1 skipped in 0.05s
+```
+
+(The skip is `test_p0_gate_passes_against_real_suite` guarding against recursion
+inside the gate's own pytest run.) Persisted report:
+`bench/results/P0-20260703T133757Z.json` (committed). Friendly-error checks:
+`make gate PHASE=P9` and bare `make gate` → message + exit 2, no traceback.
+Full suite: 31 passed; lint clean.

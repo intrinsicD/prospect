@@ -5,6 +5,7 @@ from .envs import Environment  # noqa: F401
 from .runlog import Record, RunLog, latest_run, read_run  # noqa: F401
 from .gates import (  # noqa: F401
     GATES,
+    RESULTS_DIR,
     SENTINELS,
     Gate,
     GateReport,
@@ -12,6 +13,11 @@ from .gates import (  # noqa: F401
     Sentinel,
     SentinelResult,
     applicable_sentinels,
+    gate_check,
     run_gate,
     run_sentinels,
+    sentinel_check,
 )
+
+# Import last: eval modules self-register their checks against the registries above.
+from . import evals  # noqa: E402, F401

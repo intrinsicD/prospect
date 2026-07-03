@@ -18,15 +18,15 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **P0-003** · `done` · R1,R7 · `Learner` protocol — the uniform training seam the harness drives (P1 trains through it; P7's gate depends on it).
 - **P0-004** · `done` · R1 · `Environment` protocol in `bench/` (harness-owned; core never imports the harness).
 - **P0-005** · `done` · — · Run-metrics artifact (JSONL run log) — the data zero-arg sentinel `check()`s read to verify "throughout training" (ADR-0006).
-- **P0-006** · `ready` · — · Gate wiring: `@gate_check`/`@sentinel_check` registration, `metrics: dict`, persisted gate reports, register the P0 gate, friendly errors, explicit seed policy. **(start here)**
-- **P0-007** · `blocked (P0-006)` · — · Regression ratchet: `bench/SHIPPED` + `make gate-all` + CI job — shipped gates stay green.
+- **P0-006** · `done` · — · Gate wiring: `@gate_check`/`@sentinel_check` registration, `metrics: dict`, persisted gate reports, register the P0 gate, friendly errors, explicit seed policy.
+- **P0-007** · `ready` · — · Regression ratchet: `bench/SHIPPED` + `make gate-all` + CI job — shipped gates stay green. **(start here)**
 - **P0-008** · `ready` · R8 · One query path into knowledge (`SemanticMemory` read-side *is* a `KnowledgeSource`), `route() -> KnowledgeSource | None` (None = parametric), provenance-`None` convention documented.
 - **P0-009** · `ready` · — · Enforce typing: mypy in CI, typed protocol-conformance assertions, ruff `I`, CI matrix 3.11–3.13. (Best taken after the other code-touching P0 tasks.)
 - **P0-010** · `ready` · R1,R3,R7 · ADR-0007: arbitration of the epistemic signal — curiosity seeks it, planning penalizes it; mode chosen by the curriculum. Plus shift-disambiguation note in ADR-0002. *(docs)*
 - **P0-011** · `ready` · R6 · Roadmap/ADR-0001 amendment: the P6 codec swap is a representation change — distill-first, retrain-fallback; replay keeps raw obs re-encodable. *(docs)*
 
 ## Phase 1 — predictive core
-- **P1-001** · `blocked (P0-001, P0-003, P0-004, P0-005, P0-006)` · R1,R4 · Flat latent world model + calibrated uncertainty. **(fully specified)**
+- **P1-001** · `ready` · R1,R4 · Flat latent world model + calibrated uncertainty. **(fully specified; unblocked — all P0 dependencies done)**
 
 ## Phase 2 — planning
 - **P2-001** · `blocked (P1-001)` · R1 · MPC/CEM planning in imagination; beat model-free at equal budget. Uncertainty-penalty sign per ADR-0007 (P0-010).

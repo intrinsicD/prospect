@@ -57,7 +57,7 @@ def test_all_skeletons_instantiate() -> None:
 
 
 def test_all_gates_registered() -> None:
-    assert set(bench.GATES) == {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"}
+    assert set(bench.GATES) == {"P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"}
     for gate in bench.GATES.values():
         assert gate.criterion  # every gate has a precise criterion
 
@@ -76,8 +76,8 @@ def test_all_sentinels_registered() -> None:
         assert sentinel.applies_from in bench.gates.PHASE_ORDER
 
 
-def test_phase_gate_is_composite_and_pending() -> None:
-    report = bench.run_gate("P5")
+def test_phase_gate_is_composite_and_pending(tmp_path) -> None:
+    report = bench.run_gate("P5", results_dir=tmp_path)
     assert isinstance(report, bench.GateReport)
     # pending capability + pending sentinels => phase is not passable yet
     assert report.passed is False
@@ -88,8 +88,8 @@ def test_phase_gate_is_composite_and_pending() -> None:
             "option-diversity"} <= names
 
 
-def test_sentinels_activate_by_phase() -> None:
-    p1 = {s.name for s in bench.run_gate("P1").sentinels}
+def test_sentinels_activate_by_phase(tmp_path) -> None:
+    p1 = {s.name for s in bench.run_gate("P1", results_dir=tmp_path).sentinels}
     assert "representation-integrity" in p1
     assert "uncertainty-reliability" in p1
     assert "replay-fidelity" not in p1  # generative replay arrives at P3

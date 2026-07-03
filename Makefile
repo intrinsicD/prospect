@@ -15,7 +15,7 @@ fmt:
 
 # usage: make gate PHASE=P1
 gate:
-> python -c "import bench; print(bench.run_gate('$(PHASE)'))"
+> python -m bench $(PHASE)
 
 tree:
 > find . -not -path '*/.*' -not -path '*/__pycache__/*' -type f | sort
