@@ -1,13 +1,26 @@
 """Unit tests for the composition root (P2-002): Agent wiring and the harness
-episode driver."""
+episode driver — plus the P3-001 monitor hook."""
 from __future__ import annotations
+
+from collections.abc import Sequence
 
 import numpy as np
 
 from bench.envs import Pendulum
 from bench.loop import Acting, run_episode
 from prospect.agent import Agent
-from prospect.types import Action, LatentState, Modality, Observation, Option, Subgoal
+from prospect.types import (
+    Action,
+    Competence,
+    LatentState,
+    Modality,
+    Observation,
+    Option,
+    Prediction,
+    Subgoal,
+    Surprise,
+    Transition,
+)
 
 
 class _StubPlanner:
@@ -71,3 +84,72 @@ def test_run_episode_is_seed_reproducible() -> None:
         return run_episode(Pendulum(), _agent(_StubPlanner()), steps=4, seed=11)[0]
 
     assert run() == run()
+
+
+class _StubModel:
+    """Protocol-only world model: predicts staying put with a marked epistemic."""
+
+    def predict(self, state: LatentState, action: Action) -> Prediction:
+        return Prediction(mean=np.asarray(state.z, dtype=float), var=np.ones(2),
+                          epistemic=0.42, aleatoric=0.1)
+
+    def imagine(self, state: LatentState, actions: Sequence[Action]) -> list[Prediction]:
+        return [self.predict(state, a) for a in actions]
+
+
+class _SpyMonitor:
+    """CompetenceMonitor conforming spy: records what the Agent feeds it."""
+
+    def __init__(self) -> None:
+        self.transitions: list[Transition] = []
+
+    def surprise(self, prediction: Prediction, observed: LatentState) -> Surprise:
+        return Surprise(total=0.0, epistemic=0.0, aleatoric=0.0)
+
+    def update(self, transition: Transition) -> None:
+        self.transitions.append(transition)
+
+    def competence(self, skill: str) -> Competence:
+        return Competence(skill=skill, epistemic=0.0, learning_progress=0.0)
+
+    def is_mastered(self, skill: str) -> bool:
+        return False
+
+    def is_forgetting(self, skill: str) -> bool:
+        return False
+
+
+def _monitored_agent(monitor: _SpyMonitor) -> Agent:
+    return Agent(encode=lambda obs: LatentState(z=np.asarray(obs.data) * 2.0),
+                 planner=_StubPlanner(), world_model=_StubModel(), monitor=monitor)
+
+
+def test_monitored_agent_feeds_latent_transitions_with_act_time_prediction() -> None:
+    monitor = _SpyMonitor()
+    agent = _monitored_agent(monitor)
+    option = Option(name="skill")
+    action = agent.act(_obs(1.0))
+    stored = agent.observe(_obs(1.0), action, _obs(2.0), reward=1.0, option=option)
+    [fed] = monitor.transitions
+    assert np.allclose(fed.state.z, [2.0, 0.0])  # monitor sees LATENT space
+    assert np.allclose(fed.next_state.z, [4.0, 0.0])
+    assert fed.prediction is not None and fed.prediction.epistemic == 0.42
+    assert fed.option is option
+    assert np.allclose(stored.state.z, [1.0, 0.0])  # storage stays RAW (P0-011)
+    assert stored.prediction is fed.prediction  # act-time expectation backfilled
+
+
+def test_observe_without_act_does_not_feed_the_monitor() -> None:
+    monitor = _SpyMonitor()
+    agent = _monitored_agent(monitor)
+    agent.observe(_obs(1.0), Action(data=np.zeros(1)), _obs(2.0), reward=0.0)
+    assert monitor.transitions == []
+
+
+def test_reset_clears_the_pending_expectation() -> None:
+    monitor = _SpyMonitor()
+    agent = _monitored_agent(monitor)
+    agent.act(_obs(1.0))
+    agent.reset()
+    agent.observe(_obs(1.0), Action(data=np.zeros(1)), _obs(2.0), reward=0.0)
+    assert monitor.transitions == []

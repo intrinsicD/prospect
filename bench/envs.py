@@ -63,6 +63,12 @@ class Pendulum:
         self._omega = float(self._rng.uniform(-self.init_omega, self.init_omega))
         return self._obs()
 
+    def set_state(self, theta: float, omega: float) -> Observation:
+        """Harness surface for counterfactual probes (P3): place the pendulum at an
+        exact state so the same premise can be stepped under different physics."""
+        self._theta, self._omega = float(theta), float(omega)
+        return self._obs()
+
     def step(self, action: Action) -> tuple[Observation, float, bool]:
         torque = float(np.clip(np.asarray(action.data, dtype=float).ravel()[0],
                                -self.max_torque, self.max_torque))

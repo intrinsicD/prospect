@@ -37,8 +37,8 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **P2-002** · `done` · R1 · Composition root: `agent.py` act–observe loop + `bench.loop.run_episode` — one place the components meet; P2 gate reproduced byte-identically through it.
 
 ## Phase 3 — VoE, curriculum, replay
-- **P3-001** · `ready` · R3 · Calibrated surprise + epistemic/aleatoric decomposition + mastery test. Returns `types.Surprise` (P0-002), never a bare float. **(start here)**
-- **P3-002** · `blocked (P3-001)` · R3 · Curiosity/intrinsic-motivation curriculum (learning-progress driven). Owns the explore/exploit mode flag per ADR-0007 (P0-010).
+- **P3-001** · `done` · R3 · Calibrated surprise + decomposition + mastery test. Differential criterion **MET** (P(violated>expected) ≥ 0.93 every seed); P3 composite blocked pending P3-002 + P3-003 by design.
+- **P3-002** · `ready` · R3 · Curiosity/intrinsic-motivation curriculum (learning-progress driven). Owns the explore/exploit mode flag per ADR-0007 (P0-010). Completes the P3 capability criterion (curiosity beats random exploration). **(start here)**
 - **P3-003** · `ready` · R7 · Episodic replay buffer + generative replay (rehearsal from the model). Enforce `replay-fidelity`: real-data anchor + lineage cap + uncertainty-gated dreams (ADR-0006). Retain raw observations so experience stays re-encodable under a future codec (P0-011).
 
 ## Phase 4 — skills
