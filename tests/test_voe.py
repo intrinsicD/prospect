@@ -8,8 +8,17 @@ from math import isinf
 import numpy as np
 import pytest
 
-from prospect.types import Action, LatentState, Option, Prediction, Transition
-from prospect.voe import SurpriseCompetenceMonitor
+from prospect.types import (
+    Action,
+    Competence,
+    LatentState,
+    Mode,
+    Option,
+    Prediction,
+    Surprise,
+    Transition,
+)
+from prospect.voe import LearningProgressCurriculum, SurpriseCompetenceMonitor
 
 
 def _pred(epistemic: float, aleatoric: float) -> Prediction:
@@ -83,3 +92,39 @@ def test_prediction_less_transitions_are_ignored() -> None:
     monitor = SurpriseCompetenceMonitor()
     monitor.update(_transition(1.0, "skill", with_prediction=False))
     assert isinf(monitor.competence("skill").epistemic)  # nothing was expected
+
+
+class _FixedMasteryMonitor:
+    """CompetenceMonitor-conforming stub with a fixed mastery verdict."""
+
+    def __init__(self, mastered: bool) -> None:
+        self._mastered = mastered
+
+    def surprise(self, prediction: Prediction, observed: LatentState) -> Surprise:
+        return Surprise(total=0.0, epistemic=0.0, aleatoric=0.0)
+
+    def update(self, transition: Transition) -> None:
+        return None
+
+    def competence(self, skill: str) -> Competence:
+        return Competence(skill=skill, epistemic=0.0, learning_progress=0.0,
+                          mastered=self._mastered)
+
+    def is_mastered(self, skill: str) -> bool:
+        return self._mastered
+
+    def is_forgetting(self, skill: str) -> bool:
+        return False
+
+
+def test_curriculum_owns_the_sign() -> None:
+    # ADR-0007: the sign applied to epistemic uncertainty is the curriculum's
+    # decision alone — negative bonus while learning, positive penalty once mastered.
+    learning = LearningProgressCurriculum(_FixedMasteryMonitor(False),
+                                          explore_bonus=2.0, exploit_penalty=3.0)
+    assert learning.mode() is Mode.EXPLORE
+    assert learning.uncertainty_coefficient() == -2.0
+    mastered = LearningProgressCurriculum(_FixedMasteryMonitor(True),
+                                          explore_bonus=2.0, exploit_penalty=3.0)
+    assert mastered.mode() is Mode.EXPLOIT
+    assert mastered.uncertainty_coefficient() == 3.0

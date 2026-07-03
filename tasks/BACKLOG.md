@@ -38,8 +38,8 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 
 ## Phase 3 — VoE, curriculum, replay
 - **P3-001** · `done` · R3 · Calibrated surprise + decomposition + mastery test. Differential criterion **MET** (P(violated>expected) ≥ 0.93 every seed); P3 composite blocked pending P3-002 + P3-003 by design.
-- **P3-002** · `ready` · R3 · Curiosity/intrinsic-motivation curriculum (learning-progress driven). Owns the explore/exploit mode flag per ADR-0007 (P0-010). Completes the P3 capability criterion (curiosity beats random exploration). **(start here)**
-- **P3-003** · `ready` · R7 · Episodic replay buffer + generative replay (rehearsal from the model). Enforce `replay-fidelity`: real-data anchor + lineage cap + uncertainty-gated dreams (ADR-0006). Retain raw observations so experience stays re-encodable under a future codec (P0-011).
+- **P3-002** · `done` · R3 · Curiosity curriculum. P3 **capability ok** (differential MET + curiosity MET: coverage ratio 0.26 vs 0.79 at equal budget); composite blocked only by the P3-003 sentinel.
+- **P3-003** · `ready` · R7 · Episodic replay buffer + generative replay (rehearsal from the model). Enforce `replay-fidelity`: real-data anchor + lineage cap + uncertainty-gated dreams (ADR-0006). Retain raw observations so experience stays re-encodable under a future codec (P0-011). Last piece of P3 — implementing the sentinel unblocks shipping the phase. **(start here)**
 
 ## Phase 4 — skills
 - **P4-001** · `blocked (P3-001)` · R5 · Skill library with predictive preconditions + simulate-to-select router (competence-gated). Promote the precondition to a **typed field** on `Option` when this lands — no metadata-dict convention. Executors set `Transition.option` so competence attribution works (P0-002).

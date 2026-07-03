@@ -1,12 +1,14 @@
 """Violation of expectation — the unifying signal (R3, R7). See ADR-0002.
-Implemented in P3-001 (surprise, decomposition, mastery); forgetting detection is
-P7-001.
+Implemented in P3-001 (surprise, decomposition, mastery) and P3-002 (the
+learning-progress curriculum that owns the ADR-0007 mode flag); forgetting
+detection is P7-001.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .types import Competence, LatentState, Prediction, Surprise, Transition
+from .interfaces import CompetenceMonitor
+from .types import Competence, LatentState, Mode, Prediction, Surprise, Transition
 
 
 @dataclass
@@ -96,3 +98,37 @@ class SurpriseCompetenceMonitor:
 
     def is_forgetting(self, skill: str) -> bool:
         raise NotImplementedError("P7-001")
+
+
+class LearningProgressCurriculum:
+    """The ADR-0007 arbiter (P3-002): decides the explore/exploit mode from
+    learning progress; consumers read the mode (or the signed coefficient) and
+    never pick the sign themselves.
+
+    Rule: EXPLORE while the skill is still being learned; EXPLOIT once the
+    monitor reports it mastered (low epistemic + flattened progress, ADR-0002).
+    The explore bonus applies to *epistemic* uncertainty only — `Prediction`
+    separates it from aleatoric, so noise is never rewarded (the noisy-TV
+    defense, ADR-0002/0006).
+    """
+
+    def __init__(
+        self,
+        monitor: CompetenceMonitor,
+        skill: str = SurpriseCompetenceMonitor.DEFAULT_SKILL,
+        explore_bonus: float = 1.0,
+        exploit_penalty: float = 1.0,
+    ) -> None:
+        self._monitor = monitor
+        self._skill = skill
+        self.explore_bonus = explore_bonus
+        self.exploit_penalty = exploit_penalty
+
+    def mode(self) -> Mode:
+        return Mode.EXPLOIT if self._monitor.is_mastered(self._skill) else Mode.EXPLORE
+
+    def uncertainty_coefficient(self) -> float:
+        """The signed coefficient consumers apply to per-step epistemic
+        uncertainty (e.g. `FlatPlanner.uncertainty_penalty`): positive = penalty
+        (exploit-mode planning), negative = bonus (explore-mode collection)."""
+        return self.exploit_penalty if self.mode() is Mode.EXPLOIT else -self.explore_bonus

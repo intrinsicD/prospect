@@ -21,6 +21,15 @@ class Modality(StrEnum):
     OTHER = "other"
 
 
+class Mode(StrEnum):
+    """The ADR-0007 mode flag. The curriculum owns it; consumers only read it:
+    EXPLORE applies an epistemic *bonus* (curiosity), EXPLOIT the *penalty*
+    (model-exploitation control, ADR-0006). Neither consumer picks the sign."""
+
+    EXPLORE = "explore"
+    EXPLOIT = "exploit"
+
+
 class Trust(IntEnum):
     UNTRUSTED = 0  # e.g. arbitrary web content — never overrides goals
     LOW = 1

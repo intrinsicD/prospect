@@ -25,12 +25,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from prospect.types import LatentState, Transition
-from prospect.voe import SurpriseCompetenceMonitor
+from prospect.agent import Agent
+from prospect.planning import FlatPlanner
+from prospect.types import Action, LatentState, Observation, Transition
+from prospect.voe import LearningProgressCurriculum, SurpriseCompetenceMonitor
 from prospect.world_model import FlatWorldModel
 
 from ..envs import Pendulum
 from ..gates import GateResult, gate_check
+from ..loop import run_episode
 from ..runlog import RUNS_DIR, RunLog
 from .p1_world_model import SEED_STEP_OFFSET, STEPS, _make_probe, _rollout, _train
 
@@ -39,6 +42,11 @@ SEEDS = [0, 1, 2]
 TRAIN_N, PROBE_N = 4096, 256
 AUC_MIN = 0.9  # probability of superiority, required on every seed
 MASTERY_WARMUP = 200  # monitor updates fed from held-out data for the mastery demo
+# Curiosity experiment (P3-002): identical budgets and training schedules; only the
+# collection policy differs. Scored on a uniform-coverage set with the scale-free
+# ratio model/persistence MSE (raw latent MSE is incomparable across encoders).
+CURIOSITY_BUDGET, CHUNK, TRAIN_PER_ROUND, COVERAGE_N = 1536, 256, 250, 512
+MONITOR_FEED = 20  # transitions per round that keep the curriculum's mode live
 
 
 def _surprise_totals(
@@ -76,12 +84,84 @@ def _counterfactual(expected: list[Transition], gravity: float) -> list[Transiti
     return violated
 
 
+class _RandomAgent:
+    """Acting-conforming random collector (the exploration baseline)."""
+
+    def __init__(self, seed: int) -> None:
+        self._rng = np.random.default_rng(seed)
+
+    def act(self, obs: Observation) -> Action:
+        return Action(data=self._rng.uniform(-2.0, 2.0, size=1))
+
+    def reset(self) -> None:
+        return None
+
+
+def _coverage_set(seed: int) -> list[Transition]:
+    """Uniform-coverage test set: states placed via `set_state`, so neither
+    collector's visitation distribution biases the evaluation."""
+    env = Pendulum()
+    env.reset(seed=seed)
+    rng = np.random.default_rng(seed)
+    out = []
+    for _ in range(COVERAGE_N):
+        obs = env.set_state(rng.uniform(-np.pi, np.pi), rng.uniform(-8.0, 8.0))
+        action = Action(data=np.array([rng.uniform(-2.0, 2.0)]))
+        next_obs, reward, _ = env.step(action)
+        out.append(Transition(state=LatentState(z=obs.data), action=action,
+                              next_state=LatentState(z=next_obs.data), reward=reward))
+    return out
+
+
+def _coverage_ratio(model: FlatWorldModel, coverage: list[Transition]) -> float:
+    """Scale-free model skill: model MSE / persistence MSE, each in the model's
+    own target-latent space."""
+    current = np.stack([np.asarray(model.encode_target(t.state.z).z, dtype=float) for t in coverage])
+    target = np.stack([np.asarray(model.encode_target(t.next_state.z).z, dtype=float) for t in coverage])
+    predicted = np.stack(
+        [np.asarray(model.predict(model.encode(t.state.z), t.action).mean, dtype=float) for t in coverage]
+    )
+    return float(np.mean((predicted - target) ** 2) / np.mean((current - target) ** 2))
+
+
+def _active_learning(seed: int, curious: bool) -> float:
+    """One collection arm: chunks of env steps + a fixed training schedule; the
+    curious arm collects with an explore-mode planner whose epistemic coefficient
+    comes from the LIVE curriculum (monitor fed each round, ADR-0007)."""
+    model = FlatWorldModel(seed=seed)
+    monitor = SurpriseCompetenceMonitor()
+    curriculum = LearningProgressCurriculum(monitor)
+    planner = FlatPlanner(model, horizon=8, candidates=32, elites=6, iterations=2, seed=seed)
+    explorer = Agent(encode=lambda obs: model.encode(obs.data), planner=planner)
+    rng = np.random.default_rng(seed + 17)
+    data: list[Transition] = []
+    for round_index in range(CURIOSITY_BUDGET // CHUNK):
+        if curious and round_index > 0:  # the seed chunk is random for both arms
+            planner.uncertainty_penalty = curriculum.uncertainty_coefficient()
+            _, chunk = run_episode(Pendulum(), explorer, CHUNK, seed * 131 + round_index,
+                                   collect=True)
+        else:
+            _, chunk = run_episode(Pendulum(), _RandomAgent(seed * 131 + round_index),
+                                   CHUNK, seed * 131 + round_index, collect=True)
+        data.extend(chunk)
+        _train(model, data, TRAIN_PER_ROUND, rng)
+        for t in chunk[:MONITOR_FEED]:  # keep the curriculum's mode decision live
+            prediction = model.predict(model.encode(t.state.z), t.action)
+            monitor.update(
+                Transition(state=model.encode(t.state.z), action=t.action,
+                           next_state=model.encode_target(t.next_state.z),
+                           reward=t.reward, prediction=prediction)
+            )
+    return _coverage_ratio(model, _coverage_set(seed + 4400))
+
+
 @gate_check("P3")
 def check_p3() -> GateResult:
     (RUNS_DIR / RUN_ID / "metrics.jsonl").unlink(missing_ok=True)
     log = RunLog(RUN_ID)
     metrics: dict[str, float] = {}
     effect_sizes = []
+    curious_ratios, random_ratios = [], []
     for seed in SEEDS:
         train = _rollout(Pendulum(), TRAIN_N, seed)
         heldout = _rollout(Pendulum(), PROBE_N, seed + 500)
@@ -107,6 +187,10 @@ def check_p3() -> GateResult:
                            reward=t.reward, prediction=prediction)
             )
         competence = monitor.competence(SurpriseCompetenceMonitor.DEFAULT_SKILL)
+        curious_ratio = _active_learning(seed, curious=True)
+        random_ratio = _active_learning(seed, curious=False)
+        curious_ratios.append(curious_ratio)
+        random_ratios.append(random_ratio)
         metrics |= {
             f"voe_auc_s{seed}": auc,
             f"cohens_d_s{seed}": _cohens_d(violated_s, expected_s),  # reference only
@@ -114,13 +198,28 @@ def check_p3() -> GateResult:
             f"expected_surprise_median_s{seed}": float(np.median(expected_s)),
             f"mastered_s{seed}": float(competence.mastered),
             f"epistemic_ema_s{seed}": competence.epistemic,
+            f"curious_coverage_ratio_s{seed}": curious_ratio,
+            f"random_coverage_ratio_s{seed}": random_ratio,
         }
     auc_min = float(min(effect_sizes))
     differential_met = auc_min >= AUC_MIN
-    metrics |= {"voe_auc_min": auc_min, "differential_met": float(differential_met)}
+    curious_med = float(np.median(curious_ratios))
+    random_med = float(np.median(random_ratios))
+    curiosity_met = curious_med < random_med
+    metrics |= {
+        "voe_auc_min": auc_min,
+        "differential_met": float(differential_met),
+        "curious_coverage_ratio_median": curious_med,
+        "random_coverage_ratio_median": random_med,
+        "curiosity_met": float(curiosity_met),
+    }
     detail = (
         f"differential: P(violated surprise > expected) per seed "
-        f"{[round(a, 2) for a in effect_sizes]}, min {auc_min:.2f} (criterion >= {AUC_MIN}) "
-        f"— {'MET' if differential_met else 'NOT MET'}; curiosity criterion pending (P3-002)"
+        f"{[round(a, 2) for a in effect_sizes]}, min {auc_min:.2f} (>= {AUC_MIN}) "
+        f"— {'MET' if differential_met else 'NOT MET'}; "
+        f"curiosity: coverage ratio (model/persistence MSE, lower is better) "
+        f"curious {curious_med:.2f} vs random {random_med:.2f} at equal budget "
+        f"({CURIOSITY_BUDGET} steps) — {'MET' if curiosity_met else 'NOT MET'}"
     )
-    return GateResult(phase="P3", passed=False, metrics=metrics, seeds=list(SEEDS), detail=detail)
+    return GateResult(phase="P3", passed=differential_met and curiosity_met,
+                      metrics=metrics, seeds=list(SEEDS), detail=detail)

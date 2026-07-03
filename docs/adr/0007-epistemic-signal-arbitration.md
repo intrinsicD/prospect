@@ -1,6 +1,7 @@
 # ADR-0007 — Arbitration of the epistemic signal (seek vs avoid)
 
-**Status:** Accepted
+**Status:** Accepted — implemented by P3-002 (`voe.LearningProgressCurriculum`
+owns the mode; consumers read `uncertainty_coefficient()`)
 
 ## Context
 Two consumers pull the one epistemic signal (ADR-0002) in opposite directions.
