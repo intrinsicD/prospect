@@ -3,3 +3,4 @@
 # and fails if any regressed — the ratchet that keeps shipped phases green (P0-007).
 P0
 P1
+P2

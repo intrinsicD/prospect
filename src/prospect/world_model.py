@@ -181,20 +181,39 @@ class FlatWorldModel:
             variances.append(np.exp(logvar))
         return np.stack(mus), np.stack(variances)
 
+    def predict_batch(
+        self, latents: np.ndarray, actions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Vectorized `predict()` for planning rollouts (n latent/action pairs).
+
+        Returns (mean (n,d), total var (n,d), epistemic (n,), aleatoric (n,),
+        reward (n,)) — the exact per-sample quantities `predict()` wraps. Not part
+        of the `WorldModel` protocol; planners duck-type it and fall back to
+        per-sample `predict()` for protocol-only models.
+        """
+        mus, variances = self._member_forward(latents, actions)
+        mean = mus.mean(axis=0)
+        aleatoric = variances.mean(axis=0)  # within-member spread
+        epistemic = mus.var(axis=0)  # between-member disagreement
+        reward_out, _ = self.reward_head.forward(np.concatenate([latents, actions], axis=1))
+        return (
+            mean,
+            aleatoric + epistemic,  # total predictive variance (moment-matched mixture)
+            epistemic.mean(axis=1),
+            aleatoric.mean(axis=1),
+            reward_out[:, 0],
+        )
+
     def predict(self, state: LatentState, action: Action) -> Prediction:
         h = np.asarray(state.z, dtype=float).reshape(1, -1)
         a = np.asarray(action.data, dtype=float).reshape(1, -1)
-        mus, variances = self._member_forward(h, a)
-        mean = mus.mean(axis=0)[0]
-        aleatoric = variances.mean(axis=0)[0]  # within-member spread
-        epistemic = mus.var(axis=0)[0]  # between-member disagreement
-        reward_out, _ = self.reward_head.forward(np.concatenate([h, a], axis=1))
+        mean, var, epistemic, aleatoric, reward = self.predict_batch(h, a)
         return Prediction(
-            mean=mean,
-            var=aleatoric + epistemic,  # total predictive variance (moment-matched mixture)
-            epistemic=float(epistemic.mean()),
-            aleatoric=float(aleatoric.mean()),
-            reward=float(reward_out[0, 0]),
+            mean=mean[0],
+            var=var[0],
+            epistemic=float(epistemic[0]),
+            aleatoric=float(aleatoric[0]),
+            reward=float(reward[0]),
         )
 
     def imagine(self, state: LatentState, actions: Sequence[Action]) -> list[Prediction]:

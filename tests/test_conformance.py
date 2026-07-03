@@ -21,7 +21,7 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
     codec: interfaces.Codec = UniversalCodec()
     world_model: interfaces.WorldModel = FlatWorldModel()
     learner: interfaces.Learner = FlatWorldModel()  # the training seam (P0-003)
-    planner: interfaces.Planner = FlatPlanner()
+    planner: interfaces.Planner = FlatPlanner(FlatWorldModel())
     option_model: interfaces.OptionModel = JumpyOptionModel()
     manager: interfaces.HierarchicalPlanner = HierarchicalManager()
     monitor: interfaces.CompetenceMonitor = SurpriseCompetenceMonitor()

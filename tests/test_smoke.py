@@ -33,7 +33,7 @@ def test_skeletons_satisfy_protocols() -> None:
     # runtime_checkable protocols verify method presence (structural typing).
     assert isinstance(FlatWorldModel(), interfaces.WorldModel)
     assert isinstance(FlatWorldModel(), interfaces.Learner)  # the training seam (P0-003)
-    assert isinstance(FlatPlanner(), interfaces.Planner)
+    assert isinstance(FlatPlanner(FlatWorldModel()), interfaces.Planner)
     assert isinstance(SurpriseCompetenceMonitor(), interfaces.CompetenceMonitor)
     assert isinstance(SkillRouter(), interfaces.SkillLibrary)
     assert isinstance(ReplayBuffer(), interfaces.EpisodicMemory)
@@ -45,10 +45,10 @@ def test_skeletons_satisfy_protocols() -> None:
 
 
 def test_all_skeletons_instantiate() -> None:
-    for cls in (
+    for factory in (
         UniversalCodec,
         FlatWorldModel,
-        FlatPlanner,
+        lambda: FlatPlanner(FlatWorldModel()),  # planners plan over a world model
         JumpyOptionModel,
         HierarchicalManager,
         SurpriseCompetenceMonitor,
@@ -60,7 +60,7 @@ def test_all_skeletons_instantiate() -> None:
         ExternalKnowledgeSource,
         ToolSource,
     ):
-        assert cls() is not None
+        assert factory() is not None
 
 
 def test_all_gates_registered() -> None:
