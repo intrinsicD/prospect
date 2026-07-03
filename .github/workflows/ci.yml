@@ -11,3 +11,5 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check .
       - run: pytest -q
+      # regression ratchet (P0-007): every shipped phase's gate must still pass
+      - run: make gate-all

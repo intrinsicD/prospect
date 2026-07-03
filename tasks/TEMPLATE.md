@@ -31,6 +31,8 @@ implementation lives>
 
 ## Docs-sync checklist
 - [ ] Task Status updated; gate result recorded below.
+- [ ] If the phase gate newly passes: append the phase to `bench/SHIPPED` in the
+      same commit (the ratchet re-runs it in CI, P0-007).
 - [ ] Requirement traceability row still accurate.
 - [ ] ADR status/consequences updated if anything changed.
 - [ ] architecture.md updated if a contract or component changed.

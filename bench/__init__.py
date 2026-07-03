@@ -12,11 +12,14 @@ from .gates import (  # noqa: F401
     GateResult,
     Sentinel,
     SentinelResult,
+    SHIPPED_FILE,
     applicable_sentinels,
     gate_check,
     run_gate,
     run_sentinels,
+    run_shipped_gates,
     sentinel_check,
+    shipped_phases,
 )
 
 # Import last: eval modules self-register their checks against the registries above.

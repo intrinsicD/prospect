@@ -25,6 +25,14 @@ Seed policy (P0-006): every registered check owns an explicit seed list, evaluat
 over those seeds, and records them in `GateResult.seeds`. `run_gate` persists a JSON
 report (criterion, metrics, seeds, run-id) under `bench/results/`, so recorded
 results are reproducible and docs-sync is mechanical.
+
+Regression ratchet (P0-007): phases whose gate has passed are listed in
+`bench/SHIPPED`. `make gate-all` re-runs every shipped gate and fails if any is
+BLOCKED; CI runs it on every push, so a shipped capability cannot silently regress.
+For gates whose evidence is an expensive training artifact, the re-run policy is:
+re-run the *evaluation* against the persisted / regenerable artifact (e.g. the run
+log), not full retraining — and say so in the report detail. Revisit via an
+ADR-0005 amendment if a gate outgrows this.
 """
 from __future__ import annotations
 
@@ -301,6 +309,36 @@ def _write_report(report: GateReport, results_dir: Path) -> Path:
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+SHIPPED_FILE = Path(__file__).resolve().parent / "SHIPPED"
+
+
+def shipped_phases(path: Path | None = None) -> list[str]:
+    """Phases recorded as shipped in `bench/SHIPPED` (one per line; blank lines and
+    `#` comments ignored). An unknown phase raises ValueError — the ratchet must
+    fail loudly, never silently skip."""
+    file = path or SHIPPED_FILE
+    if not file.exists():
+        return []
+    phases: list[str] = []
+    for lineno, raw in enumerate(file.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line not in GATES:
+            raise ValueError(
+                f"{file}:{lineno}: unknown phase {line!r} in SHIPPED; known phases: {', '.join(GATES)}"
+            )
+        phases.append(line)
+    return phases
+
+
+def run_shipped_gates(
+    path: Path | None = None, results_dir: Path | None = None
+) -> list[GateReport]:
+    """Re-run every shipped phase's gate (the regression ratchet, P0-007)."""
+    return [run_gate(phase, results_dir=results_dir) for phase in shipped_phases(path)]
 
 
 def run_gate(phase: str, run_id: str | None = None, results_dir: Path | None = None) -> GateReport:

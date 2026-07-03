@@ -74,6 +74,8 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 - [ ] Satisfies the task's interface (a `Protocol` in `interfaces.py`).
 - [ ] Meets every acceptance criterion in the task file.
 - [ ] `make test` green; `make lint` clean.
-- [ ] Phase gate run; result recorded in the task file.
+- [ ] Phase gate run; result recorded in the task file. If the gate newly passes,
+      the phase is appended to `bench/SHIPPED` in the same commit (the CI ratchet
+      re-runs every shipped gate).
 - [ ] docs-sync done (traceability, task status, ADRs, architecture).
 - [ ] No speculative scope beyond the task.
