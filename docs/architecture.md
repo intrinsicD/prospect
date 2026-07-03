@@ -33,6 +33,11 @@ the undecomposed total. The same quantity is reused as:
 | 5 | Forgetting detector — rising surprise on a mastered skill → rehearse | R7 | voe, memory |
 | 6 | Retrieval trigger — high uncertainty → query a knowledge source | R8 | memory, knowledge |
 
+Two of these jobs pull the signal in opposite directions: planning is *repelled*
+from epistemic uncertainty (ADR-0006's exploitation control) while the curiosity
+curriculum *seeks* it. The sign is mode-dependent — explore vs exploit — and the
+curriculum owns the mode; neither consumer decides the sign itself (ADR-0007).
+
 If a new requirement needs a brand-new bespoke signal, treat that as a smell: the
 design's health is that additions plug into this backbone.
 

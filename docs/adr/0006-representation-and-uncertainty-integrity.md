@@ -35,10 +35,12 @@ from a real-data-anchored checkpoint, never dream-of-dreams); and **quality-gate
 dreamed trajectories with the (validated) uncertainty estimate — rehearse only
 in-distribution dreams.
 
-**Model-exploitation control.** Planning uses **uncertainty-penalized rollouts** with
-short/branched horizons (MBPO/MOPO), so the planner is repelled from regions the model
-is wrong about. This defense *depends on* a healthy uncertainty estimate, which is why
-the reliability check is upstream of it.
+**Model-exploitation control.** Planning **in exploit mode** uses
+**uncertainty-penalized rollouts** with short/branched horizons (MBPO/MOPO), so the
+planner is repelled from regions the model is wrong about; explore-mode data
+collection flips the sign under the curriculum's control (ADR-0007). This defense
+*depends on* a healthy uncertainty estimate, which is why the reliability check is
+upstream of it.
 
 **Integrity is gated, not hoped for.** Because collapse hides in a good loss, integrity
 is enforced by standing **sentinels** in `bench/gates.py`. Every phase gate passes only

@@ -14,3 +14,4 @@ Format: Status · Context · Decision · Consequences.
 | 0004 | Three-tier knowledge; retrieval/tools as uncertainty-gated actions | Accepted |
 | 0005 | Benchmark-gated incremental delivery | Accepted |
 | 0006 | Representation & uncertainty integrity (collapse prevention) | Accepted |
+| 0007 | Arbitration of the epistemic signal (explore/exploit modes) | Accepted |

@@ -1,6 +1,6 @@
 # P0-010 — ADR-0007: arbitration of the epistemic signal (seek vs avoid)
 
-- **Status:** ready
+- **Status:** done
 - **Phase:** P0
 - **Requirements:** R1, R3, R7 (consumers of the one signal that currently conflict)
 - **ADRs:** new ADR-0007; ADR-0002 (add consequence)
@@ -42,22 +42,36 @@ architecture.md note.
   table, cross-referencing ADR-0007.
 
 ## Acceptance criteria
-- [ ] ADR-0007 exists (Status/Context/Decision/Consequences), added to the ADR README
-      index table.
-- [ ] ADR-0002 gains the shift-disambiguation consequence.
-- [ ] architecture.md "one signal, many jobs" section references the arbitration.
-- [ ] No contradiction with ADR-0006 (its uncertainty-penalty paragraph now says
-      "in exploitation mode" or equivalent cross-reference).
-- [ ] `make test` green, `make lint` clean (unchanged code).
+- [x] ADR-0007 exists (Status/Context/Decision/Consequences), added to the ADR README
+      index table (`docs/adr/0007-epistemic-signal-arbitration.md`).
+- [x] ADR-0002 gains the sign-arbitration + shift-disambiguation consequence.
+- [x] architecture.md "one signal, many jobs" section references the arbitration
+      (paragraph after the jobs table).
+- [x] No contradiction with ADR-0006 — its model-exploitation paragraph now reads
+      "in exploit mode … explore-mode data collection flips the sign under the
+      curriculum's control (ADR-0007)".
+- [x] `make test` green, `make lint` clean (unchanged code).
 
 ## Test plan
 - Docs review only: re-read ADR-0002/0006/0007 together for consistency; check the
   backlog rows for P2-001/P3-002 reference ADR-0007.
 
 ## Docs-sync checklist
-- [ ] Task Status updated; gate result recorded below.
-- [ ] ADR README table updated.
-- [ ] Backlog P2-001 and P3-002 rows link ADR-0007.
+- [x] Task Status updated; gate result recorded below.
+- [x] ADR README table updated (0007 · Accepted).
+- [x] Backlog P2-001 and P3-002 rows link ADR-0007 (annotated at planning time;
+      verified — P2-001 applies the penalty sign, P3-002 owns the mode flag).
 
 ## Gate result
-_not run yet_
+Docs-only task; consistency review done (ADR-0002 ↔ 0006 ↔ 0007 cross-references
+read together — the sign is owned once, by the curriculum; ADR-0006's penalty is
+scoped to exploit mode; ADR-0002 points sign conflicts at ADR-0007). Code unchanged:
+
+```
+make test      : 37 passed
+make lint      : All checks passed!
+make typecheck : Success: no issues found in 25 source files
+make gate-all  : [P0] PASS — ratchet ok
+```
+
+Result: **PASS** (P0 criterion met; docs consistent).

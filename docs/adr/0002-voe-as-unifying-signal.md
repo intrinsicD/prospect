@@ -31,3 +31,12 @@ all six jobs listed in `docs/architecture.md`.
   `.epistemic`, not the undecomposed total (the same rule as `Prediction`, one level
   up). Transitions collected while executing a skill set `Transition.option`, so
   competence is attributable per skill. *(Amended by P0-002.)*
+- Consumers can conflict over the signal's *sign* — planning avoids epistemic
+  uncertainty while curiosity seeks it; that arbitration is decided in ADR-0007
+  (mode-dependent, curriculum-owned). And under distribution shift the signal is
+  ambiguous across consumers: the forgetting detector (job 5) and the retrieval
+  trigger (job 6) fire together, yet "I forgot", "the world changed", and "I'm
+  off-distribution, so the uncertainty estimate itself is unreliable" are three
+  different correct responses to one scalar. Disambiguation is expected to need
+  context beyond the scalar (which skill, which regime) — a named P7 concern, not
+  assumed away. *(Amended by P0-010.)*
