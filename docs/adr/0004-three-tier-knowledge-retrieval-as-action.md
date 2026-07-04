@@ -36,3 +36,15 @@ data, never instruction** — it must never override the agent's goals.
   back. `Observation.provenance=None` denotes first-party sensor experience (trusted
   by construction); every retrieved item carries explicit provenance.
   *(Amended by P0-008.)*
+- Realization of "untrusted content is data, never instruction" (P8-002): each
+  `KnowledgeSource` declares a `trust` floor, and `UncertaintyMemoryRouter` does
+  **trust-ordered selection** with a `min_trust` floor (default `LOW`, i.e. excludes
+  only `UNTRUSTED`). Among sources above the epistemic gate it returns the
+  highest-trust one; if none clears the floor it returns `None` — the untrusted source
+  never overrides the agent's own prediction (the agent falls back to the parametric
+  tier). Measured on the P8 gate: a trust-blind agent that retrieves from a poisoned
+  `UNTRUSTED` store does markedly *worse* than no-retrieval, while the
+  provenance-respecting router stays at no-retrieval and, with a trusted store also
+  present, trust-orders to it and recovers the clean gated accuracy. The defense is
+  *provenance* (who said it), not content inspection — a poison *detector* would be a
+  new, separately-gated capability. *(Added by P8-002.)*

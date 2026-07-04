@@ -1,4 +1,5 @@
-"""P8 eval — partial, from P8-001: uncertainty-gated retrieval beats no-retrieval.
+"""P8 eval: uncertainty-gated retrieval beats no-retrieval (P8-001) AND is robust to
+a poisoned/low-trust source (P8-002) — the two halves of the P8 capability.
 
 Retrieval is an action gated by epistemic uncertainty (ADR-0004): answer from the
 parametric tier (the world model's weights) where the model is confident, retrieve
@@ -9,16 +10,21 @@ next-latent facts across the FULL range (the knowledge base). Per test query the
 `UncertaintyMemoryRouter` gates on the model's `prediction.epistemic` (threshold =
 a held-out seen-region epistemic quantile).
 
-Measured claim: gated 1-step MSE beats model-alone (no-retrieval) on every seed —
-and typically beats ALWAYS-retrieve too, because gating keeps the model's accurate
-prediction in the confident region and only fetches facts where the model is
-wrong, retrieving a fraction of the time (the gating IS the point).
+Accuracy half (P8-001): gated 1-step MSE beats model-alone (no-retrieval) on every
+seed — and typically beats ALWAYS-retrieve too, because gating keeps the model's
+accurate prediction in the confident region and only fetches facts where the model
+is wrong, retrieving a fraction of the time (the gating IS the point).
 
-The full P8 capability is gated-beats-no-retrieval AND robustness to a
-poisoned/low-trust source (P8-002), so this check reports `passed=False` with the
-pending half named. Run `p8` carries all four sentinels: the limited-region model
-must still be healthy, and its natural OOD (|omega| > REGION) feeds the
-uncertainty-reliability probe.
+Robustness half (P8-002): a poisoned store (UNTRUSTED provenance, corrupted answers)
+over the same keys is the attack surface. A trust-blind agent that retrieves from it
+does WORSE than no-retrieval (the poison bites). A provenance-respecting router
+(`min_trust` floor + trust-ordered selection) never lets the untrusted source
+override the model — it declines to retrieve and stays at no-retrieval — and when the
+trusted store is also present it trust-orders to it, recovering the clean gated
+accuracy. Untrusted content is data, never instruction (ADR-0004).
+
+Run `p8` carries all four sentinels: the limited-region model must still be healthy,
+and its natural OOD (|omega| > REGION) feeds the uncertainty-reliability probe.
 """
 from __future__ import annotations
 
@@ -42,6 +48,9 @@ REGION, FULL = 4.0, 8.0  # trained |omega| <= REGION; store & test span |omega| 
 TRAIN_N, STORE_N, TEST_N, PROBE_N = 4096, 3000, 400, 256
 EPISTEMIC_QUANTILE = 0.9  # retrieve above the 90th-percentile seen-region epistemic
 IMPROVEMENT_MARGIN = 1.5  # gated MSE must beat no-retrieval by at least this factor
+POISON_SCALE = 0.5  # noise added to the poisoned store's answers (target-latent units)
+POISON_HARM_FACTOR = 2.0  # trust-blind retrieval from the poison must be >= this x worse
+ROBUST_TOL = 1.05  # provenance-respecting MSE must stay within this of its clean target
 
 
 def _env() -> Pendulum:
@@ -80,12 +89,40 @@ def _build_store(model: FlatWorldModel, facts: list[Transition]) -> SemanticStor
     return store
 
 
+def _build_poisoned_store(
+    model: FlatWorldModel, facts: list[Transition], seed: int
+) -> SemanticStore:
+    """An UNTRUSTED store over the same keys as the clean store, but whose answers are
+    corrupted (large noise) — a plausible poisoned/low-trust source (P8-002). Its
+    provenance is UNTRUSTED, so a provenance-respecting router must never let it
+    override the model's own prediction (ADR-0004: untrusted content is data)."""
+    rng = np.random.default_rng(seed)
+    store = SemanticStore(trust=Trust.UNTRUSTED)
+    for t in facts:
+        correct = np.asarray(model.encode_target(t.next_state.z).z, dtype=float)
+        poison = correct + rng.normal(0.0, POISON_SCALE, size=correct.shape)
+        store.write(KnowledgeItem(content=(_key(model, t), poison),
+                                  provenance=Provenance(source="poisoned", trust=Trust.UNTRUSTED)))
+    return store
+
+
+def _routed_answer(
+    router: UncertaintyMemoryRouter, key: np.ndarray, epistemic: float, parametric: np.ndarray
+) -> np.ndarray:
+    """The answer a provenance-respecting agent uses: the router's chosen source's
+    fact when it retrieves, else the model's own prediction (`route() -> None`)."""
+    source = router.route(None, epistemic)
+    if source is None:
+        return parametric
+    return np.asarray(source.query(key)[0].content[1], dtype=float)
+
+
 @gate_check("P8")
 def check_p8() -> GateResult:
     (RUNS_DIR / RUN_ID / "metrics.jsonl").unlink(missing_ok=True)
     log = RunLog(RUN_ID)
     metrics: dict[str, float] = {}
-    beats_no_retrieval = []
+    beats_no_retrieval, robust = [], []
     for seed in SEEDS:
         train = _region_data(REGION, TRAIN_N, seed)
         heldout = _region_data(REGION, PROBE_N, seed + 500)  # in-distribution (seen region)
@@ -101,48 +138,84 @@ def check_p8() -> GateResult:
         log_replay_fidelity(model, train, seed, log, step_offset=seed * SEED_STEP_OFFSET + 50_000)
         _log_option_diversity(model, seed, log)
 
-        store = _build_store(model, _region_data(FULL, STORE_N, seed + 50))
+        facts = _region_data(FULL, STORE_N, seed + 50)
+        store = _build_store(model, facts)
+        poisoned = _build_poisoned_store(model, facts, seed + 70)
         seen_epistemic = sorted(
             model.predict(model.encode(t.state.z), t.action).epistemic for t in heldout)
         threshold = seen_epistemic[int(EPISTEMIC_QUANTILE * len(seen_epistemic))]
-        router = UncertaintyMemoryRouter([store], threshold=threshold)
+        # P8-001 accuracy path (a single trusted store); P8-002 robustness paths over a
+        # poisoned UNTRUSTED source: trust-blind (ignores provenance — a P8-001-style
+        # agent), provenance-respecting alone, and provenance-respecting alongside the
+        # trusted store (trust-ordered selection). Default min_trust=LOW excludes UNTRUSTED.
+        gated_router = UncertaintyMemoryRouter([store], threshold=threshold)
+        blind_router = UncertaintyMemoryRouter([poisoned], threshold=threshold,
+                                               min_trust=Trust.UNTRUSTED)
+        respecting_router = UncertaintyMemoryRouter([poisoned], threshold=threshold)
+        mixed_router = UncertaintyMemoryRouter([poisoned, store], threshold=threshold)
 
         test = _region_data(FULL, TEST_N, seed + 200)
-        none_err, gated_err, always_err, retrieved = [], [], [], 0
+        none_err, gated_err, always_err = [], [], []
+        blind_err, resp_err, mixed_err, retrieved = [], [], [], 0
         for t in test:
+            key = _key(model, t)
             pred = model.predict(model.encode(t.state.z), t.action)
             target = np.asarray(model.encode_target(t.next_state.z).z, dtype=float)
             parametric = np.asarray(pred.mean, dtype=float)
-            retrieved_answer = np.asarray(store.query(_key(model, t))[0].content[1], dtype=float)
-            source = router.route(None, pred.epistemic)
-            gated = parametric if source is None else retrieved_answer
-            if source is not None:
-                retrieved += 1
+            clean_answer = np.asarray(store.query(key)[0].content[1], dtype=float)
+            retrieved += int(pred.epistemic > threshold)
             none_err.append(float(np.mean((parametric - target) ** 2)))
-            gated_err.append(float(np.mean((gated - target) ** 2)))
-            always_err.append(float(np.mean((retrieved_answer - target) ** 2)))
+            gated_err.append(float(np.mean(
+                (_routed_answer(gated_router, key, pred.epistemic, parametric) - target) ** 2)))
+            always_err.append(float(np.mean((clean_answer - target) ** 2)))
+            blind_err.append(float(np.mean(
+                (_routed_answer(blind_router, key, pred.epistemic, parametric) - target) ** 2)))
+            resp_err.append(float(np.mean(
+                (_routed_answer(respecting_router, key, pred.epistemic, parametric) - target) ** 2)))
+            mixed_err.append(float(np.mean(
+                (_routed_answer(mixed_router, key, pred.epistemic, parametric) - target) ** 2)))
         none_mse, gated_mse = float(np.mean(none_err)), float(np.mean(gated_err))
         always_mse, rate = float(np.mean(always_err)), retrieved / len(test)
+        blind_mse, resp_mse, mixed_mse = (
+            float(np.mean(blind_err)), float(np.mean(resp_err)), float(np.mean(mixed_err)))
         beats_no_retrieval.append(gated_mse * IMPROVEMENT_MARGIN <= none_mse)
+        # Robustness (every seed): the poison genuinely harms a trust-blind agent,
+        # provenance-respecting retrieval stays no worse than no-retrieval (untrusted
+        # never overrides), and trust-ordering recovers the clean gated accuracy.
+        robust.append(blind_mse >= none_mse * POISON_HARM_FACTOR
+                      and resp_mse <= none_mse * ROBUST_TOL
+                      and mixed_mse <= gated_mse * ROBUST_TOL)
         metrics |= {
             f"no_retrieval_mse_s{seed}": none_mse,
             f"gated_mse_s{seed}": gated_mse,
             f"always_retrieve_mse_s{seed}": always_mse,
             f"retrieval_rate_s{seed}": rate,
+            f"poison_blind_mse_s{seed}": blind_mse,
+            f"poison_respecting_mse_s{seed}": resp_mse,
+            f"poison_mixed_mse_s{seed}": mixed_mse,
         }
 
-    accuracy_met = all(beats_no_retrieval)
-    none_med = float(np.median([metrics[f"no_retrieval_mse_s{s}"] for s in SEEDS]))
-    gated_med = float(np.median([metrics[f"gated_mse_s{s}"] for s in SEEDS]))
-    always_med = float(np.median([metrics[f"always_retrieve_mse_s{s}"] for s in SEEDS]))
-    rate_med = float(np.median([metrics[f"retrieval_rate_s{s}"] for s in SEEDS]))
+    accuracy_met, robustness_met = all(beats_no_retrieval), all(robust)
+    passed = accuracy_met and robustness_met
+
+    def med(key: str) -> float:
+        return float(np.median([metrics[f"{key}_s{s}"] for s in SEEDS]))
+
+    none_med, gated_med, always_med, rate_med = (
+        med("no_retrieval_mse"), med("gated_mse"), med("always_retrieve_mse"), med("retrieval_rate"))
+    blind_med, resp_med, mixed_med = (
+        med("poison_blind_mse"), med("poison_respecting_mse"), med("poison_mixed_mse"))
     metrics |= {"no_retrieval_mse_median": none_med, "gated_mse_median": gated_med,
                 "always_retrieve_mse_median": always_med, "retrieval_rate_median": rate_med,
-                "accuracy_half_met": float(accuracy_met)}
+                "poison_blind_mse_median": blind_med, "poison_respecting_mse_median": resp_med,
+                "poison_mixed_mse_median": mixed_med, "accuracy_half_met": float(accuracy_met),
+                "robustness_half_met": float(robustness_met)}
     detail = (
-        f"1-step MSE: gated {gated_med:.4f} vs no-retrieval {none_med:.4f} "
-        f"(>= x{IMPROVEMENT_MARGIN} better on every seed: {'MET' if accuracy_met else 'NOT MET'}) "
-        f"vs always-retrieve {always_med:.4f}; retrieval rate {rate_med:.0%} (gated: model where "
-        f"confident, retrieve where uncertain); robustness half pending (P8-002)"
+        f"accuracy: gated {gated_med:.4f} vs no-retrieval {none_med:.4f} "
+        f"(>= x{IMPROVEMENT_MARGIN}/seed: {'MET' if accuracy_met else 'NOT MET'}) vs always "
+        f"{always_med:.4f}, retrieval {rate_med:.0%}. "
+        f"robustness: trust-blind swallows poison {blind_med:.4f} (>= x{POISON_HARM_FACTOR} "
+        f"worse), provenance-respecting stays {resp_med:.4f} (<= no-retrieval) and trust-ordered "
+        f"mixed recovers {mixed_med:.4f}: {'MET' if robustness_met else 'NOT MET'}"
     )
-    return GateResult(phase="P8", passed=False, metrics=metrics, seeds=list(SEEDS), detail=detail)
+    return GateResult(phase="P8", passed=passed, metrics=metrics, seeds=list(SEEDS), detail=detail)

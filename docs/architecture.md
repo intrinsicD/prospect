@@ -61,10 +61,13 @@ design's health is that additions plug into this backbone.
   only competence-gated (mastered) skills are offered upward (R5).
 - **memory.py** — episodic replay + *generative* replay (rehearsal), a semantic
   store whose read side is a `KnowledgeSource` (one query verb, P0-008), and an
-  uncertainty-gated router over the memory tiers that may decline to retrieve
-  (`None` = answer parametrically) (R7, R8).
+  uncertainty-gated, **provenance-respecting** router over the memory tiers: it may
+  decline to retrieve (`None` = answer parametrically), and it selects among sources
+  by `trust` — highest-trust above a `min_trust` floor wins, so an untrusted source
+  never overrides the agent's own prediction (R7, R8; ADR-0004).
 - **knowledge.py** — internal/external knowledge sources and tools as
-  uncertainty-gated actions, each item carrying provenance/trust (R8).
+  uncertainty-gated actions; each source declares a `trust` floor and each item
+  carries provenance/trust — untrusted content is data, never instruction (R8).
 - **types.py / interfaces.py** — shared types and the `Protocol` contracts every
   component satisfies. Components that learn additionally satisfy `Learner`
   (`update(batch) -> metrics dict`) — the uniform training seam the harness drives,

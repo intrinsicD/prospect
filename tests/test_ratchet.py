@@ -40,21 +40,22 @@ def test_gate_all_exit_codes(tmp_path: Path, capsys: pytest.CaptureFixture[str])
     shipped.write_text("")
     assert main(["--all"], shipped_path=shipped, results_dir=tmp_path) == 0
 
-    # A shipped phase whose gate is BLOCKED (P8 is still PENDING) -> 1.
-    shipped.write_text("P8\n")
-    assert main(["--all"], shipped_path=shipped, results_dir=tmp_path) == 1
-    assert "RATCHET FAILED" in capsys.readouterr().out
-
     # Malformed SHIPPED -> 2.
     shipped.write_text("P42\n")
     assert main(["--all"], shipped_path=shipped, results_dir=tmp_path) == 2
 
-    # All shipped gates pass -> 0 (fake a passing P0 check; P0 has no sentinels).
+    # Exit codes for a shipped gate's health are exercised on a controlled P0 check
+    # (P0 has no sentinels, so its composite result == its capability). Every phase
+    # now ships a passing gate, so a BLOCKED phase is synthesized rather than borrowed.
     original = bench.GATES["P0"].check
+    shipped.write_text("P0\n")
     try:
+        bench.GATES["P0"].check = lambda: GateResult(phase="P0", passed=False, detail="fake block")
+        assert main(["--all"], shipped_path=shipped, results_dir=tmp_path) == 1  # BLOCKED -> 1
+        assert "RATCHET FAILED" in capsys.readouterr().out
+
         bench.GATES["P0"].check = lambda: GateResult(phase="P0", passed=True, detail="fake pass")
-        shipped.write_text("P0\n")
-        assert main(["--all"], shipped_path=shipped, results_dir=tmp_path) == 0
+        assert main(["--all"], shipped_path=shipped, results_dir=tmp_path) == 0  # all pass -> 0
         assert "ratchet ok" in capsys.readouterr().out
     finally:
         bench.GATES["P0"].check = original

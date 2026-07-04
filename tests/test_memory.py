@@ -160,6 +160,30 @@ def test_router_gates_on_epistemic() -> None:
     assert empty.route(np.zeros(2), epistemic=0.9) is None  # nothing to retrieve from
 
 
+def test_semantic_store_declares_trust() -> None:
+    assert SemanticStore().trust is Trust.HIGH  # internal distilled store, trusted
+    assert SemanticStore(trust=Trust.UNTRUSTED).trust is Trust.UNTRUSTED
+
+
+def test_router_is_trust_ordered() -> None:  # P8-002: highest-trust eligible wins
+    low, high = SemanticStore(trust=Trust.LOW), SemanticStore(trust=Trust.HIGH)
+    assert UncertaintyMemoryRouter([low, high], threshold=0.5).route(None, 0.9) is high
+    assert UncertaintyMemoryRouter([high, low], threshold=0.5).route(None, 0.9) is high
+
+
+def test_router_never_lets_untrusted_override() -> None:  # P8-002: data, not instruction
+    poisoned = SemanticStore(trust=Trust.UNTRUSTED)
+    trusted = SemanticStore(trust=Trust.HIGH)
+    # default floor (LOW) excludes an untrusted-only set -> fall back to the model
+    assert UncertaintyMemoryRouter([poisoned], threshold=0.5).route(None, 0.9) is None
+    # a trust-blind caller (floor UNTRUSTED) would consult the poison...
+    blind = UncertaintyMemoryRouter([poisoned], threshold=0.5, min_trust=Trust.UNTRUSTED)
+    assert blind.route(None, 0.9) is poisoned
+    # ...but trust-ordering still prefers a trusted source when one is present
+    mixed = UncertaintyMemoryRouter([poisoned, trusted], threshold=0.5, min_trust=Trust.UNTRUSTED)
+    assert mixed.route(None, 0.9) is trusted
+
+
 def test_store_and_router_satisfy_protocols() -> None:
     assert isinstance(SemanticStore(), interfaces.SemanticMemory)
     assert isinstance(SemanticStore(), interfaces.KnowledgeSource)

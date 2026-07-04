@@ -75,4 +75,15 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 
 ## Phase 8 — knowledge bases
 - **P8-001** · `done` · R8 · Three-tier memory router + uncertainty-gated retrieval-as-action. Accuracy half **MET**: gated 1-step MSE ~3.2x lower than model-alone every seed (beats always-retrieve too), retrieving 55% of queries; all four sentinels healthy. P8 composite honestly BLOCKED pending P8-002.
-- **P8-002** · `ready` · R8 · Provenance/trust handling + poisoned/low-trust source robustness — completes the P8 gate. **(start here — final task)**
+- **P8-002** · `done` · R8 · Provenance/trust handling + poisoned/low-trust source robustness. `KnowledgeSource.trust` + trust-ordered routing with a `min_trust` floor: a trust-blind agent swallows the poison (5.4x worse than no-retrieval), the provenance-respecting router stays at no-retrieval (untrusted never overrides) and trust-orders to a trusted store to recover clean gated accuracy. Gate **P8 PASS** (shipped).
+
+> **Phase 8 shipped** — `bench/SHIPPED` now ratchets P0–P8. Uncertainty-gated
+> retrieval-as-action improves prediction where the model is uncertain, and provenance
+> (trust-ordered selection + a `min_trust` floor) keeps a poisoned/low-trust source
+> from ever overriding the agent — data, never instruction (ADR-0004).
+
+> **P0–P8 complete.** Every roadmap phase has a passing kill-gate with its collapse
+> sentinels healthy; the regression ratchet re-runs all nine in CI. The one signal —
+> prediction error over a distribution with an epistemic/aleatoric split — is live
+> end-to-end: prediction, planning, VoE/mastery/curiosity, skills, hierarchy,
+> any-to-any I/O, continual improvement, and knowledge retrieval.

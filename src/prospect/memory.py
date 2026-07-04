@@ -1,6 +1,7 @@
 """Memory tiers (R7, R8). Episodic replay + *generative* replay (rehearsal), a
-semantic store, and an uncertainty-gated router over the tiers. See ADR-0004.
-ReplayBuffer implemented in P3-003; SemanticStore + UncertaintyMemoryRouter in P8-001.
+semantic store, and an uncertainty-gated, provenance-respecting router over the
+tiers. See ADR-0004. ReplayBuffer implemented in P3-003; SemanticStore +
+UncertaintyMemoryRouter in P8-001; trust-ordered routing in P8-002.
 """
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from .interfaces import KnowledgeSource, WorldModel
-from .types import KnowledgeItem, LatentState, Option, Transition
+from .types import KnowledgeItem, LatentState, Option, Transition, Trust
 
 
 class ReplayBuffer:
@@ -142,12 +143,17 @@ class SemanticStore:
     returns the single nearest fact by key distance (or `[]` when empty). Every
     item carries `Provenance` (P0-008).
 
+    `trust` is the store's source-level provenance floor (P8-002): `HIGH` by default
+    (the internal distilled store), but a test/adversarial store can be built at a
+    lower level so the router treats it as untrusted.
+
     Contract: interfaces.SemanticMemory.
     """
 
     name = "semantic"
 
-    def __init__(self) -> None:
+    def __init__(self, trust: Trust = Trust.HIGH) -> None:
+        self.trust = trust
         self._items: list[KnowledgeItem] = []
         self._keys: list[np.ndarray] = []
 
@@ -169,22 +175,36 @@ class SemanticStore:
 
 
 class UncertaintyMemoryRouter:
-    """Route a query to a tier by current epistemic uncertainty (P8-001): answer
-    from the model when confident — `route()` returns `None`, the parametric tier
-    (P0-008) — and retrieve when uncertain (retrieval-as-action, ADR-0004). The
-    threshold is calibrated to the model's epistemic scale by the caller.
+    """Route a query to a tier by epistemic uncertainty *and* provenance (P8-001,
+    P8-002): answer from the model when confident — `route()` returns `None`, the
+    parametric tier (P0-008) — and retrieve when uncertain (retrieval-as-action,
+    ADR-0004). The epistemic `threshold` is calibrated to the model's scale by the
+    caller.
 
-    Minimal tier selection: below-threshold ⇒ parametric (`None`); above ⇒ the
-    first source. Trust-ordered selection among external sources is P8-002.
+    Selection is **trust-ordered** (P8-002). A source is eligible only if its declared
+    `trust` clears `min_trust`; among eligible sources the highest-trust one wins. If
+    nothing clears the floor, `route()` returns `None` — an untrusted source is data,
+    never instruction (ADR-0004): it must never override the agent's own prediction,
+    so the router falls back to the parametric tier. `min_trust=LOW` (the default)
+    excludes only `UNTRUSTED`.
 
     Contract: interfaces.MemoryRouter.
     """
 
-    def __init__(self, sources: Sequence[KnowledgeSource] = (), threshold: float = 0.0) -> None:
+    def __init__(
+        self,
+        sources: Sequence[KnowledgeSource] = (),
+        threshold: float = 0.0,
+        min_trust: Trust = Trust.LOW,
+    ) -> None:
         self._sources = list(sources)
         self.threshold = threshold
+        self.min_trust = min_trust
 
     def route(self, query: object, epistemic: float) -> KnowledgeSource | None:
-        if epistemic <= self.threshold or not self._sources:
-            return None  # confident (or nothing to retrieve from): answer parametrically
-        return self._sources[0]
+        if epistemic <= self.threshold:
+            return None  # confident: answer parametrically
+        eligible = [s for s in self._sources if s.trust >= self.min_trust]
+        if not eligible:
+            return None  # nothing trusted enough to override the model's own prediction
+        return max(eligible, key=lambda s: s.trust)  # trust-ordered; ties keep first

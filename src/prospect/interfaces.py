@@ -16,6 +16,7 @@ from .types import (
     Subgoal,
     Surprise,
     Transition,
+    Trust,
 )
 
 
@@ -113,9 +114,16 @@ class EpisodicMemory(Protocol):
 @runtime_checkable
 class KnowledgeSource(Protocol):
     """Internal or external knowledge / tools (R8, ADR-0004). Querying is an *action*
-    the planner selects, gated by uncertainty; every item carries provenance/trust."""
+    the planner selects, gated by uncertainty; every item carries provenance/trust.
+
+    `trust` is the source's provenance *floor* — the trust level the router uses for
+    trust-ordered selection (P8-002). It is the source-level counterpart of each
+    item's `Provenance.trust`; an `UNTRUSTED` source is data the router must never let
+    override the agent's own prediction (ADR-0004: untrusted content is never
+    instruction)."""
 
     name: str
+    trust: Trust
 
     def query(self, query: object) -> list[KnowledgeItem]: ...
 
@@ -137,6 +145,11 @@ class MemoryRouter(Protocol):
 
     Returning `None` means: confident — answer parametrically (from the model's
     weights), do not retrieve (P0-008). At P8 the router's decision surfaces to the
-    planner as retrieval *options* (retrieval-as-action, ADR-0004 rule 2)."""
+    planner as retrieval *options* (retrieval-as-action, ADR-0004 rule 2).
+
+    Selection is provenance-respecting (P8-002): a source is eligible only if its
+    `trust` clears the router's floor, and among eligible sources the highest-trust
+    one wins — so an untrusted source can never override the agent's own prediction
+    (returns `None` instead)."""
 
     def route(self, query: object, epistemic: float) -> KnowledgeSource | None: ...
