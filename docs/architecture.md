@@ -53,8 +53,10 @@ design's health is that additions plug into this backbone.
 - **planning.py** — flat MPC/CEM in imagination (R1); the hierarchical manager over
   a *jumpy* option-model + VoE-triggered termination (R2).
 - **voe.py** — calibrated surprise; epistemic/aleatoric split; competence/mastery
-  and forgetting detection (R3, R7); the learning-progress curriculum that owns
-  the ADR-0007 explore/exploit mode flag (consumers read the sign, never pick it).
+  (keyed on epistemic) and forgetting detection (keyed on rising prediction error —
+  the ensemble is confidently wrong under shift, P7-001) (R3, R7); the
+  learning-progress curriculum that owns the ADR-0007 explore/exploit mode flag
+  (consumers read the sign, never pick it).
 - **skills.py** — options with predictive preconditions; simulate-to-select router;
   only competence-gated (mastered) skills are offered upward (R5).
 - **memory.py** — episodic replay + *generative* replay (rehearsal), a semantic

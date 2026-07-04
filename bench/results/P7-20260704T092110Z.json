@@ -1,0 +1,86 @@
+{
+  "phase": "P7",
+  "passed": true,
+  "run_id": null,
+  "written_at": "20260704T092110Z",
+  "capability": {
+    "criterion": "On a task sequence, retention of earlier skills stays above threshold (no catastrophic forgetting), AND plasticity is retained (late tasks learn as fast as early ones).",
+    "passed": true,
+    "metrics": {
+      "retention_consolidate_s0": 0.09798977040319852,
+      "retention_none_s0": 0.26784677547457963,
+      "plasticity_consolidate_s0": 1.4368166901697415,
+      "plasticity_none_s0": 0.26914221032186075,
+      "forgetting_detected_none_s0": 0.0,
+      "forgetting_detected_consolidate_s0": 0.0,
+      "retention_consolidate_s1": 0.0939039793889846,
+      "retention_none_s1": 0.3693122335884434,
+      "plasticity_consolidate_s1": 0.8789663044557028,
+      "plasticity_none_s1": 0.3901434723038276,
+      "forgetting_detected_none_s1": 0.0,
+      "forgetting_detected_consolidate_s1": 0.0,
+      "retention_consolidate_s2": 0.07056546546829415,
+      "retention_none_s2": 0.3788385674729223,
+      "plasticity_consolidate_s2": 2.974302036374185,
+      "plasticity_none_s2": 5.547179207010491,
+      "forgetting_detected_none_s2": 0.0,
+      "forgetting_detected_consolidate_s2": 0.0,
+      "retention_consolidate_mean": 0.08748640508682574,
+      "retention_none_mean": 0.3386658588453151,
+      "plasticity_consolidate_mean": 1.7633616769998763,
+      "plasticity_none_mean": 2.0688216298787263,
+      "continual_improvement_passes": 1.0
+    },
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "detail": "retention (avg past-task MSE, lower=better) consolidate [0.1, 0.09, 0.07] vs none [0.27, 0.37, 0.38] (contrast, tol x0.8); plasticity (last-task fit / from-scratch scale) consolidate [1.44, 0.88, 2.97] (naive [0.27, 0.39, 5.55], abs tol x3.5) \u2014 consolidation prevents the forgetting naive suffers while the model still learns new tasks: YES"
+  },
+  "sentinels": [
+    {
+      "name": "representation-integrity",
+      "criterion": "Latent per-dimension std stays above a floor AND effective rank (participation ratio of the latent covariance) stays above a threshold on held-out data throughout training \u2014 not only at the capability checkpoint.",
+      "healthy": true,
+      "metrics": {
+        "min_latent_std": 0.7110566541530516,
+        "min_effective_rank": 2.2398665057917575
+      },
+      "detail": "across 48 held-out probes (warm-up 300 steps): min per-dim std 0.711 (floor 0.3), min effective rank 2.24 (floor 2.0)"
+    },
+    {
+      "name": "uncertainty-reliability",
+      "criterion": "Predicted epistemic uncertainty is rank-correlated with held-out prediction error above a threshold, and ensemble-member disagreement does not decay to ~0 in regions where error is high.",
+      "healthy": true,
+      "metrics": {
+        "min_final_rank_corr": 0.644363396087534,
+        "min_high_error_disagreement_ratio": 18.36868109837647
+      },
+      "detail": "worst seed at end of training: disagreement-vs-error rank corr 0.64 (min 0.3), high-error-decile disagreement 18.37x median (min 1.0) on a mixed in-dist + OOD probe set"
+    },
+    {
+      "name": "replay-fidelity",
+      "criterion": "Rehearsal keeps a fixed real-data fraction; dreamed-sample diversity (feature variance / coverage vs real) stays above a floor and does not shrink across regenerations; rehearsal lineage depth is capped (no dream-of-dreams).",
+      "healthy": true,
+      "metrics": {
+        "min_real_fraction": 0.5,
+        "min_dream_diversity": 0.640656433705776,
+        "worst_diversity_shrink": 0.9441153834655411,
+        "max_dream_depth": 3.0
+      },
+      "detail": "across 5 regenerations x 3 seed(s): real fraction min 0.50 (floor 0.3), dream diversity min 0.64 (floor 0.3), diversity shrink 0.94 (floor 0.5), lineage depth max 3 (cap 3), dreams stored: 0"
+    },
+    {
+      "name": "option-diversity",
+      "criterion": "Option-usage entropy stays above a floor (no single option dominates), mean option duration stays above one step, and pairwise option outcome-distributions remain distinguishable.",
+      "healthy": true,
+      "metrics": {
+        "min_usage_entropy": 0.7702981566472435,
+        "min_mean_duration": 2.9411764705882355,
+        "min_pairwise_dprime": 0.7155616900967386
+      },
+      "detail": "worst seed over the two-level eval episodes: usage entropy 0.77 (floor 0.3), mean executed duration 2.94 steps (floor > 1.0), min pairwise landing d' 0.72 (floor 0.5)"
+    }
+  ]
+}

@@ -84,16 +84,16 @@ def test_all_sentinels_registered() -> None:
 
 
 def test_phase_gate_is_composite_and_pending(tmp_path: Path) -> None:
-    # P7 is the furthest still-PENDING phase (P1-P6 checks run real evals now);
+    # P8 is the furthest still-PENDING phase (P1-P7 checks run real evals now);
     # its report exercises the same composite structure with all four sentinels
     # and stays cheap (a PENDING capability trains nothing).
-    report = bench.run_gate("P7", results_dir=tmp_path)
+    report = bench.run_gate("P8", results_dir=tmp_path)
     assert isinstance(report, bench.GateReport)
     # pending capability => phase is not passable yet
     assert report.passed is False
     assert "PENDING" in report.capability.detail
     names = {s.name for s in report.sentinels}
-    # by P7, all four integrity sentinels are active
+    # by P8, all four integrity sentinels are active
     assert {"representation-integrity", "uncertainty-reliability", "replay-fidelity",
             "option-diversity"} <= names
 

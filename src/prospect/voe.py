@@ -1,7 +1,7 @@
 """Violation of expectation — the unifying signal (R3, R7). See ADR-0002.
-Implemented in P3-001 (surprise, decomposition, mastery) and P3-002 (the
-learning-progress curriculum that owns the ADR-0007 mode flag); forgetting
-detection is P7-001.
+Implemented across P3-001 (surprise, decomposition, mastery), P3-002 (the
+learning-progress curriculum that owns the ADR-0007 mode flag) and P7-001
+(error-based forgetting detection).
 """
 from __future__ import annotations
 
@@ -13,17 +13,25 @@ from .types import Competence, LatentState, Mode, Prediction, Surprise, Transiti
 
 @dataclass
 class _SkillStats:
-    """Fast/slow EMAs of epistemic uncertainty; their gap is learning progress."""
+    """Per-skill EMAs. Epistemic fast/slow (their gap is learning progress) drive
+    MASTERY; a fast EMA of prediction ERROR drives FORGETTING. `mastered_error`
+    latches the error at first mastery — the floor `is_forgetting` measures a rise
+    against (`inf` = never mastered)."""
     fast: float = 0.0
     slow: float = 0.0
+    fast_error: float = 0.0
     updates: int = 0
+    mastered_epistemic: float = float("inf")
+    mastered_error: float = float("inf")
 
-    def push(self, epistemic: float, fast_rate: float, slow_rate: float) -> None:
+    def push(self, epistemic: float, error: float, fast_rate: float, slow_rate: float) -> None:
         if self.updates == 0:
             self.fast = self.slow = epistemic
+            self.fast_error = error
         else:
             self.fast += fast_rate * (epistemic - self.fast)
             self.slow += slow_rate * (epistemic - self.slow)
+            self.fast_error += fast_rate * (error - self.fast_error)
         self.updates += 1
 
 
@@ -45,7 +53,13 @@ class SurpriseCompetenceMonitor:
     model's act-time `prediction`; per-skill attribution via `Transition.option`
     (P0-002); transitions without a prediction are ignored (nothing was expected).
     Unseen skill ⇒ epistemic `inf`, unmastered: never practiced = maximally
-    unknown. `is_forgetting` arrives with P7-001.
+    unknown. `is_forgetting` (P7-001): prediction ERROR risen back up on a
+    once-mastered skill — the signal that, in the full system, triggers rehearsal
+    (generative replay, ADR-0002/0006). Forgetting keys on *error*, not epistemic,
+    because under distribution shift the ensemble is often confidently WRONG — it
+    agrees on a wrong answer, so epistemic (disagreement) does not rise even as the
+    skill decays (ADR-0002, resolving the P0-010-flagged P7 concern). Mastery still
+    keys on epistemic (learned = low uncertainty).
 
     Contract: interfaces.CompetenceMonitor.
     """
@@ -59,12 +73,33 @@ class SurpriseCompetenceMonitor:
         min_updates: int = 20,
         fast_rate: float = 0.1,
         slow_rate: float = 0.02,
+        forget_factor: float = 3.0,
+        error_floor: float = 0.01,
     ) -> None:
         self.mastery_epistemic = mastery_epistemic
         self.flat_progress = flat_progress
         self.min_updates = min_updates
         self.fast_rate, self.slow_rate = fast_rate, slow_rate
+        self.forget_factor = forget_factor
+        self.error_floor = error_floor
         self._skills: dict[str, _SkillStats] = {}
+
+    def _mastered(self, stats: _SkillStats) -> bool:
+        return (
+            stats.updates >= self.min_updates
+            and stats.fast <= self.mastery_epistemic
+            and abs(stats.slow - stats.fast) <= self.flat_progress
+        )
+
+    @staticmethod
+    def _prediction_error(prediction: Prediction, observed: LatentState) -> float:
+        """Mean squared latent prediction error (pure Python; core stays
+        dependency-free). Mismatched shapes ⇒ 0.0 (nothing to compare)."""
+        mean = [float(m) for m in prediction.mean]
+        obs = [float(x) for x in observed.z]
+        if len(mean) != len(obs) or not mean:
+            return 0.0
+        return sum((m - x) ** 2 for m, x in zip(mean, obs, strict=True)) / len(mean)
 
     def surprise(self, prediction: Prediction, observed: LatentState) -> Surprise:
         total = -prediction.log_prob(observed.z)
@@ -78,26 +113,34 @@ class SurpriseCompetenceMonitor:
             return  # nothing was expected — no violation to measure
         skill = transition.option.name if transition.option is not None else self.DEFAULT_SKILL
         stats = self._skills.setdefault(skill, _SkillStats())
-        stats.push(max(transition.prediction.epistemic, 0.0), self.fast_rate, self.slow_rate)
+        epistemic = max(transition.prediction.epistemic, 0.0)
+        error = self._prediction_error(transition.prediction, transition.next_state)
+        stats.push(epistemic, error, self.fast_rate, self.slow_rate)
+        if stats.mastered_epistemic == float("inf") and self._mastered(stats):
+            stats.mastered_epistemic = stats.fast  # latch the mastery floors...
+            stats.mastered_error = stats.fast_error  # ...for forgetting detection
 
     def competence(self, skill: str) -> Competence:
         stats = self._skills.get(skill)
         if stats is None:
             return Competence(skill=skill, epistemic=float("inf"), learning_progress=0.0)
-        progress = stats.slow - stats.fast
-        mastered = (
-            stats.updates >= self.min_updates
-            and stats.fast <= self.mastery_epistemic
-            and abs(progress) <= self.flat_progress
-        )
-        return Competence(skill=skill, epistemic=stats.fast, learning_progress=progress,
-                          mastered=mastered)
+        return Competence(skill=skill, epistemic=stats.fast, learning_progress=stats.slow - stats.fast,
+                          mastered=self._mastered(stats))
 
     def is_mastered(self, skill: str) -> bool:
         return self.competence(skill).mastered
 
     def is_forgetting(self, skill: str) -> bool:
-        raise NotImplementedError("P7-001")
+        """Prediction ERROR risen back up on a once-mastered skill (ADR-0002). A
+        skill that never mastered cannot be forgetting; a mastered one is forgetting
+        when its fast-EMA error exceeds `forget_factor` x its mastered-error floor
+        (floored by `error_floor` so a near-zero mastered error can't trip on noise).
+        Error, not epistemic: a confidently-wrong ensemble under shift keeps
+        epistemic low even as the skill decays (ADR-0002)."""
+        stats = self._skills.get(skill)
+        if stats is None or stats.mastered_error == float("inf"):
+            return False
+        return stats.fast_error > self.forget_factor * max(stats.mastered_error, self.error_floor)
 
 
 class LearningProgressCurriculum:

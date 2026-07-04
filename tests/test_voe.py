@@ -26,11 +26,13 @@ def _pred(epistemic: float, aleatoric: float) -> Prediction:
 
 
 def _transition(epistemic: float, skill: str | None = None,
-                with_prediction: bool = True) -> Transition:
+                with_prediction: bool = True, error: float = 0.0) -> Transition:
+    # `error` sets how far the observed next-state sits from the prediction mean
+    # (mean is zeros), i.e. the prediction error the monitor tracks for forgetting.
     return Transition(
         state=LatentState(z=np.zeros(2)),
         action=Action(data=np.zeros(1)),
-        next_state=LatentState(z=np.zeros(2)),
+        next_state=LatentState(z=np.full(2, error**0.5)),
         reward=0.0,
         prediction=_pred(epistemic, 0.1) if with_prediction else None,
         option=Option(name=skill) if skill is not None else None,
@@ -128,3 +130,34 @@ def test_curriculum_owns_the_sign() -> None:
                                           explore_bonus=2.0, exploit_penalty=3.0)
     assert mastered.mode() is Mode.EXPLOIT
     assert mastered.uncertainty_coefficient() == 3.0
+
+
+def test_is_forgetting_lifecycle() -> None:
+    # P7-001: forgetting = prediction ERROR rising on a once-mastered skill. It
+    # keys on error, not epistemic, because a confidently-wrong ensemble under
+    # shift keeps epistemic LOW even as the skill decays (ADR-0002).
+    monitor = SurpriseCompetenceMonitor(
+        mastery_epistemic=0.1, flat_progress=0.02, min_updates=5,
+        fast_rate=0.5, slow_rate=0.4, forget_factor=3.0, error_floor=0.01,
+    )
+    skill = "reach"
+    assert monitor.is_forgetting(skill) is False  # never practiced -> not forgetting
+    for _ in range(30):  # master it: low epistemic, low error
+        monitor.update(_transition(0.02, skill, error=0.005))
+    assert monitor.is_mastered(skill) is True
+    assert monitor.is_forgetting(skill) is False  # mastered and accurate -> not forgetting
+    # The skill decays: the model is now CONFIDENTLY WRONG — epistemic stays low
+    # but prediction error climbs. Epistemic alone would miss this.
+    for _ in range(30):
+        monitor.update(_transition(0.02, skill, error=1.0))
+    assert monitor.is_forgetting(skill) is True  # error risen far above the mastered floor
+
+
+def test_is_forgetting_needs_prior_mastery_and_is_isolated() -> None:
+    monitor = SurpriseCompetenceMonitor(min_updates=1, fast_rate=0.5, slow_rate=0.5)
+    for _ in range(20):  # high epistemic throughout: never mastered
+        monitor.update(_transition(1.0, "never"))
+    assert monitor.is_forgetting("never") is False
+    for _ in range(20):
+        monitor.update(_transition(0.001, "solid"))  # mastered and stays low
+    assert monitor.is_forgetting("solid") is False

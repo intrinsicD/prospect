@@ -66,8 +66,13 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > encoder swaps modality with <2% core-loop impact.
 
 ## Phase 7 — continual improvement
-- **P7-001** · `ready` · R7 · Forgetting/plasticity metrics + consolidation policy; retention + plasticity gate. Consumes the latent-space `__dream__` transitions from P3-003; implements `CompetenceMonitor.is_forgetting` (still `NotImplementedError("P7-001")`). **(start here)**
+- **P7-001** · `done` · R7 · Continual improvement: `is_forgetting` (error-keyed, ADR-0002 amended) + rehearsal consolidation. Retention 3-5x better than naive; plasticity retained; naive loses both. Gate **P7 PASS** (shipped).
+
+> **Phase 7 shipped** — `bench/SHIPPED` now ratchets P0–P7. The consolidation
+> discipline preserves the memory AND plasticity that naive continual learning
+> loses; forgetting detection keys on prediction error (the ensemble is
+> confidently wrong under shift).
 
 ## Phase 8 — knowledge bases
-- **P8-001** · `ready` · R8 · Three-tier memory router + retrieval-as-action (uncertainty-gated). `route()` may return `None` (answer parametrically); retrieval surfaces to the planner as options (ADR-0004, P0-008).
+- **P8-001** · `ready` · R8 · Three-tier memory router + retrieval-as-action (uncertainty-gated). `route()` may return `None` (answer parametrically); retrieval surfaces to the planner as options (ADR-0004, P0-008). **(start here — last capability phase)**
 - **P8-002** · `blocked (P8-001)` · R8 · Provenance/trust handling + poisoned/low-trust source robustness.

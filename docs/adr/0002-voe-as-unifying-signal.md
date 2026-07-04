@@ -40,3 +40,12 @@ all six jobs listed in `docs/architecture.md`.
   different correct responses to one scalar. Disambiguation is expected to need
   context beyond the scalar (which skill, which regime) — a named P7 concern, not
   assumed away. *(Amended by P0-010.)*
+- **Forgetting detection keys on prediction ERROR, not epistemic** (P7-001). The
+  natural reading — "forgetting = epistemic rising on a mastered skill" — fails
+  under distribution shift because the ensemble is often *confidently wrong*: its
+  members agree on a wrong answer, so epistemic (disagreement) stays low even as
+  the skill decays. Measured: an epistemic-keyed detector never fired on real
+  continual-learning forgetting. `CompetenceMonitor.is_forgetting` therefore latches
+  a skill's *prediction error* at mastery and fires when it rises; mastery still
+  keys on epistemic (learned = low uncertainty). This resolves the P0-010-flagged
+  forgetting-under-shift concern for the "I forgot" case. *(Amended by P7-001.)*
