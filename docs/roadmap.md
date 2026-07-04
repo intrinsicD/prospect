@@ -15,6 +15,7 @@ criteria precise even while the eval body is a TODO.
 | P6 | Any-to-any codec | `UniversalCodec` | swapping the single-modality codec for the universal one preserves core-loop performance within tolerance | R6 |
 | P7 | Continual improvement | consolidation + metrics | on a task sequence: retention above threshold (no catastrophic forgetting) AND plasticity retained (late tasks learn as fast as early) | R7 |
 | P8 | Knowledge bases | `UncertaintyMemoryRouter`, `KnowledgeSource`s | uncertainty-gated retrieval beats no-retrieval on the use-case benchmark AND stays robust to a poisoned/low-trust source | R8 |
+| P9 | Whole-system validation | integration gate + ablation + 2nd env + invariants | the **composed** agent works end-to-end (learns while acting; one VoE signal drives explore/exploit, mastery and retrieval in one run; retrieval improves control); every part is load-bearing (ablation); capabilities survive a 2nd environment; no gate passes on a trivial solution or within noise | R1–R8 |
 
 ## Sequencing notes
 - **Build the predictive core and its uncertainty estimate first** (P1). Every other

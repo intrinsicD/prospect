@@ -87,3 +87,13 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > prediction error over a distribution with an epistemic/aleatoric split — is live
 > end-to-end: prediction, planning, VoE/mastery/curiosity, skills, hierarchy,
 > any-to-any I/O, continual improvement, and knowledge retrieval.
+
+## Phase 9 — whole-system validation & hardening
+> P0–P8 prove the *parts*. Phase 9 proves the *whole*, that each part is
+> load-bearing, that the capabilities are not Pendulum artifacts, and that the gates
+> measure capability rather than a calibrated trivial solution (ADR-0008).
+
+- **P9-001** · `ready` · R1–R8 · End-to-end integration gate: run the fully-composed agent through `agent.py` and assert emergent closed-loop properties (learns while acting; the one VoE signal drives explore/exploit, mastery and retrieval in the *same* run; retrieval-as-action improves control) with sentinels healthy. **(start here)**
+- **P9-002** · `blocked (P9-001)` · R1–R8 · Ablation harness: disable each component, measure the delta on the P9 metric — a part that can be removed with no loss is a finding (dead weight or untested).
+- **P9-003** · `blocked (P9-001)` · R1,R4,R8 · Second environment + cross-environment generalization: re-run the load-bearing gates (P1/P2/P8) + P9 on a structurally different env with the same core code — survives = real, collapses = Pendulum artifact.
+- **P9-004** · `blocked (P9-001)` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening: guard against gate-overfit (a trivial solution passing) and noise (a margin within seed variance).
