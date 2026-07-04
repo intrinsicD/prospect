@@ -14,7 +14,12 @@ dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10"]
 # Learning backends are pulled in by the implementation, kept OUT of the core's
 # required deps. numpy since P1-001; heavier backends (torch) only when an
 # implementation actually needs them (minimal rule).
-learn = ["numpy>=1.26"]
+# Upper bound <2.5: the kill-gates are numerically calibrated, so numpy stays
+# pinned to a reproducible range (a floating numpy can drift a tight gate
+# threshold in CI). 2.5.0 also ships PEP 695 `type` stubs that mypy (targeting
+# 3.11) rejects; 2.4.x stubs typecheck cleanly. Raise the bound only alongside a
+# gate re-run and a mypy python_version bump.
+learn = ["numpy>=1.26,<2.5"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/prospect"]
