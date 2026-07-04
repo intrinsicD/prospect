@@ -62,7 +62,7 @@ def test_all_skeletons_instantiate() -> None:
 
 
 def test_all_gates_registered() -> None:
-    assert set(bench.GATES) == {"P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"}
+    assert set(bench.GATES) == {"P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"}
     for gate in bench.GATES.values():
         assert gate.criterion  # every gate has a precise criterion
 

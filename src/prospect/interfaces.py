@@ -139,6 +139,28 @@ class SemanticMemory(KnowledgeSource, Protocol):
 
 
 @runtime_checkable
+class ModeArbiter(Protocol):
+    """The explore/exploit arbitration seam the composition root reads (ADR-0007,
+    P9-001). `uncertainty_coefficient()` is the signed coefficient applied to
+    per-step epistemic uncertainty — positive penalises it (exploit-mode planning),
+    negative rewards it (explore-mode collection). The arbiter (the curriculum) owns
+    the sign; the agent and planner never pick it. Satisfied by
+    `voe.LearningProgressCurriculum`."""
+
+    def uncertainty_coefficient(self) -> float: ...
+
+
+@runtime_checkable
+class UncertaintyTunable(Protocol):
+    """A planner whose per-step epistemic coefficient the composition root can set
+    from the `ModeArbiter` (P9-001). Kept separate from `Planner` because not every
+    planner exposes the knob; the agent narrows to this before writing it. Satisfied
+    by `planning.FlatPlanner`."""
+
+    uncertainty_penalty: float
+
+
+@runtime_checkable
 class MemoryRouter(Protocol):
     """Chooses which tier to consult (parametric / internal / external) given the
     query and current epistemic uncertainty (R8, ADR-0004).

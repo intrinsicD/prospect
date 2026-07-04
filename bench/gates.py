@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]
+PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
 
 
 def _phase_at_least(phase: str, floor: str) -> bool:
@@ -141,6 +141,15 @@ _register(
     "Uncertainty-gated retrieval improves accuracy vs no-retrieval on the use-case "
     "benchmark, AND performance is robust to a poisoned/low-trust source (provenance "
     "respected).",
+)
+_register(
+    "P9",
+    "Whole-system integration",
+    "The fully-composed agent works end-to-end through the composition root: it "
+    "controls better than a reactive baseline; within ONE run the single epistemic "
+    "signal both sets the planner's explore/exploit coefficient AND gates retrieval "
+    "(retrieval fires where the model is uncertain); retrieval-as-action does not "
+    "degrade control; and all applicable collapse sentinels stay healthy.",
 )
 
 

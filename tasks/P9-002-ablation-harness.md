@@ -17,6 +17,15 @@ hurts.** A no-op ablation is a finding — either the component is not pulling i
 weight (a design shortcoming) or the E2E gate can't see its value (a test
 shortcoming). This turns "we assume each piece matters" into "we measured it."
 
+**Start with the finding P9-001 already surfaced:** retrieval-into-planning has a
+*negative* marginal value (disabling retrieval IMPROVED control, ~-19 → ~-8 return) —
+retrieval helps 1-step prediction (P8) but overriding the planner's rollout dynamics
+corrupts multi-step optimisation. Quantify the delta across gate settings, and
+investigate whether retrieval can enter planning without the cost (e.g. depth-0 only,
+or as a bounded residual correction rather than a blanket override). This is the first
+ablation with a known, non-trivial answer — a good test that the harness measures what
+it should.
+
 ## Non-goals
 - Not a redesign of any component; ablations only *disable* (identity/point-estimate/
   no-op), they do not rewrite.

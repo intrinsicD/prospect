@@ -93,7 +93,12 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > load-bearing, that the capabilities are not Pendulum artifacts, and that the gates
 > measure capability rather than a calibrated trivial solution (ADR-0008).
 
-- **P9-001** · `ready` · R1–R8 · End-to-end integration gate: run the fully-composed agent through `agent.py` and assert emergent closed-loop properties (learns while acting; the one VoE signal drives explore/exploit, mastery and retrieval in the *same* run; retrieval-as-action improves control) with sentinels healthy. **(start here)**
-- **P9-002** · `blocked (P9-001)` · R1–R8 · Ablation harness: disable each component, measure the delta on the P9 metric — a part that can be removed with no loss is a finding (dead weight or untested).
-- **P9-003** · `blocked (P9-001)` · R1,R4,R8 · Second environment + cross-environment generalization: re-run the load-bearing gates (P1/P2/P8) + P9 on a structurally different env with the same core code — survives = real, collapses = Pendulum artifact.
-- **P9-004** · `blocked (P9-001)` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening: guard against gate-overfit (a trivial solution passing) and noise (a margin within seed variance).
+- **P9-001** · `done` · R1–R8 · End-to-end integration gate. The composed agent controls the task (−19.4 vs random −73.1); in ONE run the single epistemic signal drives the planner's exploit coefficient AND retrieval; four sentinels healthy. Gate **P9 PASS** (shipped). **Finding:** retrieval-*into-planning* degrades control (−19.4 vs −8.1 off) — handed to P9-002.
+- **P9-002** · `ready` · R1–R8 · Ablation harness: disable each component, measure the delta on the P9 metric — a part that can be removed with no loss is a finding (dead weight or untested). **(start here — begins with the P9-001 retrieval-into-planning finding.)**
+- **P9-003** · `ready` · R1,R4,R8 · Second environment + cross-environment generalization: re-run the load-bearing gates (P1/P2/P8) + P9 on a structurally different env with the same core code — survives = real, collapses = Pendulum artifact.
+- **P9-004** · `ready` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening: guard against gate-overfit (a trivial solution passing) and noise (a margin within seed variance).
+
+> **Phase 9 in progress** — P9-001 shipped: `bench/SHIPPED` now ratchets P0–P9. The
+> whole system is verified end-to-end, not just per part; and the integration gate
+> already earned its keep by surfacing that retrieval-into-planning costs control — a
+> finding no single-phase gate could see.

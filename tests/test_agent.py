@@ -177,3 +177,37 @@ def test_agent_buffers_observed_transitions() -> None:
                   planner=_StubPlanner(), memory=memory)
     stored = agent.observe(_obs(1.0), Action(data=np.zeros(1)), _obs(2.0), reward=0.5)
     assert memory.added == [stored]  # raw-modality transition, buffered (P3-003)
+
+
+class _TunablePlanner(_StubPlanner):
+    """A planner exposing the exploit coefficient (satisfies UncertaintyTunable)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.uncertainty_penalty = 0.0
+
+
+class _StubCurriculum:
+    """ModeArbiter spy: reports a fixed signed coefficient."""
+
+    def __init__(self, coefficient: float) -> None:
+        self._coefficient = coefficient
+
+    def uncertainty_coefficient(self) -> float:
+        return self._coefficient
+
+
+def test_curriculum_sets_the_planner_mode_each_act() -> None:  # P9-001
+    planner = _TunablePlanner()
+    agent = Agent(encode=lambda obs: LatentState(z=np.asarray(obs.data)),
+                  planner=planner, curriculum=_StubCurriculum(-0.7))
+    agent.act(_obs(1.0))
+    assert planner.uncertainty_penalty == -0.7  # arbiter's signed coefficient applied (ADR-0007)
+
+
+def test_curriculum_with_a_non_tunable_planner_is_a_safe_noop() -> None:  # P9-001
+    planner = _StubPlanner()  # no uncertainty_penalty knob to set
+    agent = Agent(encode=lambda obs: LatentState(z=np.asarray(obs.data)),
+                  planner=planner, curriculum=_StubCurriculum(1.0))
+    agent.act(_obs(1.0))  # narrows to UncertaintyTunable, skips cleanly — no crash
+    assert not hasattr(planner, "uncertainty_penalty")

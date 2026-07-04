@@ -10,10 +10,15 @@ from __future__ import annotations
 from prospect import interfaces
 from prospect.codec import UniversalCodec
 from prospect.knowledge import ExternalKnowledgeSource, InternalKnowledgeSource, ToolSource
-from prospect.memory import ReplayBuffer, SemanticStore, UncertaintyMemoryRouter
+from prospect.memory import (
+    ReplayBuffer,
+    RetrievalAugmentedWorldModel,
+    SemanticStore,
+    UncertaintyMemoryRouter,
+)
 from prospect.planning import FlatPlanner, HierarchicalManager, JumpyOptionModel
 from prospect.skills import SkillRouter
-from prospect.voe import SurpriseCompetenceMonitor
+from prospect.voe import LearningProgressCurriculum, SurpriseCompetenceMonitor
 from prospect.world_model import FlatWorldModel
 
 
@@ -34,6 +39,12 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
     internal: interfaces.KnowledgeSource = InternalKnowledgeSource()
     external: interfaces.KnowledgeSource = ExternalKnowledgeSource()
     tool: interfaces.KnowledgeSource = ToolSource()
+    # P9-001 seams: the arbiter the composition root reads, the tunable planner it
+    # writes, and the retrieval-augmented model the planner plans over.
+    arbiter: interfaces.ModeArbiter = LearningProgressCurriculum(SurpriseCompetenceMonitor())
+    tunable: interfaces.UncertaintyTunable = FlatPlanner(FlatWorldModel())
+    augmented: interfaces.WorldModel = RetrievalAugmentedWorldModel(
+        FlatWorldModel(), UncertaintyMemoryRouter())
 
     for impl in (
         codec,
@@ -52,5 +63,8 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
         internal,
         external,
         tool,
+        arbiter,
+        tunable,
+        augmented,
     ):
         assert impl is not None

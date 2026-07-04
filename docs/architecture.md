@@ -100,7 +100,12 @@ retrieval and tool-use as actions the planner selects, gated by uncertainty. See
 - **Generative-replay collapse** (training on your own dreams → model autophagy) — the
   anti-forgetting mechanism turning into a forgetting one (ADR-0006).
 - Catastrophic forgetting and loss of plasticity — the price of continual learning.
-- Retrieval quality and trust of external sources.
+- Retrieval quality and trust of external sources — *and where retrieval is safe to
+  apply*: the P9 integration gate found retrieval helps 1-step prediction (P8) yet
+  **degrades multi-step planning** when it overrides the planner's rollout dynamics
+  (ADR-0008; P9-002 dissects it).
+- **Composing parts that each pass their own gate can still fail as a whole** — the
+  reason Phase 9 validates the assembled agent, not just the components (ADR-0008).
 
 Each is named in the relevant ADR and gated by a benchmark; the collapse modes are
 additionally guarded by standing integrity **sentinels** (ADR-0006), because they hide
