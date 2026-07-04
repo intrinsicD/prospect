@@ -39,10 +39,14 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 ## Phase 3 — VoE, curriculum, replay
 - **P3-001** · `done` · R3 · Calibrated surprise + decomposition + mastery test. Differential criterion **MET** (P(violated>expected) ≥ 0.93 every seed); P3 composite blocked pending P3-002 + P3-003 by design.
 - **P3-002** · `done` · R3 · Curiosity curriculum. P3 **capability ok** (differential MET + curiosity MET: coverage ratio 0.26 vs 0.79 at equal budget); composite blocked only by the P3-003 sentinel.
-- **P3-003** · `ready` · R7 · Episodic replay buffer + generative replay (rehearsal from the model). Enforce `replay-fidelity`: real-data anchor + lineage cap + uncertainty-gated dreams (ADR-0006). Retain raw observations so experience stays re-encodable under a future codec (P0-011). Last piece of P3 — implementing the sentinel unblocks shipping the phase. **(start here)**
+- **P3-003** · `done` · R7 · Episodic replay + generative replay + `replay-fidelity` sentinel (real anchor 0.50, dream diversity 0.47, lineage ≤ 3, zero dreams stored). Gate **P3 PASS** (shipped).
+
+> **Phase 3 shipped** — `bench/SHIPPED` now ratchets P0–P3. The one signal is
+> live end-to-end: calibrated decomposed surprise, mastery, mode arbitration,
+> curiosity, and collapse-guarded rehearsal.
 
 ## Phase 4 — skills
-- **P4-001** · `blocked (P3-001)` · R5 · Skill library with predictive preconditions + simulate-to-select router (competence-gated). Promote the precondition to a **typed field** on `Option` when this lands — no metadata-dict convention. Executors set `Transition.option` so competence attribution works (P0-002).
+- **P4-001** · `ready` · R5 · Skill library with predictive preconditions + simulate-to-select router (competence-gated). Promote the precondition to a **typed field** on `Option` when this lands — no metadata-dict convention. Executors set `Transition.option` so competence attribution works (P0-002). **(start here)**
 
 ## Phase 5 — hierarchy
 - **P5-001** · `blocked (P4-001)` · R2 · Abstraction map φ + jumpy option-model (landing latent, cumulative reward, duration, uncertainty).
@@ -52,8 +56,8 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **P6-001** · `blocked (P2-001)` · R6 · Universal codec (Perceiver-IO-style) wrapper; swap preserves core-loop performance. Migration per P0-011: **distill into the incumbent latent space first**; budgeted full-stack retrain only as fallback (ADR-0001).
 
 ## Phase 7 — continual improvement
-- **P7-001** · `blocked (P3-003)` · R7 · Forgetting/plasticity metrics + consolidation policy; retention + plasticity gate.
+- **P7-001** · `ready` · R7 · Forgetting/plasticity metrics + consolidation policy; retention + plasticity gate. Consumes the latent-space `__dream__` transitions from P3-003.
 
 ## Phase 8 — knowledge bases
-- **P8-001** · `blocked (P3-003, P0-008)` · R8 · Three-tier memory router + retrieval-as-action (uncertainty-gated). `route()` may return `None` (answer parametrically); retrieval surfaces to the planner as options (ADR-0004, P0-008).
+- **P8-001** · `ready` · R8 · Three-tier memory router + retrieval-as-action (uncertainty-gated). `route()` may return `None` (answer parametrically); retrieval surfaces to the planner as options (ADR-0004, P0-008).
 - **P8-002** · `blocked (P8-001)` · R8 · Provenance/trust handling + poisoned/low-trust source robustness.

@@ -8,15 +8,16 @@ evals and future phases extend one loop instead of re-inventing it.
 Plugged in so far:
 - P3-001: pass (world_model, monitor) and the loop feeds the `CompetenceMonitor`
   a latent-space transition carrying the act-time prediction (VoE).
+- P3-003: pass `memory` and every `observe()`d transition (raw modality, P0-011)
+  is buffered in the `EpisodicMemory`.
 Where the next phases plug in (the seams already exist):
-- P3-003: the `EpisodicMemory` buffers each `observe()`d transition (replay).
 - P8: retrieval-as-action joins `act()` via the `MemoryRouter` (ADR-0004).
 """
 from __future__ import annotations
 
 from collections.abc import Callable
 
-from .interfaces import CompetenceMonitor, Planner, WorldModel
+from .interfaces import CompetenceMonitor, EpisodicMemory, Planner, WorldModel
 from .types import Action, LatentState, Observation, Option, Prediction, Transition
 
 
@@ -30,11 +31,13 @@ class Agent:
         planner: Planner,
         world_model: WorldModel | None = None,
         monitor: CompetenceMonitor | None = None,
+        memory: EpisodicMemory | None = None,
     ) -> None:
         self._encode = encode
         self._planner = planner
         self._model = world_model
         self._monitor = monitor
+        self._memory = memory
         self._last: tuple[LatentState, Prediction] | None = None  # act-time expectation
 
     def act(self, obs: Observation) -> Action:
@@ -70,7 +73,7 @@ class Agent:
                            reward=reward, prediction=expected, option=option)
             )
             self._last = None
-        return Transition(
+        stored = Transition(
             state=LatentState(z=obs.data),
             action=action,
             next_state=LatentState(z=next_obs.data),
@@ -78,6 +81,9 @@ class Agent:
             prediction=expected,
             option=option,
         )
+        if self._memory is not None:
+            self._memory.add(stored)
+        return stored
 
     def reset(self) -> None:
         """Start of episode: clear planner state (e.g. a receding-horizon warm

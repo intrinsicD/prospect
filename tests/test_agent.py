@@ -153,3 +153,27 @@ def test_reset_clears_the_pending_expectation() -> None:
     agent.reset()
     agent.observe(_obs(1.0), Action(data=np.zeros(1)), _obs(2.0), reward=0.0)
     assert monitor.transitions == []
+
+
+class _SpyMemory:
+    """EpisodicMemory-conforming spy."""
+
+    def __init__(self) -> None:
+        self.added: list[Transition] = []
+
+    def add(self, transition: Transition) -> None:
+        self.added.append(transition)
+
+    def sample(self, n: int) -> list[Transition]:
+        return self.added[:n]
+
+    def generative_replay(self, n: int) -> list[Transition]:
+        return self.added[:n]
+
+
+def test_agent_buffers_observed_transitions() -> None:
+    memory = _SpyMemory()
+    agent = Agent(encode=lambda obs: LatentState(z=np.asarray(obs.data)),
+                  planner=_StubPlanner(), memory=memory)
+    stored = agent.observe(_obs(1.0), Action(data=np.zeros(1)), _obs(2.0), reward=0.5)
+    assert memory.added == [stored]  # raw-modality transition, buffered (P3-003)

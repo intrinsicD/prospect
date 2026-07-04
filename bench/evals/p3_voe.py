@@ -36,6 +36,7 @@ from ..gates import GateResult, gate_check
 from ..loop import run_episode
 from ..runlog import RUNS_DIR, RunLog
 from .p1_world_model import SEED_STEP_OFFSET, STEPS, _make_probe, _rollout, _train
+from .p3_replay import log_replay_fidelity
 
 RUN_ID = "p3"
 SEEDS = [0, 1, 2]
@@ -187,6 +188,8 @@ def check_p3() -> GateResult:
                            reward=t.reward, prediction=prediction)
             )
         competence = monitor.competence(SurpriseCompetenceMonitor.DEFAULT_SKILL)
+        log_replay_fidelity(model, train, seed, log,
+                            step_offset=seed * SEED_STEP_OFFSET + 50_000)
         curious_ratio = _active_learning(seed, curious=True)
         random_ratio = _active_learning(seed, curious=False)
         curious_ratios.append(curious_ratio)
