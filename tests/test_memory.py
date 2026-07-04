@@ -8,8 +8,16 @@ import numpy as np
 import pytest
 
 from prospect import interfaces
-from prospect.memory import ReplayBuffer
-from prospect.types import Action, LatentState, Prediction, Transition
+from prospect.memory import ReplayBuffer, SemanticStore, UncertaintyMemoryRouter
+from prospect.types import (
+    Action,
+    KnowledgeItem,
+    LatentState,
+    Prediction,
+    Provenance,
+    Transition,
+    Trust,
+)
 from prospect.world_model import FlatWorldModel
 
 
@@ -125,3 +133,34 @@ def test_gated_out_dreams_are_topped_up_with_real_anchors() -> None:
     assert dreams, "in-distribution starts still dream"
     assert len(batch) == 32  # shortage refilled
     assert len(reals) > 8  # the real fraction is a floor, not a ceiling
+
+def _fact(key: list[float], answer: list[float], trust: Trust = Trust.HIGH) -> KnowledgeItem:
+    prov = Provenance(source="unit", trust=trust)
+    return KnowledgeItem(content=(np.array(key), np.array(answer)), provenance=prov)
+
+
+def test_semantic_store_returns_nearest_fact_with_provenance() -> None:
+    store = SemanticStore()
+    assert store.query(np.array([0.0, 0.0])) == []  # empty store
+    store.write(_fact([0.0, 0.0], [1.0]))
+    store.write(_fact([5.0, 5.0], [2.0]))
+    [near] = store.query(np.array([0.2, -0.1]))
+    assert near.content[1][0] == 1.0  # nearest to [0,0]
+    assert near.provenance is not None
+    [far] = store.query(np.array([4.8, 5.1]))
+    assert far.content[1][0] == 2.0
+
+
+def test_router_gates_on_epistemic() -> None:
+    store = SemanticStore()
+    router = UncertaintyMemoryRouter([store], threshold=0.5)
+    assert router.route(np.zeros(2), epistemic=0.2) is None  # confident -> parametric
+    assert router.route(np.zeros(2), epistemic=0.9) is store  # uncertain -> retrieve
+    empty = UncertaintyMemoryRouter([], threshold=0.5)
+    assert empty.route(np.zeros(2), epistemic=0.9) is None  # nothing to retrieve from
+
+
+def test_store_and_router_satisfy_protocols() -> None:
+    assert isinstance(SemanticStore(), interfaces.SemanticMemory)
+    assert isinstance(SemanticStore(), interfaces.KnowledgeSource)
+    assert isinstance(UncertaintyMemoryRouter(), interfaces.MemoryRouter)

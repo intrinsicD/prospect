@@ -16,4 +16,5 @@ from . import (  # noqa: F401
     p5_options,
     p6_codec,
     p7_continual,
+    p8_knowledge,
 )

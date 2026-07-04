@@ -2,8 +2,6 @@
 from commit one; real behaviour tests arrive with each task."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import bench
 import prospect
 from prospect import interfaces, types
@@ -83,19 +81,21 @@ def test_all_sentinels_registered() -> None:
         assert sentinel.applies_from in bench.gates.PHASE_ORDER
 
 
-def test_phase_gate_is_composite_and_pending(tmp_path: Path) -> None:
-    # P8 is the furthest still-PENDING phase (P1-P7 checks run real evals now);
-    # its report exercises the same composite structure with all four sentinels
-    # and stays cheap (a PENDING capability trains nothing).
-    report = bench.run_gate("P8", results_dir=tmp_path)
-    assert isinstance(report, bench.GateReport)
-    # pending capability => phase is not passable yet
-    assert report.passed is False
-    assert "PENDING" in report.capability.detail
-    names = {s.name for s in report.sentinels}
+def test_phase_gate_is_composite_and_capability_gated() -> None:
+    # The composite invariant: a phase passes only if its capability passes AND
+    # every applicable sentinel is healthy — a not-met capability BLOCKS the phase
+    # no matter how healthy the sentinels are. Every phase now ships a real,
+    # model-training capability eval, so this is built synthetically to stay a cheap
+    # structural check (running P8's live eval trains three models).
+    not_met = bench.GateResult(phase="P8", passed=False, detail="capability not met")
+    names = {s.name for s in bench.applicable_sentinels("P8")}
     # by P8, all four integrity sentinels are active
     assert {"representation-integrity", "uncertainty-reliability", "replay-fidelity",
             "option-diversity"} <= names
+    all_healthy = [bench.SentinelResult(name=n, healthy=True) for n in names]
+    report = bench.GateReport(phase="P8", capability=not_met, sentinels=all_healthy)
+    assert isinstance(report, bench.GateReport)
+    assert report.passed is False  # capability gates the composite, even all-healthy
 
 
 def test_sentinels_activate_by_phase() -> None:

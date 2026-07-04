@@ -74,5 +74,5 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > confidently wrong under shift).
 
 ## Phase 8 — knowledge bases
-- **P8-001** · `ready` · R8 · Three-tier memory router + retrieval-as-action (uncertainty-gated). `route()` may return `None` (answer parametrically); retrieval surfaces to the planner as options (ADR-0004, P0-008). **(start here — last capability phase)**
-- **P8-002** · `blocked (P8-001)` · R8 · Provenance/trust handling + poisoned/low-trust source robustness.
+- **P8-001** · `done` · R8 · Three-tier memory router + uncertainty-gated retrieval-as-action. Accuracy half **MET**: gated 1-step MSE ~3.2x lower than model-alone every seed (beats always-retrieve too), retrieving 55% of queries; all four sentinels healthy. P8 composite honestly BLOCKED pending P8-002.
+- **P8-002** · `ready` · R8 · Provenance/trust handling + poisoned/low-trust source robustness — completes the P8 gate. **(start here — final task)**

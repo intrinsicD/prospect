@@ -1,0 +1,80 @@
+{
+  "phase": "P8",
+  "passed": false,
+  "run_id": null,
+  "written_at": "20260704T104005Z",
+  "capability": {
+    "criterion": "Uncertainty-gated retrieval improves accuracy vs no-retrieval on the use-case benchmark, AND performance is robust to a poisoned/low-trust source (provenance respected).",
+    "passed": false,
+    "metrics": {
+      "no_retrieval_mse_s0": 0.025522351673822177,
+      "gated_mse_s0": 0.006428586506833881,
+      "always_retrieve_mse_s0": 0.01177430147113619,
+      "retrieval_rate_s0": 0.5475,
+      "no_retrieval_mse_s1": 0.02891542737137832,
+      "gated_mse_s1": 0.008347986927288402,
+      "always_retrieve_mse_s1": 0.013675453227407867,
+      "retrieval_rate_s1": 0.5475,
+      "no_retrieval_mse_s2": 0.02398988996474861,
+      "gated_mse_s2": 0.007884552857819803,
+      "always_retrieve_mse_s2": 0.014283827349355635,
+      "retrieval_rate_s2": 0.4925,
+      "no_retrieval_mse_median": 0.025522351673822177,
+      "gated_mse_median": 0.007884552857819803,
+      "always_retrieve_mse_median": 0.013675453227407867,
+      "retrieval_rate_median": 0.5475,
+      "accuracy_half_met": 1.0
+    },
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "detail": "1-step MSE: gated 0.0079 vs no-retrieval 0.0255 (>= x1.5 better on every seed: MET) vs always-retrieve 0.0137; retrieval rate 55% (gated: model where confident, retrieve where uncertain); robustness half pending (P8-002)"
+  },
+  "sentinels": [
+    {
+      "name": "representation-integrity",
+      "criterion": "Latent per-dimension std stays above a floor AND effective rank (participation ratio of the latent covariance) stays above a threshold on held-out data throughout training \u2014 not only at the capability checkpoint.",
+      "healthy": true,
+      "metrics": {
+        "min_latent_std": 0.8516131753250953,
+        "min_effective_rank": 2.1568075804702813
+      },
+      "detail": "across 36 held-out probes (warm-up 300 steps): min per-dim std 0.852 (floor 0.3), min effective rank 2.16 (floor 2.0)"
+    },
+    {
+      "name": "uncertainty-reliability",
+      "criterion": "Predicted epistemic uncertainty is rank-correlated with held-out prediction error above a threshold, and ensemble-member disagreement does not decay to ~0 in regions where error is high.",
+      "healthy": true,
+      "metrics": {
+        "min_final_rank_corr": 0.6312548458761058,
+        "min_high_error_disagreement_ratio": 18.9263848138974
+      },
+      "detail": "worst seed at end of training: disagreement-vs-error rank corr 0.63 (min 0.3), high-error-decile disagreement 18.93x median (min 1.0) on a mixed in-dist + OOD probe set"
+    },
+    {
+      "name": "replay-fidelity",
+      "criterion": "Rehearsal keeps a fixed real-data fraction; dreamed-sample diversity (feature variance / coverage vs real) stays above a floor and does not shrink across regenerations; rehearsal lineage depth is capped (no dream-of-dreams).",
+      "healthy": true,
+      "metrics": {
+        "min_real_fraction": 0.5,
+        "min_dream_diversity": 0.9329517787020188,
+        "worst_diversity_shrink": 0.929937938083157,
+        "max_dream_depth": 3.0
+      },
+      "detail": "across 5 regenerations x 3 seed(s): real fraction min 0.50 (floor 0.3), dream diversity min 0.93 (floor 0.3), diversity shrink 0.93 (floor 0.5), lineage depth max 3 (cap 3), dreams stored: 0"
+    },
+    {
+      "name": "option-diversity",
+      "criterion": "Option-usage entropy stays above a floor (no single option dominates), mean option duration stays above one step, and pairwise option outcome-distributions remain distinguishable.",
+      "healthy": true,
+      "metrics": {
+        "min_usage_entropy": 0.7717481459139731,
+        "min_mean_duration": 2.9411764705882355,
+        "min_pairwise_dprime": 0.7352103951324829
+      },
+      "detail": "worst seed over the two-level eval episodes: usage entropy 0.77 (floor 0.3), mean executed duration 2.94 steps (floor > 1.0), min pairwise landing d' 0.74 (floor 0.5)"
+    }
+  ]
+}

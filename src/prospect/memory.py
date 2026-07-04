@@ -1,8 +1,10 @@
 """Memory tiers (R7, R8). Episodic replay + *generative* replay (rehearsal), a
 semantic store, and an uncertainty-gated router over the tiers. See ADR-0004.
-ReplayBuffer implemented in P3-003; SemanticStore/router are P8-001.
+ReplayBuffer implemented in P3-003; SemanticStore + UncertaintyMemoryRouter in P8-001.
 """
 from __future__ import annotations
+
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -130,26 +132,59 @@ class ReplayBuffer:
 
 
 class SemanticStore:
-    """Distilled facts consolidated from experience. Its read side is a
-    `KnowledgeSource` (one query verb into every tier, P0-008); `write` is the
-    consolidation surface. Contract: interfaces.SemanticMemory."""
+    """Distilled facts as a queryable `KnowledgeSource` (P8-001). Its read side is
+    a `KnowledgeSource` (one query verb into every tier, P0-008); `write` is the
+    consolidation surface.
+
+    A fact's `content` is a `(key, answer)` pair — the query key it answers and the
+    answer it holds (knowledge-as-tokens, ADR-0004: the answer is a next-latent in
+    the model's own space, a drop-in for the model's prediction). `query(key)`
+    returns the single nearest fact by key distance (or `[]` when empty). Every
+    item carries `Provenance` (P0-008).
+
+    Contract: interfaces.SemanticMemory.
+    """
 
     name = "semantic"
 
+    def __init__(self) -> None:
+        self._items: list[KnowledgeItem] = []
+        self._keys: list[np.ndarray] = []
+
+    def __len__(self) -> int:
+        return len(self._items)
+
     def write(self, item: KnowledgeItem) -> None:
-        raise NotImplementedError("P8-001")
+        key, _ = item.content
+        self._items.append(item)
+        self._keys.append(np.asarray(key, dtype=float))
 
     def query(self, query: object) -> list[KnowledgeItem]:
-        raise NotImplementedError("P8-001")
+        if not self._items:
+            return []
+        q = np.asarray(query, dtype=float)
+        keys = np.stack(self._keys)
+        nearest = int(np.argmin(np.sum((keys - q) ** 2, axis=1)))
+        return [self._items[nearest]]
 
 
 class UncertaintyMemoryRouter:
-    """Route a query to a tier by current epistemic uncertainty: answer from the model
-    when confident — `route()` returns `None`, the parametric tier (P0-008) — and
-    retrieve when uncertain (retrieval-as-action).
+    """Route a query to a tier by current epistemic uncertainty (P8-001): answer
+    from the model when confident — `route()` returns `None`, the parametric tier
+    (P0-008) — and retrieve when uncertain (retrieval-as-action, ADR-0004). The
+    threshold is calibrated to the model's epistemic scale by the caller.
+
+    Minimal tier selection: below-threshold ⇒ parametric (`None`); above ⇒ the
+    first source. Trust-ordered selection among external sources is P8-002.
 
     Contract: interfaces.MemoryRouter.
     """
 
+    def __init__(self, sources: Sequence[KnowledgeSource] = (), threshold: float = 0.0) -> None:
+        self._sources = list(sources)
+        self.threshold = threshold
+
     def route(self, query: object, epistemic: float) -> KnowledgeSource | None:
-        raise NotImplementedError("P8-001")
+        if epistemic <= self.threshold or not self._sources:
+            return None  # confident (or nothing to retrieve from): answer parametrically
+        return self._sources[0]
