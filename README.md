@@ -21,10 +21,13 @@ grows one benchmark-gated phase at a time.
 
 ## Quickstart
 ```bash
+python -m venv .venv && source .venv/bin/activate   # recommended: work in a venv
 make install     # editable install + dev tools
 make test        # smoke tests (green from commit one)
 make lint        # ruff
+make typecheck   # mypy — full type hints are enforced
 make gate PHASE=P1   # inspect a phase kill-gate
+make gate-all    # re-run every shipped gate (the regression ratchet)
 make tree        # see the layout
 ```
 
@@ -42,6 +45,6 @@ docs/                architecture, requirements, roadmap
 docs/adr/            locked architecture decisions
 tasks/               backlog, task template, specified tasks
 src/prospect/        task-unspecific CORE (interfaces + one file per component)
-bench/               task-specific HARNESS: the kill-gates (the fitness function)
+bench/               task-specific HARNESS: kill-gates (the fitness function) + the Environment seam
 tests/               smoke tests
 ```

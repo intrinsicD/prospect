@@ -1,6 +1,6 @@
 # P0-002 — Decomposed `Surprise` type + per-skill transition attribution
 
-- **Status:** blocked (P0-001)
+- **Status:** done
 - **Phase:** P0
 - **Requirements:** R3, R5, R7
 - **ADRs:** ADR-0002 (amend contract consequence)
@@ -36,22 +36,36 @@ match (still raising `NotImplementedError("P3-001")`).
   never a bare float — the same rule as `Prediction`, one level up."
 
 ## Acceptance criteria
-- [ ] `types.Surprise` exists with `total`, `epistemic`, `aleatoric`.
-- [ ] `CompetenceMonitor.surprise` returns `Surprise`; skeleton and smoke tests match.
-- [ ] `Transition.option` exists, defaults to `None`, and is documented.
-- [ ] ADR-0002 consequence amended.
-- [ ] `make test` green, `make lint` clean.
+- [x] `types.Surprise` exists with `total`, `epistemic`, `aleatoric`.
+- [x] `CompetenceMonitor.surprise` returns `Surprise`; skeleton and smoke tests match.
+- [x] `Transition.option` exists, defaults to `None`, and is documented.
+- [x] ADR-0002 consequence amended.
+- [x] `make test` green, `make lint` clean.
 
 ## Test plan
 - Unit: `Surprise` instantiates and is frozen; `Transition(option=...)` round-trips;
   smoke protocol-conformance check still passes with the new signature.
 
 ## Docs-sync checklist
-- [ ] Task Status updated; gate result recorded below.
-- [ ] ADR-0002 contract consequence amended.
-- [ ] `docs/architecture.md` "one signal, many jobs" section notes the decomposed
+- [x] Task Status updated; gate result recorded below.
+- [x] ADR-0002 contract consequence amended (second contract bullet: `Surprise`,
+      never a bare float; `Transition.option` for attribution).
+- [x] `docs/architecture.md` "one signal, many jobs" section notes the decomposed
       return type.
-- [ ] Backlog rows for P3-001 / P4-001 reference the new seam.
+- [x] Backlog rows for P3-001 / P4-001 reference the new seam (P3-001 returns
+      `types.Surprise`; P4-001 executors set `Transition.option`).
 
 ## Gate result
-_not run yet_
+The P0 gate is not yet registered in `bench/gates.py` (that arrives with P0-006), so
+the P0 criterion from the roadmap was applied directly:
+
+```
+imports clean, smoke tests green
+make test : 19 passed (15 prior + 4 new VoE-seam unit tests)
+make lint : All checks passed!
+```
+
+Result: **PASS** (P0 criterion met). Tests covering this task:
+`tests/test_surprise.py` — `Surprise` decomposition + immutability,
+`Transition.option` default `None` and round-trip, and
+`SurpriseCompetenceMonitor` protocol conformance with the new signature.

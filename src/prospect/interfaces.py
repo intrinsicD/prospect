@@ -2,8 +2,8 @@
 typing — implementations need not inherit). These are the seams an agent fills in."""
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
 from collections.abc import Sequence
+from typing import Protocol, runtime_checkable
 
 from .types import (
     Action,
@@ -14,7 +14,9 @@ from .types import (
     Option,
     Prediction,
     Subgoal,
+    Surprise,
     Transition,
+    Trust,
 )
 
 
@@ -34,6 +36,20 @@ class WorldModel(Protocol):
 
     def predict(self, state: LatentState, action: Action) -> Prediction: ...
     def imagine(self, state: LatentState, actions: Sequence[Action]) -> list[Prediction]: ...
+
+
+@runtime_checkable
+class Learner(Protocol):
+    """A component the harness can train (P0-003) — the uniform training seam.
+
+    `update()` consumes a batch of transitions and returns a metrics dict (loss
+    terms + integrity stats); the harness logs these to the run-metrics artifact
+    (P0-005) that the ADR-0006 sentinels read. Kept separate from the inference
+    contracts so consumers like the planner keep a narrow view. Expected to be
+    satisfied, alongside their primary contract, by: the world model (P1), the
+    option model (P5), the codec (P6)."""
+
+    def update(self, batch: Sequence[Transition]) -> dict[str, float]: ...
 
 
 @runtime_checkable
@@ -64,9 +80,13 @@ class HierarchicalPlanner(Protocol):
 @runtime_checkable
 class CompetenceMonitor(Protocol):
     """Violation of expectation as the unifying signal (R3, R7, ADR-0002).
-    One object, many jobs: surprise, mastery, forgetting."""
+    One object, many jobs: surprise, mastery, forgetting.
 
-    def surprise(self, prediction: Prediction, observed: LatentState) -> float: ...
+    surprise() returns a decomposed `Surprise` — never a bare float (P0-002):
+    consumers gate on `.epistemic`, not the undecomposed total. Transitions
+    collected under a skill carry `Transition.option` for per-skill attribution."""
+
+    def surprise(self, prediction: Prediction, observed: LatentState) -> Surprise: ...
     def update(self, transition: Transition) -> None: ...
     def competence(self, skill: str) -> Competence: ...
     def is_mastered(self, skill: str) -> bool: ...
@@ -92,26 +112,44 @@ class EpisodicMemory(Protocol):
 
 
 @runtime_checkable
-class SemanticMemory(Protocol):
-    """Distilled, queryable facts consolidated from experience (R7, R8)."""
-
-    def write(self, item: KnowledgeItem) -> None: ...
-    def read(self, query: object) -> list[KnowledgeItem]: ...
-
-
-@runtime_checkable
 class KnowledgeSource(Protocol):
     """Internal or external knowledge / tools (R8, ADR-0004). Querying is an *action*
-    the planner selects, gated by uncertainty; every item carries provenance/trust."""
+    the planner selects, gated by uncertainty; every item carries provenance/trust.
+
+    `trust` is the source's provenance *floor* — the trust level the router uses for
+    trust-ordered selection (P8-002). It is the source-level counterpart of each
+    item's `Provenance.trust`; an `UNTRUSTED` source is data the router must never let
+    override the agent's own prediction (ADR-0004: untrusted content is never
+    instruction)."""
 
     name: str
+    trust: Trust
 
     def query(self, query: object) -> list[KnowledgeItem]: ...
 
 
 @runtime_checkable
+class SemanticMemory(KnowledgeSource, Protocol):
+    """Distilled facts consolidated from experience (R7, R8). The read side *is* a
+    `KnowledgeSource` (P0-008): one query verb into every knowledge tier, so the
+    router selects the semantic store like any other source — no parallel query
+    path. `write` is its separate consolidation surface."""
+
+    def write(self, item: KnowledgeItem) -> None: ...
+
+
+@runtime_checkable
 class MemoryRouter(Protocol):
     """Chooses which tier to consult (parametric / internal / external) given the
-    query and current epistemic uncertainty (R8, ADR-0004)."""
+    query and current epistemic uncertainty (R8, ADR-0004).
 
-    def route(self, query: object, epistemic: float) -> KnowledgeSource: ...
+    Returning `None` means: confident — answer parametrically (from the model's
+    weights), do not retrieve (P0-008). At P8 the router's decision surfaces to the
+    planner as retrieval *options* (retrieval-as-action, ADR-0004 rule 2).
+
+    Selection is provenance-respecting (P8-002): a source is eligible only if its
+    `trust` clears the router's floor, and among eligible sources the highest-trust
+    one wins — so an untrusted source can never override the agent's own prediction
+    (returns `None` instead)."""
+
+    def route(self, query: object, epistemic: float) -> KnowledgeSource | None: ...

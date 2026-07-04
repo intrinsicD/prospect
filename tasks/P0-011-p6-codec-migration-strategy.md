@@ -1,6 +1,6 @@
 # P0-011 — Docs: the P6 codec swap is a representation change — name the migration strategy
 
-- **Status:** ready
+- **Status:** done
 - **Phase:** P0
 - **Requirements:** R6
 - **ADRs:** ADR-0001 (add consequence); `docs/roadmap.md` P6 row
@@ -43,20 +43,34 @@ P6-001 backlog row update.
   note it on the P3-003 backlog row so the decision is made consciously there.
 
 ## Acceptance criteria
-- [ ] Roadmap P6 row/sequencing note names the migration strategy (distill-first,
-      retrain-fallback) and its cost.
-- [ ] ADR-0001 consequence added.
-- [ ] Backlog rows for P6-001 and P3-003 updated with the implications above.
-- [ ] `make test` green, `make lint` clean (unchanged code).
+- [x] Roadmap sequencing note names the migration strategy (distill-first,
+      retrain-fallback) and that P6's cost estimate includes it.
+- [x] ADR-0001 consequence added (the latent is a contract — components couple to
+      its distribution, not just its shape).
+- [x] Backlog rows updated: P6-001 carries the migration strategy; P3-003 already
+      carried the raw-observation retention note from planning time (verified).
+- [x] `make test` green, `make lint` clean (unchanged code).
 
 ## Test plan
 - Docs review only: roadmap, ADR-0001, backlog rows consistent with each other and
   with the unchanged P6 gate criterion.
 
 ## Docs-sync checklist
-- [ ] Task Status updated; gate result recorded below.
-- [ ] architecture.md "what is deliberately hard" list gains the generality-tax /
-      representation-migration point if not already covered.
+- [x] Task Status updated; gate result recorded below.
+- [x] architecture.md "what is deliberately hard" list: the any-to-any generality-tax
+      bullet now names the representation-migration cost explicitly.
 
 ## Gate result
-_not run yet_
+Docs-only task; consistency review done (roadmap ↔ ADR-0001 ↔ architecture.md ↔
+backlog all state the same strategy: distill-first, retrain-fallback, raw
+observations retained in replay). Code unchanged:
+
+```
+make test      : 37 passed
+make lint      : All checks passed!
+make typecheck : Success: no issues found in 25 source files
+make gate-all  : [P0] PASS — ratchet ok
+```
+
+Result: **PASS** (P0 criterion met; docs consistent). **Phase 0 complete** — the
+top unblocked backlog item is now P1-001.

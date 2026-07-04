@@ -9,12 +9,38 @@ the training loss: the trivial solution has low loss.
 Each gate/sentinel has a *precise* criterion and a `check()` returning a result
 object. Until the eval body exists, `check()` returns a PENDING (not-passed /
 not-healthy) result and does not raise, so `make gate` prints cleanly.
+
+Sentinel data contract (P0-005): training loops write per-step metrics to
+`bench/runs/<run-id>/metrics.jsonl` via `bench.runlog.RunLog` — the keys come from
+what `Learner.update()` returns plus held-out probes. A zero-argument sentinel
+`check()` reads the run back (`bench.runlog.read_run`, default `latest_run()`) to
+verify its criterion throughout training, not only at the capability checkpoint.
+Each sentinel's criterion names the metric keys it requires.
+
+Check registration (P0-006): the registries here hold criteria as *data*; eval
+bodies live in `bench/evals/` and replace their PENDING check by decorating a
+zero-arg callable with `@gate_check(phase)` / `@sentinel_check(name)` at import.
+
+Seed policy (P0-006): every registered check owns an explicit seed list, evaluates
+over those seeds, and records them in `GateResult.seeds`. `run_gate` persists a JSON
+report (criterion, metrics, seeds, run-id) under `bench/results/`, so recorded
+results are reproducible and docs-sync is mechanical.
+
+Regression ratchet (P0-007): phases whose gate has passed are listed in
+`bench/SHIPPED`. `make gate-all` re-runs every shipped gate and fails if any is
+BLOCKED; CI runs it on every push, so a shipped capability cannot silently regress.
+For gates whose evidence is an expensive training artifact, the re-run policy is:
+re-run the *evaluation* against the persisted / regenerable artifact (e.g. the run
+log), not full retraining — and say so in the report detail. Revisit via an
+ADR-0005 amendment if a gate outgrows this.
 """
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from math import nan
+from datetime import UTC, datetime
+from pathlib import Path
 
 PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]
 
@@ -31,7 +57,8 @@ def _phase_at_least(phase: str, floor: str) -> bool:
 class GateResult:
     phase: str
     passed: bool
-    metric: float
+    metrics: dict[str, float] = field(default_factory=dict)
+    seeds: list[int] = field(default_factory=list)
     detail: str = ""
 
 
@@ -45,7 +72,7 @@ class Gate:
 
 def _pending_gate(phase: str, criterion: str) -> Callable[[], GateResult]:
     def _check() -> GateResult:
-        return GateResult(phase=phase, passed=False, metric=nan, detail=f"PENDING — {criterion}")
+        return GateResult(phase=phase, passed=False, detail=f"PENDING — {criterion}")
 
     return _check
 
@@ -57,6 +84,12 @@ def _register(phase: str, goal: str, criterion: str) -> None:
     GATES[phase] = Gate(phase, goal, criterion, _pending_gate(phase, criterion))
 
 
+_register(
+    "P0",
+    "Scaffold",
+    "Imports are clean and the smoke test suite passes (pytest exit code 0). "
+    "Eval registered in bench/evals/p0_scaffold.py.",
+)
 _register(
     "P1",
     "Flat world model + calibrated uncertainty",
@@ -119,7 +152,7 @@ _register(
 class SentinelResult:
     name: str
     healthy: bool
-    metric: float
+    metrics: dict[str, float] = field(default_factory=dict)
     detail: str = ""
 
 
@@ -134,7 +167,7 @@ class Sentinel:
 
 def _pending_sentinel(name: str, criterion: str) -> Callable[[], SentinelResult]:
     def _check() -> SentinelResult:
-        return SentinelResult(name=name, healthy=False, metric=nan, detail=f"PENDING — {criterion}")
+        return SentinelResult(name=name, healthy=False, detail=f"PENDING — {criterion}")
 
     return _check
 
@@ -180,6 +213,34 @@ _register_sentinel(
 )
 
 
+# --------------------------------------------------------------------------- #
+# Check registration: eval modules in bench/evals/ replace PENDING checks.
+# --------------------------------------------------------------------------- #
+def gate_check(phase: str) -> Callable[[Callable[[], GateResult]], Callable[[], GateResult]]:
+    """Decorator: register the real capability eval for `phase`, replacing PENDING.
+    Criteria stay data in this module; eval bodies self-register on import."""
+    if phase not in GATES:
+        raise KeyError(f"unknown phase {phase!r}; known phases: {', '.join(GATES)}")
+
+    def _register_check(fn: Callable[[], GateResult]) -> Callable[[], GateResult]:
+        GATES[phase].check = fn
+        return fn
+
+    return _register_check
+
+
+def sentinel_check(name: str) -> Callable[[Callable[[], SentinelResult]], Callable[[], SentinelResult]]:
+    """Decorator: register the real integrity eval for sentinel `name`, replacing PENDING."""
+    if name not in SENTINELS:
+        raise KeyError(f"unknown sentinel {name!r}; known sentinels: {', '.join(SENTINELS)}")
+
+    def _register_check(fn: Callable[[], SentinelResult]) -> Callable[[], SentinelResult]:
+        SENTINELS[name].check = fn
+        return fn
+
+    return _register_check
+
+
 def applicable_sentinels(phase: str) -> list[Sentinel]:
     """The integrity sentinels active by `phase` (those whose applies_from <= phase)."""
     return [s for s in SENTINELS.values() if _phase_at_least(phase, s.applies_from)]
@@ -197,6 +258,7 @@ class GateReport:
     phase: str
     capability: GateResult
     sentinels: list[SentinelResult] = field(default_factory=list)
+    run_id: str | None = None  # the training run the eval refers to (report metadata)
 
     @property
     def passed(self) -> bool:
@@ -212,10 +274,89 @@ class GateReport:
         return "\n".join(lines)
 
 
-def run_gate(phase: str) -> GateReport:
+RESULTS_DIR = Path(__file__).resolve().parent / "results"
+
+
+def _write_report(report: GateReport, results_dir: Path) -> Path:
+    """Persist the report as JSON — the record the docs-sync step cites (committed)."""
+    results_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    path, n = results_dir / f"{report.phase}-{stamp}.json", 1
+    while path.exists():
+        path, n = results_dir / f"{report.phase}-{stamp}-{n}.json", n + 1
+    payload = {
+        "phase": report.phase,
+        "passed": report.passed,
+        "run_id": report.run_id,
+        "written_at": stamp,
+        "capability": {
+            "criterion": GATES[report.phase].criterion,
+            "passed": report.capability.passed,
+            "metrics": report.capability.metrics,
+            "seeds": report.capability.seeds,
+            "detail": report.capability.detail,
+        },
+        "sentinels": [
+            {
+                "name": s.name,
+                "criterion": SENTINELS[s.name].criterion,
+                "healthy": s.healthy,
+                "metrics": s.metrics,
+                "detail": s.detail,
+            }
+            for s in report.sentinels
+        ],
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+SHIPPED_FILE = Path(__file__).resolve().parent / "SHIPPED"
+
+
+def shipped_phases(path: Path | None = None) -> list[str]:
+    """Phases recorded as shipped in `bench/SHIPPED` (one per line; blank lines and
+    `#` comments ignored). An unknown phase raises ValueError — the ratchet must
+    fail loudly, never silently skip."""
+    file = path or SHIPPED_FILE
+    if not file.exists():
+        return []
+    phases: list[str] = []
+    for lineno, raw in enumerate(file.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line not in GATES:
+            raise ValueError(
+                f"{file}:{lineno}: unknown phase {line!r} in SHIPPED; known phases: {', '.join(GATES)}"
+            )
+        phases.append(line)
+    return phases
+
+
+def run_shipped_gates(
+    path: Path | None = None, results_dir: Path | None = None
+) -> list[GateReport]:
+    """Re-run every shipped phase's gate (the regression ratchet, P0-007)."""
+    return [run_gate(phase, results_dir=results_dir) for phase in shipped_phases(path)]
+
+
+def run_gate(phase: str, run_id: str | None = None, results_dir: Path | None = None) -> GateReport:
     """Run a phase's kill-gate: capability + all applicable integrity sentinels.
 
     The phase passes only if capability passes AND every applicable sentinel is
-    healthy. Raises KeyError for an unknown phase.
+    healthy. Persists a JSON report under `bench/results/` (or `results_dir`).
+    `run_id` names the training run the eval refers to — recorded in the report;
+    zero-arg checks default to `runlog.latest_run()`. Raises KeyError (listing the
+    known phases) for an unknown phase.
     """
-    return GateReport(phase=phase, capability=GATES[phase].check(), sentinels=run_sentinels(phase))
+    if phase not in GATES:
+        raise KeyError(f"unknown phase {phase!r}; known phases: {', '.join(GATES)}")
+    report = GateReport(
+        phase=phase,
+        capability=GATES[phase].check(),
+        sentinels=run_sentinels(phase),
+        run_id=run_id,
+    )
+    _write_report(report, results_dir or RESULTS_DIR)
+    return report

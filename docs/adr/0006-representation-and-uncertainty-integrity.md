@@ -35,10 +35,12 @@ from a real-data-anchored checkpoint, never dream-of-dreams); and **quality-gate
 dreamed trajectories with the (validated) uncertainty estimate — rehearse only
 in-distribution dreams.
 
-**Model-exploitation control.** Planning uses **uncertainty-penalized rollouts** with
-short/branched horizons (MBPO/MOPO), so the planner is repelled from regions the model
-is wrong about. This defense *depends on* a healthy uncertainty estimate, which is why
-the reliability check is upstream of it.
+**Model-exploitation control.** Planning **in exploit mode** uses
+**uncertainty-penalized rollouts** with short/branched horizons (MBPO/MOPO), so the
+planner is repelled from regions the model is wrong about; explore-mode data
+collection flips the sign under the curriculum's control (ADR-0007). This defense
+*depends on* a healthy uncertainty estimate, which is why the reliability check is
+upstream of it.
 
 **Integrity is gated, not hoped for.** Because collapse hides in a good loss, integrity
 is enforced by standing **sentinels** in `bench/gates.py`. Every phase gate passes only
@@ -53,6 +55,11 @@ if its capability criterion passes **and** all applicable sentinels are healthy.
 - (−) Extra losses/regularizers add tuning surface and compute; the std/rank floors and
   reliability thresholds are themselves hyperparameters that need calibrating per task.
 - (−) Sentinels require held-out probes and add evaluation cost to every gate.
+- Sentinels are fed by a run-metrics artifact (`bench/runs/<run-id>/metrics.jsonl`,
+  P0-005): training loops log per-step integrity metrics — the dict
+  `Learner.update()` returns plus held-out probes — and a zero-argument sentinel
+  `check()` reads the run back, so "throughout training" is verifiable, not
+  aspirational. *(Amended by P0-005.)*
 - Out of scope here: **curiosity collapse** (noisy-TV) is already handled by rewarding
   *epistemic* (not raw) surprise in ADR-0002; **posterior collapse** applies only if a
   stochastic latent with a KL term is used, in which case add free-bits / KL-balancing

@@ -1,6 +1,6 @@
 # P0-008 — One query path into knowledge; the router may decline; provenance defaults
 
-- **Status:** ready
+- **Status:** done
 - **Phase:** P0
 - **Requirements:** R8
 - **ADRs:** ADR-0004 (amend)
@@ -41,23 +41,37 @@ skeletons in `memory.py` / `knowledge.py` updated to match.
   P8 mechanism is retrieval surfaced as planner-selectable options.
 
 ## Acceptance criteria
-- [ ] `SemanticMemory` extends `KnowledgeSource`; `SemanticStore` skeleton matches;
-      smoke tests updated (conformance check for both protocols).
-- [ ] `MemoryRouter.route` returns `KnowledgeSource | None`, documented.
-- [ ] `Observation.provenance` docstring defines the `None` convention.
-- [ ] ADR-0004 amended (three points above).
-- [ ] `make test` green, `make lint` clean.
+- [x] `SemanticMemory` extends `KnowledgeSource`; `SemanticStore` skeleton matches
+      (`name = "semantic"`, `query()` replaces `read()`); smoke tests updated
+      (conformance check for both protocols).
+- [x] `MemoryRouter.route` returns `KnowledgeSource | None`, documented (interface,
+      skeleton, and architecture.md).
+- [x] `Observation.provenance` docstring defines the `None` convention.
+- [x] ADR-0004 amended (three points above, as two consequence bullets).
+- [x] `make test` green, `make lint` clean.
 
 ## Test plan
 - Smoke: `isinstance(SemanticStore(), interfaces.KnowledgeSource)`; skeleton
   instantiation unchanged; protocol-presence checks for the new signatures.
 
 ## Docs-sync checklist
-- [ ] Task Status updated; gate result recorded below.
-- [ ] ADR-0004 amended.
-- [ ] `docs/architecture.md` memory/knowledge component notes reflect the unified
-      query path.
-- [ ] Backlog P8-001 row references the `None` (parametric) contract.
+- [x] Task Status updated; gate result recorded below.
+- [x] ADR-0004 amended.
+- [x] `docs/architecture.md` memory component note reflects the unified query path
+      and the `None` (parametric) routing contract.
+- [x] Backlog P8-001 row references the `None` (parametric) contract (was already
+      annotated at planning time; verified).
 
 ## Gate result
-_not run yet_
+The P0 gate is registered and shipped; the ratchet re-runs it:
+
+```
+make gate-all : [P0] PASS — ratchet ok, 1 shipped gate(s) still green
+make test     : 36 passed
+make lint     : All checks passed!
+```
+
+Result: **PASS** (P0 criterion met). Coverage for this task: smoke conformance
+asserts `SemanticStore` satisfies **both** `SemanticMemory` and `KnowledgeSource`,
+`InternalKnowledgeSource` satisfies `KnowledgeSource`, and `UncertaintyMemoryRouter`
+satisfies `MemoryRouter` with the new `KnowledgeSource | None` signature.

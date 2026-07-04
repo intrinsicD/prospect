@@ -20,5 +20,32 @@ all six jobs listed in `docs/architecture.md`.
 - (+) A mastery **test** and a curiosity **curriculum** come from the same quantity.
 - (−) Everything depends on calibrated uncertainty; calibration degrades
   off-distribution and must be monitored (a P7 concern).
-- **Contract:** the world model returns `types.Prediction` (mean + epistemic +
-  aleatoric), never a bare float. Downstream code must not bypass this.
+- **Contract:** the world model returns `types.Prediction` — a diagonal Gaussian
+  (`mean` + per-dimension `var`) with the epistemic/aleatoric split and a **concrete**
+  `log_prob` — never a bare float or an unimplemented distribution. Downstream code
+  must not bypass this. *(Amended by P0-001: `var` and a working `log_prob` are part
+  of the contract, so surprise is computable from any `Prediction` without
+  subclassing.)*
+- **Contract:** the surprise signal itself is `types.Surprise` — total NLL plus its
+  epistemic/aleatoric attribution — never a bare float; consumers gate on
+  `.epistemic`, not the undecomposed total (the same rule as `Prediction`, one level
+  up). Transitions collected while executing a skill set `Transition.option`, so
+  competence is attributable per skill. *(Amended by P0-002.)*
+- Consumers can conflict over the signal's *sign* — planning avoids epistemic
+  uncertainty while curiosity seeks it; that arbitration is decided in ADR-0007
+  (mode-dependent, curriculum-owned). And under distribution shift the signal is
+  ambiguous across consumers: the forgetting detector (job 5) and the retrieval
+  trigger (job 6) fire together, yet "I forgot", "the world changed", and "I'm
+  off-distribution, so the uncertainty estimate itself is unreliable" are three
+  different correct responses to one scalar. Disambiguation is expected to need
+  context beyond the scalar (which skill, which regime) — a named P7 concern, not
+  assumed away. *(Amended by P0-010.)*
+- **Forgetting detection keys on prediction ERROR, not epistemic** (P7-001). The
+  natural reading — "forgetting = epistemic rising on a mastered skill" — fails
+  under distribution shift because the ensemble is often *confidently wrong*: its
+  members agree on a wrong answer, so epistemic (disagreement) stays low even as
+  the skill decays. Measured: an epistemic-keyed detector never fired on real
+  continual-learning forgetting. `CompetenceMonitor.is_forgetting` therefore latches
+  a skill's *prediction error* at mastery and fires when it rises; mastery still
+  keys on epistemic (learned = low uncertainty). This resolves the P0-010-flagged
+  forgetting-under-shift concern for the "I forgot" case. *(Amended by P7-001.)*

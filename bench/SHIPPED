@@ -1,0 +1,12 @@
+# Phases whose kill-gate has passed (one per line, appended in the same commit
+# that records the passing gate). `make gate-all` re-runs every phase listed here
+# and fails if any regressed — the ratchet that keeps shipped phases green (P0-007).
+P0
+P1
+P2
+P3
+P4
+P5
+P6
+P7
+P8

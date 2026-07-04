@@ -20,7 +20,9 @@ distractors (that is requirement R4).
 ## The one signal, many jobs
 Surprise is computed as the negative log-likelihood of the observed outcome under
 the predicted distribution (never raw L2), with epistemic isolated from aleatoric.
-The same quantity is reused as:
+In code the signal is `types.Surprise` — the total NLL carrying its
+epistemic/aleatoric attribution (P0-002); consumers gate on `.epistemic`, never on
+the undecomposed total. The same quantity is reused as:
 
 | # | Job | Requirement | Lives in |
 |---|-----|-------------|----------|
@@ -31,10 +33,18 @@ The same quantity is reused as:
 | 5 | Forgetting detector — rising surprise on a mastered skill → rehearse | R7 | voe, memory |
 | 6 | Retrieval trigger — high uncertainty → query a knowledge source | R8 | memory, knowledge |
 
+Two of these jobs pull the signal in opposite directions: planning is *repelled*
+from epistemic uncertainty (ADR-0006's exploitation control) while the curiosity
+curriculum *seeks* it. The sign is mode-dependent — explore vs exploit — and the
+curriculum owns the mode; neither consumer decides the sign itself (ADR-0007).
+
 If a new requirement needs a brand-new bespoke signal, treat that as a smell: the
 design's health is that additions plug into this backbone.
 
 ## Components (one file each, in `src/prospect/`)
+- **agent.py** — the composition root (P2-002): the act–observe loop where the
+  components meet — encode → plan → act; the monitor (P3), replay (P3) and
+  retrieval-as-action (P8) plug into this one loop instead of re-inventing wiring.
 - **codec.py** — universal encode/decode: any input → shared latent, latent → any
   output (R6). Retrieved knowledge enters through the *same* encoder (knowledge as
   tokens).
@@ -43,15 +53,25 @@ design's health is that additions plug into this backbone.
 - **planning.py** — flat MPC/CEM in imagination (R1); the hierarchical manager over
   a *jumpy* option-model + VoE-triggered termination (R2).
 - **voe.py** — calibrated surprise; epistemic/aleatoric split; competence/mastery
-  and forgetting detection (R3, R7).
+  (keyed on epistemic) and forgetting detection (keyed on rising prediction error —
+  the ensemble is confidently wrong under shift, P7-001) (R3, R7); the
+  learning-progress curriculum that owns the ADR-0007 explore/exploit mode flag
+  (consumers read the sign, never pick it).
 - **skills.py** — options with predictive preconditions; simulate-to-select router;
   only competence-gated (mastered) skills are offered upward (R5).
 - **memory.py** — episodic replay + *generative* replay (rehearsal), a semantic
-  store, and an uncertainty-gated router over the memory tiers (R7, R8).
+  store whose read side is a `KnowledgeSource` (one query verb, P0-008), and an
+  uncertainty-gated, **provenance-respecting** router over the memory tiers: it may
+  decline to retrieve (`None` = answer parametrically), and it selects among sources
+  by `trust` — highest-trust above a `min_trust` floor wins, so an untrusted source
+  never overrides the agent's own prediction (R7, R8; ADR-0004).
 - **knowledge.py** — internal/external knowledge sources and tools as
-  uncertainty-gated actions, each item carrying provenance/trust (R8).
+  uncertainty-gated actions; each source declares a `trust` floor and each item
+  carries provenance/trust — untrusted content is data, never instruction (R8).
 - **types.py / interfaces.py** — shared types and the `Protocol` contracts every
-  component satisfies.
+  component satisfies. Components that learn additionally satisfy `Learner`
+  (`update(batch) -> metrics dict`) — the uniform training seam the harness drives,
+  and the channel through which sentinel metrics leave the training loop (P0-003).
 
 ## Hierarchy (R2), in one line
 Hierarchical *planning* = a jumpy, option-conditioned world model + planning at each
@@ -69,7 +89,9 @@ retrieval and tool-use as actions the planner selects, gated by uncertainty. See
 - Compounding rollout error (bounded by hierarchy) — the main limiter on R1.
 - Causal vs. spurious features (shortcut learning) — mitigated by acting = intervening.
 - Skill composition beyond a flat menu.
-- The generality tax of any-to-any I/O.
+- The generality tax of any-to-any I/O — including the P6 migration: a codec swap
+  is a *representation* change, because everything downstream couples to the latent
+  distribution (distill-first, retrain-fallback; ADR-0001, P0-011).
 - Calibration under distribution shift — the whole VoE story rests on it.
 - **Collapse of the shared latent** (constant / low-rank encoder) — because latent
   prediction is collapse-prone and everything reads this latent (ADR-0006).

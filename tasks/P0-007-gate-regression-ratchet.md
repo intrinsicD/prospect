@@ -1,6 +1,6 @@
 # P0-007 — Regression ratchet: shipped gates stay green
 
-- **Status:** blocked (P0-006)
+- **Status:** done
 - **Phase:** P0
 - **Requirements:** — (delivery infrastructure; makes ADR-0005 self-enforcing)
 - **ADRs:** ADR-0005 (amend consequence)
@@ -35,12 +35,14 @@ Harness + CI surface: `bench/SHIPPED`, `make gate-all`, a CI step.
   to `bench/SHIPPED`."
 
 ## Acceptance criteria
-- [ ] `bench/SHIPPED` exists and lists `P0`.
-- [ ] `make gate-all` green locally; deliberately breaking a smoke test makes it fail
-      (verified once, then reverted).
-- [ ] CI workflow runs `make gate-all` and would fail on a BLOCKED shipped gate.
-- [ ] The expensive-gate re-run policy is documented (gates.py docstring or ADR-0005).
-- [ ] `make test` green, `make lint` clean.
+- [x] `bench/SHIPPED` exists and lists `P0`.
+- [x] `make gate-all` green locally; deliberately breaking a smoke test makes it fail
+      (verified once, then reverted — see gate result below).
+- [x] CI workflow runs `make gate-all` and would fail on a BLOCKED shipped gate
+      (the ratchet exits 1 on regression; verified by the break experiment).
+- [x] The expensive-gate re-run policy is documented (gates.py docstring AND the
+      ADR-0005 amendment).
+- [x] `make test` green, `make lint` clean.
 
 ## Test plan
 - Unit: `gate-all` aggregation logic (all pass ⇒ exit 0; one BLOCKED ⇒ nonzero;
@@ -48,12 +50,31 @@ Harness + CI surface: `bench/SHIPPED`, `make gate-all`, a CI step.
 - Manual: the break-one-test experiment above; CI run on the branch.
 
 ## Docs-sync checklist
-- [ ] Task Status updated; gate result recorded below.
-- [ ] ADR-0005 consequence amended.
-- [ ] `tasks/TEMPLATE.md` docs-sync checklist gains "append phase to `bench/SHIPPED`
+- [x] Task Status updated; gate result recorded below.
+- [x] ADR-0005 consequence amended (gates gate *staying* shipped).
+- [x] `tasks/TEMPLATE.md` docs-sync checklist gains "append phase to `bench/SHIPPED`
       when the gate passes".
-- [ ] CLAUDE.md "Definition of done" unchanged? — check; amend if the ratchet adds a
-      step.
+- [x] CLAUDE.md "Definition of done" amended — the ratchet does add a step
+      (append to `bench/SHIPPED` in the same commit as the passing gate result).
 
 ## Gate result
-_not run yet_
+Ratchet verified end-to-end (`make gate-all`):
+
+```
+[P0] PASS
+  capability: ok — 35 passed, 1 skipped in 0.08s
+ratchet ok — 1 shipped gate(s) still green        exit=0
+```
+
+Break-one-test experiment (a deliberately failing test added, then reverted):
+
+```
+[P0] BLOCKED
+  capability: not met — 1 failed, 35 passed, 1 skipped in 0.08s
+RATCHET FAILED — shipped gate(s) regressed: P0    exit≠0
+```
+
+Green again after revert (exit 0); the green ratchet report is committed as
+`bench/results/P0-20260703T143627Z.json`. Unit tests cover all exit paths
+(0 all-pass / 0 empty, 1 blocked, 2 malformed SHIPPED). Full suite: 36 passed;
+lint clean.

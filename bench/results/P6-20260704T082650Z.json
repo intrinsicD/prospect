@@ -1,0 +1,87 @@
+{
+  "phase": "P6",
+  "passed": true,
+  "run_id": null,
+  "written_at": "20260704T082650Z",
+  "capability": {
+    "criterion": "Swapping the single-modality codec for the universal codec preserves core-loop performance within tolerance.",
+    "passed": true,
+    "metrics": {
+      "incumbent_mse_s0": 0.043001037844761454,
+      "state_swap_mse_s0": 0.04302535712240761,
+      "image_swap_mse_s0": 0.043890439717631444,
+      "state_swap_ratio_s0": 1.0005655509463272,
+      "image_swap_ratio_s0": 1.0206832652756157,
+      "cross_modality_latent_mse_s0": 0.001279974822710886,
+      "state_reconstruction_mse_s0": 0.008021106370606578,
+      "incumbent_mse_s1": 0.05765763924366331,
+      "state_swap_mse_s1": 0.057757601694795074,
+      "image_swap_mse_s1": 0.05771740554182834,
+      "state_swap_ratio_s1": 1.0017337243155122,
+      "image_swap_ratio_s1": 1.0010365720648473,
+      "cross_modality_latent_mse_s1": 0.001416061048528898,
+      "state_reconstruction_mse_s1": 0.007123716302010523,
+      "incumbent_mse_s2": 0.06900845794136838,
+      "state_swap_mse_s2": 0.06784690611593405,
+      "image_swap_mse_s2": 0.06822549650708662,
+      "state_swap_ratio_s2": 0.9831679788233898,
+      "image_swap_ratio_s2": 0.9886541236010955,
+      "cross_modality_latent_mse_s2": 0.0009087945159886841,
+      "state_reconstruction_mse_s2": 0.00416055008540345,
+      "state_swap_ratio_max": 1.0017337243155122,
+      "image_swap_ratio_max": 1.0206832652756157,
+      "codec_preserves_core_loop": 1.0
+    },
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "detail": "codec-swapped 1-step MSE / incumbent \u2014 STATE [1.0, 1.0, 0.98], IMAGE [1.02, 1.0, 0.99] (tolerance x1.5); the swap preserves the core loop and a second modality drives it identically on every seed: YES"
+  },
+  "sentinels": [
+    {
+      "name": "representation-integrity",
+      "criterion": "Latent per-dimension std stays above a floor AND effective rank (participation ratio of the latent covariance) stays above a threshold on held-out data throughout training \u2014 not only at the capability checkpoint.",
+      "healthy": true,
+      "metrics": {
+        "min_latent_std": 0.8674177855282365,
+        "min_effective_rank": 2.024951144921557
+      },
+      "detail": "across 39 held-out probes (warm-up 300 steps): min per-dim std 0.867 (floor 0.3), min effective rank 2.02 (floor 2.0)"
+    },
+    {
+      "name": "uncertainty-reliability",
+      "criterion": "Predicted epistemic uncertainty is rank-correlated with held-out prediction error above a threshold, and ensemble-member disagreement does not decay to ~0 in regions where error is high.",
+      "healthy": true,
+      "metrics": {
+        "min_final_rank_corr": 0.6981079088989597,
+        "min_high_error_disagreement_ratio": 29.414564567255614
+      },
+      "detail": "worst seed at end of training: disagreement-vs-error rank corr 0.70 (min 0.3), high-error-decile disagreement 29.41x median (min 1.0) on a mixed in-dist + OOD probe set"
+    },
+    {
+      "name": "replay-fidelity",
+      "criterion": "Rehearsal keeps a fixed real-data fraction; dreamed-sample diversity (feature variance / coverage vs real) stays above a floor and does not shrink across regenerations; rehearsal lineage depth is capped (no dream-of-dreams).",
+      "healthy": true,
+      "metrics": {
+        "min_real_fraction": 0.5,
+        "min_dream_diversity": 0.613841506838667,
+        "worst_diversity_shrink": 0.9436141205379408,
+        "max_dream_depth": 3.0
+      },
+      "detail": "across 5 regenerations x 3 seed(s): real fraction min 0.50 (floor 0.3), dream diversity min 0.61 (floor 0.3), diversity shrink 0.94 (floor 0.5), lineage depth max 3 (cap 3), dreams stored: 0"
+    },
+    {
+      "name": "option-diversity",
+      "criterion": "Option-usage entropy stays above a floor (no single option dominates), mean option duration stays above one step, and pairwise option outcome-distributions remain distinguishable.",
+      "healthy": true,
+      "metrics": {
+        "min_usage_entropy": 0.7997901404618238,
+        "min_mean_duration": 2.5906735751295336,
+        "min_pairwise_dprime": 0.6609691628737714
+      },
+      "detail": "worst seed over the two-level eval episodes: usage entropy 0.80 (floor 0.3), mean executed duration 2.59 steps (floor > 1.0), min pairwise landing d' 0.66 (floor 0.5)"
+    }
+  ]
+}

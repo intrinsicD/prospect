@@ -36,6 +36,10 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 ## Workflow (one loop per unit of work)
 - **task-workflow** — Take the top *unblocked* item in `tasks/BACKLOG.md`. Open its
   task file. Your job is exactly its interface + acceptance criteria — no more.
+  Drive the Status lifecycle explicitly: set it to `in-progress` when you pick the
+  task up, and retire it to `done` — acceptance boxes ticked, gate result recorded
+  in the task file, backlog row updated (unblocking dependents) — before you finish.
+  One focused commit per task.
 - **method** — Follow `docs/architecture.md` and the ADRs the task links. If the
   right move contradicts an ADR, do not just do it: add or amend an ADR first
   (a 15-line ADR is cheaper than silent architectural drift).
@@ -47,14 +51,18 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 - **docs-sync** — Update whatever you invalidated: the requirement traceability row,
   the task status, an ADR's status, the architecture doc. **Code and docs must not
   drift.** A change to behaviour that leaves docs stale is incomplete.
-- **core conventions** — Python ≥3.11, full type hints, `ruff` clean, tests green.
-  New public surface satisfies a `Protocol` in `interfaces.py`.
+- **core conventions** — Python ≥3.11, full type hints (enforced: `make typecheck`
+  must be clean), `ruff` clean, tests green. New public surface satisfies a
+  `Protocol` in `interfaces.py` and gets a typed conformance assertion in
+  `tests/test_conformance.py`.
 
 ## Commands
 - `make install`         editable install with dev tools
 - `make test`            pytest (must stay green)
 - `make lint`            ruff
+- `make typecheck`       mypy (must stay clean)
 - `make gate PHASE=P1`   run a phase kill-gate
+- `make gate-all`        re-run every shipped gate (the regression ratchet)
 - `make tree`            list the project files
 
 ## Repo map
@@ -62,6 +70,8 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 - `src/prospect/types.py` — shared types; `Prediction` is the important one.
 - `src/prospect/{codec,world_model,planning,voe,skills,memory,knowledge}.py` — one
   component each; skeletons raise `NotImplementedError("<task-id>")`.
+- `src/prospect/agent.py` — the composition root: the act–observe loop the
+  components plug into (don't re-invent wiring in evals; extend this).
 - `bench/gates.py` — the kill-gates (the project's fitness function).
 - `tasks/` — backlog, template, and specified tasks.
 - `docs/` — architecture, requirements, roadmap, ADRs.
@@ -69,7 +79,9 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 ## Definition of done
 - [ ] Satisfies the task's interface (a `Protocol` in `interfaces.py`).
 - [ ] Meets every acceptance criterion in the task file.
-- [ ] `make test` green; `make lint` clean.
-- [ ] Phase gate run; result recorded in the task file.
+- [ ] `make test` green; `make lint` clean; `make typecheck` clean.
+- [ ] Phase gate run; result recorded in the task file. If the gate newly passes,
+      the phase is appended to `bench/SHIPPED` in the same commit (the CI ratchet
+      re-runs every shipped gate).
 - [ ] docs-sync done (traceability, task status, ADRs, architecture).
 - [ ] No speculative scope beyond the task.
