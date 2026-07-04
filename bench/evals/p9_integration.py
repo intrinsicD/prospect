@@ -15,25 +15,27 @@ that the curriculum turns into the planner's exploit coefficient also gates retr
 inside the rollouts (one signal, several jobs, one loop).
 
 PASS = the whole system works end-to-end AND the one signal does several jobs at once
-AND the ablation confirms the load-bearing part matters (every seed):
+AND the ablation confirms the load-bearing part matters AND the core capabilities
+generalize to a second environment:
 1. **Controls end-to-end** — the composed agent's return beats a reactive (random)
    baseline: the full wiring produces control, not just isolated capabilities.
 2. **One signal, many jobs, one run** — in the *same* run the monitor's epistemic
    signal (a) is turned by the curriculum into the planner's live exploit coefficient
    (mastered ⇒ positive; the value the agent actually applied), and (b) gates
    retrieval (it fired; every retrieval was above the router's uncertainty threshold
-   by construction).
+   by construction). Also carries all four collapse sentinels on run `p9`.
 3. **Ablation — the load-bearing part matters** (P9-002) — leave-one-out marginal
-   control value (`composed - ablated`) of each component: planning must be
-   load-bearing on every seed. Also carries all four collapse sentinels on run `p9`
-   (the limited-region model + its natural OOD feed the probes).
+   control value (`composed - ablated`): planning must be load-bearing on every seed.
+4. **Generalizes to a 2nd environment** (P9-003) — prediction (P1) and planning (P2)
+   survive on `bench.envs.PointMass`, a structurally different task, with the SAME core
+   code (recalibrated eval params only).
 
-MEASURED, NOT GATED — the other components' marginals. The ablation quantifies what
-each part is worth, and reports a component that HURTS as a finding rather than tuning
-it away (ADR-0008): retrieval-into-planning has a *negative* marginal (it improves
-1-step prediction per P8 but overriding the planner's rollout dynamics with
-nearest-neighbour facts corrupts the multi-step optimisation). Whether retrieval can
-enter planning without the cost is the open follow-up.
+MEASURED, NOT GATED — the findings (ADR-0008): (a) retrieval-into-planning has a
+*negative* ablation marginal (it helps 1-step prediction per P8 but overriding the
+planner's rollout dynamics corrupts multi-step optimisation); (b) retrieval does NOT
+generalize to PointMass — its benefit is env-dependent (the ensemble's epistemic barely
+rises OOD there, so retrieval rarely fires); (c) the exploit-penalty is ~negligible.
+None is tuned away; each is a reported generalization/composition limit.
 """
 from __future__ import annotations
 
@@ -57,6 +59,7 @@ from .p3_replay import log_replay_fidelity
 from .p7_continual import _log_option_diversity
 from .p8_knowledge import FULL, REGION, _env, _key, _region_data
 from .p9_ablation import MARGIN, classify, marginals
+from .p9_generalization import generalizes
 
 RUN_ID = "p9"
 SEEDS = [0, 1, 2]
@@ -192,13 +195,25 @@ def check_p9() -> GateResult:
             f"marginal_exploit_penalty_s{seed}": marg["exploit_penalty"],
         }
 
+    # P9-003 cross-environment generalization: the load-bearing capabilities must
+    # survive on a SECOND, structurally different environment (PointMass) with the same
+    # core. Gate on prediction + planning generalizing; retrieval's generalization is
+    # recorded (its benefit is env-dependent — a finding).
+    gen = generalizes()
+    metrics |= gen.metrics
+    generalizes_met = gen.prediction_met and gen.planning_met
+    metrics |= {"prediction_generalizes": float(gen.prediction_met),
+                "planning_generalizes": float(gen.planning_met),
+                "retrieval_generalizes": float(gen.retrieval_met),
+                "generalizes_met": float(generalizes_met)}
+
     # PASS = the whole system works end-to-end (controls), the one epistemic signal
-    # drives several jobs in one run, AND the leave-one-out ablation confirms the
-    # clearly load-bearing component (planning) matters on every seed. The other
-    # components' marginals are RECORDED, not gated: a harmful marginal (retrieval)
-    # is a finding to report, not tuned away (ADR-0008).
+    # drives several jobs in one run, the leave-one-out ablation confirms the clearly
+    # load-bearing component (planning) matters, AND the core capabilities generalize to
+    # a second environment. Recorded-not-gated findings: a harmful/negligible ablation
+    # marginal, and retrieval's env-dependent generalization (ADR-0008).
     controls_met, one_signal_met, ablation_met = all(controls), all(one_signal), all(ablation_ok)
-    passed = controls_met and one_signal_met and ablation_met
+    passed = controls_met and one_signal_met and ablation_met and generalizes_met
     composed_med, bare_med = float(np.median(composed_ret)), float(np.median(bare_ret))
     reactive_med = float(np.median([metrics[f"reactive_return_s{s}"] for s in SEEDS]))
     rate_med = float(np.median([metrics[f"retrieval_rate_s{s}"] for s in SEEDS]))
@@ -209,14 +224,16 @@ def check_p9() -> GateResult:
                 "ablation_met": float(ablation_met)}
     metrics |= {f"marginal_{c}_median": m for c, m in marg_med.items()}
     table = ", ".join(f"{c} {m:+.1f} ({classify(m)})" for c, m in marg_med.items())
+    gen_note = (f"prediction {'✓' if gen.prediction_met else '✗'} + planning "
+                f"{'✓' if gen.planning_met else '✗'} generalize to a 2nd env (PointMass); "
+                f"retrieval {'✓' if gen.retrieval_met else '✗ (env-dependent)'}")
     detail = (
         f"composed agent controls end-to-end: return {composed_med:.1f} vs reactive "
         f"{reactive_med:.1f} ({'beats every seed' if controls_met else 'FAILS'}); one epistemic "
         f"signal drives exploit-mode AND retrieval in one run "
-        f"({'MET' if one_signal_met else 'NOT MET'}; retrieval rate {rate_med:.0%}). "
-        f"ablation leave-one-out marginal control value: {table} "
-        f"[planning load-bearing every seed: {'MET' if ablation_met else 'NOT MET'}]. "
-        f"FINDING: retrieval hurts control here (marginal {marg_med['retrieval']:+.1f}) — helps "
-        f"1-step prediction (P8) but corrupts multi-step planning"
+        f"({'MET' if one_signal_met else 'NOT MET'}). ablation marginal control value: {table}. "
+        f"cross-env: {gen_note}. FINDINGS: retrieval hurts control (marginal "
+        f"{marg_med['retrieval']:+.1f}) and does not generalize to PointMass — its value is "
+        f"env-dependent; exploit-penalty is negligible"
     )
     return GateResult(phase="P9", passed=passed, metrics=metrics, seeds=list(SEEDS), detail=detail)

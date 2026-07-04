@@ -70,3 +70,18 @@ then quantified it and found a second under-performer:
 Both under-performers are recorded as findings (harmful retrieval; a near-negligible
 exploit penalty) rather than tuned away — the ablation is the standing tool that keeps
 "every part earns its place" honest.
+
+P9-003 then ran the capabilities on a **second, structurally different environment**
+(`PointMass`, 2D nonlinear-drag; obs_dim 3→4, action_dim 1→2) with the same core:
+
+| Capability | env #2 | Verdict |
+|---|---|---|
+| prediction (P1) | WM 0.0011 vs persistence 0.0295 | generalizes |
+| planning (P2) | planner −15.5 vs random −52.8 | generalizes |
+| retrieval (P8) | gated 0.0183 vs no-retrieval 0.0172 | does NOT generalize |
+
+Prediction and planning generalize with only recalibrated eval params (no core change —
+that no core change is required is the result). **Retrieval does not generalize**: the
+ensemble is *confidently wrong* out-of-region on PointMass (epistemic barely rises, so
+the uncertainty gate rarely fires) — the ADR-0002 limitation, now shown to make
+retrieval's benefit env-dependent. A third finding, recorded not patched.

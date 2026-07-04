@@ -5,7 +5,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+
 from bench import Environment
+from bench.envs import PointMass
 from prospect.types import Action, Modality, Observation
 
 _CORE = Path(__file__).resolve().parent.parent / "src" / "prospect"
@@ -41,6 +44,30 @@ def test_env_round_trips_with_core_types() -> None:
     assert done is False
     _, _, done = env.step(Action(data=[0.0]))
     assert done is True
+
+
+def test_pointmass_satisfies_protocol_and_steps() -> None:  # P9-003 second environment
+    env = PointMass()
+    assert isinstance(env, Environment)
+    obs = env.reset(seed=3)
+    assert isinstance(obs, Observation) and np.asarray(obs.data).shape == (4,)  # x, y, vx, vy
+    obs, reward, done = env.step(Action(data=np.array([1.0, -1.0])))
+    assert np.asarray(obs.data).shape == (4,) and isinstance(reward, float) and done is False
+
+
+def test_pointmass_set_state_and_nonlinear_drag() -> None:  # P9-003
+    env = PointMass()
+    # set_state places an exact state; a rightward push from rest moves +x, +vx.
+    env.set_state(0.0, 0.0, 0.0, 0.0)
+    obs, _, _ = env.step(Action(data=np.array([1.0, 0.0])))
+    x, _, vx, _ = np.asarray(obs.data)
+    assert vx > 0.0 and x > 0.0
+    # quadratic drag: the per-step velocity gain is smaller at high speed than at rest.
+    env.set_state(0.0, 0.0, 0.0, 0.0)
+    gain_rest = np.asarray(env.step(Action(data=np.array([1.0, 0.0])))[0].data)[2]
+    env.set_state(0.0, 0.0, 5.0, 0.0)
+    gain_fast = np.asarray(env.step(Action(data=np.array([1.0, 0.0])))[0].data)[2] - 5.0
+    assert gain_fast < gain_rest  # drag opposes motion more at higher speed (nonlinear)
 
 
 def test_core_never_imports_the_harness() -> None:

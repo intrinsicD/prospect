@@ -144,13 +144,15 @@ _register(
 )
 _register(
     "P9",
-    "Whole-system integration + ablation",
+    "Whole-system integration + ablation + generalization",
     "The fully-composed agent works end-to-end through the composition root: it "
     "controls better than a reactive baseline; within ONE run the single epistemic "
     "signal both sets the planner's explore/exploit coefficient AND gates retrieval; "
     "a leave-one-out ablation confirms the load-bearing component (planning) matters "
-    "on every seed (each component's marginal control value is recorded — a harmful "
-    "marginal is a reported finding); and all applicable collapse sentinels stay healthy.",
+    "(each component's marginal control value recorded — a harmful marginal is a "
+    "reported finding); the core capabilities (prediction, planning) generalize to a "
+    "second, structurally different environment with the same core; and all applicable "
+    "collapse sentinels stay healthy.",
 )
 
 

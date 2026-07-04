@@ -95,12 +95,13 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 
 - **P9-001** · `done` · R1–R8 · End-to-end integration gate. The composed agent controls the task (−19.4 vs random −73.1); in ONE run the single epistemic signal drives the planner's exploit coefficient AND retrieval; four sentinels healthy. Gate **P9 PASS** (shipped). **Finding:** retrieval-*into-planning* degrades control (−19.4 vs −8.1 off) — handed to P9-002.
 - **P9-002** · `done` · R1–R8 · Ablation harness (leave-one-out marginal control value), folded into the P9 gate. Verdicts: planning **+53.7 load-bearing** (gated every seed), retrieval **−9.5 harmful** (the P9-001 finding, quantified), exploit_penalty **+2.5 negligible**. Two under-performers surfaced as findings, not tuned away. Gate **P9 PASS**.
-- **P9-003** · `ready` · R1,R4,R8 · Second environment + cross-environment generalization: re-run the load-bearing gates (P1/P2/P8) + P9 on a structurally different env with the same core code — survives = real, collapses = Pendulum artifact.
-- **P9-004** · `ready` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening: guard against gate-overfit (a trivial solution passing) and noise (a margin within seed variance).
+- **P9-003** · `done` · R1,R4,R8 · Second environment (`PointMass`, 2D nonlinear-drag; obs 3→4, action 1→2) + cross-env generalization, folded into the P9 gate. **Prediction and planning generalize** with the same core (recalibrated eval params only). **Finding:** retrieval does NOT generalize (confidently-wrong OOD → gate never fires) — its benefit is env-dependent. Gate **P9 PASS**.
+- **P9-004** · `ready` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening: guard against gate-overfit (a trivial solution passing) and noise (a margin within seed variance). **(start here — last Phase 9 task.)**
 
-> **Phase 9 in progress** — P9-001 + P9-002 shipped (both fold into the P9 gate;
-> `bench/SHIPPED` ratchets P0–P9). The whole system is verified end-to-end, not just
-> per part, and the leave-one-out ablation now quantifies every component's marginal
-> value — already catching two parts not pulling their weight (harmful retrieval,
-> negligible exploit-penalty). Remaining: P9-003 (2nd environment), P9-004 (invariants
-> + negative controls).
+> **Phase 9 in progress** — P9-001 + P9-002 + P9-003 shipped (all fold into the P9
+> gate; `bench/SHIPPED` ratchets P0–P9). The whole system is verified end-to-end (not
+> just per part), the leave-one-out ablation quantifies every component's marginal
+> value, and the core capabilities are confirmed to generalize to a second environment.
+> Three findings surfaced and reported (not tuned away): retrieval hurts control, is
+> negligible-to-harmful, and does not generalize; the exploit-penalty is negligible.
+> Remaining: P9-004 (metamorphic invariants + negative controls).

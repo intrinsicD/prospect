@@ -86,3 +86,68 @@ class Pendulum:
     def _obs(self) -> Observation:
         data = np.array([np.cos(self._theta), np.sin(self._theta), self._omega], dtype=float)
         return Observation(modality=Modality.STATE, data=data)
+
+
+class PointMass:
+    """2D point mass with nonlinear (quadratic) drag — the P9-003 second environment.
+
+    Structurally different from the Pendulum: Cartesian, 4-dim state (x, y, vx, vy),
+    2-dim action (ax, ay force), no rotational/trig structure. The nonlinearity is
+    quadratic drag (`drag * v * |v|`): negligible at low speed, dominant at high speed,
+    so a model trained on a limited-velocity region is confident there and uncertain
+    outside it — the seen/OOD split P8/P9-style retrieval needs. No spring: the agent
+    must apply force to reach and hold the origin. Satisfies `bench.Environment`.
+
+    The point of a *second* environment is to run the SAME core (world model, planner,
+    retrieval) on a genuinely different task with only recalibrated thresholds — a
+    capability that survives is real, one that collapses was a Pendulum artifact (P9-003).
+    """
+
+    def __init__(
+        self,
+        dt: float = 0.1,
+        force_scale: float = 4.0,
+        drag: float = 0.4,
+        max_force: float = 1.0,
+        vel_max: float = 8.0,
+        pos_max: float = 8.0,
+        init_pos: float = 2.0,
+        init_vel: float = 1.0,
+    ) -> None:
+        self.dt, self.force_scale, self.drag = dt, force_scale, drag
+        self.max_force, self.vel_max, self.pos_max = max_force, vel_max, pos_max
+        self.init_pos, self.init_vel = init_pos, init_vel
+        self._rng = np.random.default_rng(0)
+        self._state = np.zeros(4)  # x, y, vx, vy
+
+    def reset(self, seed: int | None = None) -> Observation:
+        self._rng = np.random.default_rng(seed)
+        self._state = np.array([
+            self._rng.uniform(-self.init_pos, self.init_pos),
+            self._rng.uniform(-self.init_pos, self.init_pos),
+            self._rng.uniform(-self.init_vel, self.init_vel),
+            self._rng.uniform(-self.init_vel, self.init_vel),
+        ])
+        return self._obs()
+
+    def set_state(self, x: float, y: float, vx: float, vy: float) -> Observation:
+        """Harness surface for region-exact probes (P9-003): place the mass at a state
+        so the seen/OOD velocity boundary is exact, not visitation-dependent."""
+        self._state = np.array([x, y, vx, vy], dtype=float)
+        return self._obs()
+
+    def step(self, action: Action) -> tuple[Observation, float, bool]:
+        a = np.clip(np.asarray(action.data, dtype=float).ravel()[:2], -self.max_force, self.max_force)
+        s = self._state
+        vx = float(np.clip(s[2] + self.dt * (self.force_scale * a[0] - self.drag * s[2] * abs(s[2])),
+                           -self.vel_max, self.vel_max))
+        vy = float(np.clip(s[3] + self.dt * (self.force_scale * a[1] - self.drag * s[3] * abs(s[3])),
+                           -self.vel_max, self.vel_max))
+        x = float(np.clip(s[0] + self.dt * vx, -self.pos_max, self.pos_max))
+        y = float(np.clip(s[1] + self.dt * vy, -self.pos_max, self.pos_max))
+        self._state = np.array([x, y, vx, vy])
+        reward = -(0.1 * (x**2 + y**2) + 0.01 * (vx**2 + vy**2) + 0.001 * float(a @ a))
+        return self._obs(), float(reward), False
+
+    def _obs(self) -> Observation:
+        return Observation(modality=Modality.STATE, data=self._state.copy())
