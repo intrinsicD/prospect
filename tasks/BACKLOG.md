@@ -46,10 +46,12 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > curiosity, and collapse-guarded rehearsal.
 
 ## Phase 4 — skills
-- **P4-001** · `ready` · R5 · Skill library with predictive preconditions + simulate-to-select router (competence-gated). Promote the precondition to a **typed field** on `Option` when this lands — no metadata-dict convention. Executors set `Transition.option` so competence attribution works (P0-002). **(start here)**
+- **P4-001** · `done` · R5 · Skill router: simulate-to-select (accuracy 0.83–0.92 vs 0.33 baseline), paired closed-loop misapplication VoE (win rate ≥ 0.95), competence gating with calibrated mastery. `Option` gained typed `policy`/`horizon`; the precondition is *computed* (predictive), not stored. Gate **P4 PASS** (shipped).
+
+> **Phase 4 shipped** — `bench/SHIPPED` now ratchets P0–P4.
 
 ## Phase 5 — hierarchy
-- **P5-001** · `blocked (P4-001)` · R2 · Abstraction map φ + jumpy option-model (landing latent, cumulative reward, duration, uncertainty).
+- **P5-001** · `ready` · R2 · Abstraction map φ + jumpy option-model (landing latent, cumulative reward, duration, uncertainty). Replaces the P4 router's flat-rollout `simulate()` with a *learned* temporally-abstract model. **(start here)**
 - **P5-002** · `blocked (P5-001)` · R2 · Hierarchical manager (search over option-model) + VoE-triggered early termination. Gate: 2-level > flat at equal compute. Enforce `option-diversity` (ADR-0006).
 
 ## Phase 6 — any-to-any

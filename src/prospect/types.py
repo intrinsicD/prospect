@@ -2,6 +2,7 @@
 distribution with uncertainty decomposed (ADR-0002)."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from math import log, tau
@@ -153,12 +154,19 @@ class Subgoal:
 
 @dataclass
 class Option:
-    """A temporally-extended skill: initiation predicate, policy, termination (R2, R5).
+    """A temporally-extended skill (R2, R5): a low-level `policy` over latents and
+    a `horizon` (terminate after at most `horizon` steps; VoE can cut it short,
+    ADR-0003).
 
-    Concrete callables are supplied by the skill implementation; kept as metadata
-    references here so the core stays behaviour-agnostic.
+    The *predictive precondition* is deliberately NOT a stored predicate field
+    (P4-001): applicability is decided by simulating the option under the world
+    model — an option is applicable where its outcome is predictable (low
+    epistemic) and useful (lands near the goal). `metadata` remains for auxiliary
+    tags only (e.g. replay's dream lineage), never for load-bearing contracts.
     """
     name: str
+    policy: Callable[[LatentState], Action] | None = None
+    horizon: int = 1
     metadata: dict = field(default_factory=dict)
 
 
