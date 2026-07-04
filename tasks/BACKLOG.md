@@ -59,10 +59,14 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > compute; all six phases green in ~3m30s.
 
 ## Phase 6 — any-to-any
-- **P6-001** · `ready` · R6 · Universal codec (Perceiver-IO-style) wrapper; swap preserves core-loop performance. Migration per P0-011: **distill into the incumbent latent space first**; budgeted full-stack retrain only as fallback (ADR-0001). **(start here)**
+- **P6-001** · `done` · R6 · Universal codec distilled into the incumbent latent (P0-011 migration, validated): swap-in 1-step MSE ratio ~1.0 for STATE **and** a rasterized IMAGE modality — the frozen core loop predicts from an image as from a state vector (any-to-any, measured). Gate **P6 PASS** (shipped).
+
+> **Phase 6 shipped** — `bench/SHIPPED` now ratchets P0–P6. The distill-first
+> migration (P0-011) is proven: the dynamics model is never retrained, yet its
+> encoder swaps modality with <2% core-loop impact.
 
 ## Phase 7 — continual improvement
-- **P7-001** · `ready` · R7 · Forgetting/plasticity metrics + consolidation policy; retention + plasticity gate. Consumes the latent-space `__dream__` transitions from P3-003.
+- **P7-001** · `ready` · R7 · Forgetting/plasticity metrics + consolidation policy; retention + plasticity gate. Consumes the latent-space `__dream__` transitions from P3-003; implements `CompetenceMonitor.is_forgetting` (still `NotImplementedError("P7-001")`). **(start here)**
 
 ## Phase 8 — knowledge bases
 - **P8-001** · `ready` · R8 · Three-tier memory router + retrieval-as-action (uncertainty-gated). `route()` may return `None` (answer parametrically); retrieval surfaces to the planner as options (ADR-0004, P0-008).

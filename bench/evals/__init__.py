@@ -14,4 +14,5 @@ from . import (  # noqa: F401
     p3_voe,
     p4_skills,
     p5_options,
+    p6_codec,
 )
