@@ -5,10 +5,11 @@ Tasks: P2-001 (done), P5-001 (done), P5-002.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from itertools import product
 
 import numpy as np
 
-from .interfaces import WorldModel
+from .interfaces import OptionModel, WorldModel
 from .types import Action, LatentState, Option, Prediction, Subgoal, Transition
 from .world_model import _LOGVAR_MAX, _LOGVAR_MIN, _MLP  # core-internal reuse
 
@@ -235,15 +236,54 @@ class JumpyOptionModel:
 
 
 class HierarchicalManager:
-    """Phase-5: search over the JumpyOptionModel, emit an option/subgoal; the worker
-    executes it; VoE terminates it early on a surprise spike.
+    """The two-level manager (P5-002, ADR-0003): *plans* over the learned jumpy
+    option-model — exhaustive search over option sequences (K^depth stays small
+    for a competence-gated library at shallow depth), scoring cumulative
+    discounted reward with duration-aware discounting minus the exploit-mode
+    epistemic penalty (ADR-0006/0007) — and emits the first option of the best
+    sequence. The worker executes it; `should_terminate` cuts it early when
+    one-step VoE spikes (the re-planning interrupt, the one signal's job #4).
 
     Contract: interfaces.HierarchicalPlanner.
     """
 
+    def __init__(
+        self,
+        option_model: OptionModel | None = None,
+        options: Sequence[Option] = (),
+        depth: int = 3,
+        discount: float = 0.99,
+        uncertainty_penalty: float = 1.0,
+        surprise_threshold: float = float("inf"),
+    ) -> None:
+        self._option_model = option_model
+        self._options = list(options)
+        self.depth = depth
+        self.discount = discount
+        self.uncertainty_penalty = uncertainty_penalty
+        self.surprise_threshold = surprise_threshold
+
     def plan_option(self, state: LatentState) -> Option:
-        raise NotImplementedError("P5-002")
+        if self._option_model is None or not self._options:
+            raise ValueError("the manager needs an option model and a non-empty option set")
+        best_score, best_first = -float("inf"), self._options[0]
+        for sequence in product(self._options, repeat=self.depth):
+            latent = state
+            score, discount = 0.0, 1.0
+            for option in sequence:
+                prediction = self._option_model.predict_option(latent, option)
+                score += discount * prediction.reward
+                score -= self.uncertainty_penalty * prediction.epistemic
+                discount *= self.discount ** max(prediction.duration, 1.0)
+                latent = LatentState(z=prediction.mean)
+            if score > best_score:
+                best_score, best_first = score, sequence[0]
+        return best_first
 
     def should_terminate(self, transition: Transition) -> bool:
-        # Terminate when the option's predicted trajectory is violated (VoE).
-        raise NotImplementedError("P5-002")
+        """Terminate the running option when its predicted step was violated:
+        one-step surprise above the calibrated threshold (VoE, ADR-0003)."""
+        if transition.prediction is None:
+            return False  # nothing was expected — nothing to violate
+        surprise = -transition.prediction.log_prob(transition.next_state.z)
+        return surprise > self.surprise_threshold

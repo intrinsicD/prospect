@@ -52,10 +52,14 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 
 ## Phase 5 — hierarchy
 - **P5-001** · `done` · R2 · Jumpy option-model (landing distribution, cumulative reward, duration): **beats the flat rollout 4–6x on every seed** — ADR-0003's compounding bound, measured. Composite blocked pending P5-002 by design.
-- **P5-002** · `ready` · R2 · Hierarchical manager (search over option-model) + VoE-triggered early termination. Gate: 2-level > flat at equal compute. Enforce `option-diversity` (ADR-0006). Completes P5. **(start here)**
+- **P5-002** · `done` · R2 · Hierarchical manager (exhaustive search over the jumpy option-model) + VoE-triggered early termination + `option-diversity` sentinel. Two-level beats compute-matched flat on every seed (−9.1/−4.2/−4.7 vs −48.5/−34.9/−14.0), and beats full-compute flat too. Gate **P5 PASS** (shipped).
+
+> **Phase 5 shipped** — `bench/SHIPPED` now ratchets P0–P5. Hierarchical
+> *planning* (jumpy model + search + VoE termination) beats flat control at equal
+> compute; all six phases green in ~3m30s.
 
 ## Phase 6 — any-to-any
-- **P6-001** · `blocked (P2-001)` · R6 · Universal codec (Perceiver-IO-style) wrapper; swap preserves core-loop performance. Migration per P0-011: **distill into the incumbent latent space first**; budgeted full-stack retrain only as fallback (ADR-0001).
+- **P6-001** · `ready` · R6 · Universal codec (Perceiver-IO-style) wrapper; swap preserves core-loop performance. Migration per P0-011: **distill into the incumbent latent space first**; budgeted full-stack retrain only as fallback (ADR-0001). **(start here)**
 
 ## Phase 7 — continual improvement
 - **P7-001** · `ready` · R7 · Forgetting/plasticity metrics + consolidation policy; retention + plasticity gate. Consumes the latent-space `__dream__` transitions from P3-003.
