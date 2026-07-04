@@ -94,11 +94,13 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > measure capability rather than a calibrated trivial solution (ADR-0008).
 
 - **P9-001** · `done` · R1–R8 · End-to-end integration gate. The composed agent controls the task (−19.4 vs random −73.1); in ONE run the single epistemic signal drives the planner's exploit coefficient AND retrieval; four sentinels healthy. Gate **P9 PASS** (shipped). **Finding:** retrieval-*into-planning* degrades control (−19.4 vs −8.1 off) — handed to P9-002.
-- **P9-002** · `ready` · R1–R8 · Ablation harness: disable each component, measure the delta on the P9 metric — a part that can be removed with no loss is a finding (dead weight or untested). **(start here — begins with the P9-001 retrieval-into-planning finding.)**
+- **P9-002** · `done` · R1–R8 · Ablation harness (leave-one-out marginal control value), folded into the P9 gate. Verdicts: planning **+53.7 load-bearing** (gated every seed), retrieval **−9.5 harmful** (the P9-001 finding, quantified), exploit_penalty **+2.5 negligible**. Two under-performers surfaced as findings, not tuned away. Gate **P9 PASS**.
 - **P9-003** · `ready` · R1,R4,R8 · Second environment + cross-environment generalization: re-run the load-bearing gates (P1/P2/P8) + P9 on a structurally different env with the same core code — survives = real, collapses = Pendulum artifact.
 - **P9-004** · `ready` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening: guard against gate-overfit (a trivial solution passing) and noise (a margin within seed variance).
 
-> **Phase 9 in progress** — P9-001 shipped: `bench/SHIPPED` now ratchets P0–P9. The
-> whole system is verified end-to-end, not just per part; and the integration gate
-> already earned its keep by surfacing that retrieval-into-planning costs control — a
-> finding no single-phase gate could see.
+> **Phase 9 in progress** — P9-001 + P9-002 shipped (both fold into the P9 gate;
+> `bench/SHIPPED` ratchets P0–P9). The whole system is verified end-to-end, not just
+> per part, and the leave-one-out ablation now quantifies every component's marginal
+> value — already catching two parts not pulling their weight (harmful retrieval,
+> negligible exploit-penalty). Remaining: P9-003 (2nd environment), P9-004 (invariants
+> + negative controls).

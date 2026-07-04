@@ -57,3 +57,16 @@ as a finding* (measured, not gated) rather than tuned until it disappears, and i
 becomes the first target of the P9-002 ablation. This is exactly the failure mode the
 whole-system layer exists to catch: every part passed its own gate, yet composing them
 naively hurt.
+
+The P9-002 ablation (leave-one-out marginal control value `composed - ablated`)
+then quantified it and found a second under-performer:
+
+| Component | Marginal | Verdict |
+|---|---|---|
+| planning | +53.7 | load-bearing (the gated criterion) |
+| retrieval | −9.5 | harmful — corrupts multi-step planning |
+| exploit_penalty | +2.5 | negligible on this task |
+
+Both under-performers are recorded as findings (harmful retrieval; a near-negligible
+exploit penalty) rather than tuned away — the ablation is the standing tool that keeps
+"every part earns its place" honest.

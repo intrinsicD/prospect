@@ -15,7 +15,7 @@ that the curriculum turns into the planner's exploit coefficient also gates retr
 inside the rollouts (one signal, several jobs, one loop).
 
 PASS = the whole system works end-to-end AND the one signal does several jobs at once
-(every seed):
+AND the ablation confirms the load-bearing part matters (every seed):
 1. **Controls end-to-end** — the composed agent's return beats a reactive (random)
    baseline: the full wiring produces control, not just isolated capabilities.
 2. **One signal, many jobs, one run** — in the *same* run the monitor's epistemic
@@ -23,17 +23,17 @@ PASS = the whole system works end-to-end AND the one signal does several jobs at
    (mastered ⇒ positive; the value the agent actually applied), and (b) gates
    retrieval (it fired; every retrieval was above the router's uncertainty threshold
    by construction).
-3. **Integrity holds** — run `p9` carries all four collapse sentinels (the
-   limited-region model + its natural OOD feed representation/uncertainty probes;
-   replay-fidelity and option-diversity logged as in P8).
+3. **Ablation — the load-bearing part matters** (P9-002) — leave-one-out marginal
+   control value (`composed - ablated`) of each component: planning must be
+   load-bearing on every seed. Also carries all four collapse sentinels on run `p9`
+   (the limited-region model + its natural OOD feed the probes).
 
-MEASURED, NOT GATED — retrieval's marginal effect on *control*. The experiment found
-that retrieval-into-planning DEGRADES control (composed return with retrieval < with
-it off): retrieval improves 1-step prediction (P8) but overriding the planner's
-rollout dynamics with nearest-neighbour facts corrupts the multi-step optimisation.
-The delta is reported as a finding; quantifying it (and whether retrieval can enter
-planning without the cost) is the P9-002 ablation's job — not a pass criterion to be
-tuned away.
+MEASURED, NOT GATED — the other components' marginals. The ablation quantifies what
+each part is worth, and reports a component that HURTS as a finding rather than tuning
+it away (ADR-0008): retrieval-into-planning has a *negative* marginal (it improves
+1-step prediction per P8 but overriding the planner's rollout dynamics with
+nearest-neighbour facts corrupts the multi-step optimisation). Whether retrieval can
+enter planning without the cost is the open follow-up.
 """
 from __future__ import annotations
 
@@ -56,6 +56,7 @@ from .p2_planner import EP_LEN, _PolicyAgent, _random_policy
 from .p3_replay import log_replay_fidelity
 from .p7_continual import _log_option_diversity
 from .p8_knowledge import FULL, REGION, _env, _key, _region_data
+from .p9_ablation import MARGIN, classify, marginals
 
 RUN_ID = "p9"
 SEEDS = [0, 1, 2]
@@ -117,7 +118,8 @@ def check_p9() -> GateResult:
     (RUNS_DIR / RUN_ID / "metrics.jsonl").unlink(missing_ok=True)
     log = RunLog(RUN_ID)
     metrics: dict[str, float] = {}
-    controls, one_signal, composed_ret, bare_ret = [], [], [], []
+    controls, one_signal, composed_ret, bare_ret, ablation_ok = [], [], [], [], []
+    marg_table: dict[str, list[float]] = {c: [] for c in ("planning", "retrieval", "exploit_penalty")}
     for seed in SEEDS:
         # 1. pre-train the world model on the seen region (+ sentinel logging on run p9)
         train = _region_data(REGION, TRAIN_N, seed)
@@ -153,9 +155,24 @@ def check_p9() -> GateResult:
         agent_bare = Agent(encode=_encoder(model), planner=FlatPlanner(model, seed=seed),
                            world_model=model, monitor=monitor, curriculum=curriculum)
         composed = _control_return(agent_full, seed)
+        rate = augmented.retrievals / max(augmented.calls, 1)  # read before augmented is reused
         bare = _control_return(agent_bare, seed)
         reactive = _control_return(_PolicyAgent(_random_policy(seed)), seed)
         applied = planner_full.uncertainty_penalty  # set live inside act() from the curriculum
+
+        # P9-002 ablation: leave-one-out control return with each component disabled —
+        # planning (reactive), retrieval (bare model), exploit_penalty (no curriculum,
+        # penalty pinned to 0). Marginal value = composed - ablated (see p9_ablation).
+        agent_no_penalty = Agent(
+            encode=_encoder(model), world_model=model, monitor=monitor,
+            planner=FlatPlanner(RetrievalAugmentedWorldModel(model, router), seed=seed,
+                                uncertainty_penalty=0.0))
+        no_penalty = _control_return(agent_no_penalty, seed)
+        marg = marginals(composed, {"planning": reactive, "retrieval": bare,
+                                    "exploit_penalty": no_penalty})
+        for name, value in marg.items():
+            marg_table[name].append(value)
+        ablation_ok.append(marg["planning"] > MARGIN)  # planning must be load-bearing
 
         controls.append(composed > reactive)
         one_signal.append(mastered and mode_coeff > 0 and abs(applied - mode_coeff) < 1e-9
@@ -166,31 +183,40 @@ def check_p9() -> GateResult:
             f"composed_return_s{seed}": composed,
             f"retrieval_off_return_s{seed}": bare,
             f"reactive_return_s{seed}": reactive,
-            f"retrieval_rate_s{seed}": augmented.retrievals / max(augmented.calls, 1),
+            f"no_penalty_return_s{seed}": no_penalty,
+            f"retrieval_rate_s{seed}": rate,
             f"exploit_coefficient_s{seed}": mode_coeff,
             f"mastered_s{seed}": float(mastered),
+            f"marginal_planning_s{seed}": marg["planning"],
+            f"marginal_retrieval_s{seed}": marg["retrieval"],
+            f"marginal_exploit_penalty_s{seed}": marg["exploit_penalty"],
         }
 
-    # PASS = the whole system works end-to-end (controls) AND the one epistemic signal
-    # drives several jobs in one run. Retrieval's *marginal* effect on control is a
-    # finding measured here and dissected by the P9-002 ablation — not a pass gate: the
-    # experiment showed retrieval-into-planning degrades control (see the module note),
-    # and tuning a gate until that inconvenient result disappears would be dishonest.
-    controls_met, one_signal_met = all(controls), all(one_signal)
-    passed = controls_met and one_signal_met
+    # PASS = the whole system works end-to-end (controls), the one epistemic signal
+    # drives several jobs in one run, AND the leave-one-out ablation confirms the
+    # clearly load-bearing component (planning) matters on every seed. The other
+    # components' marginals are RECORDED, not gated: a harmful marginal (retrieval)
+    # is a finding to report, not tuned away (ADR-0008).
+    controls_met, one_signal_met, ablation_met = all(controls), all(one_signal), all(ablation_ok)
+    passed = controls_met and one_signal_met and ablation_met
     composed_med, bare_med = float(np.median(composed_ret)), float(np.median(bare_ret))
     reactive_med = float(np.median([metrics[f"reactive_return_s{s}"] for s in SEEDS]))
     rate_med = float(np.median([metrics[f"retrieval_rate_s{s}"] for s in SEEDS]))
+    marg_med = {c: float(np.median(v)) for c, v in marg_table.items()}
     metrics |= {"composed_return_median": composed_med, "retrieval_off_return_median": bare_med,
                 "reactive_return_median": reactive_med, "retrieval_rate_median": rate_med,
                 "controls_met": float(controls_met), "one_signal_met": float(one_signal_met),
-                "retrieval_planning_cost": bare_med - composed_med}
+                "ablation_met": float(ablation_met)}
+    metrics |= {f"marginal_{c}_median": m for c, m in marg_med.items()}
+    table = ", ".join(f"{c} {m:+.1f} ({classify(m)})" for c, m in marg_med.items())
     detail = (
         f"composed agent controls end-to-end: return {composed_med:.1f} vs reactive "
         f"{reactive_med:.1f} ({'beats every seed' if controls_met else 'FAILS'}); one epistemic "
         f"signal drives exploit-mode AND retrieval in one run "
         f"({'MET' if one_signal_met else 'NOT MET'}; retrieval rate {rate_med:.0%}). "
-        f"FINDING: retrieval-into-planning costs control here ({composed_med:.1f} vs "
-        f"{bare_med:.1f} retrieval-off) — its marginal value is the P9-002 ablation question"
+        f"ablation leave-one-out marginal control value: {table} "
+        f"[planning load-bearing every seed: {'MET' if ablation_met else 'NOT MET'}]. "
+        f"FINDING: retrieval hurts control here (marginal {marg_med['retrieval']:+.1f}) — helps "
+        f"1-step prediction (P8) but corrupts multi-step planning"
     )
     return GateResult(phase="P9", passed=passed, metrics=metrics, seeds=list(SEEDS), detail=detail)
