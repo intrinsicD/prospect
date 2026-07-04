@@ -51,8 +51,8 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > **Phase 4 shipped** — `bench/SHIPPED` now ratchets P0–P4.
 
 ## Phase 5 — hierarchy
-- **P5-001** · `ready` · R2 · Abstraction map φ + jumpy option-model (landing latent, cumulative reward, duration, uncertainty). Replaces the P4 router's flat-rollout `simulate()` with a *learned* temporally-abstract model. **(start here)**
-- **P5-002** · `blocked (P5-001)` · R2 · Hierarchical manager (search over option-model) + VoE-triggered early termination. Gate: 2-level > flat at equal compute. Enforce `option-diversity` (ADR-0006).
+- **P5-001** · `done` · R2 · Jumpy option-model (landing distribution, cumulative reward, duration): **beats the flat rollout 4–6x on every seed** — ADR-0003's compounding bound, measured. Composite blocked pending P5-002 by design.
+- **P5-002** · `ready` · R2 · Hierarchical manager (search over option-model) + VoE-triggered early termination. Gate: 2-level > flat at equal compute. Enforce `option-diversity` (ADR-0006). Completes P5. **(start here)**
 
 ## Phase 6 — any-to-any
 - **P6-001** · `blocked (P2-001)` · R6 · Universal codec (Perceiver-IO-style) wrapper; swap preserves core-loop performance. Migration per P0-011: **distill into the incumbent latent space first**; budgeted full-stack retrain only as fallback (ADR-0001).

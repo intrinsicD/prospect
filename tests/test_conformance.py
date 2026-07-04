@@ -23,6 +23,7 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
     learner: interfaces.Learner = FlatWorldModel()  # the training seam (P0-003)
     planner: interfaces.Planner = FlatPlanner(FlatWorldModel())
     option_model: interfaces.OptionModel = JumpyOptionModel()
+    option_learner: interfaces.Learner = JumpyOptionModel()  # trains on option jumps (P5-001)
     manager: interfaces.HierarchicalPlanner = HierarchicalManager()
     monitor: interfaces.CompetenceMonitor = SurpriseCompetenceMonitor()
     skills: interfaces.SkillLibrary = SkillRouter()
@@ -40,6 +41,7 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
         learner,
         planner,
         option_model,
+        option_learner,
         manager,
         monitor,
         skills,

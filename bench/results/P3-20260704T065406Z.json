@@ -1,0 +1,81 @@
+{
+  "phase": "P3",
+  "passed": true,
+  "run_id": null,
+  "written_at": "20260704T065406Z",
+  "capability": {
+    "criterion": "Expected-vs-violated surprise differential is large and reliable (effect size over N seeds), AND curiosity-driven data collection improves sample efficiency vs random exploration.",
+    "passed": true,
+    "metrics": {
+      "voe_auc_s0": 0.9832763671875,
+      "cohens_d_s0": 1.0238086651342073,
+      "violated_surprise_median_s0": 188.65115579056362,
+      "expected_surprise_median_s0": -15.072024382515146,
+      "mastered_s0": 1.0,
+      "epistemic_ema_s0": 0.0005853206587729291,
+      "curious_coverage_ratio_s0": 0.2580756525740281,
+      "random_coverage_ratio_s0": 1.3275280420289008,
+      "voe_auc_s1": 0.9312591552734375,
+      "cohens_d_s1": 0.9526102163174172,
+      "violated_surprise_median_s1": 100.0059096286991,
+      "expected_surprise_median_s1": -14.32124962163959,
+      "mastered_s1": 1.0,
+      "epistemic_ema_s1": 0.0005288877451379962,
+      "curious_coverage_ratio_s1": 0.34653037379909035,
+      "random_coverage_ratio_s1": 0.760419318486297,
+      "voe_auc_s2": 0.9322357177734375,
+      "cohens_d_s2": 0.9715373993830727,
+      "violated_surprise_median_s2": 90.79295404034335,
+      "expected_surprise_median_s2": -11.909691489072674,
+      "mastered_s2": 1.0,
+      "epistemic_ema_s2": 0.0003451155577337072,
+      "curious_coverage_ratio_s2": 0.1717394364148477,
+      "random_coverage_ratio_s2": 0.7914926153012767,
+      "voe_auc_min": 0.9312591552734375,
+      "differential_met": 1.0,
+      "curious_coverage_ratio_median": 0.2580756525740281,
+      "random_coverage_ratio_median": 0.7914926153012767,
+      "curiosity_met": 1.0
+    },
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "detail": "differential: P(violated surprise > expected) per seed [0.98, 0.93, 0.93], min 0.93 (>= 0.9) \u2014 MET; curiosity: coverage ratio (model/persistence MSE, lower is better) curious 0.26 vs random 0.79 at equal budget (1536 steps) \u2014 MET"
+  },
+  "sentinels": [
+    {
+      "name": "representation-integrity",
+      "criterion": "Latent per-dimension std stays above a floor AND effective rank (participation ratio of the latent covariance) stays above a threshold on held-out data throughout training \u2014 not only at the capability checkpoint.",
+      "healthy": true,
+      "metrics": {
+        "min_latent_std": 0.867748900349471,
+        "min_effective_rank": 2.1752100442338858
+      },
+      "detail": "across 39 held-out probes (warm-up 300 steps): min per-dim std 0.868 (floor 0.3), min effective rank 2.18 (floor 2.0)"
+    },
+    {
+      "name": "uncertainty-reliability",
+      "criterion": "Predicted epistemic uncertainty is rank-correlated with held-out prediction error above a threshold, and ensemble-member disagreement does not decay to ~0 in regions where error is high.",
+      "healthy": true,
+      "metrics": {
+        "min_final_rank_corr": 0.791334429109303,
+        "min_high_error_disagreement_ratio": 21.008590217860633
+      },
+      "detail": "worst seed at end of training: disagreement-vs-error rank corr 0.79 (min 0.3), high-error-decile disagreement 21.01x median (min 1.0) on a mixed in-dist + OOD probe set"
+    },
+    {
+      "name": "replay-fidelity",
+      "criterion": "Rehearsal keeps a fixed real-data fraction; dreamed-sample diversity (feature variance / coverage vs real) stays above a floor and does not shrink across regenerations; rehearsal lineage depth is capped (no dream-of-dreams).",
+      "healthy": true,
+      "metrics": {
+        "min_real_fraction": 0.5,
+        "min_dream_diversity": 0.4735528983029979,
+        "worst_diversity_shrink": 0.8602652243187094,
+        "max_dream_depth": 3.0
+      },
+      "detail": "across 5 regenerations x 3 seed(s): real fraction min 0.50 (floor 0.3), dream diversity min 0.47 (floor 0.3), diversity shrink 0.86 (floor 0.5), lineage depth max 3 (cap 3), dreams stored: 0"
+    }
+  ]
+}
