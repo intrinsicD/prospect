@@ -150,9 +150,9 @@ _register(
     "signal both sets the planner's explore/exploit coefficient AND gates retrieval; "
     "a leave-one-out ablation confirms the load-bearing component (planning) matters "
     "(each component's marginal control value recorded — a harmful marginal is a "
-    "reported finding); the core capabilities (prediction, planning) generalize to a "
-    "second, structurally different environment with the same core; and all applicable "
-    "collapse sentinels stay healthy.",
+    "reported finding); the core capabilities (prediction, planning, AND the epistemic "
+    "uncertainty signal itself) generalize to a second, structurally different "
+    "environment with the same core; and all applicable collapse sentinels stay healthy.",
 )
 
 

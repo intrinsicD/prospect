@@ -62,8 +62,15 @@ class Observation:
 
 @dataclass(frozen=True)
 class LatentState:
-    """A point in the shared latent space. All reasoning conditions on this."""
+    """A point in the shared latent space. All reasoning conditions on this.
+
+    `ood` is an optional out-of-distribution score for the observation this latent was
+    *encoded* from — how far it sits from the training distribution, measured BEFORE the
+    (saturating) encoder (ADR-0002, P9-005). It rides here because a latent synthesized
+    in a planning rollout has no such preimage (`ood=None`); only a latent from a real
+    `encode(obs)` carries it, and `predict` uses it to make epistemic OOD-reliable."""
     z: Array
+    ood: float | None = None
 
 
 @dataclass(frozen=True)

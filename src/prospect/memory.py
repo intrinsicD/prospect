@@ -228,15 +228,33 @@ class RetrievalAugmentedWorldModel:
     Wraps a base model + an `UncertaintyMemoryRouter`. For each (state, action): if the
     base prediction's epistemic clears the router's gate, retrieve the nearest fact —
     a next-latent in the base model's own space, keyed by `concat(latent, action)` — and
-    return it as a confident prediction; otherwise return the base prediction unchanged.
-    The planner (which duck-types `predict_batch`) plans over this transparently.
+    substitute it; otherwise return the base prediction unchanged. The planner (which
+    duck-types `predict_batch`) plans over this transparently.
+
+    **Distance-gated substitution (P9-007).** A retrieved fact is trusted only when it is
+    *close* to the query. Inside a planner's imagination rollout the queries are imagined
+    latents that, at depth, wander far from any real stored transition; substituting the
+    nearest (far, misaligned) fact there corrupts multi-step control — the P9-002 finding.
+    So when `reliability_radius` is set, a would-be retrieval whose nearest-fact key
+    distance exceeds the radius is *skipped* (the model's own prediction stands), and an
+    accepted retrieval carries **honest epistemic scaled by distance** (`epi ×
+    min(1, dist/radius)`: an exact hit is trusted, a boundary hit keeps the model's
+    uncertainty) instead of the certainty (`epi = 0`) that let CEM exploit the retrieval
+    seam. Reliability = closeness (the P9-006 distance-as-reliability insight, now gating
+    *whether* to retrieve). The radius is calibrated to the store's coverage by the caller
+    (as the router's epistemic `threshold` is). `reliability_radius=None` keeps the legacy
+    substitute-and-zero behaviour (the 1-step P8 role, where queries are real states).
 
     Contract: interfaces.WorldModel. `retrievals`/`calls` count the gated retrievals
     (the run-level evidence that retrieval fired where the model was uncertain)."""
 
-    def __init__(self, base: WorldModel, router: UncertaintyMemoryRouter) -> None:
+    def __init__(
+        self, base: WorldModel, router: UncertaintyMemoryRouter,
+        reliability_radius: float | None = None,
+    ) -> None:
         self._base = base
         self._router = router
+        self._reliability_radius = reliability_radius
         self.retrievals = 0
         self.calls = 0
 
@@ -285,10 +303,18 @@ class RetrievalAugmentedWorldModel:
         if source is None:
             return mean, var, epi, ale, rew  # nothing uncertain enough / nothing trusted
         for i in np.nonzero(epi > self._router.threshold)[0]:
-            items = source.query(np.concatenate([latents[i], actions[i]]))
+            key = np.concatenate([latents[i], actions[i]])
+            items = source.query(key)
             if not items:
                 continue
-            mean[i] = np.asarray(items[0].content[1], dtype=float)
-            epi[i] = 0.0  # retrieved: the fact stands in for the model's guess
+            fact_key, answer = items[0].content
+            if self._reliability_radius is not None:  # distance-gated (P9-007)
+                dist = float(np.sum((key - np.asarray(fact_key, dtype=float)) ** 2))
+                if dist > self._reliability_radius:
+                    continue  # far fact = fiction at rollout depth; keep the model
+                epi[i] *= min(1.0, dist / self._reliability_radius)  # honest: reliability=closeness
+            else:
+                epi[i] = 0.0  # legacy 1-step role: the fact stands in as a confident guess
+            mean[i] = np.asarray(answer, dtype=float)
             self.retrievals += 1
         return mean, var, epi, ale, rew

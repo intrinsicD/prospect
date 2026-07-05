@@ -97,3 +97,18 @@ def test_pendulum_stochastic_variant_adds_noise() -> None:
 
     assert next_omega(0.0) == next_omega(0.0)  # deterministic core
     assert next_omega(0.0) != next_omega(0.5)  # noise actually enters the dynamics
+
+
+def test_distance_aware_epistemic_rises_out_of_distribution() -> None:  # P9-005
+    model = FlatWorldModel(seed=0)
+    for _ in range(50):  # populate the input-standardization stats (training range ~[-1,1])
+        model.update(_random_transitions(64, seed=1))
+    action = Action(data=np.array([0.0]))
+    in_dist = model.encode(np.array([0.2, -0.1, 0.3]))   # near the training range
+    far = model.encode(np.array([12.0, -9.0, 8.0]))       # far outside it
+    assert far.ood is not None and far.ood > 0.0          # the far obs is flagged OOD
+    assert (in_dist.ood or 0.0) < far.ood                 # and more OOD than the near one
+    # predict scales epistemic by the OOD score; a synthesized latent (ood=None) is unscaled
+    boosted = model.predict(far, action).epistemic
+    plain = model.predict(LatentState(z=far.z), action).epistemic  # same latent, no ood
+    assert boosted > plain

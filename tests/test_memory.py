@@ -225,3 +225,25 @@ def test_retrieval_augments_only_when_uncertain() -> None:  # P9-001
     assert list(corrected.mean) == [9.0, 9.0]  # the retrieved fact stands in for the guess
     assert corrected.epistemic == 0.0 and uncertain.retrievals == 1 and uncertain.calls == 1
     assert isinstance(uncertain, interfaces.WorldModel)
+
+
+def test_retrieval_distance_gated_in_planning() -> None:  # P9-007
+    store = SemanticStore()
+    store.write(_fact([0.0, 0.0, 0.5], [9.0, 9.0]))  # fact key = latent(2) + action(1)
+    router = UncertaintyMemoryRouter([store], threshold=0.5)
+    action = Action(data=np.array([0.5]))
+
+    # A FAR query (key-distance 50 > radius): the nearest fact is fiction at this point,
+    # so it is NOT substituted — the model's own prediction stands, uncertainty intact.
+    far = RetrievalAugmentedWorldModel(_EpiModel(0.9), router, reliability_radius=2.0)
+    far_pred = far.predict(LatentState(z=np.array([5.0, 5.0])), action)
+    assert list(far_pred.mean) == [6.0, 5.0]  # base (state + [1,0]), not the fact
+    assert far.retrievals == 0 and far_pred.epistemic == 0.9  # untouched, no free pass
+
+    # A CLOSE query (key-distance 1.0 <= radius 2.0): substitute, but carry HONEST
+    # distance-scaled epistemic (0.9 * dist/radius) instead of the certain epi=0.
+    near = RetrievalAugmentedWorldModel(_EpiModel(0.9), router, reliability_radius=2.0)
+    near_pred = near.predict(LatentState(z=np.array([1.0, 0.0])), action)
+    assert list(near_pred.mean) == [9.0, 9.0] and near.retrievals == 1  # trusted fact stands in
+    assert 0.0 < near_pred.epistemic < 0.9  # not zeroed: reliability = closeness
+    assert abs(near_pred.epistemic - 0.9 * (1.0 / 2.0)) < 1e-12
