@@ -29,6 +29,7 @@ from .types import Action, LatentState, Prediction, Transition
 _LOGVAR_MIN, _LOGVAR_MAX = -6.0, 2.0
 _CLIP_NORM = 1.0  # global gradient-norm clip per network
 _LOG_TAU = float(np.log(2.0 * np.pi))
+_DIST_WEIGHT = 1.0  # distance-aware epistemic: boost factor for the pre-encoder OOD score
 
 
 class _MLP:
@@ -149,10 +150,18 @@ class FlatWorldModel:
             self._obs_var = 0.99 * self._obs_var + 0.01 * obs.var(axis=0)
 
     def encode(self, obs: object) -> LatentState:
-        """Online encoder: raw observation vector -> latent (the model's input space)."""
+        """Online encoder: raw observation vector -> latent (the model's input space).
+
+        The latent carries an `ood` score — the standardized input's excess energy over
+        the training distribution's unit variance (0 in-distribution, rising out of it),
+        measured on the raw input *before* the encoder. Ensemble disagreement alone
+        under-detects OOD once the tanh encoder saturates (P9-005): this pre-encoder
+        distance is what makes epistemic OOD-reliable, and it rides on the latent so
+        `predict` can use it without re-plumbing the raw observation everywhere."""
         x = self._standardize(np.asarray(obs, dtype=float).reshape(1, -1))
+        ood = max(0.0, float(np.mean(x**2)) - 1.0) if self._obs_stats_ready else 0.0
         h, _ = self.encoder.forward(x)
-        return LatentState(z=h[0])
+        return LatentState(z=h[0], ood=ood)
 
     def encode_target(self, obs: object) -> LatentState:
         """EMA target encoder (stop-gradient) — the space prediction error lives in."""
@@ -208,10 +217,19 @@ class FlatWorldModel:
         h = np.asarray(state.z, dtype=float).reshape(1, -1)
         a = np.asarray(action.data, dtype=float).reshape(1, -1)
         mean, var, epistemic, aleatoric, reward = self.predict_batch(h, a)
+        # Distance-aware epistemic (P9-005): when the latent came from a real
+        # observation (encode set `state.ood`), scale ensemble disagreement by the
+        # pre-encoder OOD score so epistemic rises out-of-distribution even where the
+        # saturated ensemble agrees. Synthesized rollout latents carry no `ood` (None)
+        # and are unchanged. Only the scalar is scaled — `var` (log_prob) stays the
+        # ensemble's calibrated total.
+        epistemic_scalar = float(epistemic[0])
+        if state.ood is not None:
+            epistemic_scalar *= 1.0 + _DIST_WEIGHT * state.ood
         return Prediction(
             mean=mean[0],
             var=var[0],
-            epistemic=float(epistemic[0]),
+            epistemic=epistemic_scalar,
             aleatoric=float(aleatoric[0]),
             reward=float(reward[0]),
         )

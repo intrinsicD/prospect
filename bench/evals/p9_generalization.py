@@ -6,6 +6,8 @@ collapses was a Pendulum artifact (ADR-0008).
 On PointMass (2D nonlinear-drag point mass, obs_dim=4, action_dim=2):
 - **prediction** — a world model beats a persistence baseline at 1-step latent MSE (P1);
 - **planning** — CEM planning beats a random reactive baseline at control (P2);
+- **uncertainty** — the epistemic signal is OOD-reliable: the highest-error-decile
+  epistemic clears a floor over the median (P9-005 distance-aware fix);
 - **retrieval** — uncertainty-gated retrieval beats no-retrieval at 1-step MSE (P8).
 
 The core is constructed with the env's dimensions and is otherwise untouched — the
@@ -38,6 +40,7 @@ GEN_HORIZON = 6              # recalibrated planning horizon for this env (was 2
 EP_LEN_GEN, EVAL_EP_GEN = 60, 2
 RETRIEVE_MULT_GEN = 2.0     # retrieve above 2x the max seen epistemic (P9 conservative gate)
 RETRIEVE_MARGIN = 1.2       # gated MSE must beat no-retrieval by at least this factor
+UNCERTAINTY_FLOOR = 3.0     # high-error-decile epistemic must exceed this x median on env #2
 
 
 def _encoder(model: FlatWorldModel) -> Callable[[Observation], LatentState]:
@@ -127,9 +130,10 @@ def _control_return(agent: object, seed: int) -> float:
 
 
 class Generalization(NamedTuple):
-    prediction_met: bool  # world model beats persistence at 1-step latent MSE (P1)
-    planning_met: bool    # CEM planning beats a random reactive baseline (P2)
-    retrieval_met: bool   # uncertainty-gated retrieval beats no-retrieval (P8) — reported, not gated
+    prediction_met: bool     # world model beats persistence at 1-step latent MSE (P1)
+    planning_met: bool       # CEM planning beats a random reactive baseline (P2)
+    uncertainty_met: bool    # epistemic is OOD-reliable on env #2 (P9-005 distance-aware fix)
+    retrieval_met: bool      # uncertainty-gated retrieval beats no-retrieval (P8) — reported, not gated
     metrics: dict[str, float]
 
 
@@ -141,6 +145,7 @@ def generalizes() -> Generalization:
     which is itself a generalization finding.
     """
     wm_mses, persist_mses, planner_rets, random_rets, gated_mses, none_mses = [], [], [], [], [], []
+    unc_ratios: list[float] = []
     metrics: dict[str, float] = {}
     for seed in GEN_SEEDS:
         # P1 + P2: one model on the visited distribution (random rollouts).
@@ -175,7 +180,7 @@ def generalizes() -> Generalization:
         seen_epi = sorted(
             region_model.predict(region_model.encode(t.state.z), t.action).epistemic for t in region_held)
         router = UncertaintyMemoryRouter([store], threshold=RETRIEVE_MULT_GEN * seen_epi[-1])
-        none_err, gated_err, retrieved = [], [], 0
+        none_err, gated_err, epi, retrieved = [], [], [], 0
         for t in _region_data(V_FULL, TEST_N, seed + 200):
             pred = region_model.predict(region_model.encode(t.state.z), t.action)
             target = np.asarray(region_model.encode_target(t.next_state.z).z, dtype=float)
@@ -187,26 +192,39 @@ def generalizes() -> Generalization:
                 retrieved += 1
             none_err.append(float(np.mean((parametric - target) ** 2)))
             gated_err.append(float(np.mean((gated - target) ** 2)))
+            epi.append(pred.epistemic)
         none_mse, gated_mse = float(np.mean(none_err)), float(np.mean(gated_err))
         gated_mses.append(gated_mse)
         none_mses.append(none_mse)
+
+        # Uncertainty-reliability on env #2 (P9-005): epistemic in the highest-error
+        # decile vs the median — the same metric the uncertainty-reliability sentinel
+        # uses, now required to GENERALIZE. Distance-aware epistemic is what lets it.
+        epi_arr, err_arr = np.array(epi), np.array(none_err)
+        hi = err_arr >= np.quantile(err_arr, 0.9)
+        med = float(np.median(epi_arr))
+        ratio = float(np.mean(epi_arr[hi]) / med) if med > 0 else 0.0
+        unc_ratios.append(ratio)
 
         metrics |= {
             f"gen_wm_mse_s{seed}": wm_mse, f"gen_persist_mse_s{seed}": persist_mse,
             f"gen_planner_return_s{seed}": planner_ret, f"gen_random_return_s{seed}": random_ret,
             f"gen_retrieval_none_mse_s{seed}": none_mse, f"gen_retrieval_gated_mse_s{seed}": gated_mse,
-            f"gen_retrieval_rate_s{seed}": retrieved / TEST_N,
+            f"gen_retrieval_rate_s{seed}": retrieved / TEST_N, f"gen_uncertainty_ratio_s{seed}": ratio,
         }
     # Median criteria (P2-style, robust to a lucky random start on one seed).
     wm_med, persist_med = float(np.median(wm_mses)), float(np.median(persist_mses))
     planner_med, random_med = float(np.median(planner_rets)), float(np.median(random_rets))
     gated_med, none_med = float(np.median(gated_mses)), float(np.median(none_mses))
+    unc_med = float(np.median(unc_ratios))
     metrics |= {"gen_wm_mse_median": wm_med, "gen_persist_mse_median": persist_med,
                 "gen_planner_return_median": planner_med, "gen_random_return_median": random_med,
-                "gen_retrieval_gated_mse_median": gated_med, "gen_retrieval_none_mse_median": none_med}
+                "gen_retrieval_gated_mse_median": gated_med, "gen_retrieval_none_mse_median": none_med,
+                "gen_uncertainty_ratio_median": unc_med}
     return Generalization(
         prediction_met=wm_med < persist_med,
         planning_met=planner_med > random_med,
+        uncertainty_met=unc_med >= UNCERTAINTY_FLOOR,
         retrieval_met=gated_med * RETRIEVE_MARGIN <= none_med,
         metrics=metrics,
     )

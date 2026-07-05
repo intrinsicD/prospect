@@ -49,3 +49,21 @@ all six jobs listed in `docs/architecture.md`.
   a skill's *prediction error* at mastery and fires when it rises; mastery still
   keys on epistemic (learned = low uncertainty). This resolves the P0-010-flagged
   forgetting-under-shift concern for the "I forgot" case. *(Amended by P7-001.)*
+- **Epistemic is distance-aware, not ensemble-disagreement alone** (P9-005). The
+  *confidently-wrong* failure has a second consequence beyond forgetting: ensemble
+  disagreement under-detects out-of-distribution inputs, because the tanh encoder
+  saturates and squashes far-away inputs into the seen latent region, so the members
+  (sharing that encoder) agree even where the model is wrong. Measured: on a second
+  environment (PointMass) epistemic rose only 1.75x out-of-region while error rose 10x,
+  and the uncertainty-reliability signal did not generalize. Fix: `encode` computes a
+  pre-encoder OOD score — the standardized input's excess energy over the training
+  distribution's unit variance, measured *before* the saturating encoder — carried on
+  the `LatentState`, and `predict` scales the epistemic scalar by `1 + w·ood`. In-
+  distribution the score is ~0 (epistemic unchanged, self-calibrated gates preserved);
+  out-of-distribution it rises by construction. Measured after the fix: OOD epistemic
+  rise 1.75x→7.85x and epistemic-vs-error rank correlation 0.52→0.80 on PointMass; the
+  uncertainty signal now generalizes (P9 gate). Only latents from a real `encode(obs)`
+  carry the score; synthesized planning-rollout latents (`ood=None`) use ensemble
+  disagreement alone, and `var`/`log_prob` stay the ensemble's calibrated total —
+  distance-awareness is added to the *reducible-uncertainty scalar*, not the likelihood.
+  *(Amended by P9-005.)*

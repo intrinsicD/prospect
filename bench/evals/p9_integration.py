@@ -26,16 +26,18 @@ generalize to a second environment:
    by construction). Also carries all four collapse sentinels on run `p9`.
 3. **Ablation — the load-bearing part matters** (P9-002) — leave-one-out marginal
    control value (`composed - ablated`): planning must be load-bearing on every seed.
-4. **Generalizes to a 2nd environment** (P9-003) — prediction (P1) and planning (P2)
-   survive on `bench.envs.PointMass`, a structurally different task, with the SAME core
-   code (recalibrated eval params only).
+4. **Generalizes to a 2nd environment** (P9-003, P9-005) — prediction (P1), planning
+   (P2), AND the epistemic uncertainty signal itself survive on `bench.envs.PointMass`,
+   a structurally different task, with the SAME core code (recalibrated eval params
+   only). The uncertainty signal generalizes thanks to the P9-005 distance-aware fix.
 
 MEASURED, NOT GATED — the findings (ADR-0008): (a) retrieval-into-planning has a
 *negative* ablation marginal (it helps 1-step prediction per P8 but overriding the
-planner's rollout dynamics corrupts multi-step optimisation); (b) retrieval does NOT
-generalize to PointMass — its benefit is env-dependent (the ensemble's epistemic barely
-rises OOD there, so retrieval rarely fires); (c) the exploit-penalty is ~negligible.
-None is tuned away; each is a reported generalization/composition limit.
+planner's rollout dynamics corrupts multi-step optimisation); (b) retrieval still does
+NOT generalize to PointMass — now the gate fires (P9-005 fixed the uncertainty signal),
+but the same encoder saturation corrupts the retrieval *key* space, so OOD queries match
+wrong facts (a distinct follow-up); (c) the exploit-penalty is ~negligible. None is
+tuned away; each is a reported generalization/composition limit.
 """
 from __future__ import annotations
 
@@ -201,9 +203,10 @@ def check_p9() -> GateResult:
     # recorded (its benefit is env-dependent — a finding).
     gen = generalizes()
     metrics |= gen.metrics
-    generalizes_met = gen.prediction_met and gen.planning_met
+    generalizes_met = gen.prediction_met and gen.planning_met and gen.uncertainty_met
     metrics |= {"prediction_generalizes": float(gen.prediction_met),
                 "planning_generalizes": float(gen.planning_met),
+                "uncertainty_generalizes": float(gen.uncertainty_met),
                 "retrieval_generalizes": float(gen.retrieval_met),
                 "generalizes_met": float(generalizes_met)}
 
@@ -225,8 +228,9 @@ def check_p9() -> GateResult:
     metrics |= {f"marginal_{c}_median": m for c, m in marg_med.items()}
     table = ", ".join(f"{c} {m:+.1f} ({classify(m)})" for c, m in marg_med.items())
     gen_note = (f"prediction {'✓' if gen.prediction_met else '✗'} + planning "
-                f"{'✓' if gen.planning_met else '✗'} generalize to a 2nd env (PointMass); "
-                f"retrieval {'✓' if gen.retrieval_met else '✗ (env-dependent)'}")
+                f"{'✓' if gen.planning_met else '✗'} + uncertainty "
+                f"{'✓' if gen.uncertainty_met else '✗'} generalize to a 2nd env (PointMass); "
+                f"retrieval {'✓' if gen.retrieval_met else '✗ (key-space saturation, P9-005)'}")
     detail = (
         f"composed agent controls end-to-end: return {composed_med:.1f} vs reactive "
         f"{reactive_med:.1f} ({'beats every seed' if controls_met else 'FAILS'}); one epistemic "

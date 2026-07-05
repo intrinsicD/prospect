@@ -97,14 +97,17 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **P9-002** · `done` · R1–R8 · Ablation harness (leave-one-out marginal control value), folded into the P9 gate. Verdicts: planning **+53.7 load-bearing** (gated every seed), retrieval **−9.5 harmful** (the P9-001 finding, quantified), exploit_penalty **+2.5 negligible**. Two under-performers surfaced as findings, not tuned away. Gate **P9 PASS**.
 - **P9-003** · `done` · R1,R4,R8 · Second environment (`PointMass`, 2D nonlinear-drag; obs 3→4, action 1→2) + cross-env generalization, folded into the P9 gate. **Prediction and planning generalize** with the same core (recalibrated eval params only). **Finding:** retrieval does NOT generalize (confidently-wrong OOD → gate never fires) — its benefit is env-dependent. Gate **P9 PASS**.
 - **P9-004** · `done` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening, as a standing `gate-overfit` sentinel (active from P9): 7 cheap checks — trivial solutions (always-retrieve, one-step options) FAIL their criteria; invariants hold (surprise decomposition exact, untrusted never overrides, log-prob peaks at mean); a bootstrap CI separates a real margin from noise. Sentinel **healthy**; P9 **PASS**.
+- **P9-005** · `done` · R1,R3,R4,R7,R8 · Distance-aware epistemic uncertainty — the fix for the P9-003 finding. Diagnosed: the tanh encoder saturates, so ensemble disagreement can't detect OOD (epi rose 1.75x while error rose 10x on PointMass). Fix: `encode` computes a pre-encoder OOD score on the standardized input (`LatentState.ood`), `predict` scales epistemic by it. Result: OOD epi-rise 1.75x→7.85x, epi-vs-error rank corr 0.52→0.80; **the uncertainty signal now generalizes** (folded into the P9 gate, floor 3.0, measured 8.8). **New finding:** retrieval still doesn't generalize — the same saturation corrupts the retrieval *key* space (OOD queries match wrong facts), a distinct follow-up. ADR-0002 amended. Gate **P9 PASS**.
 
-> **Phase 9 complete** — P9-001..004 all shipped (all fold into the P9 gate;
-> `bench/SHIPPED` ratchets P0–P9). The whole system is verified end-to-end (not just
-> per part), a leave-one-out ablation quantifies every component's marginal value, the
-> core capabilities generalize to a second environment, and a standing `gate-overfit`
-> sentinel keeps the gates from measuring artifacts or noise. Findings surfaced and
-> reported (not tuned away): retrieval hurts control, is negligible-to-harmful, and does
-> not generalize; the exploit-penalty is negligible.
+> **Phase 9** — P9-001..005 shipped (all fold into the P9 gate; `bench/SHIPPED` ratchets
+> P0–P9). The whole system is verified end-to-end (not just per part), a leave-one-out
+> ablation quantifies every component's marginal value, the core capabilities — now
+> *including the epistemic signal itself* (P9-005 distance-aware fix) — generalize to a
+> second environment, and a standing `gate-overfit` sentinel keeps the gates from
+> measuring artifacts or noise. Findings surfaced and reported (not tuned away):
+> retrieval hurts control, is negligible-to-harmful, and does not generalize (now blocked
+> by retrieval-key saturation, not the uncertainty signal); the exploit-penalty is
+> negligible.
 
 > **P0–P9 complete.** Every roadmap phase ships with a passing kill-gate and healthy
 > collapse sentinels; the ratchet re-runs all ten. Beyond the capabilities (P0–P8), the
