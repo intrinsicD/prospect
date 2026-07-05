@@ -134,4 +134,11 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > base) first; Option B (compute-as-action tools) is a later phase.
 
 - **P10-001** · `done` (capability; composite blocked pending P10-002) · R8,R6 · External knowledge through the codec. `ExternalKnowledgeSource` answers with raw content (an observation the agent never sensed) that it ingests via `codec.encode` (rule 1, first exercised), extending competence to an OOD band the model can't extrapolate: gated MSE 3.4× below model-alone, seen no-harm, corrupting the retrieved observation worsens it 50× (the answer flows through the codec). **Finding:** the uncertainty gate alone let seen false-consults fetch irrelevant OOD facts and hurt — the P9-007 distance gate is needed at the external tier too (consult-when-uncertain AND trust-when-close). Capability **MET**, all sentinels healthy; composite P10 BLOCKED pending P10-002.
-- **P10-002** · `backlog` · R8 · External-source trust robustness: a poisoned/UNTRUSTED external source must never override the model (reuse P8-002 trust-ordering + `min_trust` floor, now over content-through-codec). Completes the composite P10 gate to PASS and ships P10 (adds it to `bench/SHIPPED`).
+- **P10-002** · `done` · R8 · External-source trust robustness. A poisoned UNTRUSTED external source (corrupted observations over the same keys) is the attack surface: a trust-blind agent ingests it through the codec and does ~40× worse than no-retrieval (1.029 vs 0.0255); the provenance-respecting router never lets it override (stays 0.0255) and trust-orders to a trusted source to recover clean accuracy (0.0076). The defense is provenance, not content inspection (reuses P8-002). Composite **P10 PASS**.
+
+> **Phase 10 shipped** — `bench/SHIPPED` now ratchets P0–P10. The external knowledge tier
+> is live: the agent answers OOD queries it can't derive from experience by retrieving
+> external *content* and ingesting it through the codec (ADR-0004 rule 1, first
+> exercised), gated by uncertainty (when to consult) AND distance (P9-007 — when to
+> trust), and provenance keeps a poisoned source from ever overriding it. Next: Option B
+> (compute-as-action tools, `ToolSource`) and/or a real (non-toy) environment.

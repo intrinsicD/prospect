@@ -1,6 +1,6 @@
 # P10-001 — External knowledge as content through the codec
 
-- **Status:** done (capability half; composite P10 BLOCKED pending P10-002)
+- **Status:** done (capability half; composite P10 now PASS with P10-002)
 - **Phase:** P10
 - **Requirements:** R8 (external knowledge for any use case), R6 (codec ingestion), R4/R1
   (the epistemic signal that gates it)

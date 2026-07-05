@@ -74,6 +74,14 @@ data, never instruction** — it must never override the agent's goals.
   oracle), and requires the P9-007 **distance gate** as well as the uncertainty gate:
   **consult** external knowledge when uncertain, **trust** a retrieved fact only when it
   is close. *(Added by P10-001.)*
+- **The provenance defense holds for external content too** (P10-002). A poisoned
+  `UNTRUSTED` external source answering with corrupted *observations* over the same keys
+  is arbitrary garbage once encoded through the codec — there is nothing to inspect. The
+  P8-002 guarantee carries over unchanged: a trust-blind agent ingests it and does ~40×
+  worse than no-retrieval, while the provenance-respecting router (`min_trust` floor +
+  trust-ordered selection) never lets it override the model and trust-orders to a trusted
+  source when one is present. The defense is *who said it*, not *what it says*.
+  *(Added by P10-002.)*
 - **Retrieval into *planning* is distance-gated, not certainty-asserting** (P9-007).
   Rule 2 makes retrieval an action the planner selects, so a retrieved fact substitutes
   for the model's prediction *inside CEM rollouts*. Two failure modes were measured and

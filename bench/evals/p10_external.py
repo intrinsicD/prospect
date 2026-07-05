@@ -30,8 +30,12 @@ Capability half (P10-001), three criteria — all in 1-step latent MSE:
    ~never on seen; and REMOVING the distance gate (ingest whenever uncertainty fires)
    makes seen accuracy worse, because seen false-consults then fetch far, wrong facts.
 
-Robustness half (poisoned/UNTRUSTED external source never overrides) is P10-002; until it
-lands the composite P10 gate is BLOCKED by design (mirrors P8-001/P8-002).
+Robustness half (P10-002): a poisoned `UNTRUSTED` external source (corrupted observations
+over the same keys) is the attack surface. A trust-blind agent ingests it and does WORSE
+than no-retrieval (the poison, encoded through the codec, bites); a provenance-respecting
+router (`min_trust` floor + trust-ordered selection, P8-002) never lets the untrusted
+source override the model, and with a trusted source also present trust-orders to it and
+recovers the clean accuracy. Untrusted content is data, never instruction (ADR-0004).
 
 Run `p10` carries all four data-sentinels (the limited-region model feeds the P1 probes,
 replay fidelity and an option-diversity rollout), plus the P9 gate-overfit sentinel.
@@ -76,6 +80,9 @@ OOD_INGEST_MIN = 0.5        # external ingested on >= this fraction of OOD queri
 CORRUPT_MARGIN = 1.5        # corrupted-content MSE >= clean gated MSE * this (codec carries it)
 DISTANCE_MARGIN = 1.5       # no-distance-gate SEEN MSE >= gated SEEN MSE * this (distance gate load-bearing)
 CORRUPT_SCALE = 1.0         # obs-space noise added to a retrieved observation (metamorphic)
+POISON_SCALE = 2.0          # obs-space noise in the poisoned UNTRUSTED store's content (P10-002)
+POISON_HARM_FACTOR = 2.0    # trust-blind ingestion of poison must be >= this x worse than no-retrieval
+ROBUST_TOL = 1.1            # provenance-respecting MSE must stay within this of its clean target
 
 
 def _ood_data(n: int, seed: int) -> list[Transition]:
@@ -125,8 +132,38 @@ def _external_store(model: FlatWorldModel, facts: list[Transition]) -> ExternalK
     return store
 
 
+def _poisoned_store(model: FlatWorldModel, facts: list[Transition], seed: int) -> ExternalKnowledgeSource:
+    """An UNTRUSTED external source over the SAME keys as the clean KB, but whose content
+    is a corrupted observation (P10-002). A provenance-respecting router must never let it
+    override the model; a trust-blind one ingests garbage through the codec (ADR-0004)."""
+    rng = np.random.default_rng(seed)
+    store = ExternalKnowledgeSource(trust=Trust.UNTRUSTED)
+    for t in facts:
+        corrupt = np.asarray(t.next_state.z, dtype=float) + rng.normal(0.0, POISON_SCALE,
+                                                                       size=np.asarray(t.next_state.z).shape)
+        content = Observation(modality=Modality.STATE, data=corrupt)
+        store.write(KnowledgeItem(content=(_key(model, t), content),
+                                  provenance=Provenance(source="poisoned", trust=Trust.UNTRUSTED)))
+    return store
+
+
 def _ingest(codec: UniversalCodec, obs: Observation) -> np.ndarray:
     return np.asarray(codec.encode(obs).z, dtype=float)
+
+
+def _routed_latent(router: UncertaintyMemoryRouter, key: np.ndarray, epistemic: float,
+                   radius: float, codec: UniversalCodec, fallback: np.ndarray) -> tuple[np.ndarray, bool]:
+    """The two-stage gate for one router config: CONSULT external when uncertain (route
+    respects trust), then TRUST the fact only when close (distance gate, P9-007). Returns
+    (latent, ingested); on no-consult or a far fact it falls back to the model's own."""
+    source = router.route(None, epistemic)
+    if source is None:
+        return fallback, False  # confident, or nothing clears the trust floor
+    item = source.query(key)[0]
+    within = float(np.sum((key - np.asarray(item.content[0], dtype=float)) ** 2)) <= radius
+    if not within:
+        return fallback, False
+    return _ingest(codec, item.content[1]), True
 
 
 def _reliability_radius(model: FlatWorldModel, store: ExternalKnowledgeSource,
@@ -160,55 +197,75 @@ def _seed_metrics(seed: int, log: RunLog) -> dict[str, float]:
     _log_option_diversity(model, seed, log)
 
     codec = _distill_codec(model, seed)
-    store = _external_store(model, _ood_data(STORE_N, seed + 50))
+    facts = _ood_data(STORE_N, seed + 50)
+    store = _external_store(model, facts)
+    poisoned = _poisoned_store(model, facts, seed + 70)  # same keys, corrupted content (P10-002)
     radius = _reliability_radius(model, store, _ood_data(PROBE_N, seed + 900))
     seen_epi = sorted(model.predict(model.encode(t.state.z), t.action).epistemic for t in heldout)
     threshold = seen_epi[int(EPISTEMIC_QUANTILE * len(seen_epi))]
-    router = UncertaintyMemoryRouter([store], threshold=threshold)
+    # P10-001 capability path (a single trusted store); P10-002 robustness paths over a
+    # poisoned UNTRUSTED source: trust-blind (ignores provenance), provenance-respecting
+    # alone, and respecting alongside the trusted store (trust-ordered). Default
+    # min_trust=LOW excludes UNTRUSTED.
+    clean_router = UncertaintyMemoryRouter([store], threshold=threshold)
+    blind_router = UncertaintyMemoryRouter([poisoned], threshold=threshold, min_trust=Trust.UNTRUSTED)
+    resp_router = UncertaintyMemoryRouter([poisoned], threshold=threshold)
+    mixed_router = UncertaintyMemoryRouter([poisoned, store], threshold=threshold)
 
-    # Per query: model-alone (bypass), external-ingested (clean / corrupted content), the
-    # two-stage decision (uncertainty consult AND distance trust), and the no-distance-gate
-    # control (uncertainty consult only). OOD = the un-learnable band.
-    model_err, ext_err, corrupt_err = [], [], []
+    def err(latent: np.ndarray, target: np.ndarray) -> float:
+        return float(np.mean((latent - target) ** 2))
+
+    model_err, gated_err, corrupt_err, nodist_err = [], [], [], []
+    blind_err, resp_err, mixed_err = [], [], []
     consulted, ingested, is_ood = [], [], []
     rng_c = np.random.default_rng(seed + 404)
     for t in _region_data(FULL, TEST_N, seed + 200):
         key = _key(model, t)
         pred = model.predict(model.encode(t.state.z), t.action)
         target = np.asarray(model.encode_target(t.next_state.z).z, dtype=float)
-        model_err.append(float(np.mean((np.asarray(pred.mean, dtype=float) - target) ** 2)))
-        item = store.query(key)[0]
-        content: Observation = item.content[1]
-        ext_err.append(float(np.mean((_ingest(codec, content) - target) ** 2)))
+        model_mean = np.asarray(pred.mean, dtype=float)
+        model_err.append(err(model_mean, target))
+
+        clean_item = store.query(key)[0]
+        content: Observation = clean_item.content[1]
+        consult = clean_router.route(None, pred.epistemic) is not None  # uncertainty gate (ADR-0004)
+        within = float(np.sum((key - np.asarray(clean_item.content[0], dtype=float)) ** 2)) <= radius
+        ingest = consult and within  # + distance gate (P9-007)
+        clean_latent = _ingest(codec, content)
+        gated_err.append(err(clean_latent if ingest else model_mean, target))
+        nodist_err.append(err(clean_latent if consult else model_mean, target))  # no distance gate
         corrupt = Observation(modality=content.modality,
                               data=content.data + rng_c.normal(0.0, CORRUPT_SCALE, size=content.data.shape))
-        corrupt_err.append(float(np.mean((_ingest(codec, corrupt) - target) ** 2)))
-        consult = router.route(None, pred.epistemic) is not None  # uncertainty gate (ADR-0004)
-        within = float(np.sum((key - np.asarray(item.content[0], dtype=float)) ** 2)) <= radius
+        corrupt_err.append(err(_ingest(codec, corrupt) if ingest else model_mean, target))
+        # P10-002: the same two-stage gate under each trust config.
+        blind_err.append(err(_routed_latent(blind_router, key, pred.epistemic, radius, codec, model_mean)[0], target))
+        resp_err.append(err(_routed_latent(resp_router, key, pred.epistemic, radius, codec, model_mean)[0], target))
+        mixed_err.append(err(_routed_latent(mixed_router, key, pred.epistemic, radius, codec, model_mean)[0], target))
         consulted.append(consult)
-        ingested.append(consult and within)  # distance gate too (P9-007)
+        ingested.append(ingest)
         is_ood.append(abs(float(t.state.z[2])) > REGION)  # obs = [cos, sin, omega]
 
-    model_e, ext_e, corr_e = np.array(model_err), np.array(ext_err), np.array(corrupt_err)
-    consult_a, ingest_a, ood_a = np.array(consulted), np.array(ingested), np.array(is_ood)
-    gated = np.where(ingest_a, ext_e, model_e)          # two-stage gated
-    corrupt_gated = np.where(ingest_a, corr_e, model_e)  # gated, but ingest corrupted content
-    nodist = np.where(consult_a, ext_e, model_e)         # no-distance-gate control
+    model_e, gated_e, corr_e, nodist_e = map(np.array, (model_err, gated_err, corrupt_err, nodist_err))
+    blind_e, resp_e, mixed_e = map(np.array, (blind_err, resp_err, mixed_err))
+    ingest_a, ood_a = np.array(ingested), np.array(is_ood)
 
     def sub(arr: np.ndarray, mask: np.ndarray) -> float:
         return float(np.mean(arr[mask])) if mask.any() else 0.0
 
     return {
         f"model_ood_mse_s{seed}": sub(model_e, ood_a),
-        f"gated_ood_mse_s{seed}": sub(gated, ood_a),
+        f"gated_ood_mse_s{seed}": sub(gated_e, ood_a),
         f"model_seen_mse_s{seed}": sub(model_e, ~ood_a),
-        f"gated_seen_mse_s{seed}": sub(gated, ~ood_a),
-        f"nodist_seen_mse_s{seed}": sub(nodist, ~ood_a),
-        f"gated_mse_s{seed}": float(np.mean(gated)),
-        f"corrupt_gated_mse_s{seed}": float(np.mean(corrupt_gated)),
+        f"gated_seen_mse_s{seed}": sub(gated_e, ~ood_a),
+        f"nodist_seen_mse_s{seed}": sub(nodist_e, ~ood_a),
+        f"gated_mse_s{seed}": float(np.mean(gated_e)),
+        f"corrupt_gated_mse_s{seed}": float(np.mean(corr_e)),
+        f"none_mse_s{seed}": float(np.mean(model_e)),
+        f"blind_mse_s{seed}": float(np.mean(blind_e)),
+        f"respecting_mse_s{seed}": float(np.mean(resp_e)),
+        f"mixed_mse_s{seed}": float(np.mean(mixed_e)),
         f"seen_ingest_rate_s{seed}": sub(ingest_a.astype(float), ~ood_a),
         f"ood_ingest_rate_s{seed}": sub(ingest_a.astype(float), ood_a),
-        f"seen_consult_rate_s{seed}": sub(consult_a.astype(float), ~ood_a),
     }
 
 
@@ -228,30 +285,39 @@ def check_p10() -> GateResult:
     nodist_seen = med("nodist_seen_mse")
     gated, corrupt = med("gated_mse"), med("corrupt_gated_mse")
     seen_ingest, ood_ingest = med("seen_ingest_rate"), med("ood_ingest_rate")
+    none_mse, blind, resp, mixed = med("none_mse"), med("blind_mse"), med("respecting_mse"), med("mixed_mse")
 
     competence_met = gated_ood * COMPETENCE_FACTOR <= model_ood and gated_seen <= model_seen * SEEN_TOL
     codec_met = corrupt >= gated * CORRUPT_MARGIN and gated_ood < model_ood
     gates_met = (seen_ingest <= SEEN_INGEST_MAX and ood_ingest >= OOD_INGEST_MIN
                  and nodist_seen >= gated_seen * DISTANCE_MARGIN)
     capability_met = competence_met and codec_met and gates_met
-    robustness_met = False  # P10-002 (poisoned/UNTRUSTED external source never overrides)
+    # P10-002: a trust-blind agent swallows the poison; a provenance-respecting router
+    # never lets the UNTRUSTED source override the model; trust-ordering to a trusted
+    # source recovers the clean accuracy (ADR-0004).
+    robustness_met = (blind >= none_mse * POISON_HARM_FACTOR and resp <= none_mse * ROBUST_TOL
+                      and mixed <= gated * ROBUST_TOL)
     passed = capability_met and robustness_met
 
     metrics |= {"model_ood_mse_median": model_ood, "gated_ood_mse_median": gated_ood,
                 "model_seen_mse_median": model_seen, "gated_seen_mse_median": gated_seen,
                 "nodist_seen_mse_median": nodist_seen, "gated_mse_median": gated,
                 "corrupt_gated_mse_median": corrupt, "seen_ingest_rate_median": seen_ingest,
-                "ood_ingest_rate_median": ood_ingest, "competence_met": float(competence_met),
-                "codec_ingestion_met": float(codec_met), "gates_met": float(gates_met),
-                "capability_met": float(capability_met), "robustness_met": float(robustness_met)}
+                "ood_ingest_rate_median": ood_ingest, "none_mse_median": none_mse,
+                "blind_mse_median": blind, "respecting_mse_median": resp, "mixed_mse_median": mixed,
+                "competence_met": float(competence_met), "codec_ingestion_met": float(codec_met),
+                "gates_met": float(gates_met), "capability_met": float(capability_met),
+                "robustness_met": float(robustness_met)}
     detail = (
         f"external knowledge through the codec — competence: OOD gated {gated_ood:.4f} vs model "
         f"{model_ood:.4f} (>= x{COMPETENCE_FACTOR}), seen no-harm {gated_seen:.4f} vs "
         f"{model_seen:.4f}: {'MET' if competence_met else 'NOT MET'}. codec carries it: corrupted "
         f"{corrupt:.4f} vs clean {gated:.4f} (>= x{CORRUPT_MARGIN}): {'MET' if codec_met else 'NOT MET'}. "
-        f"gates load-bearing: ingest seen {seen_ingest:.0%}/OOD {ood_ingest:.0%}, remove distance-gate "
-        f"-> seen {nodist_seen:.4f} vs {gated_seen:.4f} (>= x{DISTANCE_MARGIN}): "
-        f"{'MET' if gates_met else 'NOT MET'}. CAPABILITY {'MET' if capability_met else 'NOT MET'}; "
-        f"composite BLOCKED pending P10-002 (external-source trust robustness)"
+        f"gates load-bearing: ingest seen {seen_ingest:.0%}/OOD {ood_ingest:.0%}, no-distance-gate "
+        f"seen {nodist_seen:.4f} vs {gated_seen:.4f} (>= x{DISTANCE_MARGIN}): "
+        f"{'MET' if gates_met else 'NOT MET'}. robustness: trust-blind swallows poison {blind:.4f} "
+        f"(>= x{POISON_HARM_FACTOR} vs no-retrieval {none_mse:.4f}), provenance-respecting stays "
+        f"{resp:.4f} (<= no-retrieval), trust-ordered recovers {mixed:.4f}: "
+        f"{'MET' if robustness_met else 'NOT MET'}. P10 {'PASS' if passed else 'BLOCKED'}"
     )
     return GateResult(phase="P10", passed=passed, metrics=metrics, seeds=list(SEEDS), detail=detail)
