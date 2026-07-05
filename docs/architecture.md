@@ -102,17 +102,19 @@ retrieval and tool-use as actions the planner selects, gated by uncertainty. See
 - Catastrophic forgetting and loss of plasticity — the price of continual learning.
 - Retrieval quality and trust of external sources — *and where retrieval is safe to
   apply*: the P9 integration gate found retrieval helps 1-step prediction (P8) yet
-  **degrades multi-step planning** when it overrides the planner's rollout dynamics
-  (ADR-0008; P9-002 dissects it).
+  **degraded multi-step planning** when it overrode the planner's rollout dynamics with
+  far, misaligned facts (P9-002). P9-007 fixed this by **distance-gating** the
+  substitution (trust a fact only within a coverage radius, with honest distance-scaled
+  epistemic) — the marginal is now negligible/safe and *gated* (ADR-0004/0008).
 - **Composing parts that each pass their own gate can still fail as a whole** — the
   reason Phase 9 validates the assembled agent, not just the components (ADR-0008).
 - **Single-environment overfit** — capabilities are validated on a *second*,
   structurally different environment (`PointMass`, P9-003): prediction, planning, the
   uncertainty signal (P9-005 distance-aware fix), and uncertainty-gated retrieval
   (P9-006, given a dimension-adequate store — retrieval-as-lookup obeys the curse of
-  dimensionality) all generalize with the same core. What does *not* generalize cleanly
-  is retrieval *into planning*: it helps 1-step prediction yet degrades multi-step
-  control — a composition limit, recorded not tuned away (ADR-0004/0008).
+  dimensionality) all generalize with the same core. Retrieval *into planning* was a
+  composition limit (it degraded multi-step control); P9-007's distance-gating made it
+  safe/neutral and gated it (ADR-0004/0008).
 
 Each is named in the relevant ADR and gated by a benchmark; the collapse modes are
 additionally guarded by standing integrity **sentinels** (ADR-0006), because they hide

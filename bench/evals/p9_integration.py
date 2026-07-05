@@ -25,18 +25,25 @@ generalize to a second environment:
    retrieval (it fired; every retrieval was above the router's uncertainty threshold
    by construction). Also carries all four collapse sentinels on run `p9`.
 3. **Ablation — the load-bearing part matters** (P9-002) — leave-one-out marginal
-   control value (`composed - ablated`): planning must be load-bearing on every seed.
+   control value (`composed - ablated`): planning must be load-bearing on every seed,
+   and retrieval into planning must be at worst neutral (P9-007: distance-gated so it is
+   not *harmful*).
 4. **Generalizes to a 2nd environment** (P9-003, P9-005, P9-006) — prediction (P1),
    planning (P2), the epistemic uncertainty signal itself (P9-005 distance-aware fix),
    AND uncertainty-gated retrieval (P9-006, given a dimension-adequate store) all survive
    on `bench.envs.PointMass`, a structurally different task, with the SAME core code
    (recalibrated eval params only).
 
-MEASURED, NOT GATED — the findings (ADR-0008): (a) retrieval-into-planning has a
-*negative* ablation marginal (it helps 1-step prediction per P8 but overriding the
-planner's rollout dynamics corrupts multi-step optimisation) — a composition limit
-distinct from its 1-step-prediction generalization; (b) the exploit-penalty is
-~negligible. None is tuned away; each is a reported composition limit.
+Retrieval into planning was a *negative* ablation marginal (it helps 1-step prediction
+per P8, but overriding the planner's rollout dynamics with a nearest-neighbour fact
+corrupts multi-step optimisation — the P9-002 finding). P9-007 fixes it by *distance-
+gating* the substitution: at rollout depth the query is an imagined latent far from any
+real fact, so its nearest fact is fiction; retrieving it only where a *close* (trusted)
+fact exists, with honest distance-scaled epistemic instead of a certain `epi=0`, removes
+the model-exploitation seam. The marginal is now not harmful (gated in criterion 3).
+
+MEASURED, NOT GATED — the finding (ADR-0008): the exploit-penalty ablation marginal is
+~negligible. Not tuned away; a reported composition limit.
 
 NB (P9-006 correction): P9-005 hypothesized that retrieval failed to generalize because
 encoder saturation corrupted the *key* space. Measurement disproved that — the latent
@@ -72,6 +79,8 @@ RUN_ID = "p9"
 SEEDS = [0, 1, 2]
 TRAIN_N, STORE_N, PROBE_N = 4096, 3000, 256
 RETRIEVE_MULT = 2.0           # retrieve only above 2x the MAX seen epistemic (see below)
+RELIABILITY_MULT = 4.0        # trust a retrieved fact only within 4x the store's coverage
+                              # distance — distance-gated retrieval into planning (P9-007)
 EVAL_EPISODES = 2             # control episodes averaged per condition
 # Why conservative (RETRIEVE_MULT on the max, not P8's 90th-percentile quantile):
 # retrieval helps 1-step prediction (P8) but a low gate fires ~55% of the time inside
@@ -116,6 +125,19 @@ def _mastered_curriculum(
     return monitor, LearningProgressCurriculum(monitor)
 
 
+def _reliability_radius(model: FlatWorldModel, store: SemanticStore,
+                        probes: list[Transition]) -> float:
+    """Calibrate the distance-gate radius to the store's coverage (P9-007): the median
+    key-distance from a real in-coverage query to its nearest fact, scaled up. A rollout
+    query farther than this is fiction — its nearest fact is not to be trusted."""
+    covered = [
+        float(np.sum((_key(model, t) - np.asarray(store.query(_key(model, t))[0].content[0],
+                                                   dtype=float)) ** 2))
+        for t in probes
+    ]
+    return RELIABILITY_MULT * float(np.median(covered))
+
+
 def _control_return(agent: object, seed: int) -> float:
     return float(np.mean([
         run_episode(_env(), agent, EP_LEN, 9000 + seed * 50 + e)[0]  # type: ignore[arg-type]
@@ -146,11 +168,12 @@ def check_p9() -> GateResult:
         log_replay_fidelity(model, train, seed, log, step_offset=seed * SEED_STEP_OFFSET + 50_000)
         _log_option_diversity(model, seed, log)
 
-        # 2. store + uncertainty-gated router
+        # 2. store + uncertainty-gated router + distance-gate radius (P9-007)
         store = _online_store(model, _region_data(FULL, STORE_N, seed + 50))
         seen_epi = sorted(model.predict(model.encode(t.state.z), t.action).epistemic for t in heldout)
         threshold = RETRIEVE_MULT * seen_epi[-1]  # 2x the most-uncertain seen state
         router = UncertaintyMemoryRouter([store], threshold=threshold)
+        radius = _reliability_radius(model, store, ood)  # trust only close (real) facts
 
         # 3. monitor -> mastery -> curriculum EXPLOIT (the same epistemic signal, other job)
         monitor, curriculum = _mastered_curriculum(model, heldout, float(np.median(seen_epi)))
@@ -158,7 +181,7 @@ def check_p9() -> GateResult:
         mastered = monitor.is_mastered(SurpriseCompetenceMonitor.DEFAULT_SKILL)
 
         # 4. compose the full agent (plan over the retrieval-augmented model) + baselines
-        augmented = RetrievalAugmentedWorldModel(model, router)
+        augmented = RetrievalAugmentedWorldModel(model, router, reliability_radius=radius)
         planner_full = FlatPlanner(augmented, seed=seed)
         agent_full = Agent(encode=_encoder(model), planner=planner_full, world_model=model,
                            monitor=monitor, curriculum=curriculum)
@@ -175,8 +198,8 @@ def check_p9() -> GateResult:
         # penalty pinned to 0). Marginal value = composed - ablated (see p9_ablation).
         agent_no_penalty = Agent(
             encode=_encoder(model), world_model=model, monitor=monitor,
-            planner=FlatPlanner(RetrievalAugmentedWorldModel(model, router), seed=seed,
-                                uncertainty_penalty=0.0))
+            planner=FlatPlanner(RetrievalAugmentedWorldModel(model, router, reliability_radius=radius),
+                                seed=seed, uncertainty_penalty=0.0))
         no_penalty = _control_return(agent_no_penalty, seed)
         marg = marginals(composed, {"planning": reactive, "retrieval": bare,
                                     "exploit_penalty": no_penalty})
@@ -218,19 +241,25 @@ def check_p9() -> GateResult:
 
     # PASS = the whole system works end-to-end (controls), the one epistemic signal
     # drives several jobs in one run, the leave-one-out ablation confirms the clearly
-    # load-bearing component (planning) matters, AND the core capabilities generalize to
-    # a second environment. Recorded-not-gated findings: a harmful/negligible ablation
-    # marginal, and retrieval's env-dependent generalization (ADR-0008).
+    # load-bearing component (planning) matters, retrieval into planning is at worst
+    # neutral (P9-007 distance-gating — no longer a harmful marginal), AND the core
+    # capabilities generalize to a second environment. Recorded-not-gated: the negligible
+    # exploit-penalty (ADR-0008).
     controls_met, one_signal_met, ablation_met = all(controls), all(one_signal), all(ablation_ok)
-    passed = controls_met and one_signal_met and ablation_met and generalizes_met
     composed_med, bare_med = float(np.median(composed_ret)), float(np.median(bare_ret))
     reactive_med = float(np.median([metrics[f"reactive_return_s{s}"] for s in SEEDS]))
     rate_med = float(np.median([metrics[f"retrieval_rate_s{s}"] for s in SEEDS]))
     marg_med = {c: float(np.median(v)) for c, v in marg_table.items()}
+    # P9-007: retrieval into planning must not be *harmful* — its median leave-one-out
+    # marginal must clear -MARGIN. Distance-gating keeps far (fictional) rollout facts
+    # from overriding the dynamics, so this holds instead of the old negative marginal.
+    retrieval_safe = marg_med["retrieval"] >= -MARGIN
+    passed = (controls_met and one_signal_met and ablation_met and generalizes_met
+              and retrieval_safe)
     metrics |= {"composed_return_median": composed_med, "retrieval_off_return_median": bare_med,
                 "reactive_return_median": reactive_med, "retrieval_rate_median": rate_med,
                 "controls_met": float(controls_met), "one_signal_met": float(one_signal_met),
-                "ablation_met": float(ablation_met)}
+                "ablation_met": float(ablation_met), "retrieval_safe": float(retrieval_safe)}
     metrics |= {f"marginal_{c}_median": m for c, m in marg_med.items()}
     table = ", ".join(f"{c} {m:+.1f} ({classify(m)})" for c, m in marg_med.items())
     gen_note = (f"prediction {'✓' if gen.prediction_met else '✗'} + planning "
@@ -242,9 +271,9 @@ def check_p9() -> GateResult:
         f"{reactive_med:.1f} ({'beats every seed' if controls_met else 'FAILS'}); one epistemic "
         f"signal drives exploit-mode AND retrieval in one run "
         f"({'MET' if one_signal_met else 'NOT MET'}). ablation marginal control value: {table}. "
-        f"cross-env: {gen_note}. FINDINGS: retrieval hurts control-INTO-PLANNING (marginal "
-        f"{marg_med['retrieval']:+.1f}) — overriding rollout dynamics mid-CEM corrupts multi-step "
-        f"optimisation (distinct from its 1-step-prediction generalization, which P9-006 gates "
-        f"via a dimension-adequate store); exploit-penalty is negligible"
+        f"cross-env: {gen_note}. retrieval into planning is distance-gated (P9-007): marginal "
+        f"{marg_med['retrieval']:+.1f} ({classify(marg_med['retrieval'])}, "
+        f"{'safe' if retrieval_safe else 'HARMFUL'}) — far facts no longer override rollout "
+        f"dynamics. FINDING: exploit-penalty is negligible"
     )
     return GateResult(phase="P9", passed=passed, metrics=metrics, seeds=list(SEEDS), detail=detail)

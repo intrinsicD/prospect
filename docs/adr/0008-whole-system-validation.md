@@ -17,8 +17,9 @@ Add **Phase 9 — whole-system validation** with four standing checks:
    `agent.py` composition root and assert emergent, closed-loop properties — it
    controls end-to-end; within ONE run the single VoE (epistemic) signal both sets
    the planner's explore/exploit coefficient (via the curriculum, ADR-0007) *and*
-   gates retrieval (ADR-0004); retrieval-as-action does not degrade control — with
-   all applicable collapse sentinels healthy.
+   gates retrieval (ADR-0004); retrieval-as-action does not degrade control (a *gated*
+   criterion since P9-007's distance-gating fix) — with all applicable collapse sentinels
+   healthy.
 2. **Ablation (P9-002):** a component earns its place only if disabling it measurably
    degrades the P9 metric. A no-op ablation is a *finding* (dead weight, or a test
    too blind to see the component's value) — never silently passed.
@@ -67,9 +68,24 @@ then quantified it and found a second under-performer:
 | retrieval | −9.5 | harmful — corrupts multi-step planning |
 | exploit_penalty | +2.5 | negligible on this task |
 
-Both under-performers are recorded as findings (harmful retrieval; a near-negligible
+Both under-performers were recorded as findings (harmful retrieval; a near-negligible
 exploit penalty) rather than tuned away — the ablation is the standing tool that keeps
 "every part earns its place" honest.
+
+**Resolution (P9-007).** The harmful-retrieval finding was then fixed at its root, not
+worked around. Diagnosis: inside CEM rollouts the query is an imagined latent that, at
+depth, sits far from any real transition (median key-distance ~7× a real in-coverage
+query), so its nearest fact is fiction; substituting it — and marking the row `epistemic
+= 0`, which deleted the ADR-0006 exploit penalty exactly where the model was least
+reliable — *lured* the planner into the retrieval seam. Fix: **distance-gated retrieval**
+— substitute a fact only within a coverage-calibrated reliability radius, with honest
+distance-scaled epistemic instead of 0 (reliability = closeness, the P9-006 insight).
+Measured after the fix (median over seeds): retrieval marginal **−9.5 → −0.3**
+(negligible, safe — now a *gated* criterion), composed control **−23.6 → −9.7**, and the
+entangled exploit-penalty marginal recovered **−6.0 → −1.6**. The 1-step retrieval role
+(real states, in coverage) is unchanged. The whole-system layer thus did its full job:
+it *found* a naive-composition harm no single-phase gate could see, and the finding drove
+a principled fix that a per-part view would never have motivated.
 
 P9-003 then ran the capabilities on a **second, structurally different environment**
 (`PointMass`, 2D nonlinear-drag; obs_dim 3→4, action_dim 1→2) with the same core:
@@ -105,6 +121,9 @@ criteria (negative controls), that metamorphic invariants hold with no golden
 threshold, and that a bootstrap CI separates a real margin from noise. With it, "the
 gates measure the capability, not the artifact" is enforced, not hoped — the same
 discipline the ADR-0006 sentinels apply to the model, applied to the measurement.
-The remaining findings — retrieval *into planning* degrades control (a composition
-limit, distinct from its now-generalizing 1-step prediction), and a near-negligible
-exploit penalty — are the honest map of where the scaffold's real work remains.
+The naive-composition harms this layer surfaced — retrieval degrading multi-step control,
+and its entanglement with the exploit penalty — have since been driven to negligible by
+the P9-007 distance-gating fix (both now gated/near-zero marginals). What remains honest
+to say is narrower: retrieval into planning *earns little* on this task (a small negative
+marginal, safe but not load-bearing), and the exploit penalty is near-negligible here —
+the map of where the scaffold's real work remains.

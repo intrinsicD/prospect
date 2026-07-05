@@ -60,3 +60,20 @@ data, never instruction** — it must never override the agent's goals.
   Consequence for external tiers: a store must be provisioned dense enough for its key
   dimension, and retrieval benefit degrades gracefully (not catastrophically) as density
   falls. *(Added by P9-006.)*
+- **Retrieval into *planning* is distance-gated, not certainty-asserting** (P9-007).
+  Rule 2 makes retrieval an action the planner selects, so a retrieved fact substitutes
+  for the model's prediction *inside CEM rollouts*. Two failure modes were measured and
+  fixed. (1) At rollout depth the query is an *imagined* latent that wanders far from any
+  real transition (median key-distance ~7× that of a real in-coverage query), so its
+  nearest fact is fiction; substituting it corrupts multi-step optimisation — the P9-002
+  harmful marginal. (2) Marking a retrieved row `epistemic = 0` (certain) removed the
+  ADR-0006 exploit penalty exactly in the least-reliable region, *luring* CEM into the
+  retrieval seam. Rule: substitute a fact **only when it is within a reliability radius**
+  (calibrated to the store's coverage, as the epistemic gate is calibrated to the model's
+  scale), and carry **honest epistemic scaled by distance** (`epi × min(1, dist/radius)`),
+  never 0 — reliability *is* closeness (the P9-006 insight, now gating *whether* to
+  retrieve). Measured: retrieval-into-planning went from a −3.1 (and, at a stronger
+  exploit penalty, −15) marginal to −0.3 (negligible, safe); composed control improved
+  (−23.6 → −9.7) and the entangled exploit-penalty marginal recovered (−6.0 → −1.6). The
+  1-step P8/P9-006 retrieval role (queries are *real* states, in coverage) is unchanged:
+  `reliability_radius=None` keeps substitute-and-trust there. *(Added by P9-007.)*

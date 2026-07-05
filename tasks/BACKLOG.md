@@ -98,17 +98,21 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **P9-003** · `done` · R1,R4,R8 · Second environment (`PointMass`, 2D nonlinear-drag; obs 3→4, action 1→2) + cross-env generalization, folded into the P9 gate. **Prediction and planning generalize** with the same core (recalibrated eval params only). **Finding:** retrieval does NOT generalize (confidently-wrong OOD → gate never fires) — its benefit is env-dependent. Gate **P9 PASS**.
 - **P9-004** · `done` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening, as a standing `gate-overfit` sentinel (active from P9): 7 cheap checks — trivial solutions (always-retrieve, one-step options) FAIL their criteria; invariants hold (surprise decomposition exact, untrusted never overrides, log-prob peaks at mean); a bootstrap CI separates a real margin from noise. Sentinel **healthy**; P9 **PASS**.
 - **P9-005** · `done` · R1,R3,R4,R7,R8 · Distance-aware epistemic uncertainty — the fix for the P9-003 finding. Diagnosed: the tanh encoder saturates, so ensemble disagreement can't detect OOD (epi rose 1.75x while error rose 10x on PointMass). Fix: `encode` computes a pre-encoder OOD score on the standardized input (`LatentState.ood`), `predict` scales epistemic by it. Result: OOD epi-rise 1.75x→7.85x, epi-vs-error rank corr 0.52→0.80; **the uncertainty signal now generalizes** (folded into the P9 gate, floor 3.0, measured 8.8). **New finding (hypothesis, later disproved):** retrieval still doesn't generalize — P9-005 guessed the same saturation corrupts the retrieval *key* space; **P9-006 measured it and found it was store density, not the key.** ADR-0002 amended. Gate **P9 PASS**.
-- **P9-006** · `done` · R8,R1,R4 · Retrieval generalization via a dimension-adequate store — the fix for the P9-005 retrieval finding, and a correction of its cause. Measured: the latent key is fine (it even beats a raw standardized-input key); retrieval failed to generalize because the store was too *sparse* for its 6-D key space (the curse of dimensionality). Fix: `STORE_N` 1500→40000 (dimension-adequate); retrieval now generalizes (gated 0.0135 vs no-retrieval 0.0172, ~22% better) and is **gated** — the P9 cross-env check now covers prediction + planning + uncertainty + retrieval. ADR-0004 amended (curse-of-dimensionality consequence). **Standing finding:** retrieval *into planning* still degrades control (a composition limit, distinct from this 1-step-prediction fix). Gate **P9 PASS**.
+- **P9-006** · `done` · R8,R1,R4 · Retrieval generalization via a dimension-adequate store — the fix for the P9-005 retrieval finding, and a correction of its cause. Measured: the latent key is fine (it even beats a raw standardized-input key); retrieval failed to generalize because the store was too *sparse* for its 6-D key space (the curse of dimensionality). Fix: `STORE_N` 1500→40000 (dimension-adequate); retrieval now generalizes (gated 0.0135 vs no-retrieval 0.0172, ~22% better) and is **gated** — the P9 cross-env check now covers prediction + planning + uncertainty + retrieval. ADR-0004 amended (curse-of-dimensionality consequence). Gate **P9 PASS**.
+- **P9-007** · `done` · R1,R8,R4 · Retrieval-into-planning composition fix. Diagnosed the P9-002 harmful-retrieval marginal: inside CEM rollouts the query is an imagined latent far from any real fact (median key-dist ~7× a covered query), so the nearest fact is fiction, and marking the retrieved row `epi=0` deleted the exploit penalty exactly where the model was least reliable — luring CEM into the retrieval seam. Fix: **distance-gated retrieval** — substitute a fact only within a coverage-calibrated `reliability_radius`, with honest distance-scaled epistemic (never 0). Measured: retrieval marginal −3.1→**−0.3 (negligible, safe, now gated)**, composed control −23.6→−9.7, and the entangled exploit-penalty marginal −6.0→−1.6. ADR-0004 amended (composition rule). Gate **P9 PASS**.
 
-> **Phase 9** — P9-001..006 shipped (all fold into the P9 gate; `bench/SHIPPED` ratchets
+> **Phase 9** — P9-001..007 shipped (all fold into the P9 gate; `bench/SHIPPED` ratchets
 > P0–P9). The whole system is verified end-to-end (not just per part), a leave-one-out
 > ablation quantifies every component's marginal value, the core capabilities — now
 > *including the epistemic signal itself* (P9-005 distance-aware fix) *and retrieval*
 > (P9-006 dimension-adequate store) — generalize to a second environment, and a standing
-> `gate-overfit` sentinel keeps the gates from measuring artifacts or noise. Findings
-> surfaced and reported (not tuned away): retrieval *into planning* degrades control (a
-> composition limit, distinct from its now-generalizing 1-step prediction); the
-> exploit-penalty is negligible. P9-005's key-saturation guess for retrieval's
+> `gate-overfit` sentinel keeps the gates from measuring artifacts or noise. The
+> whole-system layer surfaced two naive-composition harms and then drove their fixes:
+> retrieval degrading multi-step control, and its entanglement with the exploit penalty,
+> both fixed by P9-007's distance-gating (retrieve into planning only trustworthy close
+> facts, honest distance-scaled epistemic) and now gated at negligible marginals. Honest
+> remainder: retrieval into planning earns little on this task (safe, not load-bearing);
+> the exploit-penalty is negligible. P9-005's key-saturation guess for retrieval's
 > non-generalization was measured and corrected to store density (curse of
 > dimensionality) in P9-006.
 
@@ -117,6 +121,8 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > whole system is validated as an assembled agent, each part is measured for its keep,
 > generalization is checked on a second environment — prediction, planning, the epistemic
 > signal (P9-005) AND retrieval (P9-006) all survive it — and the gates are guarded
-> against overfit and noise. The honest findings that remain (retrieval *into planning*
-> degrades control; the negligible exploit-penalty) are the map of where the scaffold's
-> real work remains.
+> against overfit and noise. The naive-composition harms the whole-system layer surfaced
+> (retrieval degrading control; its exploit-penalty entanglement) were driven to
+> negligible by P9-007's distance-gating. What remains honest to say is narrower:
+> retrieval into planning earns little here, and the exploit-penalty is negligible — the
+> map of where the scaffold's real work remains.
