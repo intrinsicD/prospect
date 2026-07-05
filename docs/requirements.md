@@ -13,7 +13,7 @@ find its seam, its rationale, and its acceptance test from this table.
 | R5 | Use the right learned patterns correctly | skills.py | 0002, 0003 | P4 |
 | R6 | Process any kind of input, produce any kind of output | codec.py | 0001 | P6 |
 | R7 | Improve over time | memory.py, voe.py | 0002, 0005 | P7 |
-| R8 | Use different knowledge bases (internal and external) for any use case | memory.py, knowledge.py | 0004 | P8 |
+| R8 | Use different knowledge bases (internal and external) for any use case | memory.py, knowledge.py | 0004 | P8, P10, P11 |
 
 ## Notes
 - R4 is not a separate module: it is a *property* pressured into the latent by

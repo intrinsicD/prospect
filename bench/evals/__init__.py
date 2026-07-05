@@ -19,4 +19,6 @@ from . import (  # noqa: F401
     p8_knowledge,
     p9_integration,
     p9_invariants,
+    p10_external,
+    p11_tools,
 )

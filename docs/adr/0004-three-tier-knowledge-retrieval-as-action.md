@@ -60,6 +60,41 @@ data, never instruction** — it must never override the agent's goals.
   Consequence for external tiers: a store must be provisioned dense enough for its key
   dimension, and retrieval benefit degrades gracefully (not catastrophically) as density
   falls. *(Added by P9-006.)*
+- **Rule 1 exercised — external knowledge enters through the codec** (P10-001). P8's
+  internal store answers with next-latents in the model's own space (digested
+  experience). The external tier (`knowledge.ExternalKnowledgeSource`) answers with raw
+  *content* — an observation the agent never sensed — which it must `codec.encode`
+  exactly like a first-party observation (rule 1, previously stated but untested). This
+  lets the agent use knowledge it cannot derive from experience: measured on a pendulum
+  OOD band the model can't extrapolate, codec-ingested external content cut 1-step MSE
+  3.4× vs the model alone, while corrupting the retrieved observation worsened it 50×
+  (the answer demonstrably flows through the codec). Two lessons composed: the external
+  KB is *complementary* (OOD-only), so misapplying it to a seen query returns an
+  irrelevant fact — which makes retrieval genuinely gated (not a trivial always-query
+  oracle), and requires the P9-007 **distance gate** as well as the uncertainty gate:
+  **consult** external knowledge when uncertain, **trust** a retrieved fact only when it
+  is close. *(Added by P10-001.)*
+- **The provenance defense holds for external content too** (P10-002). A poisoned
+  `UNTRUSTED` external source answering with corrupted *observations* over the same keys
+  is arbitrary garbage once encoded through the codec — there is nothing to inspect. The
+  P8-002 guarantee carries over unchanged: a trust-blind agent ingests it and does ~40×
+  worse than no-retrieval, while the provenance-respecting router (`min_trust` floor +
+  trust-ordered selection) never lets it override the model and trust-orders to a trusted
+  source when one is present. The defense is *who said it*, not *what it says*.
+  *(Added by P10-002.)*
+- **Rule 2 exercised — tool-use as a compute-as-action** (P11-001). The third tier is a
+  tool that *computes* its answer on demand (`knowledge.ToolSource`) — exact for any
+  query, no store or coverage limit, but each call carries a COST (`calls` is the signal).
+  So invoking it is an action gated by epistemic uncertainty AND cost: call the expensive
+  exact tool only where the cheap parametric model is unreliable. Measured with an exact
+  next-state oracle on the OOD band: the tool result (ingested through the codec, reusing
+  rule 1) cut 1-step MSE ~200× vs the model alone; uncertainty-gating spent an equal call
+  budget far better than random (it calls where the model error — hence the benefit — is
+  largest, not uniformly), and is the cost sweet spot — strictly better than never-calling
+  on error at strictly fewer calls than always-calling. Unlike the retrieval tiers,
+  correctness is never in question (the tool is exact); the *whole* decision is *when it
+  is worth calling*, which is exactly what "uncertainty-gated action" buys. *(Added by
+  P11-001.)*
 - **Retrieval into *planning* is distance-gated, not certainty-asserting** (P9-007).
   Rule 2 makes retrieval an action the planner selects, so a retrieved fact substitutes
   for the model's prediction *inside CEM rollouts*. Two failure modes were measured and

@@ -126,3 +126,26 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > negligible by P9-007's distance-gating. What remains honest to say is narrower:
 > retrieval into planning earns little here, and the exploit-penalty is negligible — the
 > map of where the scaffold's real work remains.
+
+## Phase 10 — external knowledge & tools (beyond the toy loop)
+> P0–P9 prove the predictive agent on toy control. Phase 10 opens the **external**
+> knowledge tier: knowledge the agent never experienced, entering through the codec
+> (ADR-0004 rule 1) — the step toward a real use case (R8). Option A (external knowledge
+> base) first; Option B (compute-as-action tools) is a later phase.
+
+- **P10-001** · `done` (capability; composite blocked pending P10-002) · R8,R6 · External knowledge through the codec. `ExternalKnowledgeSource` answers with raw content (an observation the agent never sensed) that it ingests via `codec.encode` (rule 1, first exercised), extending competence to an OOD band the model can't extrapolate: gated MSE 3.4× below model-alone, seen no-harm, corrupting the retrieved observation worsens it 50× (the answer flows through the codec). **Finding:** the uncertainty gate alone let seen false-consults fetch irrelevant OOD facts and hurt — the P9-007 distance gate is needed at the external tier too (consult-when-uncertain AND trust-when-close). Capability **MET**, all sentinels healthy; composite P10 BLOCKED pending P10-002.
+- **P10-002** · `done` · R8 · External-source trust robustness. A poisoned UNTRUSTED external source (corrupted observations over the same keys) is the attack surface: a trust-blind agent ingests it through the codec and does ~40× worse than no-retrieval (1.029 vs 0.0255); the provenance-respecting router never lets it override (stays 0.0255) and trust-orders to a trusted source to recover clean accuracy (0.0076). The defense is provenance, not content inspection (reuses P8-002). Composite **P10 PASS**.
+
+> **Phase 10 shipped** — `bench/SHIPPED` now ratchets P0–P10. The external knowledge tier
+> is live: the agent answers OOD queries it can't derive from experience by retrieving
+> external *content* and ingesting it through the codec (ADR-0004 rule 1, first
+> exercised), gated by uncertainty (when to consult) AND distance (P9-007 — when to
+> trust), and provenance keeps a poisoned source from ever overriding it. Next: Option B
+> (compute-as-action tools, `ToolSource`) and/or a real (non-toy) environment.
+
+## Phase 11 — compute-as-action tools
+> The third knowledge tier (ADR-0004 rule 2): a tool the agent *calls*. Unlike a lookup
+> KB, a tool **computes** its answer — exact for any query, but each call costs. So the
+> decision is cleanly about uncertainty AND cost.
+
+- **P11-001** · `done` · R8,R1 · Compute-as-action tools. `ToolSource` wraps a harness-supplied compute function (an exact next-state oracle) and counts calls (the cost signal); the tool result ingests through the codec (reusing P10). Uncertainty-gated tool-use: on OOD the tool beats the model ~200×; the uncertainty signal spends an equal call budget far better than random (it calls where model error — the benefit — is largest); and gating is the cost sweet spot (better than never-calling, fewer calls than always-calling). Gate **P11 PASS**; ships (`bench/SHIPPED` ratchets P0–P11).
