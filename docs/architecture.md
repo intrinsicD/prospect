@@ -107,9 +107,12 @@ retrieval and tool-use as actions the planner selects, gated by uncertainty. See
 - **Composing parts that each pass their own gate can still fail as a whole** — the
   reason Phase 9 validates the assembled agent, not just the components (ADR-0008).
 - **Single-environment overfit** — capabilities are validated on a *second*,
-  structurally different environment (`PointMass`, P9-003): prediction and planning
-  generalize with the same core, but retrieval's benefit is env-dependent (the
-  uncertainty signal must be OOD-sensitive, which it is not everywhere — ADR-0002/0008).
+  structurally different environment (`PointMass`, P9-003): prediction, planning, the
+  uncertainty signal (P9-005 distance-aware fix), and uncertainty-gated retrieval
+  (P9-006, given a dimension-adequate store — retrieval-as-lookup obeys the curse of
+  dimensionality) all generalize with the same core. What does *not* generalize cleanly
+  is retrieval *into planning*: it helps 1-step prediction yet degrades multi-step
+  control — a composition limit, recorded not tuned away (ADR-0004/0008).
 
 Each is named in the relevant ADR and gated by a benchmark; the collapse modes are
 additionally guarded by standing integrity **sentinels** (ADR-0006), because they hide

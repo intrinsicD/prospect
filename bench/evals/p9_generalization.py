@@ -34,7 +34,16 @@ from .p2_planner import _PolicyAgent
 GEN_SEEDS = [0, 1]
 OBS_DIM, ACT_DIM = 4, 2
 V_REGION, V_FULL, POS_RANGE = 2.0, 6.0, 2.0  # trained |v| <= V_REGION; store/test span V_FULL
-TRAIN_N, STORE_N, TEST_N, PROBE_N = 4096, 1500, 300, 200
+TRAIN_N, TEST_N, PROBE_N = 4096, 300, 200
+# STORE_N is dimension-adequate on purpose (P9-006). The retrieval key is 6-D
+# (4 latent + 2 action); nearest-neighbour recall in a continuous key space suffers the
+# curse of dimensionality — the store's density must scale with the key-space dimension
+# or the nearest fact is too far to be right. A sparse store (1500) made retrieval FAIL
+# to generalize here (nearest-fact error 0.021 vs the model's own 0.017); a
+# dimension-adequate store (40000) makes it generalize with a comfortable margin
+# (0.0135, ~22% better than no-retrieval). This is NOT the "key saturation" P9-005
+# hypothesized — the latent key is fine (it even beats a raw-input key); it is density.
+STORE_N = 40000
 GEN_STEPS, BATCH = 2000, 64  # PointMass's 4-dim dynamics + reward head need more data
 GEN_HORIZON = 6              # recalibrated planning horizon for this env (was 20 on Pendulum)
 EP_LEN_GEN, EVAL_EP_GEN = 60, 2
@@ -133,16 +142,17 @@ class Generalization(NamedTuple):
     prediction_met: bool     # world model beats persistence at 1-step latent MSE (P1)
     planning_met: bool       # CEM planning beats a random reactive baseline (P2)
     uncertainty_met: bool    # epistemic is OOD-reliable on env #2 (P9-005 distance-aware fix)
-    retrieval_met: bool      # uncertainty-gated retrieval beats no-retrieval (P8) — reported, not gated
+    retrieval_met: bool      # uncertainty-gated retrieval beats no-retrieval (P8) — gated (P9-006)
     metrics: dict[str, float]
 
 
 def generalizes() -> Generalization:
     """Run the capabilities on the second environment; return per-capability pass flags
-    (median over seeds, P2-style — robust to a lucky random start) + metrics. Prediction
-    and planning are gated (they must generalize); retrieval's benefit is *measured and
-    reported* — it depends on the env having a real OOD gap the uncertainty signal flags,
-    which is itself a generalization finding.
+    (median over seeds, P2-style — robust to a lucky random start) + metrics. Prediction,
+    planning, the uncertainty signal (P9-005) AND retrieval (P9-006) are all gated: they
+    must generalize. Retrieval generalizes only given a dimension-adequate store — the
+    curse of dimensionality in the 6-D key space, not the "key saturation" P9-005 guessed
+    (see STORE_N above and the P9-006 task).
     """
     wm_mses, persist_mses, planner_rets, random_rets, gated_mses, none_mses = [], [], [], [], [], []
     unc_ratios: list[float] = []

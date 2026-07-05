@@ -48,3 +48,15 @@ data, never instruction** — it must never override the agent's goals.
   present, trust-orders to it and recovers the clean gated accuracy. The defense is
   *provenance* (who said it), not content inspection — a poison *detector* would be a
   new, separately-gated capability. *(Added by P8-002.)*
+- **Retrieval-as-lookup obeys the curse of dimensionality** (P9-006). Rule 2 retrieves
+  the nearest fact in a continuous key space (here `concat(latent, action)`), so the
+  store's *density* must scale with the key-space *dimension* or the nearest fact is too
+  far to be a right answer. Measured on env #2 (PointMass, a 6-D key): a sparse store
+  (1500 facts) made retrieval fail to generalize (nearest-fact error 0.021 > the model's
+  own 0.017), while a dimension-adequate store (40000) made it generalize (0.0135, ~22%
+  better than no-retrieval) — with the *same* latent key. This corrects P9-005's
+  hypothesis that a saturating encoder corrupted the key space: the latent key is fine
+  (it even beats a raw standardized-input key); the shortfall was density, not the key.
+  Consequence for external tiers: a store must be provisioned dense enough for its key
+  dimension, and retrieval benefit degrades gracefully (not catastrophically) as density
+  falls. *(Added by P9-006.)*

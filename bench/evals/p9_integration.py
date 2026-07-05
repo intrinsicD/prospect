@@ -26,18 +26,23 @@ generalize to a second environment:
    by construction). Also carries all four collapse sentinels on run `p9`.
 3. **Ablation — the load-bearing part matters** (P9-002) — leave-one-out marginal
    control value (`composed - ablated`): planning must be load-bearing on every seed.
-4. **Generalizes to a 2nd environment** (P9-003, P9-005) — prediction (P1), planning
-   (P2), AND the epistemic uncertainty signal itself survive on `bench.envs.PointMass`,
-   a structurally different task, with the SAME core code (recalibrated eval params
-   only). The uncertainty signal generalizes thanks to the P9-005 distance-aware fix.
+4. **Generalizes to a 2nd environment** (P9-003, P9-005, P9-006) — prediction (P1),
+   planning (P2), the epistemic uncertainty signal itself (P9-005 distance-aware fix),
+   AND uncertainty-gated retrieval (P9-006, given a dimension-adequate store) all survive
+   on `bench.envs.PointMass`, a structurally different task, with the SAME core code
+   (recalibrated eval params only).
 
 MEASURED, NOT GATED — the findings (ADR-0008): (a) retrieval-into-planning has a
 *negative* ablation marginal (it helps 1-step prediction per P8 but overriding the
-planner's rollout dynamics corrupts multi-step optimisation); (b) retrieval still does
-NOT generalize to PointMass — now the gate fires (P9-005 fixed the uncertainty signal),
-but the same encoder saturation corrupts the retrieval *key* space, so OOD queries match
-wrong facts (a distinct follow-up); (c) the exploit-penalty is ~negligible. None is
-tuned away; each is a reported generalization/composition limit.
+planner's rollout dynamics corrupts multi-step optimisation) — a composition limit
+distinct from its 1-step-prediction generalization; (b) the exploit-penalty is
+~negligible. None is tuned away; each is a reported composition limit.
+
+NB (P9-006 correction): P9-005 hypothesized that retrieval failed to generalize because
+encoder saturation corrupted the *key* space. Measurement disproved that — the latent
+key is fine (it even beats a raw-input key). The real cause was store *density* vs
+key-space *dimensionality* (curse of dimensionality in 6-D); a dimension-adequate store
+makes retrieval generalize, and it is now gated in criterion 4.
 """
 from __future__ import annotations
 
@@ -199,11 +204,12 @@ def check_p9() -> GateResult:
 
     # P9-003 cross-environment generalization: the load-bearing capabilities must
     # survive on a SECOND, structurally different environment (PointMass) with the same
-    # core. Gate on prediction + planning generalizing; retrieval's generalization is
-    # recorded (its benefit is env-dependent — a finding).
+    # core. Gate on prediction + planning + the uncertainty signal (P9-005) AND retrieval
+    # (P9-006, given a dimension-adequate store) all generalizing.
     gen = generalizes()
     metrics |= gen.metrics
-    generalizes_met = gen.prediction_met and gen.planning_met and gen.uncertainty_met
+    generalizes_met = (gen.prediction_met and gen.planning_met and gen.uncertainty_met
+                       and gen.retrieval_met)
     metrics |= {"prediction_generalizes": float(gen.prediction_met),
                 "planning_generalizes": float(gen.planning_met),
                 "uncertainty_generalizes": float(gen.uncertainty_met),
@@ -229,15 +235,16 @@ def check_p9() -> GateResult:
     table = ", ".join(f"{c} {m:+.1f} ({classify(m)})" for c, m in marg_med.items())
     gen_note = (f"prediction {'✓' if gen.prediction_met else '✗'} + planning "
                 f"{'✓' if gen.planning_met else '✗'} + uncertainty "
-                f"{'✓' if gen.uncertainty_met else '✗'} generalize to a 2nd env (PointMass); "
-                f"retrieval {'✓' if gen.retrieval_met else '✗ (key-space saturation, P9-005)'}")
+                f"{'✓' if gen.uncertainty_met else '✗'} + retrieval "
+                f"{'✓' if gen.retrieval_met else '✗'} generalize to a 2nd env (PointMass)")
     detail = (
         f"composed agent controls end-to-end: return {composed_med:.1f} vs reactive "
         f"{reactive_med:.1f} ({'beats every seed' if controls_met else 'FAILS'}); one epistemic "
         f"signal drives exploit-mode AND retrieval in one run "
         f"({'MET' if one_signal_met else 'NOT MET'}). ablation marginal control value: {table}. "
-        f"cross-env: {gen_note}. FINDINGS: retrieval hurts control (marginal "
-        f"{marg_med['retrieval']:+.1f}) and does not generalize to PointMass — its value is "
-        f"env-dependent; exploit-penalty is negligible"
+        f"cross-env: {gen_note}. FINDINGS: retrieval hurts control-INTO-PLANNING (marginal "
+        f"{marg_med['retrieval']:+.1f}) — overriding rollout dynamics mid-CEM corrupts multi-step "
+        f"optimisation (distinct from its 1-step-prediction generalization, which P9-006 gates "
+        f"via a dimension-adequate store); exploit-penalty is negligible"
     )
     return GateResult(phase="P9", passed=passed, metrics=metrics, seeds=list(SEEDS), detail=detail)

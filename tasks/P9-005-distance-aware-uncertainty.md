@@ -20,9 +20,10 @@ that it generalizes.
 ## Non-goals
 - Not a new uncertainty *architecture* (no SNGP/GP/normalizing-flow) — the minimal
   distance-aware augmentation, earned by the measurement.
-- Not fixing retrieval-generalization: the same encoder saturation also corrupts the
-  retrieval *key* space (OOD queries match wrong facts), a distinct issue this task
-  surfaces as a finding, not solves.
+- Not fixing retrieval-generalization: this task surfaces it as a finding, not solves.
+  (**Correction, P9-006:** the finding below *hypothesized* encoder saturation corrupts
+  the retrieval key space. P9-006 measured it and disproved that — the latent key is
+  fine; the cause was store *density* vs key-space *dimensionality*. See P9-006.)
 - No change to `var`/`log_prob` (likelihood calibration stays the ensemble's).
 
 ## Interface to satisfy
@@ -60,7 +61,8 @@ unchanged. No new `Protocol`.
 ## Docs-sync checklist
 - [x] Status → `done`; before/after numbers recorded below.
 - [x] ADR-0002 amended (distance-aware epistemic).
-- [x] Backlog: P9-005 done; the retrieval-key-saturation follow-up recorded.
+- [x] Backlog: P9-005 done; the retrieval follow-up recorded (fixed in P9-006, which
+      corrected the key-saturation hypothesis to store density).
 
 ## Gate result
 `make gate PHASE=P9` → **PASS** with `uncertainty ✓ generalize` (high-error-decile
@@ -81,9 +83,12 @@ disagreement 60–120× median, up from ~18×) — the OOD probes now separate c
 
 **New findings surfaced by the fix (reported, not tuned away):**
 1. **Retrieval still doesn't generalize** — the gate now fires (uncertainty fixed), but
-   the same encoder saturation corrupts the retrieval *key* space, so OOD queries match
-   wrong in-region facts. A distinct follow-up (a non-saturating key space, or keys in a
-   pre-encoder feature).
+   retrieval still doesn't help. *Hypothesis (recorded, then tested):* the same encoder
+   saturation corrupts the retrieval *key* space, so OOD queries match wrong in-region
+   facts. **P9-006 disproved this** — the latent key is fine (it even beats a raw
+   standardized-input key); the real cause is store *density* vs key-space
+   *dimensionality* (curse of dimensionality). A dimension-adequate store makes retrieval
+   generalize, and it is now gated. See `tasks/P9-006-retrieval-generalization.md`.
 2. **The ablation shifted:** with OOD-aware epistemic, the exploit-penalty flipped from
    +2.5 (negligible) to **−6.0 (harmful)** — penalising the now-larger OOD epistemic
    steers the planner away from OOD too aggressively; retrieval's harm shrank to −3.1

@@ -78,13 +78,26 @@ P9-003 then ran the capabilities on a **second, structurally different environme
 |---|---|---|
 | prediction (P1) | WM 0.0011 vs persistence 0.0295 | generalizes |
 | planning (P2) | planner −15.5 vs random −52.8 | generalizes |
-| retrieval (P8) | gated 0.0183 vs no-retrieval 0.0172 | does NOT generalize |
+| uncertainty (P9-005) | high-error-decile epi 8.8× median | generalizes |
+| retrieval (P8) | gated 0.0135 vs no-retrieval 0.0172 | generalizes (dense store) |
 
 Prediction and planning generalize with only recalibrated eval params (no core change —
-that no core change is required is the result). **Retrieval does not generalize**: the
-ensemble is *confidently wrong* out-of-region on PointMass (epistemic barely rises, so
-the uncertainty gate rarely fires) — the ADR-0002 limitation, now shown to make
-retrieval's benefit env-dependent. A third finding, recorded not patched.
+that no core change is required is the result). Retrieval's story took two corrections
+before it generalized, both recorded honestly rather than patched silently:
+
+- **P9-003** found retrieval did *not* generalize (gated 0.0183 vs no-retrieval 0.0172).
+  Two causes were compounded. The first: the ensemble was *confidently wrong*
+  out-of-region on PointMass, so the uncertainty gate barely fired (the ADR-0002
+  limitation).
+- **P9-005** fixed that first cause (distance-aware epistemic) — the gate now fires
+  out-of-region — but retrieval *still* didn't help, and P9-005 **wrongly hypothesized**
+  the residual cause was encoder saturation corrupting the retrieval *key* space.
+- **P9-006** measured the residual cause and disproved the key-saturation hypothesis:
+  the latent key is fine (it even beats a raw standardized-input key). The real cause is
+  store **density vs key-space dimensionality** — the curse of dimensionality in the 6-D
+  key. A sparse store (1500 facts) leaves the nearest fact too far to be right; a
+  dimension-adequate store (40000) makes retrieval generalize (gated 0.0135, ~22% better
+  than no-retrieval). Retrieval is now **gated** in the P9 generalization check.
 
 Finally, P9-004 closed the phase by guarding the gates themselves: the standing
 `gate-overfit` sentinel (7 cheap checks) asserts that trivial solutions FAIL their
@@ -92,4 +105,6 @@ criteria (negative controls), that metamorphic invariants hold with no golden
 threshold, and that a bootstrap CI separates a real margin from noise. With it, "the
 gates measure the capability, not the artifact" is enforced, not hoped — the same
 discipline the ADR-0006 sentinels apply to the model, applied to the measurement.
-The three findings above are the honest map of where the scaffold's real work remains.
+The remaining findings — retrieval *into planning* degrades control (a composition
+limit, distinct from its now-generalizing 1-step prediction), and a near-negligible
+exploit penalty — are the honest map of where the scaffold's real work remains.
