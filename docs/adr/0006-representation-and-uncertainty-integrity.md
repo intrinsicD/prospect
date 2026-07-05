@@ -64,3 +64,11 @@ if its capability criterion passes **and** all applicable sentinels are healthy.
   *epistemic* (not raw) surprise in ADR-0002; **posterior collapse** applies only if a
   stochastic latent with a KL term is used, in which case add free-bits / KL-balancing
   at that time.
+- **Gate-overfit is itself a collapse mode** (of the *measurement*, not the model): a
+  calibrated gate can be satisfied by a trivial solution, or by a margin within seed
+  noise. P9-004 adds the standing `gate-overfit` sentinel (active from P9): each
+  capability criterion must REJECT its degenerate solution (always-retrieve, one-step
+  options), the metamorphic invariants must hold with no golden threshold, and a
+  bootstrap CI must separate a real margin from noise — the same "measured, not
+  assumed" discipline this ADR applies to the model, now applied to the gates.
+  *(Added by P9-004.)*

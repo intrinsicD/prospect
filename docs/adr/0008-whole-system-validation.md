@@ -85,3 +85,11 @@ that no core change is required is the result). **Retrieval does not generalize*
 ensemble is *confidently wrong* out-of-region on PointMass (epistemic barely rises, so
 the uncertainty gate rarely fires) — the ADR-0002 limitation, now shown to make
 retrieval's benefit env-dependent. A third finding, recorded not patched.
+
+Finally, P9-004 closed the phase by guarding the gates themselves: the standing
+`gate-overfit` sentinel (7 cheap checks) asserts that trivial solutions FAIL their
+criteria (negative controls), that metamorphic invariants hold with no golden
+threshold, and that a bootstrap CI separates a real margin from noise. With it, "the
+gates measure the capability, not the artifact" is enforced, not hoped — the same
+discipline the ADR-0006 sentinels apply to the model, applied to the measurement.
+The three findings above are the honest map of where the scaffold's real work remains.

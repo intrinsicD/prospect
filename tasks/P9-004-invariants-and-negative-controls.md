@@ -1,6 +1,6 @@
 # P9-004 — Metamorphic invariants, negative controls, statistics hardening
 
-- **Status:** blocked (P9-001)
+- **Status:** done
 - **Phase:** P9
 - **Requirements:** R1–R8 (guard the claims against gate-overfit and noise)
 - **ADRs:** ADR-0006 (integrity is enforced, not hoped), ADR-0008
@@ -36,20 +36,45 @@ assertions, per-gate negative controls, and effect-size/CI reporting. Registered
   a bootstrap CI; flag any gate whose margin sits within noise.
 
 ## Acceptance criteria
-- [ ] The metamorphic invariants hold across the relevant gates (unit + eval).
-- [ ] Each capability gate has a negative control its trivial solution fails.
-- [ ] Cheap gates report effect size + CI; no shipped gate passes within noise.
+- [ ] A `gate-overfit` sentinel (active from P9) runs a battery of negative controls +
+      metamorphic invariants + a bootstrap-CI check; healthy iff all hold.
+- [ ] Metamorphic invariants hold (surprise decomposition exact, untrusted never
+      overrides, log-prob peaks at the mean); negative controls reject their trivial
+      solution (always-retrieve, one-step options, ablation-no-over-credit).
+- [ ] `bootstrap_ci` distinguishes a real margin from noise; unit-tested.
 - [ ] `make test` green, `make lint` clean, `make typecheck` clean.
 
 ## Test plan
-- Unit: each invariant + each negative control as a focused assertion.
-- Eval: the `gate-overfit` sentinel runs with the phase gates.
+- Unit (tests/test_invariants.py): the whole battery holds; the bootstrap CI straddles
+  0 for noise and excludes it for a real margin.
+- Eval: `make gate PHASE=P9` — the `gate-overfit` sentinel runs (healthy).
 
 ## Docs-sync checklist
-- [ ] Status → `done`; invariant/negative-control results recorded below.
-- [ ] Register the `gate-overfit` sentinel in the sentinel table + smoke test.
-- [ ] ADR-0006 consequences note the negative-control discipline; ADR-0008 updated.
-- [ ] Backlog: P9-004 done.
+- [x] Status → `done`; battery result recorded below.
+- [x] Register the `gate-overfit` sentinel in the sentinel table + smoke test.
+- [x] ADR-0006 consequences note the negative-control discipline; ADR-0008 updated.
+- [x] Backlog: P9-004 done — Phase 9 complete.
 
 ## Gate result
-_not run yet_
+`make gate PHASE=P9`: the `gate-overfit` sentinel is **healthy** — 7 negative controls
++ metamorphic invariants hold, and it is correctly scoped (active from P9; absent from
+P8's sentinel set). P9 composite still **PASS** (five sentinels now healthy).
+
+Battery (all cheap, no training — stands in the ratchet):
+
+| Check | Kind | Guards |
+|---|---|---|
+| surprise-decomposition-exact | invariant | epistemic + aleatoric == total |
+| untrusted-never-overrides | invariant | untrusted content is data, never instruction |
+| log-prob-peaks-at-mean | invariant | the predicted distribution is well-formed |
+| always-retrieve-fails | negative control | the retrieval gate rejects blanket retrieval |
+| one-step-options-fail-diversity | negative control | option-diversity rejects one-step options |
+| ablation-no-over-credit | negative control | the ablation harness doesn't over-credit noise |
+| bootstrap-flags-noise | statistics | a within-noise margin is not significant |
+
+**P9-004 PASS — Phase 9 complete.** The suite is now guarded against its own two
+failure modes: a trivial solution can't pass a capability criterion (negative controls),
+and a margin within seed noise can't read as a pass (bootstrap CI). The metamorphic
+invariants catch malformed distributions/routing with no golden threshold. This is the
+standing complement to the findings P9-001..003 surfaced — the gates measure the
+capability, not the artifact.

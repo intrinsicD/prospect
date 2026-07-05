@@ -96,12 +96,19 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **P9-001** · `done` · R1–R8 · End-to-end integration gate. The composed agent controls the task (−19.4 vs random −73.1); in ONE run the single epistemic signal drives the planner's exploit coefficient AND retrieval; four sentinels healthy. Gate **P9 PASS** (shipped). **Finding:** retrieval-*into-planning* degrades control (−19.4 vs −8.1 off) — handed to P9-002.
 - **P9-002** · `done` · R1–R8 · Ablation harness (leave-one-out marginal control value), folded into the P9 gate. Verdicts: planning **+53.7 load-bearing** (gated every seed), retrieval **−9.5 harmful** (the P9-001 finding, quantified), exploit_penalty **+2.5 negligible**. Two under-performers surfaced as findings, not tuned away. Gate **P9 PASS**.
 - **P9-003** · `done` · R1,R4,R8 · Second environment (`PointMass`, 2D nonlinear-drag; obs 3→4, action 1→2) + cross-env generalization, folded into the P9 gate. **Prediction and planning generalize** with the same core (recalibrated eval params only). **Finding:** retrieval does NOT generalize (confidently-wrong OOD → gate never fires) — its benefit is env-dependent. Gate **P9 PASS**.
-- **P9-004** · `ready` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening: guard against gate-overfit (a trivial solution passing) and noise (a margin within seed variance). **(start here — last Phase 9 task.)**
+- **P9-004** · `done` · R1–R8 · Metamorphic invariants + per-gate negative controls + statistics hardening, as a standing `gate-overfit` sentinel (active from P9): 7 cheap checks — trivial solutions (always-retrieve, one-step options) FAIL their criteria; invariants hold (surprise decomposition exact, untrusted never overrides, log-prob peaks at mean); a bootstrap CI separates a real margin from noise. Sentinel **healthy**; P9 **PASS**.
 
-> **Phase 9 in progress** — P9-001 + P9-002 + P9-003 shipped (all fold into the P9
-> gate; `bench/SHIPPED` ratchets P0–P9). The whole system is verified end-to-end (not
-> just per part), the leave-one-out ablation quantifies every component's marginal
-> value, and the core capabilities are confirmed to generalize to a second environment.
-> Three findings surfaced and reported (not tuned away): retrieval hurts control, is
-> negligible-to-harmful, and does not generalize; the exploit-penalty is negligible.
-> Remaining: P9-004 (metamorphic invariants + negative controls).
+> **Phase 9 complete** — P9-001..004 all shipped (all fold into the P9 gate;
+> `bench/SHIPPED` ratchets P0–P9). The whole system is verified end-to-end (not just
+> per part), a leave-one-out ablation quantifies every component's marginal value, the
+> core capabilities generalize to a second environment, and a standing `gate-overfit`
+> sentinel keeps the gates from measuring artifacts or noise. Findings surfaced and
+> reported (not tuned away): retrieval hurts control, is negligible-to-harmful, and does
+> not generalize; the exploit-penalty is negligible.
+
+> **P0–P9 complete.** Every roadmap phase ships with a passing kill-gate and healthy
+> collapse sentinels; the ratchet re-runs all ten. Beyond the capabilities (P0–P8), the
+> whole system is validated as an assembled agent, each part is measured for its keep,
+> generalization is checked on a second environment, and the gates are guarded against
+> overfit and noise. The honest findings (retrieval's context-dependence, the negligible
+> exploit-penalty) are the map of where the scaffold's real work remains.

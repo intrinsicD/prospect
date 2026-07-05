@@ -73,6 +73,7 @@ def test_all_sentinels_registered() -> None:
         "uncertainty-reliability",
         "replay-fidelity",
         "option-diversity",
+        "gate-overfit",
     }
     assert set(bench.SENTINELS) == expected
     for sentinel in bench.SENTINELS.values():

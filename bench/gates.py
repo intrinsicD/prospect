@@ -223,6 +223,16 @@ _register_sentinel(
     "option duration stays above one step, and pairwise option outcome-distributions "
     "remain distinguishable.",
 )
+_register_sentinel(
+    "gate-overfit",
+    "a gate passing on a trivial/degenerate solution, or a margin within seed noise",
+    "P9",
+    "Each capability criterion REJECTS its trivial solution (always-retrieve, one-step "
+    "options, a persistence predictor), the named metamorphic invariants hold with no "
+    "golden threshold (surprise decomposition is exact, an untrusted source never "
+    "overrides, log-prob peaks at the mean), and a bootstrap CI distinguishes a real "
+    "margin from noise — so passing means the capability, not the artifact (P9-004).",
+)
 
 
 # --------------------------------------------------------------------------- #
