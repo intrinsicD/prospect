@@ -82,6 +82,19 @@ data, never instruction** — it must never override the agent's goals.
   trust-ordered selection) never lets it override the model and trust-orders to a trusted
   source when one is present. The defense is *who said it*, not *what it says*.
   *(Added by P10-002.)*
+- **Rule 2 exercised — tool-use as a compute-as-action** (P11-001). The third tier is a
+  tool that *computes* its answer on demand (`knowledge.ToolSource`) — exact for any
+  query, no store or coverage limit, but each call carries a COST (`calls` is the signal).
+  So invoking it is an action gated by epistemic uncertainty AND cost: call the expensive
+  exact tool only where the cheap parametric model is unreliable. Measured with an exact
+  next-state oracle on the OOD band: the tool result (ingested through the codec, reusing
+  rule 1) cut 1-step MSE ~200× vs the model alone; uncertainty-gating spent an equal call
+  budget far better than random (it calls where the model error — hence the benefit — is
+  largest, not uniformly), and is the cost sweet spot — strictly better than never-calling
+  on error at strictly fewer calls than always-calling. Unlike the retrieval tiers,
+  correctness is never in question (the tool is exact); the *whole* decision is *when it
+  is worth calling*, which is exactly what "uncertainty-gated action" buys. *(Added by
+  P11-001.)*
 - **Retrieval into *planning* is distance-gated, not certainty-asserting** (P9-007).
   Rule 2 makes retrieval an action the planner selects, so a retrieved fact substitutes
   for the model's prediction *inside CEM rollouts*. Two failure modes were measured and

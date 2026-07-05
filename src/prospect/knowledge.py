@@ -7,13 +7,17 @@ The **internal** tier is `memory.SemanticStore` (its read side *is* a `Knowledge
 P0-008) — distilled experience answered as next-latents in the model's own space. The
 **external** tier (`ExternalKnowledgeSource`, P10-001) answers with raw *content* the
 agent must encode through its codec (ADR-0004 rule 1) — knowledge it did not experience.
-`ToolSource` (compute-as-action) is a later phase. Tasks: P8-001, P8-002, P10-001.
+`ToolSource` (P11-001) *computes* its answer on demand (ADR-0004 rule 2) — exact for any
+query, but each call has a cost, so it is gated by uncertainty AND cost. Tasks: P8-001,
+P8-002, P10-001, P11-001.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 
-from .types import KnowledgeItem, Trust
+from .types import KnowledgeItem, Provenance, Trust
 
 
 class InternalKnowledgeSource:
@@ -74,14 +78,37 @@ class ExternalKnowledgeSource:
 
 
 class ToolSource:
-    """A tool call is a knowledge/action source with a predictable, modellable effect —
-    compute-as-action (uncertainty- and cost-gated). Deferred to a later phase.
+    """A tool call is a knowledge/action source that **computes** its answer on demand
+    (compute-as-action, ADR-0004 rule 2) rather than looking it up — exact for any query,
+    with no store or coverage limit, but each call has a COST. So it is worth invoking
+    only where the cheap parametric model is unreliable: tool-use is an action gated by
+    uncertainty AND cost (P11-001), not a blind pipeline.
+
+    Task-unspecific (core imports no task): the harness supplies `compute`, a
+    `query -> content` function (the actual tool — a simulator, solver, API). `query`
+    wraps the result with provenance and **counts the call** — `calls` is the cost signal
+    the harness reads. `content` is `(query, result)`, uniform with the other tiers, so a
+    computed result ingests through the codec exactly like a retrieved observation. `trust`
+    defaults to MEDIUM (a vetted tool). An unconfigured `ToolSource()` (no `compute`) still
+    satisfies the protocol shape but raises if queried.
 
     Contract: interfaces.KnowledgeSource.
     """
 
     name = "tool"
-    trust = Trust.MEDIUM
+
+    def __init__(
+        self, compute: Callable[[object], object] | None = None,
+        trust: Trust = Trust.MEDIUM, source: str = "tool",
+    ) -> None:
+        self._compute = compute
+        self.trust = trust
+        self._source = source
+        self.calls = 0
 
     def query(self, query: object) -> list[KnowledgeItem]:
-        raise NotImplementedError("compute-as-action tool tier is a later phase")
+        if self._compute is None:
+            raise NotImplementedError("ToolSource needs a harness-supplied compute function")
+        self.calls += 1  # the cost signal: one invocation
+        return [KnowledgeItem(content=(query, self._compute(query)),
+                              provenance=Provenance(source=self._source, trust=self.trust))]

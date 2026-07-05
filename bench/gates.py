@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
+PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"]
 
 
 def _phase_at_least(phase: str, floor: str) -> bool:
@@ -166,6 +166,17 @@ _register(
     "corrupted retrieved token yields a worse answer); AND retrieval stays robust to a "
     "poisoned/low-trust external source (provenance respected). All applicable collapse "
     "sentinels stay healthy.",
+)
+_register(
+    "P11",
+    "Compute-as-action tools",
+    "The agent calls a COMPUTE tool (an exact oracle, cost per call) as an action gated "
+    "by epistemic uncertainty (ADR-0004 rule 2): on out-of-distribution queries the tool "
+    "result (ingested through the codec) beats the model alone; the uncertainty signal "
+    "spends the call budget on the right queries (beats a random-gated baseline at equal "
+    "budget, calls concentrated on OOD); and uncertainty-gating is the cost sweet spot — "
+    "strictly better than never-calling on error AND strictly fewer calls than "
+    "always-calling. All applicable collapse sentinels stay healthy.",
 )
 
 

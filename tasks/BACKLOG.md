@@ -142,3 +142,10 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > exercised), gated by uncertainty (when to consult) AND distance (P9-007 — when to
 > trust), and provenance keeps a poisoned source from ever overriding it. Next: Option B
 > (compute-as-action tools, `ToolSource`) and/or a real (non-toy) environment.
+
+## Phase 11 — compute-as-action tools
+> The third knowledge tier (ADR-0004 rule 2): a tool the agent *calls*. Unlike a lookup
+> KB, a tool **computes** its answer — exact for any query, but each call costs. So the
+> decision is cleanly about uncertainty AND cost.
+
+- **P11-001** · `done` · R8,R1 · Compute-as-action tools. `ToolSource` wraps a harness-supplied compute function (an exact next-state oracle) and counts calls (the cost signal); the tool result ingests through the codec (reusing P10). Uncertainty-gated tool-use: on OOD the tool beats the model ~200×; the uncertainty signal spends an equal call budget far better than random (it calls where model error — the benefit — is largest); and gating is the cost sweet spot (better than never-calling, fewer calls than always-calling). Gate **P11 PASS**; ships (`bench/SHIPPED` ratchets P0–P11).
