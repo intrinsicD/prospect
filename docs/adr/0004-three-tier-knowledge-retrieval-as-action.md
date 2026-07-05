@@ -60,6 +60,20 @@ data, never instruction** — it must never override the agent's goals.
   Consequence for external tiers: a store must be provisioned dense enough for its key
   dimension, and retrieval benefit degrades gracefully (not catastrophically) as density
   falls. *(Added by P9-006.)*
+- **Rule 1 exercised — external knowledge enters through the codec** (P10-001). P8's
+  internal store answers with next-latents in the model's own space (digested
+  experience). The external tier (`knowledge.ExternalKnowledgeSource`) answers with raw
+  *content* — an observation the agent never sensed — which it must `codec.encode`
+  exactly like a first-party observation (rule 1, previously stated but untested). This
+  lets the agent use knowledge it cannot derive from experience: measured on a pendulum
+  OOD band the model can't extrapolate, codec-ingested external content cut 1-step MSE
+  3.4× vs the model alone, while corrupting the retrieved observation worsened it 50×
+  (the answer demonstrably flows through the codec). Two lessons composed: the external
+  KB is *complementary* (OOD-only), so misapplying it to a seen query returns an
+  irrelevant fact — which makes retrieval genuinely gated (not a trivial always-query
+  oracle), and requires the P9-007 **distance gate** as well as the uncertainty gate:
+  **consult** external knowledge when uncertain, **trust** a retrieved fact only when it
+  is close. *(Added by P10-001.)*
 - **Retrieval into *planning* is distance-gated, not certainty-asserting** (P9-007).
   Rule 2 makes retrieval an action the planner selects, so a retrieved fact substitutes
   for the model's prediction *inside CEM rollouts*. Two failure modes were measured and

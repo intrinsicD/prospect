@@ -126,3 +126,12 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > negligible by P9-007's distance-gating. What remains honest to say is narrower:
 > retrieval into planning earns little here, and the exploit-penalty is negligible — the
 > map of where the scaffold's real work remains.
+
+## Phase 10 — external knowledge & tools (beyond the toy loop)
+> P0–P9 prove the predictive agent on toy control. Phase 10 opens the **external**
+> knowledge tier: knowledge the agent never experienced, entering through the codec
+> (ADR-0004 rule 1) — the step toward a real use case (R8). Option A (external knowledge
+> base) first; Option B (compute-as-action tools) is a later phase.
+
+- **P10-001** · `done` (capability; composite blocked pending P10-002) · R8,R6 · External knowledge through the codec. `ExternalKnowledgeSource` answers with raw content (an observation the agent never sensed) that it ingests via `codec.encode` (rule 1, first exercised), extending competence to an OOD band the model can't extrapolate: gated MSE 3.4× below model-alone, seen no-harm, corrupting the retrieved observation worsens it 50× (the answer flows through the codec). **Finding:** the uncertainty gate alone let seen false-consults fetch irrelevant OOD facts and hurt — the P9-007 distance gate is needed at the external tier too (consult-when-uncertain AND trust-when-close). Capability **MET**, all sentinels healthy; composite P10 BLOCKED pending P10-002.
+- **P10-002** · `backlog` · R8 · External-source trust robustness: a poisoned/UNTRUSTED external source must never override the model (reuse P8-002 trust-ordering + `min_trust` floor, now over content-through-codec). Completes the composite P10 gate to PASS and ships P10 (adds it to `bench/SHIPPED`).

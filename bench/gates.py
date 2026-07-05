@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
+PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
 
 
 def _phase_at_least(phase: str, floor: str) -> bool:
@@ -153,6 +153,19 @@ _register(
     "reported finding); the core capabilities (prediction, planning, AND the epistemic "
     "uncertainty signal itself) generalize to a second, structurally different "
     "environment with the same core; and all applicable collapse sentinels stay healthy.",
+)
+_register(
+    "P10",
+    "External knowledge through the codec",
+    "The agent uses an EXTERNAL knowledge base to answer queries its parametric model "
+    "cannot derive from experience: on out-of-distribution queries, uncertainty-gated "
+    "retrieval of external CONTENT ingested through the codec (ADR-0004 rule 1) beats the "
+    "model alone, while staying no worse where the model is already competent; the "
+    "uncertainty signal spends external calls on the right queries (beats a random-gated "
+    "baseline at equal budget); the answer demonstrably flows through the codec (a "
+    "corrupted retrieved token yields a worse answer); AND retrieval stays robust to a "
+    "poisoned/low-trust external source (provenance respected). All applicable collapse "
+    "sentinels stay healthy.",
 )
 
 
