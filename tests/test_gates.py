@@ -39,22 +39,22 @@ def test_gate_check_replaces_pending_and_report_persists(tmp_path: Path) -> None
 
 def test_registering_unknown_phase_or_sentinel_fails() -> None:
     with pytest.raises(KeyError, match="unknown phase"):
-        gate_check("P9")
+        gate_check("P99")  # a phase that does not exist (P9 is now real)
     with pytest.raises(KeyError, match="unknown sentinel"):
         sentinel_check("nonexistent-sentinel")
 
 
 def test_run_gate_unknown_phase_lists_known(tmp_path: Path) -> None:
     with pytest.raises(KeyError, match="known phases"):
-        bench.run_gate("P9", results_dir=tmp_path)
+        bench.run_gate("P99", results_dir=tmp_path)
 
 
 def test_cli_is_friendly_without_traceback(capsys: pytest.CaptureFixture[str]) -> None:
     assert main([]) == 2
     assert "usage" in capsys.readouterr().out.lower()
-    assert main(["P9"]) == 2
+    assert main(["P99"]) == 2
     out = capsys.readouterr().out
-    assert "P9" in out and "P1" in out
+    assert "P99" in out and "P1" in out
 
 
 @pytest.mark.skipif(

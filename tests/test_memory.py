@@ -8,7 +8,12 @@ import numpy as np
 import pytest
 
 from prospect import interfaces
-from prospect.memory import ReplayBuffer, SemanticStore, UncertaintyMemoryRouter
+from prospect.memory import (
+    ReplayBuffer,
+    RetrievalAugmentedWorldModel,
+    SemanticStore,
+    UncertaintyMemoryRouter,
+)
 from prospect.types import (
     Action,
     KnowledgeItem,
@@ -188,3 +193,35 @@ def test_store_and_router_satisfy_protocols() -> None:
     assert isinstance(SemanticStore(), interfaces.SemanticMemory)
     assert isinstance(SemanticStore(), interfaces.KnowledgeSource)
     assert isinstance(UncertaintyMemoryRouter(), interfaces.MemoryRouter)
+
+
+class _EpiModel:
+    """Protocol-only base world model (P9-001 test): fixed epistemic; predict bumps
+    dim-0 by 1, so the base prediction is distinguishable from a retrieved fact."""
+
+    def __init__(self, epistemic: float) -> None:
+        self._epi = epistemic
+
+    def predict(self, state: LatentState, action: Action) -> Prediction:
+        return Prediction(mean=np.asarray(state.z, dtype=float) + np.array([1.0, 0.0]),
+                          var=np.ones(2), epistemic=self._epi, aleatoric=0.1)
+
+    def imagine(self, state: LatentState, actions: Sequence[Action]) -> list[Prediction]:
+        return [self.predict(state, a) for a in actions]
+
+
+def test_retrieval_augments_only_when_uncertain() -> None:  # P9-001
+    store = SemanticStore()
+    store.write(_fact([0.0, 0.0, 0.5], [9.0, 9.0]))  # key = latent(2) + action(1)
+    router = UncertaintyMemoryRouter([store], threshold=0.5)
+    state, action = LatentState(z=np.array([0.0, 0.0])), Action(data=np.array([0.5]))
+
+    confident = RetrievalAugmentedWorldModel(_EpiModel(0.2), router)  # 0.2 <= 0.5
+    passthrough = confident.predict(state, action)
+    assert list(passthrough.mean) == [1.0, 0.0] and confident.retrievals == 0  # base, no retrieval
+
+    uncertain = RetrievalAugmentedWorldModel(_EpiModel(0.9), router)  # 0.9 > 0.5 -> retrieve
+    corrected = uncertain.predict(state, action)
+    assert list(corrected.mean) == [9.0, 9.0]  # the retrieved fact stands in for the guess
+    assert corrected.epistemic == 0.0 and uncertain.retrievals == 1 and uncertain.calls == 1
+    assert isinstance(uncertain, interfaces.WorldModel)

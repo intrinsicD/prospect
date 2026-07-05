@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from .interfaces import KnowledgeSource, WorldModel
-from .types import KnowledgeItem, LatentState, Option, Transition, Trust
+from .types import Action, KnowledgeItem, LatentState, Option, Prediction, Transition, Trust
 
 
 class ReplayBuffer:
@@ -156,6 +156,7 @@ class SemanticStore:
         self.trust = trust
         self._items: list[KnowledgeItem] = []
         self._keys: list[np.ndarray] = []
+        self._matrix: np.ndarray | None = None  # cached key stack (read-heavy query path)
 
     def __len__(self) -> int:
         return len(self._items)
@@ -164,13 +165,21 @@ class SemanticStore:
         key, _ = item.content
         self._items.append(item)
         self._keys.append(np.asarray(key, dtype=float))
+        self._matrix = None  # invalidate; rebuilt lazily on the next query
+
+    def _key_matrix(self) -> np.ndarray:
+        # Stack once and reuse: a store is written once then queried many times (in
+        # planning, hundreds of thousands of times), so re-stacking per query is the
+        # difference between a fast gate and a hung one.
+        if self._matrix is None:
+            self._matrix = np.stack(self._keys)
+        return self._matrix
 
     def query(self, query: object) -> list[KnowledgeItem]:
         if not self._items:
             return []
         q = np.asarray(query, dtype=float)
-        keys = np.stack(self._keys)
-        nearest = int(np.argmin(np.sum((keys - q) ** 2, axis=1)))
+        nearest = int(np.argmin(np.sum((self._key_matrix() - q) ** 2, axis=1)))
         return [self._items[nearest]]
 
 
@@ -208,3 +217,78 @@ class UncertaintyMemoryRouter:
         if not eligible:
             return None  # nothing trusted enough to override the model's own prediction
         return max(eligible, key=lambda s: s.trust)  # trust-ordered; ties keep first
+
+
+class RetrievalAugmentedWorldModel:
+    """A `WorldModel` that patches its predictions with retrieved facts where it is
+    epistemically uncertain (P9-001) — retrieval-as-action (ADR-0004) applied to the
+    prediction the *planner* consumes, so retrieval extends the agent's competence
+    into regions its parametric model has not learned.
+
+    Wraps a base model + an `UncertaintyMemoryRouter`. For each (state, action): if the
+    base prediction's epistemic clears the router's gate, retrieve the nearest fact —
+    a next-latent in the base model's own space, keyed by `concat(latent, action)` — and
+    return it as a confident prediction; otherwise return the base prediction unchanged.
+    The planner (which duck-types `predict_batch`) plans over this transparently.
+
+    Contract: interfaces.WorldModel. `retrievals`/`calls` count the gated retrievals
+    (the run-level evidence that retrieval fired where the model was uncertain)."""
+
+    def __init__(self, base: WorldModel, router: UncertaintyMemoryRouter) -> None:
+        self._base = base
+        self._router = router
+        self.retrievals = 0
+        self.calls = 0
+
+    def predict(self, state: LatentState, action: Action) -> Prediction:
+        mean, var, epi, ale, rew = self._rows(
+            np.asarray(state.z, dtype=float).reshape(1, -1),
+            np.asarray(action.data, dtype=float).reshape(1, -1),
+        )
+        return Prediction(mean=mean[0], var=var[0], epistemic=float(epi[0]),
+                          aleatoric=float(ale[0]), reward=float(rew[0]))
+
+    def imagine(self, state: LatentState, actions: Sequence[Action]) -> list[Prediction]:
+        predictions: list[Prediction] = []
+        current = state
+        for action in actions:
+            prediction = self.predict(current, action)
+            predictions.append(prediction)
+            current = LatentState(z=prediction.mean)
+        return predictions
+
+    def predict_batch(
+        self, latents: np.ndarray, actions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        return self._rows(np.asarray(latents, dtype=float), np.asarray(actions, dtype=float))
+
+    def _rows(
+        self, latents: np.ndarray, actions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        batch = getattr(self._base, "predict_batch", None)
+        if batch is not None:
+            mean, var, epi, ale, rew = batch(latents, actions)
+            mean, epi = np.array(mean, dtype=float), np.array(epi, dtype=float)
+        else:  # protocol-only base: per-row predict()
+            preds = [self._base.predict(LatentState(z=z), Action(data=a))
+                     for z, a in zip(latents, actions, strict=True)]
+            mean = np.stack([np.asarray(p.mean, dtype=float) for p in preds])
+            var = np.stack([np.asarray(p.var, dtype=float) for p in preds])
+            epi = np.array([p.epistemic for p in preds], dtype=float)
+            ale = np.array([p.aleatoric for p in preds], dtype=float)
+            rew = np.array([p.reward for p in preds], dtype=float)
+        self.calls += len(latents)
+        # Which rows the router would retrieve for: gating is monotone in epistemic, so
+        # one route() probe fixes the selected source and the threshold — then the mask
+        # is vectorized and only the uncertain rows touch the store (the hot path).
+        source = self._router.route(None, float(np.max(epi)) if len(epi) else 0.0)
+        if source is None:
+            return mean, var, epi, ale, rew  # nothing uncertain enough / nothing trusted
+        for i in np.nonzero(epi > self._router.threshold)[0]:
+            items = source.query(np.concatenate([latents[i], actions[i]]))
+            if not items:
+                continue
+            mean[i] = np.asarray(items[0].content[1], dtype=float)
+            epi[i] = 0.0  # retrieved: the fact stands in for the model's guess
+            self.retrievals += 1
+        return mean, var, epi, ale, rew

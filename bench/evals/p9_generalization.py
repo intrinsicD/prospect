@@ -1,0 +1,212 @@
+"""P9-003 cross-environment generalization: re-run the load-bearing capabilities on a
+SECOND, structurally different environment (`bench.envs.PointMass`) with the SAME core
+code — only recalibrated thresholds. A capability that survives is real; one that
+collapses was a Pendulum artifact (ADR-0008).
+
+On PointMass (2D nonlinear-drag point mass, obs_dim=4, action_dim=2):
+- **prediction** — a world model beats a persistence baseline at 1-step latent MSE (P1);
+- **planning** — CEM planning beats a random reactive baseline at control (P2);
+- **retrieval** — uncertainty-gated retrieval beats no-retrieval at 1-step MSE (P8).
+
+The core is constructed with the env's dimensions and is otherwise untouched — the
+generalization test IS that no core change is needed. `generalizes()` returns per-
+capability pass flags + metrics; `check_p9` folds them into the P9 gate.
+"""
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import NamedTuple
+
+import numpy as np
+
+from prospect.agent import Agent
+from prospect.memory import SemanticStore, UncertaintyMemoryRouter
+from prospect.planning import FlatPlanner
+from prospect.types import Action, KnowledgeItem, LatentState, Observation, Provenance, Transition, Trust
+from prospect.world_model import FlatWorldModel
+
+from ..envs import PointMass
+from ..loop import run_episode
+from .p2_planner import _PolicyAgent
+
+GEN_SEEDS = [0, 1]
+OBS_DIM, ACT_DIM = 4, 2
+V_REGION, V_FULL, POS_RANGE = 2.0, 6.0, 2.0  # trained |v| <= V_REGION; store/test span V_FULL
+TRAIN_N, STORE_N, TEST_N, PROBE_N = 4096, 1500, 300, 200
+GEN_STEPS, BATCH = 2000, 64  # PointMass's 4-dim dynamics + reward head need more data
+GEN_HORIZON = 6              # recalibrated planning horizon for this env (was 20 on Pendulum)
+EP_LEN_GEN, EVAL_EP_GEN = 60, 2
+RETRIEVE_MULT_GEN = 2.0     # retrieve above 2x the max seen epistemic (P9 conservative gate)
+RETRIEVE_MARGIN = 1.2       # gated MSE must beat no-retrieval by at least this factor
+
+
+def _encoder(model: FlatWorldModel) -> Callable[[Observation], LatentState]:
+    def encode(obs: Observation) -> LatentState:
+        return model.encode(obs.data)
+
+    return encode
+
+
+def _region_data(v_max: float, n: int, seed: int) -> list[Transition]:
+    """Transitions with |vx|,|vy| <= v_max (positions in [-POS_RANGE, POS_RANGE]), placed
+    via set_state so the seen/OOD velocity boundary is exact."""
+    env = PointMass()
+    rng = np.random.default_rng(seed)
+    out: list[Transition] = []
+    for _ in range(n):
+        env.reset(seed=0)
+        obs = env.set_state(rng.uniform(-POS_RANGE, POS_RANGE), rng.uniform(-POS_RANGE, POS_RANGE),
+                            rng.uniform(-v_max, v_max), rng.uniform(-v_max, v_max))
+        action = Action(data=rng.uniform(-1.0, 1.0, size=ACT_DIM))
+        next_obs, reward, _ = env.step(action)
+        out.append(Transition(state=LatentState(z=obs.data), action=action,
+                              next_state=LatentState(z=next_obs.data), reward=reward))
+    return out
+
+
+def _key(model: FlatWorldModel, t: Transition) -> np.ndarray:
+    return np.concatenate([np.asarray(model.encode(t.state.z).z, dtype=float),
+                           np.asarray(t.action.data, dtype=float)])
+
+
+def _store(model: FlatWorldModel, facts: list[Transition]) -> SemanticStore:
+    """P8-style store: correct next-latent (target space) keyed by (latent, action)."""
+    store = SemanticStore()
+    for t in facts:
+        answer = np.asarray(model.encode_target(t.next_state.z).z, dtype=float)
+        store.write(KnowledgeItem(content=(_key(model, t), answer),
+                                  provenance=Provenance(source="reference", trust=Trust.HIGH)))
+    return store
+
+
+def _rollout(n: int, seed: int) -> list[Transition]:
+    """Random-action rollouts (the visited distribution) — the P1/P2 training regime,
+    resetting periodically for coverage. Distinct from `_region_data`'s exact-region
+    sampling, which the retrieval capability (P8) needs for its seen/OOD split."""
+    env = PointMass()
+    rng = np.random.default_rng(seed)
+    obs = env.reset(seed=seed)
+    out: list[Transition] = []
+    for i in range(n):
+        if i % 50 == 0:
+            obs = env.reset(seed=seed * 97 + i)
+        action = Action(data=rng.uniform(-1.0, 1.0, size=ACT_DIM))
+        next_obs, reward, _ = env.step(action)
+        out.append(Transition(state=LatentState(z=obs.data), action=action,
+                              next_state=LatentState(z=next_obs.data), reward=reward))
+        obs = next_obs
+    return out
+
+
+def _train(model: FlatWorldModel, data: list[Transition], seed: int) -> FlatWorldModel:
+    rng = np.random.default_rng(seed + 1)
+    for _ in range(GEN_STEPS):
+        idx = rng.integers(0, len(data), size=BATCH)
+        model.update([data[i] for i in idx])
+    return model
+
+
+def _fresh_model(seed: int) -> FlatWorldModel:
+    return FlatWorldModel(obs_dim=OBS_DIM, action_dim=ACT_DIM, seed=seed)
+
+
+def _random_agent(seed: int) -> _PolicyAgent:
+    rng = np.random.default_rng(seed + 700)
+
+    def policy(obs: Observation) -> Action:
+        return Action(data=rng.uniform(-1.0, 1.0, size=ACT_DIM))
+
+    return _PolicyAgent(policy)
+
+
+def _control_return(agent: object, seed: int) -> float:
+    return float(np.mean([
+        run_episode(PointMass(), agent, EP_LEN_GEN, 8000 + seed * 40 + e)[0]  # type: ignore[arg-type]
+        for e in range(EVAL_EP_GEN)
+    ]))
+
+
+class Generalization(NamedTuple):
+    prediction_met: bool  # world model beats persistence at 1-step latent MSE (P1)
+    planning_met: bool    # CEM planning beats a random reactive baseline (P2)
+    retrieval_met: bool   # uncertainty-gated retrieval beats no-retrieval (P8) — reported, not gated
+    metrics: dict[str, float]
+
+
+def generalizes() -> Generalization:
+    """Run the capabilities on the second environment; return per-capability pass flags
+    (median over seeds, P2-style — robust to a lucky random start) + metrics. Prediction
+    and planning are gated (they must generalize); retrieval's benefit is *measured and
+    reported* — it depends on the env having a real OOD gap the uncertainty signal flags,
+    which is itself a generalization finding.
+    """
+    wm_mses, persist_mses, planner_rets, random_rets, gated_mses, none_mses = [], [], [], [], [], []
+    metrics: dict[str, float] = {}
+    for seed in GEN_SEEDS:
+        # P1 + P2: one model on the visited distribution (random rollouts).
+        model = _train(_fresh_model(seed), _rollout(TRAIN_N, seed), seed)
+        heldout = _rollout(PROBE_N, seed + 300)
+
+        # 1. prediction beats a persistence baseline (P1)
+        wm_err, persist_err = [], []
+        for t in heldout:
+            target = np.asarray(model.encode_target(t.next_state.z).z, dtype=float)
+            pred_mean = np.asarray(model.predict(model.encode(t.state.z), t.action).mean, dtype=float)
+            persist = np.asarray(model.encode_target(t.state.z).z, dtype=float)  # predict "no change"
+            wm_err.append(float(np.mean((pred_mean - target) ** 2)))
+            persist_err.append(float(np.mean((persist - target) ** 2)))
+        wm_mse, persist_mse = float(np.mean(wm_err)), float(np.mean(persist_err))
+        wm_mses.append(wm_mse)
+        persist_mses.append(persist_mse)
+
+        # 2. planning beats a random reactive baseline (P2)
+        planner = FlatPlanner(model, action_dim=ACT_DIM, action_low=-1.0, action_high=1.0,
+                              horizon=GEN_HORIZON, seed=seed)
+        planner_ret = _control_return(Agent(encode=_encoder(model), planner=planner), seed)
+        random_ret = _control_return(_random_agent(seed), seed)
+        planner_rets.append(planner_ret)
+        random_rets.append(random_ret)
+
+        # 3. uncertainty-gated retrieval beats no-retrieval (P8) — a SEPARATE model
+        # trained on a limited region so it is confident there and uncertain outside.
+        region_model = _train(_fresh_model(seed + 7), _region_data(V_REGION, TRAIN_N, seed), seed)
+        region_held = _region_data(V_REGION, PROBE_N, seed + 300)
+        store = _store(region_model, _region_data(V_FULL, STORE_N, seed + 50))
+        seen_epi = sorted(
+            region_model.predict(region_model.encode(t.state.z), t.action).epistemic for t in region_held)
+        router = UncertaintyMemoryRouter([store], threshold=RETRIEVE_MULT_GEN * seen_epi[-1])
+        none_err, gated_err, retrieved = [], [], 0
+        for t in _region_data(V_FULL, TEST_N, seed + 200):
+            pred = region_model.predict(region_model.encode(t.state.z), t.action)
+            target = np.asarray(region_model.encode_target(t.next_state.z).z, dtype=float)
+            parametric = np.asarray(pred.mean, dtype=float)
+            source = router.route(None, pred.epistemic)
+            gated = parametric
+            if source is not None:
+                gated = np.asarray(store.query(_key(region_model, t))[0].content[1], dtype=float)
+                retrieved += 1
+            none_err.append(float(np.mean((parametric - target) ** 2)))
+            gated_err.append(float(np.mean((gated - target) ** 2)))
+        none_mse, gated_mse = float(np.mean(none_err)), float(np.mean(gated_err))
+        gated_mses.append(gated_mse)
+        none_mses.append(none_mse)
+
+        metrics |= {
+            f"gen_wm_mse_s{seed}": wm_mse, f"gen_persist_mse_s{seed}": persist_mse,
+            f"gen_planner_return_s{seed}": planner_ret, f"gen_random_return_s{seed}": random_ret,
+            f"gen_retrieval_none_mse_s{seed}": none_mse, f"gen_retrieval_gated_mse_s{seed}": gated_mse,
+            f"gen_retrieval_rate_s{seed}": retrieved / TEST_N,
+        }
+    # Median criteria (P2-style, robust to a lucky random start on one seed).
+    wm_med, persist_med = float(np.median(wm_mses)), float(np.median(persist_mses))
+    planner_med, random_med = float(np.median(planner_rets)), float(np.median(random_rets))
+    gated_med, none_med = float(np.median(gated_mses)), float(np.median(none_mses))
+    metrics |= {"gen_wm_mse_median": wm_med, "gen_persist_mse_median": persist_med,
+                "gen_planner_return_median": planner_med, "gen_random_return_median": random_med,
+                "gen_retrieval_gated_mse_median": gated_med, "gen_retrieval_none_mse_median": none_med}
+    return Generalization(
+        prediction_met=wm_med < persist_med,
+        planning_met=planner_med > random_med,
+        retrieval_met=gated_med * RETRIEVE_MARGIN <= none_med,
+        metrics=metrics,
+    )

@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]
+PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
 
 
 def _phase_at_least(phase: str, floor: str) -> bool:
@@ -142,6 +142,18 @@ _register(
     "benchmark, AND performance is robust to a poisoned/low-trust source (provenance "
     "respected).",
 )
+_register(
+    "P9",
+    "Whole-system integration + ablation + generalization",
+    "The fully-composed agent works end-to-end through the composition root: it "
+    "controls better than a reactive baseline; within ONE run the single epistemic "
+    "signal both sets the planner's explore/exploit coefficient AND gates retrieval; "
+    "a leave-one-out ablation confirms the load-bearing component (planning) matters "
+    "(each component's marginal control value recorded — a harmful marginal is a "
+    "reported finding); the core capabilities (prediction, planning) generalize to a "
+    "second, structurally different environment with the same core; and all applicable "
+    "collapse sentinels stay healthy.",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -210,6 +222,16 @@ _register_sentinel(
     "Option-usage entropy stays above a floor (no single option dominates), mean "
     "option duration stays above one step, and pairwise option outcome-distributions "
     "remain distinguishable.",
+)
+_register_sentinel(
+    "gate-overfit",
+    "a gate passing on a trivial/degenerate solution, or a margin within seed noise",
+    "P9",
+    "Each capability criterion REJECTS its trivial solution (always-retrieve, one-step "
+    "options, a persistence predictor), the named metamorphic invariants hold with no "
+    "golden threshold (surprise decomposition is exact, an untrusted source never "
+    "overrides, log-prob peaks at the mean), and a bootstrap CI distinguishes a real "
+    "margin from noise — so passing means the capability, not the artifact (P9-004).",
 )
 
 
