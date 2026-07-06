@@ -33,7 +33,7 @@ criteria precise even while the eval body is a TODO.
 | Phase | Name | Key components | Kill-gate (one line) | Reqs |
 |-------|------|----------------|----------------------|------|
 | P12 | Swappable visual perception (first omni-modal seam) · **shipped** | frozen encoder → `UniversalCodec` VISION modality | the world model predicts over visual embeddings (48× better than persistence) and is surprised on novel frames (4.6×); a **better encoder swaps in** without retraining the core (1.05×, P0-011); built with deterministic stand-in encoders (CI numpy-only) — a real pretrained encoder swaps in via the same distill path | R6, R1, R3 |
-| P13 | Learn from passive observation | action-free world model + **latent-action inference** | learns dynamics **and** recovers hidden actions above chance from an action-free stream, and it **transfers** (watching first → faster competence) | R7, R1 |
+| P13 | Learn from passive observation · **shipped** | action-free world model + **latent-action inference** (ADR-0010) | from an action-free stream: learns dynamics (beats persistence), recovers the hidden actions above chance (decorrelation identifiability fix), and **transfers** in the low-data regime (watch-first beats from-scratch at a small labelled budget) | R7, R1 |
 | P14 | Observe → repeat (imitation) | planner + inferred latent actions + skill library | reproduces a demonstrated behavior the agent never performed itself (imitation-from-observation), then **explore** (P3-002) fills what watching can't teach | R5, R7 |
 
 ## Sequencing notes
