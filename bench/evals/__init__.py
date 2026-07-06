@@ -21,4 +21,5 @@ from . import (  # noqa: F401
     p9_invariants,
     p10_external,
     p11_tools,
+    p12_vision,
 )

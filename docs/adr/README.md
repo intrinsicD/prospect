@@ -15,3 +15,5 @@ Format: Status · Context · Decision · Consequences.
 | 0005 | Benchmark-gated incremental delivery | Accepted |
 | 0006 | Representation & uncertainty integrity (collapse prevention) | Accepted |
 | 0007 | Arbitration of the epistemic signal (explore/exploit modes) | Accepted |
+| 0008 | Whole-system validation (integration, ablation, generalization) | Accepted |
+| 0009 | Omni-modal seams: any modality in/out, specialized per deployment | Accepted |

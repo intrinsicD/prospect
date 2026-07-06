@@ -16,6 +16,7 @@ Array = Any
 class Modality(StrEnum):
     TEXT = "text"
     IMAGE = "image"
+    VISION = "vision"  # a frozen pretrained-encoder embedding of a frame (P12, ADR-0009)
     AUDIO = "audio"
     POINT_CLOUD = "point_cloud"
     STATE = "state"

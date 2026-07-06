@@ -149,3 +149,29 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > decision is cleanly about uncertainty AND cost.
 
 - **P11-001** · `done` · R8,R1 · Compute-as-action tools. `ToolSource` wraps a harness-supplied compute function (an exact next-state oracle) and counts calls (the cost signal); the tool result ingests through the codec (reusing P10). Uncertainty-gated tool-use: on OOD the tool beats the model ~200×; the uncertainty signal spends an equal call budget far better than random (it calls where model error — the benefit — is largest); and gating is the cost sweet spot (better than never-calling, fewer calls than always-calling). Gate **P11 PASS**; ships (`bench/SHIPPED` ratchets P0–P11).
+
+## Phase 12+ — omni-modal seams & learning from observation · ADR-0009 accepted
+> **Universal adaptable seams, specialized per deployment, one modality per gate**
+> (ADR-0009). The codec admits any input/output modality into the shared latent; a
+> deployment (private, industrial, science, robotics) instantiates and trains the subset it
+> needs — same architecture, specialized weights. Then the agent learns from watching
+> (observe→repeat→explore = ADR-0007's curriculum); the one genuinely new component is
+> **latent-action inference** (learning *behavior*, not just physics, from action-free
+> video). Honest walls: real modules need pretrained backends (harness-side, optional — the
+> core stays numpy over embeddings), and real-video *at scale* is a runtime concern, so
+> gates run on committed fixtures and scale is *demonstrated*, not gated. **Future seams,
+> each its own gate, added on demand:** audio · proprioception · force · text · time-series
+> · action-output modalities (motor, text) · true variable/missing-modality cross-attention.
+
+- **P12-001** · `done` · R6,R1,R3 · Swappable visual perception — **the first omni-modal seam**. A frozen encoder turns a frame into an embedding; the codec's VISION modality distils it into the shared latent; the world model predicts over what it sees (48× better than persistence) and is **surprised** on novel frames (4.6×); and a **second, different encoder swaps in without retraining the core** (1.05× — P0-011). Built Path B: deterministic stand-in encoders on rendered rotating-blob clips (pure numpy, CI stays numpy-only, no fixture files); a real pretrained encoder on real frames swaps in via the same distill path (the `[vision]` regen + live-webcam demo). Gate **P12 PASS**, all sentinels healthy; ships (`bench/SHIPPED` ratchets P0–P12). (ADR-0009.)
+
+> **Phase 12 shipped** — the first omni-modal seam is live: the agent sees through a
+> (swappable) frozen encoder and predicts over what it sees, understanding it *predictively*
+> (surprised when wrong). The mechanism — see → codec → shared latent → predict → swap →
+> surprise — is proven in a numpy gate; real vision (a pretrained encoder on real content)
+> and the live-webcam demo ride the same seam. Next in the arc: **P13 — learn from passive
+> observation** (action-free world model + latent-action inference), then P14 (observe →
+> repeat). Other seams (audio, proprioception, text, action-out, cross-attention) are
+> named future gates, added on demand.
+- **P13-001** · `backlog` · R7,R1 · Learn from passive observation: action-free world model + **latent-action inference** (infer the action between frames, Genie/LAPO-style) — learn dynamics AND behavior from a stream with no actions/rewards; gate transfer + latent-action recovery. Its own ADR when scoped.
+- **P14-001** · `backlog` · R5,R7 · Observe → repeat: reproduce a demonstrated behavior the agent never performed itself (imitation-from-observation) via the planner + inferred latent actions; **explore** (P3-002) then fills what watching can't teach. Runtime layer on top: real-YouTube ingestion + live-webcam demo (non-gated).

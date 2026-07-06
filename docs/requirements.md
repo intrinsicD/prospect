@@ -11,7 +11,7 @@ find its seam, its rationale, and its acceptance test from this table.
 | R3 | Use violation of expectation to test whether an action is learned | voe.py | 0002 | P3 |
 | R4 | Identify the right patterns in the input | world_model.py (latent), codec.py | 0001 | P1 |
 | R5 | Use the right learned patterns correctly | skills.py | 0002, 0003 | P4 |
-| R6 | Process any kind of input, produce any kind of output | codec.py | 0001 | P6 |
+| R6 | Process any kind of input, produce any kind of output | codec.py | 0001, 0009 | P6, P12 |
 | R7 | Improve over time | memory.py, voe.py | 0002, 0005 | P7 |
 | R8 | Use different knowledge bases (internal and external) for any use case | memory.py, knowledge.py | 0004 | P8, P10, P11 |
 
