@@ -173,5 +173,13 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > observation** (action-free world model + latent-action inference), then P14 (observe →
 > repeat). Other seams (audio, proprioception, text, action-out, cross-attention) are
 > named future gates, added on demand.
-- **P13-001** · `backlog` · R7,R1 · Learn from passive observation: action-free world model + **latent-action inference** (infer the action between frames, Genie/LAPO-style) — learn dynamics AND behavior from a stream with no actions/rewards; gate transfer + latent-action recovery. Its own ADR when scoped.
+- **P13-001** · `done` · R7,R1,R8 · Learn from passive observation via **latent-action inference** (ADR-0010). `observation.LatentActionModel`: an inverse model infers a bottlenecked latent action between consecutive observations, a forward model predicts forward from it; from an action-free, reward-free stream it learns dynamics (beats persistence) AND recovers the hidden actions. **The load-bearing fix:** a naive bottleneck captures a state-feature of the next obs, not the action (recovery R² 0.02); a **decorrelation penalty** (push the latent action uncorrelated with the current obs) lifts recovery to ~0.80 while keeping reconstruction >150× better than persistence. Transfer is a low-data-regime win (watch-first beats from-scratch at a small labelled budget; past ~60 labels direct learning catches up — the honest boundary). Gate **P13 PASS**, all sentinels healthy; ships.
+
+> **Phase 13 shipped** — the agent learns from *watching*: a predictive world model from an
+> action-free, reward-free observation stream, recovering the action structure (not just
+> physics) via latent-action inference with a decorrelation identifiability fix. This is the
+> observe half of observe→repeat→explore (ADR-0007's curriculum already arbitrates the
+> loop); the same code runs on state vectors now and visual embeddings (P12) for real video.
+> Next: **P14 — observe → repeat** (imitation-from-observation), then explore (P3-002) fills
+> what watching can't teach.
 - **P14-001** · `backlog` · R5,R7 · Observe → repeat: reproduce a demonstrated behavior the agent never performed itself (imitation-from-observation) via the planner + inferred latent actions; **explore** (P3-002) then fills what watching can't teach. Runtime layer on top: real-YouTube ingestion + live-webcam demo (non-gated).

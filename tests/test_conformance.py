@@ -16,6 +16,7 @@ from prospect.memory import (
     SemanticStore,
     UncertaintyMemoryRouter,
 )
+from prospect.observation import LatentActionModel
 from prospect.planning import FlatPlanner, HierarchicalManager, JumpyOptionModel
 from prospect.skills import SkillRouter
 from prospect.voe import LearningProgressCurriculum, SurpriseCompetenceMonitor
@@ -45,6 +46,7 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
     tunable: interfaces.UncertaintyTunable = FlatPlanner(FlatWorldModel())
     augmented: interfaces.WorldModel = RetrievalAugmentedWorldModel(
         FlatWorldModel(), UncertaintyMemoryRouter())
+    observer: interfaces.ObservationLearner = LatentActionModel(obs_dim=3)  # P13-001, ADR-0010
 
     for impl in (
         codec,
@@ -66,5 +68,6 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
         arbiter,
         tunable,
         augmented,
+        observer,
     ):
         assert impl is not None

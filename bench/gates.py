@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12"]
+PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"]
 
 
 def _phase_at_least(phase: str, floor: str) -> bool:
@@ -190,6 +190,17 @@ _register(
     "familiar ones (understanding = knowing what it did not expect). The gate runs over "
     "committed embedding fixtures (CI stays numpy-only); all applicable collapse sentinels "
     "stay healthy.",
+)
+_register(
+    "P13",
+    "Learn from passive observation (latent-action inference)",
+    "From a stream of observations with NO actions and NO rewards, the agent learns a "
+    "predictive model (a latent-action forward model beats a persistence baseline — it "
+    "learned dynamics by watching) AND recovers the hidden action structure above chance "
+    "(the decorrelated latent action decodes to the true action far better than a shuffled "
+    "control, ADR-0010); and watching first TRANSFERS — in the low-data regime a model "
+    "bootstrapped from action-free observation beats one trained from scratch at an equal "
+    "(small) action-labelled budget. All applicable collapse sentinels stay healthy.",
 )
 
 

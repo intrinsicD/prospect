@@ -22,4 +22,5 @@ from . import (  # noqa: F401
     p10_external,
     p11_tools,
     p12_vision,
+    p13_observation,
 )

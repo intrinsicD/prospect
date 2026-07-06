@@ -7,6 +7,7 @@ from typing import Protocol, runtime_checkable
 
 from .types import (
     Action,
+    Array,
     Competence,
     KnowledgeItem,
     LatentState,
@@ -50,6 +51,20 @@ class Learner(Protocol):
     option model (P5), the codec (P6)."""
 
     def update(self, batch: Sequence[Transition]) -> dict[str, float]: ...
+
+
+@runtime_checkable
+class ObservationLearner(Protocol):
+    """Learn dynamics from ACTION-FREE observation (R7, R8, ADR-0010): infer a latent
+    action between consecutive observations and predict forward from it — learning to
+    predict by watching, and recovering the action structure without ever seeing an
+    action. `observe()` is the action-free training verb (no `Transition`, no reward). The
+    decorrelation-for-identifiability detail lives in the implementation (ADR-0010).
+    Satisfied by `observation.LatentActionModel`."""
+
+    def infer_action(self, obs: Array, next_obs: Array) -> Array: ...
+    def predict(self, obs: Array, latent_action: Array) -> Array: ...
+    def observe(self, obs: Array, next_obs: Array) -> dict[str, float]: ...
 
 
 @runtime_checkable
