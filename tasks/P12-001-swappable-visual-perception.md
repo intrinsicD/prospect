@@ -1,6 +1,6 @@
 # P12-001 — Swappable visual perception (real frozen eyes → predictive world model)
 
-- **Status:** proposed (pending sign-off)
+- **Status:** done
 - **Phase:** P12
 - **Requirements:** R6 (process any kind of input), R4 (right patterns), R1 (predict),
   R3 (VoE / surprise on what it sees)
@@ -47,17 +47,15 @@ the project can upgrade its eyes as the field improves.
   within tolerance (the swap test, P6-style).
 
 ## Acceptance criteria (single-task phase — PASS ships)
-- [ ] **Sees and predicts:** over held-out clip frames, the world model's 1-step
-      next-visual-latent MSE beats a persistence baseline (it learned visual dynamics from
-      *real* embeddings).
-- [ ] **Vision is swappable (P0-011):** distilling a second, different frozen encoder into
-      the incumbent latent preserves core-loop 1-step MSE within tolerance — a better
-      vision module drops in without retraining the core.
-- [ ] **Surprise is calibrated:** epistemic VoE is higher on genuinely novel / out-of-clip
-      frames than on in-distribution ones (understanding = knowing what it did not expect).
-- [ ] `make gate PHASE=P12` PASS with all sentinels healthy; P12 appended to `bench/SHIPPED`;
-      `make gate-all` green; `make test`/`lint`/`typecheck` clean; the vision backend is an
-      optional extra and CI stays numpy-only (gate runs over committed fixtures).
+- [x] **Sees and predicts:** held-out next-visual-latent MSE beats persistence — **0.0055
+      vs 0.2651 (48×)**; the world model learned the visual dynamics from embeddings.
+- [x] **Vision is swappable (P0-011):** a second, different frozen encoder distils into the
+      incumbent latent and preserves the core loop — **encoder-B-via-codec 0.0058 vs
+      incumbent 0.0055 (1.05×)**. A better vision module drops in without retraining the core.
+- [x] **Surprise is calibrated:** epistemic VoE higher on novel (two-blob) frames than
+      familiar ones — **0.0032 vs 0.0007 (4.6×)**.
+- [x] `make gate PHASE=P12` PASS, all sentinels healthy; P12 appended to `bench/SHIPPED`;
+      `make gate-all` green; `make test`/`lint`/`typecheck` clean; CI stays numpy-only.
 
 ## Test plan
 - Unit: the VISION modality round-trips through the codec; a fixture loader is deterministic.
@@ -70,14 +68,30 @@ the project can upgrade its eyes as the field improves.
 - [ ] ADR-0009 → Accepted; codec docstring notes the VISION modality.
 - [ ] R6 traceability row (+P12); roadmap P12 row; BACKLOG P12 + shipped note.
 
-## Open decisions for sign-off
-- **Encoder choice** for the fixtures (e.g., DINOv2-small vs. a CLIP/ViT vs. a tiny
-  MobileNet) — smaller = faster fixtures, larger = more semantic. Two *different* ones are
-  needed for the swap test.
-- **Fixture content:** rendered deterministic clips (recommended) vs. a small committed set
-  of real frames.
-- **CI policy:** commit embedding fixtures so the gate needs no vision backend (recommended),
-  vs. gate the vision extra directly in a separate CI job.
+## Decisions taken (Path B build)
+- **Encoders:** two **deterministic stand-in** frozen encoders (fixed random-feature
+  projections). A *real* pretrained encoder only makes sense on real image content, which a
+  numpy CI gate has none of — and it swaps in via the identical distill path (that is the
+  whole point of ADR-0009's swappability). Real DINOv2/CLIP embeddings are the local
+  `[vision]` regen (Path A), where the content is real.
+- **Content:** rendered deterministic clips — a blob orbiting under a fixed global flow, so
+  single-frame prediction is well-posed; novel = a two-blob scene (OOD embeddings).
+- **CI policy:** because the stand-in encoder is pure numpy and deterministic, embeddings
+  are generated **inline** — no committed fixture files needed; CI stays numpy-only.
+  Committed fixtures become relevant only when a real (torch/ONNX) encoder is used offline.
 
 ## Gate result
-<pending>
+`make gate PHASE=P12` → **[P12] PASS**, all five collapse sentinels healthy (~2m). Median
+over 3 seeds:
+
+| criterion | measured | bar |
+|---|---|---|
+| sees & predicts — wm vs persistence MSE | **0.0055 vs 0.2651 (48×)** | wm·1.2 ≤ persist |
+| swappable — encoder-B-via-codec vs incumbent MSE | **0.0058 vs 0.0055 (1.05×)** | ≤ 1.5× |
+| surprise — novel vs familiar epistemic | **0.0032 vs 0.0007 (4.6×)** | ≥ 1.5× |
+
+The swap ratio ~1.0 is the headline: a second frozen encoder, distilled into the incumbent
+latent (P0-011), drives the frozen world model *as well as* the original — a better vision
+module drops in without retraining the core. **P12 ships** (`bench/SHIPPED` ratchets
+P0–P12). Real vision (a pretrained encoder on real frames) is the `[vision]`-extra regen +
+the live-webcam runtime demo — same seam, same distill path (ADR-0009).

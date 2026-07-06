@@ -87,3 +87,24 @@ def test_unknown_modality_and_query_fail_loudly() -> None:
         codec.encode(Observation(Modality.IMAGE, np.zeros(3)))
     with pytest.raises(KeyError, match="no decoder"):
         codec.decode(LatentState(z=np.zeros(8)), Modality.AUDIO)
+
+
+def test_vision_embedding_ingests_and_distils_into_the_latent() -> None:  # P12-001
+    """A VISION seam (a frozen-encoder embedding) is just another modality: it lands in
+    the shared latent and distils toward an incumbent latent (P0-011, ADR-0009)."""
+    codec = UniversalCodec({Modality.VISION: 16}, latent_dim=8, seed=0)
+    rng = np.random.default_rng(0)
+    emb = rng.normal(size=(96, 16))
+    target = np.tanh(emb[:, :8] * 0.7)  # a fixed incumbent latent to reproduce
+    assert len(codec.encode(Observation(Modality.VISION, emb[0])).z) == 8  # lands in the latent
+
+    def err() -> float:
+        return float(np.mean([np.mean((np.asarray(codec.encode(Observation(Modality.VISION, e)).z) - t) ** 2)
+                              for e, t in zip(emb, target, strict=True)]))
+
+    before = err()
+    fit = np.random.default_rng(1)
+    for _ in range(400):
+        idx = fit.integers(0, len(emb), 32)
+        codec.distill_encode(emb[idx], Modality.VISION, target[idx])
+    assert err() < before * 0.5  # the VISION adapter distils toward the incumbent latent

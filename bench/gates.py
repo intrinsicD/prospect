@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"]
+PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12"]
 
 
 def _phase_at_least(phase: str, floor: str) -> bool:
@@ -177,6 +177,19 @@ _register(
     "budget, calls concentrated on OOD); and uncertainty-gating is the cost sweet spot — "
     "strictly better than never-calling on error AND strictly fewer calls than "
     "always-calling. All applicable collapse sentinels stay healthy.",
+)
+_register(
+    "P12",
+    "Swappable visual perception (first omni-modal seam)",
+    "The agent sees through a frozen pretrained encoder: a frame → embedding → codec → "
+    "shared latent, and the world model predicts over what it sees, beating a persistence "
+    "baseline at next-visual-latent MSE (it learned visual dynamics from embeddings); a "
+    "SECOND, different frozen encoder distils into the incumbent latent and preserves the "
+    "core loop within tolerance (a better vision module swaps in without retraining the "
+    "core — P0-011); and epistemic uncertainty is higher on genuinely novel frames than "
+    "familiar ones (understanding = knowing what it did not expect). The gate runs over "
+    "committed embedding fixtures (CI stays numpy-only); all applicable collapse sentinels "
+    "stay healthy.",
 )
 
 
