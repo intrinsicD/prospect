@@ -13,16 +13,16 @@ expectation) is the single signal** that threads through learning, mastery-testi
 skill selection, re-planning, forgetting-detection and retrieval. Most requirements
 are *consumers* of that core, not separate systems. See `docs/architecture.md`.
 
-## Status — P0–P13 shipped; validated on toy benchmarks
+## Status — P0–P14 shipped; validated on toy benchmarks
 The design is realized, not skeletal. There are working numpy implementations of the
 flat world model (ensemble Gaussian latent dynamics with an epistemic/aleatoric split,
 EMA target encoder, anti-collapse regularization, inverse-dynamics + reward heads),
 CEM/MPC planning, the jumpy option-model and hierarchical manager, skills, replay,
 semantic memory + uncertainty-gated retrieval, the universal codec, external knowledge +
-compute-as-action tools, a swappable vision seam, and latent-action learning from
-action-free observation — plus five standing **collapse sentinels** (representation,
-uncertainty, replay, option, gate-overfit). `bench/SHIPPED` ratchets **P0–P13**;
-`make gate-all` re-runs every kill-gate in CI.
+compute-as-action tools, a swappable vision seam, latent-action learning from
+action-free observation, and imitation from observation (observe→repeat) — plus five
+standing **collapse sentinels** (representation, uncertainty, replay, option, gate-overfit).
+`bench/SHIPPED` ratchets **P0–P14**; `make gate-all` re-runs every kill-gate in CI.
 
 **Honest scope.** This is a disciplined *research scaffold*, validated on controlled toy
 benchmarks — pendulum, a 2D point-mass, and synthetic visual blobs with deterministic
@@ -51,10 +51,9 @@ make tree        # see the layout
 ## Where to start (as a human or an agent)
 1. Read `CLAUDE.md` — how work is done here.
 2. Read `docs/architecture.md`, `docs/requirements.md`, `docs/roadmap.md`.
-3. Take the top unblocked task in `tasks/BACKLOG.md`. Phases P0–P13 are shipped
-   (`bench/SHIPPED`); the current front is P14 (observe→repeat). For worked examples,
-   `tasks/P1-001-flat-world-model.md` shows an implementation phase and
-   `tasks/P13-001-learn-from-observation.md` a recent one.
+3. Take the top unblocked task in `tasks/BACKLOG.md`. Phases P0–P14 are shipped
+   (`bench/SHIPPED`). For worked examples, `tasks/P1-001-flat-world-model.md` shows an
+   implementation phase and `tasks/P14-001-observe-repeat-imitation.md` a recent one.
 
 ## Layout
 ```

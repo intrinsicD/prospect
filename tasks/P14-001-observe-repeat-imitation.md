@@ -1,18 +1,17 @@
 # P14-001 — Observe → repeat (imitation from observation)
 
-- **Status:** demonstrated (non-gated, on the hard-benchmark tier); numpy gate = follow-up
-- **Phase:** P14 (roadmap). Capability shown here on a real task; the numpy kill-gate that
-  formally ships P14 in the ratchet is the named follow-up (mirrors P12: gated on stand-ins,
-  real vision demonstrated off-gate).
+- **Status:** done — **numpy-gated (P14 shipped)** AND demonstrated on the real hard-benchmark tier
+- **Phase:** P14. `GATES["P14"]` PASS on a numpy swing-up task (ships in `bench/SHIPPED`,
+  ratchet green at 15 gates); the DMC swingup study is the non-gated real-task demonstration on
+  top (mirrors P12: gated on stand-ins, real vision demonstrated off-gate).
 - **Requirements:** R5 (use the right learned patterns — reproduce a skill), R7 (improve
   from watching)
 - **ADRs:** ADR-0012 (imitation-from-observation: action recovery to reproduce a demo),
-  ADR-0010 (latent-action inference — the arc-faithful recovery route), ADR-0007 (the
-  observe→repeat→explore curriculum), ADR-0011 (the non-gated tier this runs in)
+  ADR-0010 (latent-action inference + the `ground` reliability fix), ADR-0007 (the
+  observe→repeat→explore curriculum), ADR-0011 (the non-gated tier the DMC demo runs in)
 - **Depends on:** P13 (LatentActionModel), P2 (planner/MBRL baseline), BH-001 + the A study
   (which established that exploration alone can't crack swingup — the motivation)
-- **Phase gate:** none yet (non-gated demonstration). A numpy-gated toy imitation task is the
-  follow-up to ship P14 in `bench/SHIPPED`.
+- **Phase gate:** `bench/gates.py::GATES["P14"]` — a single-task phase; PASS ships it.
 
 ## Goal
 Reproduce a **demonstrated behaviour the agent never performed itself**, from the demo's
@@ -21,15 +20,18 @@ study proved exploration (even curiosity) cannot crack at feasible budgets. Then
 (P3-002) fills what watching can't teach.
 
 ## Non-goals
-- Not a numpy kill-gate (runs on dm_control, non-gated — ADR-0011). Shipping P14 in the
-  ratchet is a separate follow-up.
 - No expert *actions* used by the imitation routes — observations only (actions are oracle-only).
 - No claim of SOTA control; the ceiling here is a cloned reactive policy, not optimal control.
+- No world-model *planner* in the reproduction path (the roadmap's "planner + latent actions"
+  synthesis is a later refinement); reproduction is a cloned reactive policy for now.
 
-## Interface / where it lives
-- Harness only (task-specific → `bench/`): `bench/hard/imitation.py::run_imitation`. Reuses the
-  **unchanged** core: P13 `LatentActionModel`, `FlatWorldModel`/`FlatPlanner` (from-scratch
-  baseline), the `bench.Environment` seam. No `src/prospect/` change.
+## Interface to satisfy
+- Core: `imitation.ObservationImitator` (satisfies `interfaces.ImitationLearner`): `ground()`
+  learns action recovery from the agent's own labelled transitions (inverse dynamics),
+  `clone()` watches the demo's observations and fits a reactive policy, `act()` reproduces.
+  Also `LatentActionModel.ground()` (ADR-0010 amendment) — the P13 route's supervised grounding.
+- Numpy gate: `bench/evals/p14_imitation.py::check_p14` on `bench.envs.PendulumSwingup`.
+- Non-gated demo: `bench/hard/imitation.py::run_imitation` on DMC swingup (real task).
 
 ## Approach (brief)
 Watch an expert swingup (observations only) → **recover its actions from observation** at the
@@ -39,34 +41,41 @@ same interaction budget a from-scratch agent gets (grounding = the agent's own l
 calibration (arc-faithful, for the fully action-free limit). Guards: oracle clone (ceiling),
 shuffled-demo (negative control), from-scratch MBRL (same budget).
 
-## Acceptance criteria (demonstration — "done" = reproduces and is reported honestly)
-- [x] Reproduces swingup from observation, **beating from-scratch MBRL** and a **shuffled-demo**
-      negative control, approaching the oracle-clone ceiling — measured over ≥3 seeds.
-- [x] Both recovery routes reported; the P13 latent route's real-task variance stated honestly.
-- [x] Runs via `make bench-hard`; isolation intact (numpy CI untouched). Report in `bench/hard/results/`.
+## Acceptance criteria (single-task phase — PASS ships)
+- [x] **Reproduces the demo** it only watched: imitation score high (swings up).
+- [x] **Recovers actions from observation**: recovered demo actions match the true hidden
+      actions (R² ≥ floor) — recovery is real, not given.
+- [x] **Specific behaviour**: a shuffled-demo control collapses toward the floor (negative control).
+- [x] **Watching is what does it**: imitation beats cloning the agent's OWN random data by a margin.
+- [x] `make gate PHASE=P14` PASS, all sentinels healthy; P14 appended to `bench/SHIPPED`;
+      `make gate-all` green (15 gates); `make test`/`lint`/`typecheck` clean.
 
 ## Test plan
-- `bench/hard/imitation.py::run_imitation` (3 seeds) → the reproduction table + recovery R².
-- Consolidated report `bench/hard/results/BH-001-report.md` §B; `tests/test_bench_hard.py`
-  keeps the adapter covered (skips without the extra).
+- Numpy gate: `bench/evals/p14_imitation.py::check_p14` (3 seeds) — the four criteria + sentinels.
+- Unit: `tests/test_imitation.py` (ObservationImitator recovery + shapes); `tests/test_observation.py`
+  (`LatentActionModel.ground`). Conformance to `ImitationLearner` (`tests/test_conformance.py`).
+- Non-gated real-task demo: `bench/hard/imitation.py::run_imitation` (DMC swingup), report §B.
 
-## Result
-`make bench-hard` → report §B (dm_control 1.0.43, mujoco 3.10.0, numpy 2.4.6). Median over 3
-seeds, expert demo return 115.9, grounding budget 4096 (== from-scratch):
+## Gate result
+`make gate PHASE=P14` → **[P14] PASS**, all five sentinels healthy. Median over 3 seeds:
 
-| agent | swingup return | ×from-scratch |
+| criterion | measured | bar |
 |---|---|---|
-| imitation — inverse-dynamics | **45.3** | 7.1× |
-| imitation — latent-action (P13) | 14.0 (67 on seed 0; high-variance) | 2.2× |
-| oracle clone (true actions, ceiling) | 76.4 | 11.9× |
-| from-scratch MBRL (same budget) | 6.4 | 1× |
-| shuffled demo (neg control) | 0.1 | 0.0× |
+| reproduces the demo — imitation score | **0.99** | ≥ 0.6 |
+| recovers actions from observation — R² | **1.000** | ≥ 0.5 |
+| specific (shuffled-demo control) — score | **0.12** | ≤ 0.35 |
+| watching matters — imitation − clone-own-random | **1.00** | ≥ 0.4 |
 
-**Imitation from observation reproduces a swingup the agent never performed** — the inverse-
-dynamics route gets a stable 45.3 (7× from-scratch, ~59% of the oracle ceiling); the shuffled
-control collapses to 0.1 (it imitates the *specific* behaviour). This lands exactly where the A
-study said exploration fails: watching converts the same budget from failure (6.4) into swingup.
-**Honest weak spot:** the P13 latent-action route is high-variance on this real task (67 on one
-seed, ~10–14 on others) — grounding a 1-D latent to executable actions across the grounding→demo
-distribution shift is not yet reliable; the direct route is preferred when grounding labels exist
-(ADR-0012). Watching is a prior; **explore (P3-002) still closes what watching can't teach.**
+**P14 ships** (`bench/SHIPPED` ratchets P0–P14). The agent reproduces a swing-up it never
+performed, from an expert's observations + a little grounding; the shuffled control collapses
+and cloning its own random data fails — watching the *specific* expert is what does it.
+
+## Real-task demonstration (DMC swingup, non-gated) + the Part-2 reliability fix
+`make bench-hard` → report §B. Reproduces the DMC swingup (inverse-dynamics **45.3** vs
+from-scratch **6.4**, shuffled 0.1, oracle 76.4). The P13-based route was initially high-variance
+(the separate latent→action calibration extrapolated with a systematic bias — and recovery R²
+didn't even predict reproduction). **Fixed** by **watch-then-ground** (`LatentActionModel.ground`,
+ADR-0010 amendment): action-free pretraining then a supervised grounding step. Measured: in the
+**512-label regime it beats from-scratch inverse dynamics (46 vs 33)** — watching is a low-data
+prior for control; at full budget direct inverse dynamics is still best (the honest boundary).
+Watching is a prior; **explore (P3-002) still closes what watching can't teach.**

@@ -68,8 +68,8 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 ## Repo map
 - `src/prospect/interfaces.py` — the `Protocol` contracts (the seams you implement).
 - `src/prospect/types.py` — shared types; `Prediction` is the important one.
-- `src/prospect/{codec,world_model,planning,voe,skills,memory,knowledge,observation}.py`
-  — one component each, implemented through P13. The only remaining `NotImplementedError`s
+- `src/prospect/{codec,world_model,planning,voe,skills,memory,knowledge,observation,imitation}.py`
+  — one component each, implemented through P14. The only remaining `NotImplementedError`s
   are two intentional stubs: `InternalKnowledgeSource.query` (served by `memory.SemanticStore`)
   and an unconfigured `ToolSource` (raises until given a `compute`).
 - `src/prospect/agent.py` — the composition root: the act–observe loop the

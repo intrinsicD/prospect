@@ -58,8 +58,10 @@ def main() -> int:
     print(f"  A curiosity (swingup): MBRL random={np.median(curiosity.mbrl_random):.1f}  "
           f"curious={np.median(curiosity.mbrl_curious):.1f}")
     print(f"  B imitation (swingup): inverse-dyn={np.median(imitation.inverse_dyn):.1f}  "
-          f"latent(P13)={np.median(imitation.latent_action):.1f}  "
-          f"from-scratch={np.median(imitation.from_scratch):.1f}")
+          f"watch-ground(P13)={np.median(imitation.watch_ground):.1f}  "
+          f"from-scratch={np.median(imitation.from_scratch):.1f}  "
+          f"[{imitation.label_small}-label: inv={np.median(imitation.inverse_small):.1f} "
+          f"wg={np.median(imitation.watch_ground_small):.1f}]")
     return 0
 
 

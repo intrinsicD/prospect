@@ -41,13 +41,15 @@ same interaction budget. The deliverable is the measured report, not a gate.
   cannot: the observe→repeat step is real on a non-toy task.
 - (+) Completes the honest arc: A (exploration reaches the goal region but can't convert it
   to control) → B (a demonstration hands over the goal-reaching behaviour directly).
-- (−) **The P13 latent-action route is the weak link on a real task.** Measured: it matches
-  the direct route on a good seed but is high-variance across seeds — grounding a 1-D latent
-  to executable actions across a distribution shift (grounding states → the demo's upright
-  states) is not yet reliable. The direct inverse-dynamics route is more robust *when
-  grounding labels exist*; the latent route earns its keep only in the fully action-free
-  limit. Improving the latent route's real-task reliability (identifiability under
-  distribution shift) is named future work, not hidden.
+- The P13 latent route was initially the weak link — high-variance on swingup because its
+  separate latent→action *calibration* extrapolated with a systematic bias from bottom-heavy
+  grounding to the demo's upright states (and recovery R² did not even predict reproduction).
+  **Fixed** by **watch-then-ground** (`LatentActionModel.ground`, ADR-0010 amendment): action-
+  free pretraining then a supervised grounding step, so recovery is a reliable inverse map with
+  no calibration. Measured: it now **beats from-scratch inverse dynamics in the low-label
+  regime** (watching is a low-data prior for control); at full budget direct inverse dynamics
+  is still best (the honest boundary). The direct route remains the robust default when labels
+  are plentiful; watch-then-ground earns its keep when they are scarce — the video regime.
 - (−) This is **non-gated** (ADR-0011): a demonstration on cartpole, not a numpy-CI kill-gate.
   Formally shipping P14 in the ratchet needs a numpy-gated imitation task on a toy env — the
   natural follow-up, mirroring how P12 gated vision on stand-ins and demonstrated real vision

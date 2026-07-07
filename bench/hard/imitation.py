@@ -41,8 +41,9 @@ from .dmc_env import DMCEnvironment
 SEEDS = (0, 1, 2)
 DEMO_SEARCH_SEED, DEMO_SEED, DEMO_EP = 0, 123, 250
 N_GROUND = 4096          # agent's own labelled steps == the from-scratch budget
+N_LABEL_SMALL = 512      # the low-label regime where watching-first should help
 DEMO_POP, DEMO_GENS, DEMO_ELITES = 40, 30, 8
-CLONE_STEPS, CAL_STEPS, LAM_STEPS = 4000, 3000, 6000
+CLONE_STEPS, GROUND_STEPS, LAM_STEPS = 4000, 3000, 6000
 EVAL_EPISODES = 3
 
 
@@ -52,9 +53,12 @@ class ImitationResult:
     from_scratch: list[float]
     oracle: list[float]
     inverse_dyn: list[float]
-    latent_action: list[float]
+    watch_ground: list[float]              # P13 action-free pretrain + supervised grounding
     shuffled: list[float]
     recovery_r2: dict[str, float]          # median action-recovery R^2 per route
+    inverse_small: list[float]             # low-label (N_LABEL_SMALL) inverse-dynamics
+    watch_ground_small: list[float]        # low-label watch-then-ground (watching as a prior)
+    label_small: int = N_LABEL_SMALL
 
     def med(self, xs: list[float]) -> float:
         return float(np.median(xs))
@@ -113,27 +117,37 @@ def _r2(pred: np.ndarray, true: np.ndarray) -> float:
 
 
 def _recover_inverse(env: DMCEnvironment, g_o: np.ndarray, g_a: np.ndarray, g_o2: np.ndarray,
-                     demo_o: np.ndarray, demo_o2: np.ndarray, seed: int) -> np.ndarray:
-    """Direct inverse dynamics g(obs, next_obs) -> action, fit on grounding labels."""
+                     demo_o: np.ndarray, demo_o2: np.ndarray, seed: int,
+                     n_labels: int | None = None) -> np.ndarray:
+    """Direct inverse dynamics g(obs, next_obs) -> action, fit on `n_labels` grounding labels."""
+    n = n_labels or len(g_o)
     inv = _mlp_regress([2 * env.obs_dim, 64, env.action_dim],
-                       np.concatenate([g_o, g_o2], 1), g_a, CLONE_STEPS, seed)
+                       np.concatenate([g_o[:n], g_o2[:n]], 1), g_a[:n], CLONE_STEPS, seed)
     return inv.forward(np.concatenate([demo_o, demo_o2], 1))[0]
 
 
-def _recover_latent(env: DMCEnvironment, g_o: np.ndarray, g_a: np.ndarray, g_o2: np.ndarray,
-                    demo_o: np.ndarray, demo_o2: np.ndarray, seed: int) -> np.ndarray:
-    """P13 LatentActionModel (action-free) on demo+grounding streams, then a tiny
-    latent -> real-action calibration fit on the grounding labels (ADR-0010)."""
+def _recover_watch_ground(env: DMCEnvironment, g_o: np.ndarray, g_a: np.ndarray, g_o2: np.ndarray,
+                          demo_o: np.ndarray, demo_o2: np.ndarray, seed: int,
+                          n_labels: int | None = None) -> np.ndarray:
+    """Watch-then-ground (ADR-0010, the Part-2 reliability fix): pretrain the LAM's inverse
+    model ACTION-FREE on the demo+grounding observation streams (watching), then supervised-
+    fine-tune it (`LatentActionModel.ground`) on `n_labels` grounding labels (a little acting)
+    so recovery is `infer_action` directly — a reliable inverse-dynamics map with NO separate,
+    extrapolating calibration. (The old latent+calibration route was unreliable because the
+    calibration, fit on bottom-heavy grounding, extrapolated with a systematic bias to the
+    demo's upright states — a bias the cloned policy then faithfully reproduced.) Watching is
+    the low-data prior; grounding turns it executable."""
     lam = LatentActionModel(obs_dim=env.obs_dim, latent_action_dim=env.action_dim, seed=seed)
     stream = list(zip(np.concatenate([g_o, demo_o]), np.concatenate([g_o2, demo_o2]), strict=True))
     rng = np.random.default_rng(seed + 3)
-    for _ in range(LAM_STEPS):
+    for _ in range(LAM_STEPS):                     # watch (action-free)
         idx = rng.integers(0, len(stream), 64)
         lam.observe_batch([stream[i] for i in idx])
-    z_g = np.array([lam.infer_action(g_o[i], g_o2[i]) for i in range(len(g_o))])
-    cal = _mlp_regress([env.action_dim, 16, env.action_dim], z_g, g_a, CAL_STEPS, seed + 1)
-    z_demo = np.array([lam.infer_action(demo_o[i], demo_o2[i]) for i in range(len(demo_o))])
-    return cal.forward(z_demo)[0]
+    n = n_labels or len(g_o)
+    for _ in range(GROUND_STEPS):                  # ground (a little labelled acting)
+        idx = rng.integers(0, n, 64)
+        lam.ground(g_o[idx], g_a[idx], g_o2[idx])
+    return np.atleast_2d(lam.infer_action(demo_o, demo_o2))
 
 
 def _clone_return(env: DMCEnvironment, demo_o: np.ndarray, target_actions: np.ndarray,
@@ -153,22 +167,28 @@ def run_imitation(seeds: Sequence[int] = SEEDS) -> ImitationResult:
     env = DMCEnvironment("cartpole", "swingup")
     demo_o, demo_a, demo_o2, demo_return = _generate_demo(env)
     shuffle = np.random.default_rng(0).permutation(len(demo_a))
-    res = ImitationResult(demo_return, [], [], [], [], [], {})
-    r2_inv, r2_lam = [], []
+    res = ImitationResult(demo_return, [], [], [], [], [], {}, [], [])
+    r2_inv, r2_wg = [], []
     for seed in seeds:
         gtr = E._rollout(env, N_GROUND, seed)
         g_o = np.array([t.state.z for t in gtr])
         g_a = np.array([t.action.data for t in gtr])
         g_o2 = np.array([t.next_state.z for t in gtr])
         a_inv = _recover_inverse(env, g_o, g_a, g_o2, demo_o, demo_o2, seed)
-        a_lam = _recover_latent(env, g_o, g_a, g_o2, demo_o, demo_o2, seed)
+        a_wg = _recover_watch_ground(env, g_o, g_a, g_o2, demo_o, demo_o2, seed)
         r2_inv.append(_r2(a_inv, demo_a))
-        r2_lam.append(_r2(a_lam, demo_a))
+        r2_wg.append(_r2(a_wg, demo_a))
         res.from_scratch.append(E._mean_return(env, E._mbrl_agent(env, gtr, seed), seed))
         res.oracle.append(_clone_return(env, demo_o, demo_a, seed + 10))
         res.inverse_dyn.append(_clone_return(env, demo_o, a_inv, seed + 20))
-        res.latent_action.append(_clone_return(env, demo_o, a_lam, seed + 30))
+        res.watch_ground.append(_clone_return(env, demo_o, a_wg, seed + 30))
         res.shuffled.append(_clone_return(env, demo_o, demo_a[shuffle], seed + 40))
+        # low-label regime: watching should let watch-then-ground beat from-scratch inverse
+        # dynamics at the same (small) label budget — watching is a low-data prior (P13).
+        a_inv_s = _recover_inverse(env, g_o, g_a, g_o2, demo_o, demo_o2, seed, N_LABEL_SMALL)
+        a_wg_s = _recover_watch_ground(env, g_o, g_a, g_o2, demo_o, demo_o2, seed, N_LABEL_SMALL)
+        res.inverse_small.append(_clone_return(env, demo_o, a_inv_s, seed + 50))
+        res.watch_ground_small.append(_clone_return(env, demo_o, a_wg_s, seed + 60))
     res.recovery_r2 = {"inverse_dyn": float(np.median(r2_inv)),
-                       "latent_action": float(np.median(r2_lam))}
+                       "watch_ground": float(np.median(r2_wg))}
     return res

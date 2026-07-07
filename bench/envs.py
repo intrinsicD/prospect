@@ -88,6 +88,23 @@ class Pendulum:
         return Observation(modality=Modality.STATE, data=data)
 
 
+class PendulumSwingup(Pendulum):
+    """The Pendulum started HANGING DOWN (θ≈π): reaching the upright reward requires an
+    energy-pumping swing-up, because `max_torque` is far below the torque needed to lift the
+    pole statically. The numpy analogue of DMC cartpole-swingup and an **exploration-hard**
+    task — random torque almost never reaches upright, so a from-scratch learner fails at a
+    small budget while *watching* a demonstration succeeds (the P14 imitation gate). Only the
+    initial state differs from `Pendulum`; the dynamics and reward are inherited. Satisfies
+    `bench.Environment`."""
+
+    def reset(self, seed: int | None = None) -> Observation:
+        self._rng = np.random.default_rng(seed)
+        theta = float(np.pi + self._rng.uniform(-0.3, 0.3))
+        self._theta = float((theta + np.pi) % (2.0 * np.pi) - np.pi)  # wrap to (-π, π]
+        self._omega = float(self._rng.uniform(-0.3, 0.3))
+        return self._obs()
+
+
 class PointMass:
     """2D point mass with nonlinear (quadratic) drag — the P9-003 second environment.
 

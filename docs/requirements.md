@@ -10,9 +10,9 @@ find its seam, its rationale, and its acceptance test from this table.
 | R2 | Hierarchical planning | planning.py | 0003 | P5 |
 | R3 | Use violation of expectation to test whether an action is learned | voe.py | 0002 | P3 |
 | R4 | Identify the right patterns in the input | world_model.py (latent), codec.py | 0001 | P1 |
-| R5 | Use the right learned patterns correctly | skills.py | 0002, 0003 | P4 |
+| R5 | Use the right learned patterns correctly | skills.py, imitation.py | 0002, 0003, 0012 | P4, P14 |
 | R6 | Process any kind of input, produce any kind of output | codec.py | 0001, 0009 | P6, P12 |
-| R7 | Improve over time | memory.py, voe.py, observation.py | 0002, 0005, 0010 | P7, P13 |
+| R7 | Improve over time | memory.py, voe.py, observation.py, imitation.py | 0002, 0005, 0010, 0012 | P7, P13, P14 |
 | R8 | Use different knowledge bases (internal and external) for any use case | memory.py, knowledge.py | 0004 | P8, P10, P11 |
 
 ## Notes
@@ -25,10 +25,10 @@ find its seam, its rationale, and its acceptance test from this table.
 - Collapse prevention (ADR-0006) is not a separate requirement — it protects the shared
   latent and the calibrated uncertainty signal that R1, R3, R4 and R7 all read. It is
   enforced by integrity **sentinels** in `bench/gates.py`, which gate every phase.
-- **Non-gated supplementary evidence** on real MuJoCo (DeepMind Control Suite), via the
-  `bench.Environment` seam, deliberately outside the numpy-only ratchet (`make bench-hard`,
-  `[bench-hard]` extra; ADR-0011). Report: `bench/hard/results/`. It carries:
-  **R1** — the P2 claim re-run on foreign dynamics (BH-001); **R5/R7** — imitation from
-  observation (P14, ADR-0012), reproducing a swingup the agent never performed, on the task
-  where directed exploration (A study) cannot. Evidence, not gates — the numpy kill-gates that
-  formally ship these remain the follow-up.
+- **P14** (R5, R7) is numpy-gated on `PendulumSwingup` (imitation from observation reproduces a
+  demonstrated swing-up the agent never performed) AND **demonstrated on real MuJoCo** (DeepMind
+  Control Suite swingup) as **non-gated supplementary evidence** — via the `bench.Environment`
+  seam, outside the numpy-only ratchet (`make bench-hard`, `[bench-hard]` extra; ADR-0011).
+  The DMC tier also carries **R1** (the P2 claim re-run on foreign dynamics, BH-001). The DMC
+  numbers are evidence, not gates; the numpy kill-gates (P0–P14) are the ratcheted guarantee.
+  Report: `bench/hard/results/`.

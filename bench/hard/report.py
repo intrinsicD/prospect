@@ -153,10 +153,10 @@ def render_imitation(imit: ImitationResult) -> str:
         "The agent **watches** an expert swingup — its *observations only*, actions hidden — "
         "then **recovers the actions from observation** at the same interaction budget a "
         "from-scratch agent gets, and **clones** a closed-loop policy. Two recovery routes: a "
-        "direct inverse-dynamics model, and the P13 `LatentActionModel` (ADR-0010) + a tiny "
-        "calibration (the arc-faithful, action-free route). Oracle = clone on the true "
-        f"(hidden) actions — the ceiling. Median over {len(imit.from_scratch)} seeds; expert "
-        f"demo return {imit.demo_return:.1f}."
+        "direct inverse-dynamics model, and the P13-based **watch-then-ground** route "
+        "(`LatentActionModel` pretrained action-free, then supervised-grounded on the labels — "
+        "ADR-0010). Oracle = clone on the true (hidden) actions — the ceiling. Median over "
+        f"{len(imit.from_scratch)} seeds; expert demo return {imit.demo_return:.1f}."
     )
     lines.append("")
     lines.append("| agent | swingup return | vs from-scratch |")
@@ -164,7 +164,7 @@ def render_imitation(imit: ImitationResult) -> str:
     fs = float(np.median(imit.from_scratch)) or 1e-9
     rows = [
         ("**imitation — inverse-dynamics**", np.median(imit.inverse_dyn)),
-        ("imitation — latent-action (P13)", np.median(imit.latent_action)),
+        ("imitation — watch-then-ground (P13)", np.median(imit.watch_ground)),
         ("oracle clone (true actions, ceiling)", np.median(imit.oracle)),
         ("from-scratch MBRL (same budget)", np.median(imit.from_scratch)),
         ("shuffled demo (neg control)", np.median(imit.shuffled)),
@@ -174,23 +174,38 @@ def render_imitation(imit: ImitationResult) -> str:
     lines.append("")
     lines.append(
         f"Action-recovery R² vs the true demo actions: inverse-dynamics "
-        f"{imit.recovery_r2.get('inverse_dyn', float('nan')):.2f}, latent-action (P13) "
-        f"{imit.recovery_r2.get('latent_action', float('nan')):.2f}."
+        f"{imit.recovery_r2.get('inverse_dyn', float('nan')):.2f}, watch-then-ground "
+        f"{imit.recovery_r2.get('watch_ground', float('nan')):.2f}."
     )
     lines.append("")
     lines.append(
-        "**Reading.** Watching **works where exploration could not**: at the *same* budget "
-        "the from-scratch agent fails swingup on (A), imitation-from-observation reproduces it "
-        "— the inverse-dynamics route reproduces a swingup the agent never performed, well "
-        "above from-scratch and approaching the oracle-clone ceiling, while the shuffled-demo "
-        "control collapses (it is imitating the *specific* behaviour, not just moving). The "
-        "P13 latent-action route is the honest weak spot: it can match the direct route on a "
-        "good seed but is high-variance on this real task — recovering executable actions "
-        "from a 1-D latent across a distribution shift (grounding states → the demo's upright "
-        "states) is not yet reliable. **The A→B arc:** exploration reaches the goal region but "
-        "can't convert it to control at feasible budgets; a demonstration hands over the "
-        "goal-reaching behaviour directly — the sample-efficient route, and the substrate for "
-        "learning from video (ADR-0009/0010)."
+        f"**Watching is a low-data prior (the {imit.label_small}-label regime).** Recovery "
+        "quality is set by the supervised stage, so at a small label budget the question is "
+        "whether *watching first* buys anything. It does:"
+    )
+    lines.append("")
+    lines.append(f"| recovery ({imit.label_small} labels) | swingup return |")
+    lines.append("|----------------------------------|----------------|")
+    lines.append(f"| inverse-dynamics (from scratch) | {np.median(imit.inverse_small):.1f} |")
+    lines.append(f"| **watch-then-ground** (pretrain + ground) | **{np.median(imit.watch_ground_small):.1f}** |")
+    lines.append("")
+    lines.append(
+        "**Reading.** Watching **works where exploration could not**: at the *same* budget the "
+        "from-scratch agent fails swingup on (A), imitation-from-observation reproduces it — "
+        "well above from-scratch and approaching the oracle-clone ceiling, while the shuffled-"
+        "demo control collapses (it imitates the *specific* behaviour, not just moving). **The "
+        "reliability fix (Part 2):** the earlier latent+calibration route was high-variance "
+        "because the calibration, fit on bottom-heavy grounding, extrapolated to the demo's "
+        "upright states with a *systematic bias* the clone faithfully reproduced (and recovery "
+        "R² did not even predict reproduction). Replacing it with **watch-then-ground** — "
+        "action-free pretraining then a supervised grounding step (`LatentActionModel.ground`) "
+        f"— makes recovery a reliable inverse map AND, in the {imit.label_small}-label regime, "
+        "**beats from-scratch inverse-dynamics**: watching is a low-data prior for *control*, "
+        "not just prediction (P13's transfer result, now for imitation). Past a modest budget "
+        "direct inverse-dynamics catches up — the honest boundary. **The A→B arc:** exploration "
+        "reaches the goal region but can't convert it to control at feasible budgets; a "
+        "demonstration hands over the behaviour directly — the substrate for learning from "
+        "video (ADR-0009/0010)."
     )
     lines.append("")
     return "\n".join(lines)
@@ -238,8 +253,10 @@ def write_report(results: list[TaskResult], reach: list[TaskResult], stamp: str,
         payload["imitation"] = {
             "demo_return": imitation.demo_return, "from_scratch": imitation.from_scratch,
             "oracle": imitation.oracle, "inverse_dyn": imitation.inverse_dyn,
-            "latent_action": imitation.latent_action, "shuffled": imitation.shuffled,
-            "recovery_r2": imitation.recovery_r2,
+            "watch_ground": imitation.watch_ground, "shuffled": imitation.shuffled,
+            "recovery_r2": imitation.recovery_r2, "label_small": imitation.label_small,
+            "inverse_small": imitation.inverse_small,
+            "watch_ground_small": imitation.watch_ground_small,
         }
     (out / "BH-001-report.json").write_text(json.dumps(payload, indent=2))
     return out / "BH-001-report.md"

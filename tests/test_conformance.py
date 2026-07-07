@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from prospect import interfaces
 from prospect.codec import UniversalCodec
+from prospect.imitation import ObservationImitator
 from prospect.knowledge import ExternalKnowledgeSource, InternalKnowledgeSource, ToolSource
 from prospect.memory import (
     ReplayBuffer,
@@ -47,6 +48,7 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
     augmented: interfaces.WorldModel = RetrievalAugmentedWorldModel(
         FlatWorldModel(), UncertaintyMemoryRouter())
     observer: interfaces.ObservationLearner = LatentActionModel(obs_dim=3)  # P13-001, ADR-0010
+    imitator: interfaces.ImitationLearner = ObservationImitator(obs_dim=3, action_dim=1)  # P14-001, ADR-0012
 
     for impl in (
         codec,
@@ -69,5 +71,6 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
         tunable,
         augmented,
         observer,
+        imitator,
     ):
         assert impl is not None

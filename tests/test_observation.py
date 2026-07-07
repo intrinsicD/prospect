@@ -36,3 +36,23 @@ def test_observe_reports_reconstruction_and_decorrelation() -> None:  # P13-001
     obs = rng.uniform(-1.0, 1.0, (256, 3))
     metrics = model.observe(obs, obs + 0.1 * rng.uniform(-1.0, 1.0, (256, 3)))
     assert "loss_recon" in metrics and "decorrelation" in metrics  # the ADR-0010 identifiability term
+
+
+def test_ground_makes_infer_action_recover_the_real_action() -> None:  # P14 reliability fix
+    """After a supervised grounding, infer_action returns a directly-executable action
+    (no separate calibration) — the Part-2 fix for imitation reliability."""
+    model = LatentActionModel(obs_dim=2, latent_action_dim=1, seed=0)
+    rng = np.random.default_rng(0)
+    obs = rng.uniform(-1.0, 1.0, (512, 2))
+    action = rng.uniform(-1.0, 1.0, (512, 1))
+    nxt = obs + np.concatenate([action, 0.1 * action], axis=1)
+    for _ in range(400):  # watch (action-free)
+        idx = rng.integers(0, 512, 64)
+        model.observe(obs[idx], nxt[idx])
+    for _ in range(1500):  # ground (a little labelled acting)
+        idx = rng.integers(0, 512, 64)
+        metrics = model.ground(obs[idx], action[idx], nxt[idx])
+    assert "loss_ground" in metrics
+    rec = np.atleast_2d(model.infer_action(obs, nxt))
+    r2 = 1.0 - np.mean((rec - action) ** 2) / np.var(action)
+    assert r2 > 0.9  # infer_action now recovers the real action directly

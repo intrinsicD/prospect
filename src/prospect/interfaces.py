@@ -68,6 +68,21 @@ class ObservationLearner(Protocol):
 
 
 @runtime_checkable
+class ImitationLearner(Protocol):
+    """Reproduce a behaviour seen only as OBSERVATIONS — the observe→repeat step (R5, R7,
+    ADR-0012). `ground()` learns to recover actions from a little of the agent's OWN labelled
+    experience (inverse dynamics); `clone()` then watches a demonstration's observation stream
+    — recovering the demonstrated actions from observation (never given) — and fits a reactive
+    policy that reproduces it via `act()`. Both training verbs are single-step; the harness
+    loops them (the P0-003 convention). Satisfied by `imitation.ObservationImitator`."""
+
+    def ground(self, batch: Sequence[Transition]) -> dict[str, float]: ...
+    def recover(self, obs: Array, next_obs: Array) -> Array: ...
+    def clone(self, observations: Array, next_observations: Array) -> dict[str, float]: ...
+    def act(self, obs: Array) -> Array: ...
+
+
+@runtime_checkable
 class OptionModel(Protocol):
     """Temporally-abstract 'jumpy' model (R2, ADR-0003): the outcome of committing to
     an option — landing latent, cumulative discounted reward, duration, uncertainty.
