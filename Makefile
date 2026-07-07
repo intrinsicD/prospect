@@ -1,5 +1,5 @@
 .RECIPEPREFIX = >
-.PHONY: install test lint fmt typecheck gate gate-all tree
+.PHONY: install test lint fmt typecheck gate gate-all bench-hard tree
 
 install:
 > pip install -e ".[dev,learn]" --break-system-packages
@@ -24,6 +24,11 @@ gate:
 # regression ratchet (P0-007): re-run every shipped phase's gate; fail on regression
 gate-all:
 > python -m bench --all
+
+# optional harder-benchmark probe (BH-001, ADR-0011) — NON-gated, needs the
+# `[bench-hard]` extra (`pip install -e '.[bench-hard]'`). Never part of gate-all/CI.
+bench-hard:
+> python -m bench.hard
 
 tree:
 > find . -not -path '*/.*' -not -path '*/__pycache__/*' -type f | sort

@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"]
+PHASE_ORDER = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"]
 
 
 def _phase_at_least(phase: str, floor: str) -> bool:
@@ -201,6 +201,18 @@ _register(
     "control, ADR-0010); and watching first TRANSFERS — in the low-data regime a model "
     "bootstrapped from action-free observation beats one trained from scratch at an equal "
     "(small) action-labelled budget. All applicable collapse sentinels stay healthy.",
+)
+_register(
+    "P14",
+    "Observe → repeat (imitation from observation)",
+    "The agent reproduces a behaviour it only WATCHED — an expert swing-up given as an "
+    "observation trajectory with NO expert actions (ADR-0012). It recovers the demonstrated "
+    "actions from observation with an inverse-dynamics model grounded on a little of its own "
+    "broad-coverage experience, then clones a policy that (1) reproduces the demo (swings up), "
+    "(2) with recovered actions matching the true hidden actions above a floor (recovery is "
+    "real), (3) while a shuffled-demo control collapses (it imitates THIS behaviour), and "
+    "(4) beats cloning its OWN random data by a margin (watching the expert is what does it). "
+    "All applicable collapse sentinels stay healthy.",
 )
 
 

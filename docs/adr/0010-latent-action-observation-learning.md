@@ -55,3 +55,22 @@ Add **latent-action inference** as the way to learn from action-free observation
   needs, not exact equality.
 - (−) High-dimensional observation (real video) still needs the frozen perception encoder
   (ADR-0009); this ADR is about the action-free *learning*, orthogonal to perception.
+
+## Amendment (P14 reliability — `LatentActionModel.ground`)
+Using the watched latent action for **imitation** (P14, ADR-0012) exposed a reliability
+failure and its fix. The original way to make the latent action *executable* was a separate
+latent→real-action **calibration** fit on the labelled grounding. On cartpole swingup this was
+high-variance, and the diagnosis was sharp: the calibration, fit on bottom-heavy grounding
+states, extrapolated to the demo's upright states with a **systematic bias** the cloned policy
+then faithfully reproduced — and, tellingly, **recovery R² did not predict reproduction**
+(a higher-R² blend reproduced worse). Ensembling, a larger latent, state-conditioned
+calibration and a supervised anchor all failed (the error is bias, not variance).
+
+The fix is `LatentActionModel.ground(obs, action, next_obs)`: after action-free `observe`
+pretraining (watching), a few **supervised** steps fine-tune the inverse model so
+`infer_action` returns the real action **directly** — no separate, extrapolating calibration.
+The final stage is thus a supervised inverse map (reliable), while watching supplies the prior:
+measured on swingup, **watch-then-ground beats from-scratch inverse dynamics in the low-label
+regime** (control, not just prediction — extending this ADR's transfer result), and past a
+modest label budget direct inverse dynamics catches up (the same honest boundary). Requires
+`latent_action_dim == action_dim` (the latent *is* the action once grounded).

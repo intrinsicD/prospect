@@ -20,6 +20,11 @@ dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10"]
 # 3.11) rejects; 2.4.x stubs typecheck cleanly. Raise the bound only alongside a
 # gate re-run and a mypy python_version bump.
 learn = ["numpy>=1.26,<2.5"]
+# Optional harder-benchmark tier (BH-001, ADR-0011): a real MuJoCo control task behind
+# the `bench.Environment` seam. Deliberately kept OUT of `[dev,learn]` and the numpy CI
+# — heavyweight, non-gated, run on demand via `make bench-hard`. State observations
+# only, so no GL/render deps are needed.
+bench-hard = ["mujoco>=3", "dm_control>=1.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/prospect"]
@@ -45,3 +50,10 @@ disallow_untyped_defs = true
 check_untyped_defs = true
 warn_return_any = true
 no_implicit_optional = true
+
+# The optional `[bench-hard]` deps ship no type stubs and are absent from the numpy
+# CI, so mypy treats them as Any rather than erroring on the missing import. The
+# adapter (bench/hard/) is still fully typed against our own contracts.
+[[tool.mypy.overrides]]
+module = ["dm_control.*", "mujoco.*"]
+ignore_missing_imports = true

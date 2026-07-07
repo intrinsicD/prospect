@@ -63,6 +63,24 @@ class LatentActionModel:
         pred, _ = self._forward.forward(np.concatenate([o, z], axis=1))
         return pred if np.ndim(obs) > 1 else pred[0]
 
+    def ground(self, obs: np.ndarray, action: np.ndarray, next_obs: np.ndarray) -> dict[str, float]:
+        """Ground the (action-free-pretrained) latent action to a real, directly-executable
+        action with a little LABELLED experience — one supervised fine-tuning step on the
+        inverse model toward the true action (ADR-0010: watching is the prior, a little acting
+        grounds it). Recovery is then `infer_action` directly, with no separate, extrapolating
+        calibration — the fix for imitation reliability (the calibration's grounding→demo bias
+        was what made the latent route unreliable). Requires latent_action_dim == action_dim;
+        the harness loops this after `observe` pretraining."""
+        o = np.atleast_2d(np.asarray(obs, dtype=float))
+        n = np.atleast_2d(np.asarray(next_obs, dtype=float))
+        a = np.asarray(action, dtype=float).reshape(len(o), -1)
+        z, cache = self._inverse.forward(np.concatenate([o, n], axis=1))
+        self._inverse.zero_grad()
+        loss = float(np.mean((z - a) ** 2))
+        self._inverse.backward(2.0 * (z - a) / len(o), cache)
+        self._inverse.step()
+        return {"loss_ground": loss}
+
     def observe(self, obs: np.ndarray, next_obs: np.ndarray) -> dict[str, float]:
         """One joint training step on a batch of (obs, next_obs) pairs — the action-free
         learning verb. Reconstructs next_obs through the latent-action bottleneck, with the
