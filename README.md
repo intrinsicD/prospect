@@ -28,8 +28,12 @@ uncertainty, replay, option, gate-overfit). `bench/SHIPPED` ratchets **P0–P13*
 benchmarks — pendulum, a 2D point-mass, and synthetic visual blobs with deterministic
 stand-in encoders. It is a machine for proving seams and surfacing failure modes, **not**
 evidence of a capable general agent. The next credibility jump needs harder environments,
-real embeddings, and stronger baselines — not more phases. Generality is *earned by a
-gate*, never assumed; code grows one benchmark-gated phase at a time (`docs/roadmap.md`,
+real embeddings, and stronger baselines — not more phases. A first step is in the repo: an
+**optional, non-gated** harder-benchmark tier (`make bench-hard`, ADR-0011) that runs the
+*unchanged* core on real DeepMind Control Suite (MuJoCo) tasks through the `Environment`
+seam and reports honestly — including where the toy wins do *not* reproduce. It is fenced
+off from the numpy-only gated CI (the `[bench-hard]` extra), so generality stays *earned by
+a gate*, never assumed; code grows one benchmark-gated phase at a time (`docs/roadmap.md`,
 `tasks/BACKLOG.md`), and a phase ships only when its gate **and** its collapse sentinels pass.
 
 ## Quickstart

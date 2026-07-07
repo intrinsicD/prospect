@@ -36,6 +36,17 @@ criteria precise even while the eval body is a TODO.
 | P13 | Learn from passive observation · **shipped** | action-free world model + **latent-action inference** (ADR-0010) | from an action-free stream: learns dynamics (beats persistence), recovers the hidden actions above chance (decorrelation identifiability fix), and **transfers** in the low-data regime (watch-first beats from-scratch at a small labelled budget) | R7, R1 |
 | P14 | Observe → repeat (imitation) | planner + inferred latent actions + skill library | reproduces a demonstrated behavior the agent never performed itself (imitation-from-observation), then **explore** (P3-002) fills what watching can't teach | R5, R7 |
 
+### Optional harder-benchmark tier (BH-001, ADR-0011) — non-gated
+> A **fenced, non-gated** credibility probe that runs the *unchanged* core on real
+> DeepMind Control Suite (MuJoCo) tasks through the `bench.Environment` seam, to test
+> whether the authored-toy results survive foreign dynamics. It re-runs the **P2 claim**
+> (MPC-over-a-learned-model vs a budget-matched model-free baseline) at P2's own settings.
+> Deliberately outside the P-series: `dm_control` is the optional `[bench-hard]` extra,
+> `bench/hard/` is never imported by the gate registry, and it runs only via
+> `make bench-hard` (or a manual CI job) — the numpy-only `gate-all` ratchet is untouched.
+> The deliverable is a committed **report** (`bench/hard/results/`), not a gate. See
+> ADR-0011 for why the reproducible core CI stays numpy-only and this stays optional.
+
 ## Sequencing notes
 - **Build the predictive core and its uncertainty estimate first** (P1). Every other
   requirement is a consumer of that core or a wrapper around it.

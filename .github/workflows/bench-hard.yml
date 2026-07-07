@@ -1,0 +1,22 @@
+# Optional harder-benchmark probe (BH-001, ADR-0011). MANUAL only — never on push/PR,
+# so the numpy-only `ci.yml` ratchet stays fast and dependency-free. Installs the
+# heavyweight `[bench-hard]` extra (dm_control + mujoco), runs the non-gated probe, and
+# uploads the report artifact. Its result never gates a merge.
+name: bench-hard
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev,learn,bench-hard]"
+      - run: make bench-hard
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bh-001-report
+          path: bench/hard/results/

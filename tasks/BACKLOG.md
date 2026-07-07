@@ -183,3 +183,10 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > Next: **P14 — observe → repeat** (imitation-from-observation), then explore (P3-002) fills
 > what watching can't teach.
 - **P14-001** · `backlog` · R5,R7 · Observe → repeat: reproduce a demonstrated behavior the agent never performed itself (imitation-from-observation) via the planner + inferred latent actions; **explore** (P3-002) then fills what watching can't teach. Runtime layer on top: real-YouTube ingestion + live-webcam demo (non-gated).
+
+## Out-of-band — optional harder-benchmark tier (non-gated, ADR-0011)
+> Not a phase and not on the P14 critical path: a fenced credibility probe that runs the
+> *unchanged* core on real MuJoCo (DeepMind Control Suite) via the `bench.Environment`
+> seam. Kept out of the numpy-only gated CI by construction (see ADR-0011).
+
+- **BH-001** · `done` · R1 (evidence) · Harder-benchmark probe. `DMCEnvironment` adapter (`bench/hard/`, satisfies `bench.Environment`) drives the unchanged `FlatWorldModel`/`FlatPlanner`/`Agent` on real MuJoCo; re-runs the **P2 claim** (MPC-over-a-learned-model vs a budget-matched CEM-ES baseline) at P2's own settings. **NON-gated** — `[bench-hard]` extra, never imported by the gate registry, `make bench-hard` / manual CI only; the deliverable is a committed report (`bench/hard/results/`). See the task file for the honest reading (the toy MBRL win is *not* a decisive win on cartpole at equal budget; harder 2-D-action tasks are below this budget's resolution). Does not block P14.

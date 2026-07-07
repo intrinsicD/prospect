@@ -18,3 +18,4 @@ Format: Status · Context · Decision · Consequences.
 | 0008 | Whole-system validation (integration, ablation, generalization) | Accepted |
 | 0009 | Omni-modal seams: any modality in/out, specialized per deployment | Accepted |
 | 0010 | Learning from action-free observation via latent-action inference | Accepted |
+| 0011 | Optional, non-gated harder-benchmark tier (real MuJoCo control) | Accepted |
