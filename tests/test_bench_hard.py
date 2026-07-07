@@ -58,3 +58,27 @@ def test_action_out_of_box_is_clipped_not_raised() -> None:
     # An action far outside the spec box must be tolerated (clipped), not error.
     obs, _, _ = env.step(Action(data=np.full(env.action_dim, 1e3)))
     assert np.all(np.isfinite(obs.data))
+
+
+def test_curiosity_rollout_collects_transitions() -> None:
+    """A study: the P3-002 explore path runs on DMC and collects the budget."""
+    from bench.hard.curiosity import curious_rollout  # noqa: E402
+
+    env = _env()
+    data = curious_rollout(env, budget=512, seed=0)  # 1 random chunk + 1 explore chunk
+    assert len(data) == 512
+    assert all(t.state.z.shape == (env.obs_dim,) for t in data[:5])
+
+
+def test_imitation_helpers_recover_a_linear_map() -> None:
+    """B study: the regressor learns and action recovery + R^2 behave on synthetic data."""
+    from bench.hard.imitation import _mlp_regress, _r2  # noqa: E402
+
+    rng = np.random.default_rng(0)
+    x = rng.uniform(-1.0, 1.0, size=(256, 1))
+    y = 2.0 * x
+    net = _mlp_regress([1, 16, 1], x, y, 2000, 0)
+    pred, _ = net.forward(np.array([[0.5]]))
+    assert abs(float(pred[0, 0]) - 1.0) < 0.2                 # learned y = 2x
+    assert _r2(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0])) > 0.99
+    assert _r2(np.zeros(3), np.array([1.0, 2.0, 3.0])) < 0.5  # a bad predictor scores low

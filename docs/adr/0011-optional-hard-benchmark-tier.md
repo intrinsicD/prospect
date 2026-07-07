@@ -49,6 +49,10 @@ Add a **fenced, optional, NON-gated benchmark tier** — not a phase, not a gate
 - (+) Surfaces honest boundaries (e.g. the exploit-mode epistemic penalty steering the
   planner away from regions a random-data model never saw) as *measured* findings
   rather than assertions — the report is auditable.
+- (+) Becomes the home for follow-up *studies* on those boundaries, not just the one probe:
+  the swingup failure it surfaced is chased by **A** (does curiosity-driven collection fix
+  it? `bench/hard/curiosity.py`) and **B** (does imitation-from-observation reproduce it?
+  `bench/hard/imitation.py`, ADR-0012) — both non-gated, both in the one consolidated report.
 - (−) The probe is not reproducible in the default CI (needs the extra + a native
   physics engine); its numbers are evidence, not a ratcheted guarantee, and can drift
   with `dm_control`/`mujoco` versions (recorded in the report).

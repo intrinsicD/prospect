@@ -103,3 +103,19 @@ working as designed, not a control failure. **Conclusion:** toy-benchmark wins a
 evidence of general control; the next credibility jump needs more budget, better model-
 training exploration, and stronger baselines — not more phases. Recorded as a finding, not
 tuned away. **This tier is non-gated: nothing ships, `bench/SHIPPED` is unchanged.**
+
+## Follow-up studies (same report, chasing the swingup failure)
+The probe surfaced that `cartpole-swingup` fails because random data never reaches the
+upright goal. Two studies chase that, in the same consolidated report (§A, §B):
+
+- **§A — curiosity (`bench/hard/curiosity.py`).** Swaps random collection for the P3-002
+  curiosity curriculum. **Finding:** curiosity *reaches* the goal region random data can't
+  (max reward 0.24 → 0.70) but does **not** convert it to control (MBRL 6.4 → 2.1); 3×
+  budget doesn't fix it. Exploration is necessary but not sufficient here.
+- **§B — imitation from observation (`bench/hard/imitation.py`, P14-001, ADR-0012).** Watch
+  an expert swingup's *observations only* → recover its actions (inverse-dynamics primary;
+  P13 latent-action route arc-faithful but high-variance) → clone a closed-loop policy.
+  **Finding:** reproduces a swingup the agent never performed — inverse-dyn **45.3 vs
+  from-scratch 6.4** (7×), shuffled control 0.1. Watching does what exploration can't at the
+  same budget. The A→B arc: exploration reaches the region; a demonstration hands over the
+  behaviour.

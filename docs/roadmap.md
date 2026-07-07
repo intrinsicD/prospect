@@ -34,7 +34,7 @@ criteria precise even while the eval body is a TODO.
 |-------|------|----------------|----------------------|------|
 | P12 | Swappable visual perception (first omni-modal seam) · **shipped** | frozen encoder → `UniversalCodec` VISION modality | the world model predicts over visual embeddings (48× better than persistence) and is surprised on novel frames (4.6×); a **better encoder swaps in** without retraining the core (1.05×, P0-011); built with deterministic stand-in encoders (CI numpy-only) — a real pretrained encoder swaps in via the same distill path | R6, R1, R3 |
 | P13 | Learn from passive observation · **shipped** | action-free world model + **latent-action inference** (ADR-0010) | from an action-free stream: learns dynamics (beats persistence), recovers the hidden actions above chance (decorrelation identifiability fix), and **transfers** in the low-data regime (watch-first beats from-scratch at a small labelled budget) | R7, R1 |
-| P14 | Observe → repeat (imitation) | planner + inferred latent actions + skill library | reproduces a demonstrated behavior the agent never performed itself (imitation-from-observation), then **explore** (P3-002) fills what watching can't teach | R5, R7 |
+| P14 | Observe → repeat (imitation) · **demonstrated (non-gated, swingup)** | recover actions from a demo's observations → clone a closed-loop policy | reproduces a demonstrated behavior the agent never performed itself (imitation-from-observation) — shown on cartpole swingup where exploration can't reach (BH-001 §B, ADR-0012): inverse-dyn imitation 45.3 vs from-scratch 6.4, shuffled control 0.1; then **explore** (P3-002) fills what watching can't teach. *Numpy kill-gate on a toy = follow-up to ship P14 in the ratchet.* | R5, R7 |
 
 ### Optional harder-benchmark tier (BH-001, ADR-0011) — non-gated
 > A **fenced, non-gated** credibility probe that runs the *unchanged* core on real
@@ -46,6 +46,15 @@ criteria precise even while the eval body is a TODO.
 > `make bench-hard` (or a manual CI job) — the numpy-only `gate-all` ratchet is untouched.
 > The deliverable is a committed **report** (`bench/hard/results/`), not a gate. See
 > ADR-0011 for why the reproducible core CI stays numpy-only and this stays optional.
+>
+> The probe surfaced that **cartpole-swingup** fails (random data never reaches the upright
+> goal), and the tier now chases that with two follow-up studies in the same report:
+> **A** — does the curiosity curriculum (P3-002) fix it? *It reaches the goal region but
+> can't convert sparse coverage to control — exploration necessary, not sufficient.*
+> **B** — does imitation-from-observation reproduce it (P14, ADR-0012)? *Yes — watching an
+> expert's observations + recovering its actions reproduces a swingup the agent never
+> performed, at the budget where exploration fails.* The honest arc: explore reaches the
+> region, a demonstration hands over the behaviour.
 
 ## Sequencing notes
 - **Build the predictive core and its uncertainty estimate first** (P1). Every other

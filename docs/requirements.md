@@ -25,7 +25,10 @@ find its seam, its rationale, and its acceptance test from this table.
 - Collapse prevention (ADR-0006) is not a separate requirement — it protects the shared
   latent and the calibrated uncertainty signal that R1, R3, R4 and R7 all read. It is
   enforced by integrity **sentinels** in `bench/gates.py`, which gate every phase.
-- **R1 has non-gated supplementary evidence** beyond P1/P2: the optional harder-benchmark
-  tier (BH-001, ADR-0011) re-runs the P2 claim on real MuJoCo (DeepMind Control Suite) via
-  the `bench.Environment` seam. It is *evidence*, not a gate — deliberately outside the
-  numpy-only ratchet (`make bench-hard`, `[bench-hard]` extra). Report: `bench/hard/results/`.
+- **Non-gated supplementary evidence** on real MuJoCo (DeepMind Control Suite), via the
+  `bench.Environment` seam, deliberately outside the numpy-only ratchet (`make bench-hard`,
+  `[bench-hard]` extra; ADR-0011). Report: `bench/hard/results/`. It carries:
+  **R1** — the P2 claim re-run on foreign dynamics (BH-001); **R5/R7** — imitation from
+  observation (P14, ADR-0012), reproducing a swingup the agent never performed, on the task
+  where directed exploration (A study) cannot. Evidence, not gates — the numpy kill-gates that
+  formally ship these remain the follow-up.

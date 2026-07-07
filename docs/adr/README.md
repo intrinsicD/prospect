@@ -19,3 +19,4 @@ Format: Status · Context · Decision · Consequences.
 | 0009 | Omni-modal seams: any modality in/out, specialized per deployment | Accepted |
 | 0010 | Learning from action-free observation via latent-action inference | Accepted |
 | 0011 | Optional, non-gated harder-benchmark tier (real MuJoCo control) | Accepted |
+| 0012 | Imitation from observation: recover actions to reproduce a demo | Accepted |
