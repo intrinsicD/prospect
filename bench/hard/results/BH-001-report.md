@@ -1,6 +1,6 @@
 # BH-001 — harder-benchmark probe (non-gated)
 
-_Generated 2026-07-07 07:42 UTC. dm_control 1.0.43, mujoco 3.10.0, numpy 2.4.6._
+_Generated 2026-07-07 09:18 UTC. dm_control 1.0.43, mujoco 3.10.0, numpy 2.4.6._
 
 Re-runs the **P2 claim** — MPC/CEM over a learned `FlatWorldModel` beats a model-free baseline at **equal env-step budget** — on DeepMind Control Suite tasks the repo did not author (ADR-0011). **Non-gated:** no phase ships on this; it is a credibility probe whose value is an honest number, not a pass.
 
@@ -41,16 +41,23 @@ Swaps the P2 probe's *random* data collection for the shipped **curiosity curric
 
 ## B — imitation from observation (does watching a demo reproduce swingup?)
 
-The agent **watches** an expert swingup — its *observations only*, actions hidden — then **recovers the actions from observation** at the same interaction budget a from-scratch agent gets, and **clones** a closed-loop policy. Two recovery routes: a direct inverse-dynamics model, and the P13 `LatentActionModel` (ADR-0010) + a tiny calibration (the arc-faithful, action-free route). Oracle = clone on the true (hidden) actions — the ceiling. Median over 3 seeds; expert demo return 115.9.
+The agent **watches** an expert swingup — its *observations only*, actions hidden — then **recovers the actions from observation** at the same interaction budget a from-scratch agent gets, and **clones** a closed-loop policy. Two recovery routes: a direct inverse-dynamics model, and the P13-based **watch-then-ground** route (`LatentActionModel` pretrained action-free, then supervised-grounded on the labels — ADR-0010). Oracle = clone on the true (hidden) actions — the ceiling. Median over 3 seeds; expert demo return 115.9.
 
 | agent | swingup return | vs from-scratch |
 |-------|----------------|-----------------|
 | **imitation — inverse-dynamics** | 45.3 | 7.1× |
-| imitation — latent-action (P13) | 14.0 | 2.2× |
+| imitation — watch-then-ground (P13) | 20.7 | 3.2× |
 | oracle clone (true actions, ceiling) | 76.4 | 12.0× |
 | from-scratch MBRL (same budget) | 6.4 | 1.0× |
 | shuffled demo (neg control) | 0.1 | 0.0× |
 
-Action-recovery R² vs the true demo actions: inverse-dynamics 0.62, latent-action (P13) 0.65.
+Action-recovery R² vs the true demo actions: inverse-dynamics 0.62, watch-then-ground 0.66.
 
-**Reading.** Watching **works where exploration could not**: at the *same* budget the from-scratch agent fails swingup on (A), imitation-from-observation reproduces it — the inverse-dynamics route reproduces a swingup the agent never performed, well above from-scratch and approaching the oracle-clone ceiling, while the shuffled-demo control collapses (it is imitating the *specific* behaviour, not just moving). The P13 latent-action route is the honest weak spot: it can match the direct route on a good seed but is high-variance on this real task — recovering executable actions from a 1-D latent across a distribution shift (grounding states → the demo's upright states) is not yet reliable. **The A→B arc:** exploration reaches the goal region but can't convert it to control at feasible budgets; a demonstration hands over the goal-reaching behaviour directly — the sample-efficient route, and the substrate for learning from video (ADR-0009/0010).
+**Watching is a low-data prior (the 512-label regime).** Recovery quality is set by the supervised stage, so at a small label budget the question is whether *watching first* buys anything. It does:
+
+| recovery (512 labels) | swingup return |
+|----------------------------------|----------------|
+| inverse-dynamics (from scratch) | 33.2 |
+| **watch-then-ground** (pretrain + ground) | **46.2** |
+
+**Reading.** Watching **works where exploration could not**: at the *same* budget the from-scratch agent fails swingup on (A), imitation-from-observation reproduces it — well above from-scratch and approaching the oracle-clone ceiling, while the shuffled-demo control collapses (it imitates the *specific* behaviour, not just moving). **The reliability fix (Part 2):** the earlier latent+calibration route was high-variance because the calibration, fit on bottom-heavy grounding, extrapolated to the demo's upright states with a *systematic bias* the clone faithfully reproduced (and recovery R² did not even predict reproduction). Replacing it with **watch-then-ground** — action-free pretraining then a supervised grounding step (`LatentActionModel.ground`) — makes recovery a reliable inverse map AND, in the 512-label regime, **beats from-scratch inverse-dynamics**: watching is a low-data prior for *control*, not just prediction (P13's transfer result, now for imitation). Past a modest budget direct inverse-dynamics catches up — the honest boundary. **The A→B arc:** exploration reaches the goal region but can't convert it to control at feasible budgets; a demonstration hands over the behaviour directly — the substrate for learning from video (ADR-0009/0010).
