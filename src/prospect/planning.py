@@ -1,6 +1,6 @@
 """Planning (R1, R2). Flat MPC in imagination, the learned jumpy option-model,
 and the hierarchical manager over it. See ADR-0001, ADR-0003, ADR-0006/0007.
-Tasks: P2-001 (done), P5-001 (done), P5-002.
+Tasks: P2-001 (done), P5-001 (done), P5-002 (done), U-001 (done).
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from itertools import product
 import numpy as np
 
 from .interfaces import OptionModel, WorldModel
-from .types import Action, LatentState, Option, Prediction, Subgoal, Transition
+from .types import Action, LatentState, MemberRollout, Option, Prediction, Subgoal, Transition
 from .world_model import _LOGVAR_MAX, _LOGVAR_MIN, _MLP  # core-internal reuse
 
 
@@ -28,8 +28,9 @@ class FlatPlanner:
     between episodes. `goal` is accepted per the Protocol and ignored until
     hierarchical planning lands (P5) — P2 plans on reward.
 
-    Contract: interfaces.Planner. Uses the model's vectorized `predict_batch` when
-    offered, falling back to the protocol's per-sample `predict()`.
+    Contract: interfaces.Planner. Uses `TrajectoryWorldModel`-style member batches
+    when offered, then the model's vectorized `predict_batch`, and finally falls
+    back to the narrow protocol's per-sample `predict()`.
     """
 
     def __init__(
@@ -43,14 +44,18 @@ class FlatPlanner:
         elites: int = 8,
         iterations: int = 3,
         discount: float = 0.99,
-        uncertainty_penalty: float = 1.0,
+        uncertainty_penalty: float = 0.03,
         seed: int = 0,
+        epistemic_horizon_bound: float | None = None,
     ) -> None:
         self._model = world_model
         self.action_dim, self.action_low, self.action_high = action_dim, action_low, action_high
         self.horizon, self.candidates, self.elites = horizon, candidates, elites
         self.iterations, self.discount = iterations, discount
         self.uncertainty_penalty = uncertainty_penalty
+        if epistemic_horizon_bound is not None and epistemic_horizon_bound < 0.0:
+            raise ValueError("epistemic_horizon_bound must be non-negative or None")
+        self.epistemic_horizon_bound = epistemic_horizon_bound
         self._rng = np.random.default_rng(seed)
         self._warm_mean: np.ndarray | None = None
 
@@ -76,30 +81,65 @@ class FlatPlanner:
 
     def _imagined_returns(self, state: LatentState, sequences: np.ndarray) -> np.ndarray:
         """Score (K,H,action_dim) candidate sequences by imagined discounted reward,
-        epistemic-penalized per step (mean rollout; bounded horizon per ADR-0006)."""
+        using TS∞ when the model exposes per-member trajectories.
+
+        The optional epistemic horizon bound stops adding rewards after a
+        candidate's accumulated trajectory spread crosses the calibrated bound.
+        The crossing step itself is scored; later, untrusted steps are not.
+        """
         k = sequences.shape[0]
         latents = np.repeat(np.asarray(state.z, dtype=float).reshape(1, -1), k, axis=0)
+        member_latents = latents
+        member_batch = getattr(self._model, "predict_member_batch", None)
         totals = np.zeros(k)
+        accumulated_epistemic = np.zeros(k)
+        active = np.ones(k, dtype=bool)
         discount = 1.0
         for t in range(self.horizon):
-            mean, _, epistemic, _, reward = self._predict_batch(latents, sequences[:, t])
-            totals += discount * (reward - self.uncertainty_penalty * epistemic)
-            latents = mean
+            if member_batch is not None:
+                result: MemberRollout = member_batch(
+                    member_latents,
+                    sequences[:, t],
+                    initial_ood=state.ood if t == 0 else None,
+                )
+                member_latents = np.asarray(result.states, dtype=float)
+                member_rewards = np.asarray(result.rewards, dtype=float)
+                epistemic = np.asarray(result.epistemic, dtype=float)
+                reward = member_rewards.mean(axis=0)
+                latents = member_latents.mean(axis=0)
+            else:
+                mean, _, epistemic, _, reward = self._predict_batch(
+                    latents,
+                    sequences[:, t],
+                    initial_ood=state.ood if t == 0 else None,
+                )
+                latents = mean
+            totals[active] += discount * (
+                reward[active] - self.uncertainty_penalty * epistemic[active]
+            )
+            accumulated_epistemic[active] += epistemic[active]
+            if self.epistemic_horizon_bound is not None:
+                active &= accumulated_epistemic <= self.epistemic_horizon_bound
+                if not np.any(active):
+                    break
             discount *= self.discount
         return totals
 
     def _predict_batch(
-        self, latents: np.ndarray, actions: np.ndarray
+        self,
+        latents: np.ndarray,
+        actions: np.ndarray,
+        initial_ood: float | None = None,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         batch = getattr(self._model, "predict_batch", None)
-        if batch is not None:
+        if batch is not None and initial_ood is None:
             result: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] = batch(
                 latents, actions
             )
             return result
         # Protocol fallback: per-sample predict() for any WorldModel.
         preds = [
-            self._model.predict(LatentState(z=z), Action(data=a))
+            self._model.predict(LatentState(z=z, ood=initial_ood), Action(data=a))
             for z, a in zip(latents, actions, strict=True)
         ]
         return (

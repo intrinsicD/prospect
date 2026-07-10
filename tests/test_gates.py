@@ -10,7 +10,9 @@ import pytest
 
 import bench
 from bench.__main__ import main
+from bench.evals import p1_world_model as p1_eval
 from bench.gates import GateResult, gate_check, sentinel_check
+from bench.runlog import Record
 
 
 def test_gate_check_replaces_pending_and_report_persists(tmp_path: Path) -> None:
@@ -47,6 +49,29 @@ def test_registering_unknown_phase_or_sentinel_fails() -> None:
 def test_run_gate_unknown_phase_lists_known(tmp_path: Path) -> None:
     with pytest.raises(KeyError, match="known phases"):
         bench.run_gate("P99", results_dir=tmp_path)
+
+
+def test_uncertainty_sentinel_rejects_mean_rollout_and_legacy_logs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    common = {
+        "seed": 0.0,
+        "disagreement_error_rank_corr": 0.8,
+        "high_error_disagreement_ratio": 2.0,
+    }
+    monkeypatch.setattr(
+        p1_eval,
+        "_p1_records",
+        lambda: [Record(step=999, metrics=common | {"ts_horizon_epistemic_ratio": 1.0})],
+    )
+    regressed = p1_eval.check_uncertainty_reliability()
+    assert not regressed.healthy  # old mean rollout gives exactly 1x and must fail
+
+    monkeypatch.setattr(
+        p1_eval, "_p1_records", lambda: [Record(step=999, metrics=common)]
+    )
+    legacy = p1_eval.check_uncertainty_reliability()
+    assert not legacy.healthy and "legacy" in legacy.detail
 
 
 def test_cli_is_friendly_without_traceback(capsys: pytest.CaptureFixture[str]) -> None:

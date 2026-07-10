@@ -26,14 +26,16 @@ environment steps for learning.
 ## Interface to satisfy
 `prospect.interfaces.Planner` — implement `FlatPlanner` in `prospect/planning.py`
 (replace the skeleton). Constructor takes the `WorldModel` to plan over. Uses the
-model's vectorized `predict_batch` when offered (added to `FlatWorldModel`),
-falling back to the protocol's per-sample `predict()` so any `WorldModel` works.
+model's `TrajectoryWorldModel.predict_member_batch` specialization when offered
+(U-001), then vectorized `predict_batch`, falling back to the protocol's per-sample
+`predict()` so any narrow `WorldModel` still works.
 
 ## Approach (brief)
 - CEM: sample K candidate action sequences from a per-timestep Gaussian, clip to
-  action bounds, roll each out in imagination (mean rollout), score by discounted
-  imagined reward **minus λ·epistemic per step** (ADR-0006 model-exploitation
-  control, exploit-mode per ADR-0007), refit the Gaussian to the elites, iterate.
+  action bounds, roll each out in imagination (TS∞ member trajectories since
+  U-001), score by discounted imagined reward **minus λ·propagated epistemic per
+  step** (ADR-0006 model-exploitation control, exploit-mode per ADR-0007), refit
+  the Gaussian to the elites, iterate.
 - Receding horizon with warm start: keep the elite mean, shift by one step for the
   next `plan()` call; `reset()` clears it between episodes.
 - Gate eval (`bench/evals/p2_planner.py`): equal-budget comparison on Pendulum.

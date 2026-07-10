@@ -100,8 +100,8 @@ _register(
 _register(
     "P2",
     "Planning beats reaction",
-    "MPC/CEM in imagination beats a model-free baseline at EQUAL environment-step "
-    "budget on the reference control task.",
+    "MPC/CEM in imagination beats a model-free baseline and the random floor on EVERY seed "
+    "at EQUAL environment-step budget on the reference control task.",
 )
 _register(
     "P3",
@@ -265,7 +265,8 @@ _register_sentinel(
     "P1",
     "Predicted epistemic uncertainty is rank-correlated with held-out prediction "
     "error above a threshold, and ensemble-member disagreement does not decay to ~0 "
-    "in regions where error is high.",
+    "in regions where error is high; propagated TS∞ horizon spread exceeds disagreement "
+    "repeatedly recomputed around the ensemble-mean trajectory by a calibrated margin.",
 )
 _register_sentinel(
     "replay-fidelity",

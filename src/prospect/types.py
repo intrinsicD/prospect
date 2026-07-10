@@ -129,6 +129,24 @@ class Prediction:
 
 
 @dataclass(frozen=True)
+class MemberRollout:
+    """One TS∞ rollout step, owned by the model that defines uncertainty (U-001).
+
+    ``states`` and ``variances`` have shape ``(members, candidates, latent_dim)``;
+    ``rewards`` has shape ``(members, candidates)``; ``epistemic`` has one
+    effective scalar per candidate.  Keeping the effective signal in this result
+    matters: wrappers and distance-aware models may transform epistemic beyond raw
+    member spread, and the planner must consume that model-owned value rather than
+    reconstructing a weaker one.
+    """
+
+    states: Array
+    variances: Array
+    rewards: Array
+    epistemic: Array
+
+
+@dataclass(frozen=True)
 class Surprise:
     """Decomposed violation of expectation (ADR-0002) — never a bare float.
 

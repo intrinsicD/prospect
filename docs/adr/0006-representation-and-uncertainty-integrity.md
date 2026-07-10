@@ -40,7 +40,13 @@ in-distribution dreams.
 planner is repelled from regions the model is wrong about; explore-mode data
 collection flips the sign under the curriculum's control (ADR-0007). This defense
 *depends on* a healthy uncertainty estimate, which is why the reliability check is
-upstream of it.
+upstream of it. Multi-step rollouts propagate one state per ensemble member (TS∞)
+rather than repeatedly collapsing to the member mean: horizon epistemic is the
+spread of those trajectories, while per-member aleatoric variance is accumulated
+alongside them without sampling noise into the state. A planner may stop scoring
+after accumulated epistemic crosses a calibrated bound. The uncertainty-reliability
+sentinel rejects a return to mean-state rollouts by comparing both paths on an OOD
+horizon probe. *(Amended by U-001.)*
 
 **Integrity is gated, not hoped for.** Because collapse hides in a good loss, integrity
 is enforced by standing **sentinels** in `bench/gates.py`. Every phase gate passes only

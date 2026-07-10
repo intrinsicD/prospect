@@ -24,7 +24,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from .types import Action, LatentState, Prediction, Transition
+from .types import Action, LatentState, MemberRollout, Prediction, Transition
 
 _LOGVAR_MIN, _LOGVAR_MAX = -6.0, 2.0
 _CLIP_NORM = 1.0  # global gradient-norm clip per network
@@ -213,6 +213,75 @@ class FlatWorldModel:
             reward_out[:, 0],
         )
 
+    def predict_member_batch(
+        self,
+        member_latents: np.ndarray,
+        actions: np.ndarray,
+        initial_ood: float | None = None,
+    ) -> MemberRollout:
+        """Advance one trajectory per ensemble member (TS∞, task U-001).
+
+        ``member_latents`` is either ``(candidates, latent_dim)`` on the first
+        rollout step (the common start is expanded across members here), or
+        ``(members, candidates, latent_dim)`` on later steps.  Each dynamics
+        member advances only its own state, so disagreement can compound across
+        the horizon instead of being recomputed around a mean state no member
+        actually occupies.
+
+        Returns a :class:`MemberRollout` whose states and variances have shape
+        ``(members, candidates, latent_dim)``, whose rewards have shape
+        ``(members, candidates)``, and whose effective epistemic signal has shape
+        ``(candidates,)``.
+        The variances are tracked alongside the deterministic member states;
+        aleatoric noise is deliberately not sampled into the trajectories.
+        """
+        states = np.asarray(member_latents, dtype=float)
+        act = np.asarray(actions, dtype=float)
+        member_count = len(self.members)
+        if states.ndim == 2:
+            states = np.repeat(states[None, :, :], member_count, axis=0)
+        if states.ndim != 3 or states.shape[0] != member_count:
+            raise ValueError(
+                "member_latents must have shape (candidates, latent_dim) or "
+                f"({member_count}, candidates, latent_dim)"
+            )
+        if states.shape[2] != self.latent_dim:
+            raise ValueError(
+                f"member_latents has latent dim {states.shape[2]}, expected {self.latent_dim}"
+            )
+        if act.ndim != 2 or act.shape != (states.shape[1], self.action_dim):
+            raise ValueError(
+                "actions must have shape "
+                f"({states.shape[1]}, {self.action_dim}), got {act.shape}"
+            )
+
+        next_states, variances = [], []
+        for member, state_rows in zip(self.members, states, strict=True):
+            out, _ = member.forward(np.concatenate([state_rows, act], axis=1))
+            delta = out[:, : self.latent_dim]
+            logvar = np.clip(out[:, self.latent_dim :], _LOGVAR_MIN, _LOGVAR_MAX)
+            next_states.append(state_rows + delta)
+            variances.append(np.exp(logvar))
+
+        # Reward is shared rather than ensembled, but it must be evaluated at
+        # every member's own current state after the trajectories diverge.
+        repeated_actions = np.broadcast_to(act, (member_count, *act.shape))
+        reward_input = np.concatenate(
+            [states, repeated_actions], axis=2
+        ).reshape(member_count * states.shape[1], self.latent_dim + self.action_dim)
+        reward_out, _ = self.reward_head.forward(reward_input)
+        rewards = reward_out[:, 0].reshape(member_count, states.shape[1])
+        next_rows = np.stack(next_states)
+        epistemic = next_rows.var(axis=0).mean(axis=1)
+        if initial_ood is not None:
+            epistemic *= 1.0 + _DIST_WEIGHT * initial_ood
+        return MemberRollout(
+            states=next_rows,
+            variances=np.stack(variances),
+            rewards=rewards,
+            epistemic=epistemic,
+        )
+
     def predict(self, state: LatentState, action: Action) -> Prediction:
         h = np.asarray(state.z, dtype=float).reshape(1, -1)
         a = np.asarray(action.data, dtype=float).reshape(1, -1)
@@ -235,14 +304,38 @@ class FlatWorldModel:
         )
 
     def imagine(self, state: LatentState, actions: Sequence[Action]) -> list[Prediction]:
-        """Open-loop rollout on the ensemble mean (uncertainty is reported per step,
-        not propagated — bounded-horizon use per ADR-0003/0006)."""
+        """Open-loop TS∞ rollout, propagating one state per ensemble member.
+
+        Epistemic uncertainty is the spread of the member trajectories at each
+        horizon step.  Per-member aleatoric variance is accumulated alongside the
+        trajectories without injecting noise into their states (U-001).
+        """
         predictions: list[Prediction] = []
-        current = state
-        for action in actions:
-            prediction = self.predict(current, action)
-            predictions.append(prediction)
-            current = LatentState(z=prediction.mean)
+        member_states = np.asarray(state.z, dtype=float).reshape(1, -1)
+        accumulated_variance: np.ndarray | None = None
+        for step, action in enumerate(actions):
+            action_rows = np.asarray(action.data, dtype=float).reshape(1, -1)
+            rollout = self.predict_member_batch(
+                member_states, action_rows, initial_ood=state.ood if step == 0 else None
+            )
+            member_states = np.asarray(rollout.states, dtype=float)
+            step_variance = np.asarray(rollout.variances, dtype=float)
+            member_rewards = np.asarray(rollout.rewards, dtype=float)
+            if accumulated_variance is None:
+                accumulated_variance = np.zeros_like(step_variance)
+            accumulated_variance += step_variance
+            mean = member_states.mean(axis=0)[0]
+            epistemic = member_states.var(axis=0)[0]
+            aleatoric = accumulated_variance.mean(axis=0)[0]
+            predictions.append(
+                Prediction(
+                    mean=mean,
+                    var=aleatoric + epistemic,
+                    epistemic=float(np.asarray(rollout.epistemic, dtype=float)[0]),
+                    aleatoric=float(aleatoric.mean()),
+                    reward=float(member_rewards.mean(axis=0)[0]),
+                )
+            )
         return predictions
 
     # ------------------------------------------------------------------- learn

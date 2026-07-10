@@ -3,10 +3,10 @@
 A full review of every architecture component against the 2023–2026 literature
 (arXiv, GitHub, OpenReview), answering one question per component: *is this part
 clearly outdated, and if so what replaces it — or is it already at (or ahead of)
-current best practice?* Every finding became a task: ready upgrades are
-**U-001…U-012**, deferred (trigger-gated) upgrades are **U-101…U-112** — see the
-upgrade track in `tasks/BACKLOG.md` and the **upgrade-triggers** workflow step in
-`CLAUDE.md`.
+current best practice?* Every finding became a task: **U-001 is shipped**, ready
+upgrades are **U-002…U-012**, and deferred (trigger-gated) upgrades are
+**U-101…U-112** — see the upgrade track in `tasks/BACKLOG.md` and the
+**upgrade-triggers** workflow step in `CLAUDE.md`.
 
 ## Headline verdict
 
@@ -14,16 +14,16 @@ The architecture is *not* broadly outdated. No current SOTA world model
 (DreamerV3/Dreamer 4, TD-MPC2, V-JEPA 2, IRIS/STORM, DIAMOND, Genie 3) natively
 produces the epistemic/aleatoric split all six VoE jobs consume; where the field
 needs an epistemic signal it bolts on exactly what this repo already has — a
-probabilistic ensemble. There is no wholesale replacement to make. Six places are
-measurably behind the literature (all cheap at this scale), a dozen upgrades are
-right-but-not-yet (deferred with explicit triggers), and three code/doc
+probabilistic ensemble. There is no wholesale replacement to make. Twelve actionable
+upgrades were identified (U-001 now shipped; eleven remain ready), a separate dozen
+are right-but-not-yet (deferred with explicit triggers), and three code/doc
 inconsistencies surfaced during the read.
 
-## Measurably behind → ready upgrade tasks
+## Measurably behind → upgrade tasks (U-001 shipped)
 
 | Task | Component | Finding (why replace) | Key sources |
 |------|-----------|----------------------|-------------|
-| U-001 | world_model/planning rollouts | Mean-latent imagination understates multi-step uncertainty and blurs the split where re-planning/mastery consume it; per-member trajectory sampling (TS∞) + accumulated-epistemic truncation is the canonical fix, ~5 forwards/step here | [PETS](https://arxiv.org/abs/1805.12114) · [MACURA](https://arxiv.org/abs/2405.19014) · [Infoprop](https://arxiv.org/abs/2501.16918) |
+| U-001 · **shipped** | world_model/planning rollouts | Mean-latent imagination understated multi-step uncertainty; per-member TS∞ propagation + optional accumulated-epistemic truncation now ships, guarded by a strict OOD horizon-spread sentinel | [PETS](https://arxiv.org/abs/1805.12114) · [MACURA](https://arxiv.org/abs/2405.19014) · [Infoprop](https://arxiv.org/abs/2501.16918) |
 | U-002 | FlatPlanner | Vanilla white-noise CEM is no longer best practice even at toy scale: colored noise + keep/shift elites + execute-best gives 2.7–22× sample efficiency in exactly this regime; softmax elite weighting is the modern update rule | [iCEM](https://arxiv.org/abs/2008.06389) · [Pink Noise](https://openreview.net/forum?id=hQ9V5QN27eS) · [TD-MPC2](https://arxiv.org/abs/2310.16828) |
 | U-003 | voe/planning/memory thresholds | Fixed NLL thresholds have no false-alarm semantics and drift as the model improves; adaptive conformal inference gives a controlled trigger rate, distribution-free, in ~2 lines | [ACI](https://arxiv.org/abs/2106.00170) · [decaying-step ACI](https://arxiv.org/pdf/2402.01139) · [conformal failure detection](https://arxiv.org/pdf/2503.08558) |
 | U-004 | ReplayBuffer eviction | FIFO eviction contradicts the anti-forgetting purpose (everything older than capacity is gone exactly when rehearsal needs it); hybrid FIFO+reservoir is the continual-learning standard, validated inside world-model agents | [WMAR](https://arxiv.org/abs/2401.16650) · [accumulate-don't-replace](https://arxiv.org/abs/2404.01413) |

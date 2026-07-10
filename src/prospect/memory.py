@@ -10,7 +10,16 @@ from collections.abc import Sequence
 import numpy as np
 
 from .interfaces import KnowledgeSource, WorldModel
-from .types import Action, KnowledgeItem, LatentState, Option, Prediction, Transition, Trust
+from .types import (
+    Action,
+    KnowledgeItem,
+    LatentState,
+    MemberRollout,
+    Option,
+    Prediction,
+    Transition,
+    Trust,
+)
 
 
 class ReplayBuffer:
@@ -262,11 +271,41 @@ class RetrievalAugmentedWorldModel:
         mean, var, epi, ale, rew = self._rows(
             np.asarray(state.z, dtype=float).reshape(1, -1),
             np.asarray(action.data, dtype=float).reshape(1, -1),
+            initial_ood=state.ood,
         )
         return Prediction(mean=mean[0], var=var[0], epistemic=float(epi[0]),
                           aleatoric=float(ale[0]), reward=float(rew[0]))
 
     def imagine(self, state: LatentState, actions: Sequence[Action]) -> list[Prediction]:
+        if getattr(self._base, "predict_member_batch", None) is not None:
+            trajectory_predictions: list[Prediction] = []
+            member_states = np.asarray(state.z, dtype=float).reshape(1, -1)
+            accumulated_variance: np.ndarray | None = None
+            for step, action in enumerate(actions):
+                rollout = self.predict_member_batch(
+                    member_states,
+                    np.asarray(action.data, dtype=float).reshape(1, -1),
+                    initial_ood=state.ood if step == 0 else None,
+                )
+                member_states = np.asarray(rollout.states, dtype=float)
+                step_variance = np.asarray(rollout.variances, dtype=float)
+                if accumulated_variance is None:
+                    accumulated_variance = np.zeros_like(step_variance)
+                accumulated_variance += step_variance
+                epistemic_variance = member_states.var(axis=0)[0]
+                aleatoric_variance = accumulated_variance.mean(axis=0)[0]
+                trajectory_predictions.append(
+                    Prediction(
+                        mean=member_states.mean(axis=0)[0],
+                        var=aleatoric_variance + epistemic_variance,
+                        epistemic=float(np.asarray(rollout.epistemic, dtype=float)[0]),
+                        aleatoric=float(aleatoric_variance.mean()),
+                        reward=float(np.asarray(rollout.rewards, dtype=float).mean(axis=0)[0]),
+                    )
+                )
+            return trajectory_predictions
+
+        # A narrow protocol-only base has no member states to propagate.
         predictions: list[Prediction] = []
         current = state
         for action in actions:
@@ -280,15 +319,99 @@ class RetrievalAugmentedWorldModel:
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return self._rows(np.asarray(latents, dtype=float), np.asarray(actions, dtype=float))
 
+    def predict_member_batch(
+        self,
+        member_latents: np.ndarray,
+        actions: np.ndarray,
+        initial_ood: float | None = None,
+    ) -> MemberRollout:
+        """Propagate TS∞ particles without bypassing retrieval (U-001/P9-007).
+
+        When the base offers member trajectories, each candidate makes one lookup
+        at its mean member state.  A distance-gated fact is accepted only when it
+        covers *every* member query, then corrects all particles; this preserves
+        TS∞ honesty without multiplying the exact-NN hot path by the ensemble size.
+        The returned candidate epistemic remains model-owned. A protocol-only base
+        falls back to one mean particle while preserving ``_rows``' effective signal.
+        """
+        states = np.asarray(member_latents, dtype=float)
+        act = np.asarray(actions, dtype=float)
+        base_member_batch = getattr(self._base, "predict_member_batch", None)
+        if base_member_batch is None:
+            if states.ndim == 3:
+                if states.shape[0] != 1:
+                    raise ValueError("a protocol-only base can propagate only one mean trajectory")
+                states = states[0]
+            mean, var, epi, _, rew = self._rows(states, act, initial_ood=initial_ood)
+            return MemberRollout(
+                states=mean[None, :, :],
+                variances=var[None, :, :],
+                rewards=rew[None, :],
+                epistemic=epi,
+            )
+
+        base_rollout: MemberRollout = base_member_batch(
+            states, act, initial_ood=initial_ood
+        )
+        next_states = np.asarray(base_rollout.states, dtype=float).copy()
+        variances = np.asarray(base_rollout.variances, dtype=float)
+        rewards = np.asarray(base_rollout.rewards, dtype=float)
+        epistemic = np.asarray(base_rollout.epistemic, dtype=float).copy()
+        member_count, candidates, _ = next_states.shape
+        if states.ndim == 2:
+            query_states = np.repeat(states[None, :, :], member_count, axis=0)
+        elif states.ndim == 3 and states.shape[:2] == (member_count, candidates):
+            query_states = states
+        else:
+            raise ValueError("member_latents shape does not match the base member rollout")
+
+        self.calls += candidates
+        source = self._router.route(None, float(np.max(epistemic)) if candidates else 0.0)
+        if source is None:
+            return MemberRollout(next_states, variances, rewards, epistemic)
+
+        for candidate in np.nonzero(epistemic > self._router.threshold)[0]:
+            base_epistemic = float(epistemic[candidate])
+            mean_key = np.concatenate([query_states[:, candidate].mean(axis=0), act[candidate]])
+            items = source.query(mean_key)
+            if not items:
+                continue
+            fact_key, answer = items[0].content
+            residual_epistemic = 0.0
+            if self._reliability_radius is not None:
+                member_keys = np.concatenate(
+                    [
+                        query_states[:, candidate],
+                        np.repeat(act[candidate][None, :], member_count, axis=0),
+                    ],
+                    axis=1,
+                )
+                distances = np.sum(
+                    (member_keys - np.asarray(fact_key, dtype=float)) ** 2, axis=1
+                )
+                max_distance = float(np.max(distances))
+                if max_distance > self._reliability_radius:
+                    continue
+                residual_epistemic = base_epistemic * min(
+                    1.0, max_distance / self._reliability_radius
+                )
+            next_states[:, candidate] = np.asarray(answer, dtype=float)
+            self.retrievals += 1
+            epistemic[candidate] = residual_epistemic
+        return MemberRollout(next_states, variances, rewards, epistemic)
+
     def _rows(
-        self, latents: np.ndarray, actions: np.ndarray
+        self,
+        latents: np.ndarray,
+        actions: np.ndarray,
+        initial_ood: float | None = None,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         batch = getattr(self._base, "predict_batch", None)
-        if batch is not None:
+        if batch is not None and initial_ood is None:
             mean, var, epi, ale, rew = batch(latents, actions)
             mean, epi = np.array(mean, dtype=float), np.array(epi, dtype=float)
-        else:  # protocol-only base: per-row predict()
-            preds = [self._base.predict(LatentState(z=z), Action(data=a))
+        else:  # protocol-only or OOD root: preserve the full LatentState signal
+            preds = [self._base.predict(LatentState(z=z, ood=initial_ood), Action(data=a))
                      for z, a in zip(latents, actions, strict=True)]
             mean = np.stack([np.asarray(p.mean, dtype=float) for p in preds])
             var = np.stack([np.asarray(p.var, dtype=float) for p in preds])

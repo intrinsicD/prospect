@@ -49,8 +49,11 @@ design's health is that additions plug into this backbone.
   output (R6). Retrieved knowledge enters through the *same* encoder (knowledge as
   tokens).
 - **world_model.py** — latent dynamics; predicts a distribution over next latent +
-  reward + uncertainty (R1, R4).
-- **planning.py** — flat MPC/CEM in imagination (R1); the hierarchical manager over
+  reward + uncertainty (R1, R4). Multi-step imagination uses TS∞: one trajectory
+  per ensemble member, so horizon epistemic is propagated member spread rather
+  than disagreement recomputed around a fictitious mean trajectory (U-001).
+- **planning.py** — flat MPC/CEM over those member trajectories, with optional
+  accumulated-epistemic horizon truncation (R1); the hierarchical manager over
   a *jumpy* option-model + VoE-triggered termination (R2).
 - **voe.py** — calibrated surprise; epistemic/aleatoric split; competence/mastery
   (keyed on epistemic) and forgetting detection (keyed on rising prediction error —
@@ -86,7 +89,8 @@ non-parametric (episodic + semantic + skills), external (docs/DBs/APIs/tools) �
 retrieval and tool-use as actions the planner selects, gated by uncertainty. See ADR-0004.
 
 ## What is deliberately hard (open problems we design *around*, not away)
-- Compounding rollout error (bounded by hierarchy) — the main limiter on R1.
+- Compounding rollout error (made visible by TS∞ uncertainty propagation and bounded
+  by optional epistemic truncation plus hierarchy) — the main limiter on R1.
 - Causal vs. spurious features (shortcut learning) — mitigated by acting = intervening.
 - Skill composition beyond a flat menu.
 - The generality tax of any-to-any I/O — including the P6 migration: a codec swap

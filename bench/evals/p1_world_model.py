@@ -8,8 +8,9 @@ Sentinels (ADR-0006), fed by the run log this eval writes (`bench/runs/p1`):
 - representation-integrity: latent per-dim std and effective rank above floors on
   held-out probes throughout training (after a short warm-up).
 - uncertainty-reliability: ensemble disagreement rank-correlates with held-out
-  error on a mixed in-distribution + out-of-distribution probe set, and stays high
-  where error is high.
+  error on a mixed in-distribution + out-of-distribution probe set, stays high
+  where error is high, and TS∞ horizon spread exceeds disagreement recomputed
+  around the ensemble-mean trajectory by a calibrated margin (U-001).
 
 All thresholds are this eval's precise instantiation of the criteria in
 `bench.gates`; seeds are explicit and recorded in the report (P0-006).
@@ -40,6 +41,7 @@ ALEATORIC_BAND = (0.5, 2.0)  # aleatoric ratio must stay inside (persists)
 # the sentinel guards against collapse: rank falling after it has formed.
 STD_FLOOR, RANK_FLOOR, WARMUP_STEPS = 0.3, 2.0, 300
 CORR_MIN, HIGH_ERROR_RATIO_MIN = 0.3, 1.0
+TS_HORIZON, TS_PROBE_SAMPLES, TS_HORIZON_RATIO_MIN = 5, 16, 1.1
 
 Probe = Callable[[FlatWorldModel], dict[str, float]]
 
@@ -107,6 +109,38 @@ def _per_sample_stats(
 
 def _make_probe(heldout: list[Transition], mixed: list[Transition], seed: int) -> Probe:
     heldout_obs = np.stack([np.asarray(t.state.z, dtype=float) for t in heldout])
+    # Callers conventionally pass heldout + OOD. Prefer that OOD suffix for the
+    # propagation probe; fall back to the full set when a phase has no OOD arm.
+    trajectory_probe = mixed[len(heldout):] or mixed
+
+    def horizon_epistemic_ratio(model: FlatWorldModel) -> float:
+        """TS∞ horizon spread / the superseded mean-state rollout spread."""
+        if not trajectory_probe:
+            return 1.0
+        indices = np.linspace(
+            0,
+            len(trajectory_probe) - 1,
+            min(TS_PROBE_SAMPLES, len(trajectory_probe)),
+            dtype=int,
+        )
+        ratios = []
+        for index in indices:
+            transition = trajectory_probe[int(index)]
+            start = model.encode(transition.state.z)
+            # Compare ensemble propagation only; raw-input OOD scaling is a
+            # separate P9-005 signal and intentionally omitted from both arms.
+            latent_start = LatentState(z=np.asarray(start.z, dtype=float))
+            actions = [transition.action] * TS_HORIZON
+            ts_epistemic = model.imagine(latent_start, actions)[-1].epistemic
+
+            mean_state = np.asarray(start.z, dtype=float).reshape(1, -1)
+            mean_epistemic = 0.0
+            action_row = np.asarray(transition.action.data, dtype=float).reshape(1, -1)
+            for _ in range(TS_HORIZON):
+                mean_state, _, epistemic, _, _ = model.predict_batch(mean_state, action_row)
+                mean_epistemic = float(epistemic[0])
+            ratios.append((ts_epistemic + 1e-12) / (mean_epistemic + 1e-12))
+        return float(np.median(ratios))
 
     def probe(model: FlatWorldModel) -> dict[str, float]:
         latents = np.stack([np.asarray(model.encode(o).z, dtype=float) for o in heldout_obs])
@@ -122,6 +156,7 @@ def _make_probe(heldout: list[Transition], mixed: list[Transition], seed: int) -
             "latent_effective_rank": effective_rank,
             "disagreement_error_rank_corr": _spearman(epi, err),
             "high_error_disagreement_ratio": ratio,
+            "ts_horizon_epistemic_ratio": horizon_epistemic_ratio(model),
             "heldout_nll": float(np.mean(nll)),
             "calibration_ratio": float(np.mean(z_sq)),
             "seed": float(seed),
@@ -257,19 +292,38 @@ def check_uncertainty_reliability() -> SentinelResult:
         records = _p1_records()
     except (FileNotFoundError, ValueError) as err:
         return SentinelResult(name=name, healthy=False, detail=f"no readable training run log: {err}")
-    final_by_seed: dict[float, Record] = {}
-    for r in records:
-        if "disagreement_error_rank_corr" in r.metrics:
-            final_by_seed[r.metrics["seed"]] = r  # records are in step order; keep last
-    if not final_by_seed:
+    reliability_records = [
+        r for r in records if "disagreement_error_rank_corr" in r.metrics
+    ]
+    if not reliability_records:
         return SentinelResult(name=name, healthy=False, detail="run log has no disagreement probes")
+    if any("ts_horizon_epistemic_ratio" not in r.metrics for r in reliability_records):
+        return SentinelResult(
+            name=name,
+            healthy=False,
+            detail="run log has legacy uncertainty probes without the TS∞ horizon metric",
+        )
+    final_by_seed: dict[float, Record] = {}
+    for r in reliability_records:
+        final_by_seed[r.metrics["seed"]] = r  # records are in step order; keep last
     corr = min(r.metrics["disagreement_error_rank_corr"] for r in final_by_seed.values())
     ratio = min(r.metrics["high_error_disagreement_ratio"] for r in final_by_seed.values())
-    healthy = corr >= CORR_MIN and ratio >= HIGH_ERROR_RATIO_MIN
+    horizon_ratio = min(r.metrics["ts_horizon_epistemic_ratio"] for r in final_by_seed.values())
+    healthy = (
+        corr >= CORR_MIN
+        and ratio >= HIGH_ERROR_RATIO_MIN
+        and horizon_ratio >= TS_HORIZON_RATIO_MIN
+    )
     return SentinelResult(
         name=name, healthy=healthy,
-        metrics={"min_final_rank_corr": corr, "min_high_error_disagreement_ratio": ratio},
+        metrics={
+            "min_final_rank_corr": corr,
+            "min_high_error_disagreement_ratio": ratio,
+            "min_ts_horizon_epistemic_ratio": horizon_ratio,
+        },
         detail=(f"worst seed at end of training: disagreement-vs-error rank corr {corr:.2f} "
                 f"(min {CORR_MIN}), high-error-decile disagreement {ratio:.2f}x median "
-                f"(min {HIGH_ERROR_RATIO_MIN}) on a mixed in-dist + OOD probe set"),
+                f"(min {HIGH_ERROR_RATIO_MIN}) on a mixed in-dist + OOD probe set; "
+                f"TS∞ horizon-{TS_HORIZON} spread / mean-rollout spread {horizon_ratio:.2f}x "
+                f"(min {TS_HORIZON_RATIO_MIN})"),
     )

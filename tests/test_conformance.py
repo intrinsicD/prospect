@@ -27,6 +27,7 @@ from prospect.world_model import FlatWorldModel
 def test_every_skeleton_conforms_to_its_protocol() -> None:
     codec: interfaces.Codec = UniversalCodec()
     world_model: interfaces.WorldModel = FlatWorldModel()
+    trajectory_model: interfaces.TrajectoryWorldModel = FlatWorldModel()
     learner: interfaces.Learner = FlatWorldModel()  # the training seam (P0-003)
     planner: interfaces.Planner = FlatPlanner(FlatWorldModel())
     option_model: interfaces.OptionModel = JumpyOptionModel()
@@ -47,12 +48,15 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
     tunable: interfaces.UncertaintyTunable = FlatPlanner(FlatWorldModel())
     augmented: interfaces.WorldModel = RetrievalAugmentedWorldModel(
         FlatWorldModel(), UncertaintyMemoryRouter())
+    augmented_trajectory: interfaces.TrajectoryWorldModel = RetrievalAugmentedWorldModel(
+        FlatWorldModel(), UncertaintyMemoryRouter())
     observer: interfaces.ObservationLearner = LatentActionModel(obs_dim=3)  # P13-001, ADR-0010
     imitator: interfaces.ImitationLearner = ObservationImitator(obs_dim=3, action_dim=1)  # P14-001, ADR-0012
 
     for impl in (
         codec,
         world_model,
+        trajectory_model,
         learner,
         planner,
         option_model,
@@ -70,6 +74,7 @@ def test_every_skeleton_conforms_to_its_protocol() -> None:
         arbiter,
         tunable,
         augmented,
+        augmented_trajectory,
         observer,
         imitator,
     ):

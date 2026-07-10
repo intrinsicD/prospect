@@ -10,8 +10,8 @@ Three agents on the Pendulum reference task, identical evaluation episodes:
 
 Learning budget = env steps used to learn (training set / fitness rollouts).
 Held-out probe sets and evaluation episodes are measurement apparatus for both
-agents alike and are not counted. Pass: median planner return beats the baseline
-AND the floor.
+agents alike and are not counted. Pass: planner return beats the baseline AND the
+floor on every seed (the documented P2 criterion, not only the median).
 """
 from __future__ import annotations
 
@@ -148,10 +148,19 @@ def check_p2() -> GateResult:
         "random_return_median": med_random,
         "budget_env_steps": float(BUDGET),
     }
-    passed = med_planner > med_baseline and med_planner > med_random
+    wins = [
+        planner > baseline and planner > random
+        for planner, baseline, random in zip(
+            planner_returns, baseline_returns, random_returns, strict=True
+        )
+    ]
+    passed = all(wins)
+    metrics["wins_every_seed"] = float(passed)
     detail = (
         f"median eval return over {EVAL_EPISODES} shared episodes: planner {med_planner:.2f} "
         f"vs model-free ES baseline {med_baseline:.2f} vs random {med_random:.2f} "
-        f"(learning budget {BUDGET} env steps each; ES used {int(metrics['baseline_env_steps_s0'])})"
+        f"(learning budget {BUDGET} env steps each; ES used "
+        f"{int(metrics['baseline_env_steps_s0'])}); planner "
+        f"{'wins' if passed else 'does not win'} on every seed"
     )
     return GateResult(phase="P2", passed=passed, metrics=metrics, seeds=list(SEEDS), detail=detail)

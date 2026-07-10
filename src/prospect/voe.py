@@ -159,8 +159,8 @@ class LearningProgressCurriculum:
         self,
         monitor: CompetenceMonitor,
         skill: str = SurpriseCompetenceMonitor.DEFAULT_SKILL,
-        explore_bonus: float = 1.0,
-        exploit_penalty: float = 1.0,
+        explore_bonus: float = 0.03,
+        exploit_penalty: float = 0.03,
     ) -> None:
         self._monitor = monitor
         self._skill = skill

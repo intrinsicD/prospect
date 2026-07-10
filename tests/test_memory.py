@@ -18,6 +18,7 @@ from prospect.types import (
     Action,
     KnowledgeItem,
     LatentState,
+    MemberRollout,
     Prediction,
     Provenance,
     Transition,
@@ -210,6 +211,30 @@ class _EpiModel:
         return [self.predict(state, a) for a in actions]
 
 
+class _MemberEpiModel(_EpiModel):
+    def predict_member_batch(
+        self,
+        member_latents: np.ndarray,
+        actions: np.ndarray,
+        initial_ood: float | None = None,
+    ) -> MemberRollout:
+        states = np.asarray(member_latents, dtype=float)
+        if states.ndim == 2:
+            states = np.repeat(states[None, :, :], 2, axis=0)
+        next_states = states.copy()
+        next_states[0, :, 0] += 1.0
+        next_states[1, :, 0] -= 1.0
+        epistemic = next_states.var(axis=0).mean(axis=1)
+        if initial_ood is not None:
+            epistemic *= 1.0 + initial_ood
+        return MemberRollout(
+            states=next_states,
+            variances=np.ones_like(next_states),
+            rewards=np.zeros((2, len(actions))),
+            epistemic=epistemic,
+        )
+
+
 def test_retrieval_augments_only_when_uncertain() -> None:  # P9-001
     store = SemanticStore()
     store.write(_fact([0.0, 0.0, 0.5], [9.0, 9.0]))  # key = latent(2) + action(1)
@@ -225,6 +250,44 @@ def test_retrieval_augments_only_when_uncertain() -> None:  # P9-001
     assert list(corrected.mean) == [9.0, 9.0]  # the retrieved fact stands in for the guess
     assert corrected.epistemic == 0.0 and uncertain.retrievals == 1 and uncertain.calls == 1
     assert isinstance(uncertain, interfaces.WorldModel)
+
+
+def test_retrieval_is_applied_inside_member_trajectory_rollouts() -> None:  # U-001
+    store = SemanticStore()
+    store.write(_fact([0.0, 0.0, 0.5], [9.0, 9.0]))
+    router = UncertaintyMemoryRouter([store], threshold=0.25)
+    augmented = RetrievalAugmentedWorldModel(_MemberEpiModel(0.9), router)
+    rollout = augmented.predict_member_batch(
+        np.zeros((1, 2)), np.array([[0.5]]), initial_ood=None
+    )
+    assert np.allclose(rollout.states, 9.0)  # the fact covers and corrects both members
+    assert float(np.asarray(rollout.epistemic)[0]) == 0.0
+    assert augmented.retrievals == 1 and augmented.calls == 1
+
+
+def test_member_retrieval_requires_distance_coverage_for_every_particle() -> None:
+    store = SemanticStore()
+    store.write(_fact([2.0, 0.0, 0.5], [9.0, 9.0]))  # exact at the member-mean query
+    router = UncertaintyMemoryRouter([store], threshold=0.25)
+    augmented = RetrievalAugmentedWorldModel(
+        _MemberEpiModel(0.9), router, reliability_radius=2.0
+    )
+    member_states = np.array([[[0.0, 0.0]], [[4.0, 0.0]]])
+    rollout = augmented.predict_member_batch(member_states, np.array([[0.5]]))
+    # Each particle is squared-distance 4 from the fact, outside radius 2: the
+    # mean query alone is insufficient evidence, so the base particles stand.
+    assert not np.allclose(rollout.states, 9.0)
+    assert augmented.retrievals == 0 and augmented.calls == 1
+
+
+def test_augmented_imagine_propagates_the_base_member_trajectories() -> None:
+    augmented = RetrievalAugmentedWorldModel(
+        _MemberEpiModel(0.9), UncertaintyMemoryRouter(threshold=10.0)
+    )
+    predictions = augmented.imagine(
+        LatentState(z=np.zeros(2)), [Action(data=np.zeros(1)) for _ in range(3)]
+    )
+    assert predictions[-1].epistemic > predictions[0].epistemic
 
 
 def test_retrieval_distance_gated_in_planning() -> None:  # P9-007

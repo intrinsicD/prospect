@@ -11,6 +11,7 @@ from .types import (
     Competence,
     KnowledgeItem,
     LatentState,
+    MemberRollout,
     Observation,
     Option,
     Prediction,
@@ -37,6 +38,20 @@ class WorldModel(Protocol):
 
     def predict(self, state: LatentState, action: Action) -> Prediction: ...
     def imagine(self, state: LatentState, actions: Sequence[Action]) -> list[Prediction]: ...
+
+
+@runtime_checkable
+class TrajectoryWorldModel(Protocol):
+    """Optional TS∞ specialization; the narrow ``WorldModel`` contract stays stable.
+
+    A common ``(candidates, latent_dim)`` start expands to member trajectories on
+    the first call; later calls feed back ``MemberRollout.states``.  ``initial_ood``
+    carries the real encoded start's distance signal on the first step only.
+    """
+
+    def predict_member_batch(
+        self, member_latents: Array, actions: Array, initial_ood: float | None = None
+    ) -> MemberRollout: ...
 
 
 @runtime_checkable

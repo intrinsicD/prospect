@@ -5,6 +5,7 @@ from __future__ import annotations
 from math import isfinite
 
 import numpy as np
+import pytest
 
 from bench.envs import Environment, Pendulum
 from prospect import interfaces
@@ -68,6 +69,38 @@ def test_imagine_rolls_out_open_loop() -> None:
     preds = model.imagine(state, actions)
     assert len(preds) == 3
     assert all(len(p.mean) == model.latent_dim for p in preds)
+
+
+def test_imagine_propagates_member_trajectories_and_horizon_uncertainty() -> None:
+    """TS∞ exposes compounding spread that a mean-state rollout hides (U-001)."""
+    model = FlatWorldModel(obs_dim=1, action_dim=1, latent_dim=1, hidden=2, ensemble=2, seed=4)
+    # Member 0 moves away from zero; member 1 mirrors it toward/through zero.
+    # Around a fixed mean state their one-step disagreement stays constant, while
+    # independently propagated member states diverge over the horizon.
+    for member, sign in zip(model.members, (1.0, -1.0), strict=True):
+        for weight in member.weights:
+            weight[...] = 0.0
+        for bias in member.biases:
+            bias[...] = 0.0
+        member.weights[0][0, 0] = 1.0
+        member.weights[1][0, 0] = sign
+
+    state = LatentState(z=np.array([0.5]))  # deliberately far from the members' fixed point
+    actions = [Action(data=np.zeros(1)) for _ in range(3)]
+    ts_predictions = model.imagine(state, actions)
+
+    mean_state = np.asarray(state.z, dtype=float).reshape(1, -1)
+    mean_rollout_epistemic = []
+    for action in actions:
+        mean, _, epistemic, _, _ = model.predict_batch(
+            mean_state, np.asarray(action.data, dtype=float).reshape(1, -1)
+        )
+        mean_rollout_epistemic.append(float(epistemic[0]))
+        mean_state = mean
+
+    assert ts_predictions[0].epistemic == pytest.approx(mean_rollout_epistemic[0])
+    assert ts_predictions[-1].epistemic > mean_rollout_epistemic[-1]
+    assert [p.aleatoric for p in ts_predictions] == pytest.approx([1.0, 2.0, 3.0])
 
 
 def test_world_model_satisfies_both_contracts() -> None:
