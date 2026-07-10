@@ -9,7 +9,7 @@ agent. This file is the contract for how to work here. Read it fully before edit
 - `docs/roadmap.md` — phases P0–P8 and their kill-gates.
 - `docs/adr/` — the locked decisions. Do not silently contradict an ADR.
 - `docs/sota-review-2026-07.md` — the 2026 literature check: what is already best-practice
-  (don't "modernize" it), the ready upgrade tasks (U-004…U-012; U-001…U-003 shipped), and the
+  (don't "modernize" it), the ready upgrade tasks (U-005…U-012; U-001…U-004 shipped), and the
   deferred ones (U-101…U-112) with the trigger that promotes each. Consult it before
   proposing to swap a component "for a newer one" — the review likely already weighed it.
 

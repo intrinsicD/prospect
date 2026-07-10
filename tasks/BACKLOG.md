@@ -188,7 +188,7 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > A full literature check of every component (2023–2026). Verdict: the architecture is
 > **not broadly outdated** — most choices match or anticipate best practice (no SOTA world
 > model even offers the epistemic/aleatoric split this design is built on). These tasks are
-> the exceptions: **U-001…U-003 are shipped**; **U-004…U-012** are *ready* (measurably behind
+> the exceptions: **U-001…U-004 are shipped**; **U-005…U-012** are *ready* (measurably behind
 > the literature, all cheap at this scale); **U-101…U-112** are *deferred* with an
 > explicit **Trigger** each — the
 > **upgrade-triggers** workflow step (CLAUDE.md) re-checks every trigger at docs-sync and
@@ -210,9 +210,13 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
   nominal audits pass; consumers still receive floats, runtime CEM crossings remain
   separately distance-gated before substitution, and the forgetting latch stays
   frozen. P5/P8/P9 and the full P0–P14 ratchet PASS.
+- **U-004** · `done` · R7 · Replay eviction is a disjoint 60/40 recent-FIFO +
+  lifetime-reservoir hybrid within the existing capacity. Algorithm R samples FIFO
+  evictees uniformly over aged-out history; uniform replay draws span both segments.
+  A 10×-capacity churn test retains an early transition, P3/P7 remain green, and the
+  full P0–P14 ratchet passes.
 
 ### Ready (measurably behind → adopt; each re-gates the phases it touches)
-- **U-004** · `ready` · R7 · Hybrid FIFO+reservoir replay eviction — fix the FIFO-vs-anti-forgetting contradiction. Re-gates P3/P7.
 - **U-005** · `ready` · R8,R1 · k>1 distance-kernel-weighted retrieval blending (replace nearest-1 substitution); doubles as the poisoning defense. Re-gates P8/P9/P10.
 - **U-006** · `ready` · R1,R4 · Multi-step (unrolled) dynamics loss term — attack compounding rollout error (the named R1 limiter). Re-gates P1.
 - **U-007** · `ready` · R1,R3,R4,R7,R8 · Latent-space Mahalanobis density as a second OOD signal (DDU-style), complementing the P9-005 pre-encoder score. Re-gates P9.

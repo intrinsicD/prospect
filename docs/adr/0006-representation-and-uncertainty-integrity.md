@@ -33,7 +33,11 @@ reliability check shows disagreement predicts held-out error.
 of **real experience anchors every rehearsal batch**; cap **lineage depth** (regenerate
 from a real-data-anchored checkpoint, never dream-of-dreams); and **quality-gate**
 dreamed trajectories with the (validated) uncertainty estimate — rehearse only
-in-distribution dreams.
+in-distribution dreams. The fixed-budget real store combines a recent FIFO window
+with an Algorithm-R reservoir over transitions that age out of it: freshness remains
+available while older lifetime experience continues to accumulate statistically
+instead of disappearing at a FIFO horizon. The two segments are disjoint and replay
+sampling stays uniform over their union. *(Amended by U-004.)*
 
 **Model-exploitation control.** Planning **in exploit mode** uses
 **uncertainty-penalized rollouts** with short/branched horizons (MBPO/MOPO), so the

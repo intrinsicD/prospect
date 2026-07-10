@@ -32,8 +32,9 @@ epistemic uncertainty (rehearse only in-distribution dreams). The
 P2-002: `Agent(memory=...)` buffers every `observe()`d transition.
 
 ## Approach (brief)
-- Ring buffer (capacity, FIFO eviction). `sample(n)`: uniform with replacement;
-  empty buffer raises.
+- Originally shipped as a ring buffer with FIFO eviction; U-004 supersedes that
+  policy with disjoint recent-FIFO + lifetime-reservoir retention at the same
+  capacity. `sample(n)` remains uniform with replacement; empty buffer raises.
 - `generative_replay(n)`: `real_fraction` of the batch sampled real; the rest
   dreamed — start latents encoded from sampled REAL states (duck-typed
   `model.encode`, identity fallback), actions bootstrapped from stored real
@@ -51,9 +52,9 @@ P2-002: `Agent(memory=...)` buffers every `observe()`d transition.
 
 ## Acceptance criteria
 - [x] `ReplayBuffer` implements `EpisodicMemory`; conformance assertion holds.
-- [x] Storage honest: FIFO eviction at capacity; dreams never stored (buffer
-      length unchanged by `generative_replay` — unit-tested); raw observations
-      in, raw out.
+- [x] Storage honest: FIFO eviction at capacity when P3 shipped (superseded by
+      U-004's fixed-budget FIFO+reservoir policy); dreams never stored (buffer length
+      unchanged by `generative_replay` — unit-tested); raw observations in, raw out.
 - [x] Rehearsal batch: real fraction is a floor (gated-out dreams topped up with
       real anchors); dreams marked `__dream__` with depth ≤ cap; latent-space
       dreams from the real model; the self-calibrating epistemic gate cuts

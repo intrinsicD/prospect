@@ -76,8 +76,9 @@ design's health is that additions plug into this backbone.
   (consumers read the sign, never pick it).
 - **skills.py** — options with predictive preconditions; simulate-to-select router;
   only competence-gated (mastered) skills are offered upward (R5).
-- **memory.py** — episodic replay + *generative* replay (rehearsal), a semantic
-  store whose read side is a `KnowledgeSource` (one query verb, P0-008), and an
+- **memory.py** — episodic replay with disjoint recent-FIFO + lifetime-reservoir
+  retention, plus *generative* replay (rehearsal); a semantic store whose read side
+  is a `KnowledgeSource` (one query verb, P0-008), and an
   uncertainty-gated, **provenance-respecting** router over the memory tiers: it may
   decline to retrieve (`None` = answer parametrically), and it selects among sources
   by `trust` — highest-trust above a `min_trust` floor wins, so an untrusted source

@@ -25,10 +25,14 @@ from .types import (
 class ReplayBuffer:
     """Real experience for learning + generative replay for rehearsal (P3-003).
 
-    Storage: a ring buffer of REAL transitions carrying raw observations
-    (P0-011: experience stays re-encodable under a future codec). Dreamed
-    transitions are NEVER stored — dream-of-dreams is structurally impossible,
-    not merely checked (ADR-0006 lineage rule).
+    Storage: a fixed-budget hybrid of recent REAL transitions in a FIFO ring and
+    older REAL transitions in an Algorithm-R reservoir (U-004). Each transition
+    lives in one segment: an item aging out of FIFO becomes a reservoir candidate,
+    so the reservoir is uniform over the lifetime history older than the recent
+    window without double-weighting entries. Raw observations are retained
+    (P0-011: experience stays re-encodable under a future codec). Dreamed transitions
+    are NEVER stored — dream-of-dreams is structurally impossible, not merely
+    checked (ADR-0006 lineage rule).
 
     `generative_replay(n)` returns a mixed rehearsal batch, anti-collapse by
     construction (ADR-0006):
@@ -50,6 +54,7 @@ class ReplayBuffer:
     """
 
     DREAM_SKILL = "__dream__"
+    RESERVOIR_FRACTION = 0.4
 
     def __init__(
         self,
@@ -60,30 +65,56 @@ class ReplayBuffer:
         epistemic_multiplier: float = 4.0,
         seed: int = 0,
     ) -> None:
+        if capacity < 1:
+            raise ValueError("replay capacity must be positive")
         self._model = world_model
         self.capacity = capacity
+        self.reservoir_capacity = (
+            max(1, min(capacity - 1, round(capacity * self.RESERVOIR_FRACTION)))
+            if capacity > 1
+            else 0
+        )
+        self.fifo_capacity = capacity - self.reservoir_capacity
         self.real_fraction = real_fraction
         self.max_dream_depth = max_dream_depth
         self.epistemic_multiplier = epistemic_multiplier
         self._rng = np.random.default_rng(seed)
-        self._data: list[Transition] = []
-        self._cursor = 0  # ring-buffer write position once full
+        self._reservoir_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(1)[0])
+        self._fifo: list[Transition] = []
+        self._reservoir: list[Transition] = []
+        self._fifo_cursor = 0  # ring-buffer write position once the recent window is full
+        self._reservoir_seen = 0  # lifetime count of FIFO evictees considered by Algorithm R
 
     def __len__(self) -> int:
-        return len(self._data)
+        return len(self._fifo) + len(self._reservoir)
 
     def add(self, transition: Transition) -> None:
-        if len(self._data) < self.capacity:
-            self._data.append(transition)
-        else:  # FIFO eviction
-            self._data[self._cursor] = transition
-            self._cursor = (self._cursor + 1) % self.capacity
+        if len(self._fifo) < self.fifo_capacity:
+            self._fifo.append(transition)
+            return
+
+        evicted = self._fifo[self._fifo_cursor]
+        self._fifo[self._fifo_cursor] = transition
+        self._fifo_cursor = (self._fifo_cursor + 1) % self.fifo_capacity
+        if self.reservoir_capacity == 0:
+            return
+        self._reservoir_seen += 1
+        if len(self._reservoir) < self.reservoir_capacity:
+            self._reservoir.append(evicted)
+            return
+        slot = int(self._reservoir_rng.integers(0, self._reservoir_seen))
+        if slot < self.reservoir_capacity:
+            self._reservoir[slot] = evicted
 
     def sample(self, n: int) -> list[Transition]:
-        if not self._data:
+        if len(self) == 0:
             raise ValueError("cannot sample from an empty replay buffer")
-        indices = self._rng.integers(0, len(self._data), size=n)
-        return [self._data[i] for i in indices]
+        fifo_size = len(self._fifo)
+        indices = self._rng.integers(0, len(self), size=n)
+        return [
+            self._fifo[i] if i < fifo_size else self._reservoir[i - fifo_size]
+            for i in indices
+        ]
 
     def generative_replay(self, n: int) -> list[Transition]:
         if self._model is None:

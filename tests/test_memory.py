@@ -1,5 +1,5 @@
-"""Unit tests for the ReplayBuffer (P3-003): honest storage, real-anchored
-rehearsal batches, lineage-capped latent-space dreams, and the epistemic gate."""
+"""Unit tests for ReplayBuffer (P3-003, U-004): hybrid real storage,
+real-anchored rehearsal, lineage-capped latent-space dreams, and the epistemic gate."""
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -58,12 +58,39 @@ class _DepthOneModel:
         return [self.predict(state, a) for a in actions]
 
 
-def test_buffer_satisfies_protocol_and_evicts_fifo() -> None:
-    buffer = _filled(ReplayBuffer(capacity=4), 6)
+def test_buffer_keeps_recent_fifo_and_early_lifetime_reservoir() -> None:
+    capacity = 10
+    buffer = ReplayBuffer(capacity=capacity, seed=7)
+    for i in range(10 * capacity):
+        buffer.add(_transition(float(i)))
+        assert len(buffer) == min(i + 1, capacity)
+
     assert isinstance(buffer, interfaces.EpisodicMemory)
-    assert len(buffer) == 4
-    stored_first_dims = {float(np.asarray(t.state.z)[0]) for t in buffer.sample(200)}
-    assert stored_first_dims <= {2.0, 3.0, 4.0, 5.0}  # 0 and 1 evicted first
+    assert buffer.fifo_capacity == 6
+    assert buffer.reservoir_capacity == 4
+    assert len(buffer._fifo) == buffer.fifo_capacity
+    assert len(buffer._reservoir) == buffer.reservoir_capacity
+
+    fifo_values = {float(np.asarray(t.state.z)[0]) for t in buffer._fifo}
+    reservoir_values = {float(np.asarray(t.state.z)[0]) for t in buffer._reservoir}
+    assert fifo_values == set(range(94, 100))
+    assert reservoir_values <= set(range(94))
+    assert 7.0 in reservoir_values  # marked early item survives 10x-capacity churn
+
+    sampled_values = {float(np.asarray(t.state.z)[0]) for t in buffer.sample(2_000)}
+    assert {7.0, 99.0} <= sampled_values  # uniform draws cover reservoir and FIFO
+
+    twin = _filled(ReplayBuffer(capacity=capacity, seed=7), 10 * capacity)
+    twin_reservoir = [float(np.asarray(t.state.z)[0]) for t in twin._reservoir]
+    assert twin_reservoir == [float(np.asarray(t.state.z)[0]) for t in buffer._reservoir]
+
+
+def test_single_slot_buffer_degrades_to_fifo() -> None:
+    buffer = _filled(ReplayBuffer(capacity=1), 3)
+    assert buffer.fifo_capacity == 1
+    assert buffer.reservoir_capacity == 0
+    assert len(buffer) == 1
+    assert float(np.asarray(buffer.sample(1)[0].state.z)[0]) == 2.0
 
 
 def test_sampling_empty_buffer_raises() -> None:
