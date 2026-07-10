@@ -100,7 +100,7 @@ _register(
 _register(
     "P2",
     "Planning beats reaction",
-    "MPC/CEM in imagination beats a model-free baseline and the random floor on EVERY seed "
+    "iCEM/MPC in imagination beats a model-free baseline and the random floor on EVERY seed "
     "at EQUAL environment-step budget on the reference control task.",
 )
 _register(

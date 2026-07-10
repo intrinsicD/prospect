@@ -17,7 +17,7 @@ are *consumers* of that core, not separate systems. See `docs/architecture.md`.
 The design is realized, not skeletal. There are working numpy implementations of the
 flat world model (ensemble Gaussian latent dynamics with an epistemic/aleatoric split,
 EMA target encoder, anti-collapse regularization, inverse-dynamics + reward heads),
-CEM/MPC planning, the jumpy option-model and hierarchical manager, skills, replay,
+iCEM/MPC planning, the jumpy option-model and hierarchical manager, skills, replay,
 semantic memory + uncertainty-gated retrieval, the universal codec, external knowledge +
 compute-as-action tools, a swappable vision seam, latent-action learning from
 action-free observation, and imitation from observation (observe→repeat) — plus five

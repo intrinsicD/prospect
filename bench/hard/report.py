@@ -31,7 +31,7 @@ def render_markdown(results: list[TaskResult], reach: list[TaskResult],
                  f"mujoco {versions.get('mujoco', '?')}, numpy {versions.get('numpy', '?')}._")
     lines.append("")
     lines.append(
-        "Re-runs the **P2 claim** — MPC/CEM over a learned `FlatWorldModel` beats a "
+        "Re-runs the **P2 claim** — iCEM/MPC over a learned `FlatWorldModel` beats a "
         "model-free baseline at **equal env-step budget** — on DeepMind Control Suite "
         "tasks the repo did not author (ADR-0011). **Non-gated:** no phase ships on this; "
         "it is a credibility probe whose value is an honest number, not a pass."

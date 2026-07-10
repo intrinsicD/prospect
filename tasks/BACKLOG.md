@@ -188,7 +188,7 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > A full literature check of every component (2023–2026). Verdict: the architecture is
 > **not broadly outdated** — most choices match or anticipate best practice (no SOTA world
 > model even offers the epistemic/aleatoric split this design is built on). These tasks are
-> the exceptions: **U-001 is shipped**; **U-002…U-012** are *ready* (measurably behind
+> the exceptions: **U-001/U-002 are shipped**; **U-003…U-012** are *ready* (measurably behind
 > the literature, all cheap at this scale); **U-101…U-112** are *deferred* with an
 > explicit **Trigger** each — the
 > **upgrade-triggers** workflow step (CLAUDE.md) re-checks every trigger at docs-sync and
@@ -201,9 +201,11 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
   accumulated-epistemic truncation. Horizon uncertainty is propagated, not recomputed
   around the mean; a strict OOD sentinel rejects regression (P1 `8.06x`), P2/P5 win
   every seed, and `make gate-all` passes P0–P14.
+- **U-002** · `done` · R1,R2 · iCEM planner: beta-2 colored proposals, keep/shift
+  elites, execute-best, and softmax-weighted elite moments. P2 improves the prior
+  per-seed margins by `[+0.92, +1.33, +2.85]`; P5 and `make gate-all` remain green.
 
 ### Ready (measurably behind → adopt; each re-gates the phases it touches)
-- **U-002** · `ready` · R1,R2 · iCEM planner — colored noise + keep/shift elites + execute-best + softmax elite weighting; replace vanilla white-noise CEM. Re-gates P2/P5.
 - **U-003** · `ready` · R2,R3,R8 · Adaptive conformal (ACI) calibration of VoE thresholds (termination + retrieval gate); forgetting floor stays frozen. Re-gates P5/P8/P9.
 - **U-004** · `ready` · R7 · Hybrid FIFO+reservoir replay eviction — fix the FIFO-vs-anti-forgetting contradiction. Re-gates P3/P7.
 - **U-005** · `ready` · R8,R1 · k>1 distance-kernel-weighted retrieval blending (replace nearest-1 substitution); doubles as the poisoning defense. Re-gates P8/P9/P10.

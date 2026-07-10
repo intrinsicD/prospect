@@ -1,5 +1,5 @@
 """BH-001 (ADR-0011) — re-run the **P2 claim** on a real MuJoCo task the repo did
-not author: does MPC/CEM over a learned `FlatWorldModel` beat a model-free baseline
+not author: does iCEM/MPC over a learned `FlatWorldModel` beat a model-free baseline
 **at equal env-step budget**?
 
 This is a NON-GATED credibility probe. There is no pass/fail bar that ships a phase;
@@ -46,7 +46,7 @@ SEEDS = (0, 1, 2, 3, 4)
 BUDGET = 4096          # env steps each agent may use to learn (== P2)
 EP_LEN = 100           # eval / fitness episode length (== P2)
 EVAL_EPISODES = 3      # shared fresh episodes, identical seeds across all agents
-HORIZON, CANDIDATES, ELITES, ITERS = 20, 64, 8, 3   # CEM/MPC — P2 FlatPlanner defaults
+HORIZON, CANDIDATES, ELITES, ITERS = 20, 64, 8, 3   # iCEM/MPC — P2 FlatPlanner defaults
 POP, GENS, HIDDEN = 10, 4, 16                        # model-free CEM-ES policy search (== P2)
 CALIB_SMALL = 256      # low-data point for the P1-calibration spot-check
 

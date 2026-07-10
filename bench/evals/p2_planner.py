@@ -3,7 +3,7 @@
 Three agents on the Pendulum reference task, identical evaluation episodes:
 - MBRL: BUDGET random env steps -> FlatWorldModel (P1 recipe; probes logged to run
   `p2`, so the P1-era sentinels judge the model THIS phase trained) -> FlatPlanner
-  (CEM in imagination, exploit-mode epistemic penalty per ADR-0007).
+  (iCEM in imagination, exploit-mode epistemic penalty per ADR-0007).
 - Model-free baseline: CEM-ES direct policy search over a small tanh-MLP policy;
   every fitness rollout is real env interaction counted against the SAME budget.
 - Random policy: the floor.
@@ -99,7 +99,7 @@ def _es_baseline(seed: int) -> tuple[Policy, int]:
 
 
 def _mpc_agent(seed: int, log: RunLog) -> Agent:
-    """World model from BUDGET random steps, then CEM planning via the composition
+    """World model from BUDGET random steps, then iCEM planning via the composition
     root: `Agent` wires the encode seam to the planner (P2-002)."""
     train = _rollout(Pendulum(), BUDGET, seed)
     heldout = _rollout(Pendulum(), 256, seed + 500)

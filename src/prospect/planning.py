@@ -1,6 +1,6 @@
-"""Planning (R1, R2). Flat MPC in imagination, the learned jumpy option-model,
+"""Planning (R1, R2). Flat iCEM/MPC in imagination, the learned jumpy option-model,
 and the hierarchical manager over it. See ADR-0001, ADR-0003, ADR-0006/0007.
-Tasks: P2-001 (done), P5-001 (done), P5-002 (done), U-001 (done).
+Tasks: P2-001 (done), P5-001 (done), P5-002 (done), U-001/U-002 (done).
 """
 from __future__ import annotations
 
@@ -15,17 +15,19 @@ from .world_model import _LOGVAR_MAX, _LOGVAR_MIN, _MLP  # core-internal reuse
 
 
 class FlatPlanner:
-    """CEM/MPC in imagination over a `WorldModel` (R1, task P2-001).
+    """iCEM/MPC in imagination over a `WorldModel` (R1, P2-001/U-002).
 
-    Candidate action sequences are rolled out in latent space and scored by
+    Candidate action sequences are proposed with temporally colored noise, retained
+    elites, and a softmax-weighted distribution update, then rolled out in latent
+    space and scored by
     discounted imagined reward **minus a per-step epistemic penalty** — ADR-0006's
     model-exploitation control. This is the ADR-0007 *exploit-mode* consumer: the
     penalty sign is fixed here; the exploration bonus (sign flip) belongs to the
     curriculum (P3-002), never to the planner.
 
     Receding horizon: `plan()` returns the first action of the optimized sequence
-    and warm-starts the next call with the shifted elite mean; call `reset()`
-    between episodes. `goal` is accepted per the Protocol and ignored until
+    and warm-starts the next call with the shifted elite mean and pool; call
+    `reset()` between episodes. `goal` is accepted per the Protocol and ignored until
     hierarchical planning lands (P5) — P2 plans on reward.
 
     Contract: interfaces.Planner. Uses `TrajectoryWorldModel`-style member batches
@@ -47,7 +49,20 @@ class FlatPlanner:
         uncertainty_penalty: float = 0.03,
         seed: int = 0,
         epistemic_horizon_bound: float | None = None,
+        colored_beta: float = 2.0,
+        keep_elite_fraction: float = 0.3,
+        temperature: float = 0.5,
     ) -> None:
+        if not 1 <= elites <= candidates:
+            raise ValueError("elites must be between 1 and candidates")
+        if iterations < 1:
+            raise ValueError("iterations must be at least 1")
+        if colored_beta < 0.0:
+            raise ValueError("colored_beta must be non-negative")
+        if not 0.0 <= keep_elite_fraction <= 1.0:
+            raise ValueError("keep_elite_fraction must be in [0, 1]")
+        if temperature <= 0.0:
+            raise ValueError("temperature must be positive")
         self._model = world_model
         self.action_dim, self.action_low, self.action_high = action_dim, action_low, action_high
         self.horizon, self.candidates, self.elites = horizon, candidates, elites
@@ -56,28 +71,105 @@ class FlatPlanner:
         if epistemic_horizon_bound is not None and epistemic_horizon_bound < 0.0:
             raise ValueError("epistemic_horizon_bound must be non-negative or None")
         self.epistemic_horizon_bound = epistemic_horizon_bound
+        self.colored_beta = colored_beta
+        self.keep_elite_fraction = keep_elite_fraction
+        self.temperature = temperature
         self._rng = np.random.default_rng(seed)
         self._warm_mean: np.ndarray | None = None
+        self._warm_elites: np.ndarray | None = None
 
     def reset(self) -> None:
         """Clear the receding-horizon warm start (call between episodes)."""
         self._warm_mean = None
+        self._warm_elites = None
+
+    def _sample_colored_noise(self, count: int) -> np.ndarray:
+        """Temporally correlated Gaussian noise via an f^(-beta/2) FFT filter.
+
+        Horizons below four have too few distinct real-FFT bins for meaningful
+        spectral coloring; they still receive a valid unit-Gaussian proposal.
+        """
+        shape = (count, self.horizon, self.action_dim)
+        white = self._rng.normal(size=shape)
+        if count == 0 or self.horizon <= 1 or self.colored_beta == 0.0:
+            return white
+        spectrum = np.fft.rfft(white, axis=1)
+        frequencies = np.fft.rfftfreq(self.horizon)
+        # Give the DC component the lowest finite frequency's power.  Zeroing DC
+        # would force every proposal to have zero temporal mean, excluding useful
+        # sustained actions and even making short-horizon samples anti-correlated.
+        frequencies[0] = frequencies[1]
+        scale = frequencies ** (-self.colored_beta / 2.0)
+        # The inverse FFT of the response is the circular filter kernel.  Its L2
+        # norm is the exact marginal standard deviation induced by unit white
+        # noise, so this deterministic normalization preserves N(0, 1) marginals
+        # without normalizing away each proposal's temporal offset.
+        kernel = np.fft.irfft(scale, n=self.horizon)
+        normalizer = float(np.sqrt(np.sum(kernel**2)))
+        spectrum *= scale[None, :, None]
+        colored = np.fft.irfft(spectrum, n=self.horizon, axis=1)
+        return np.asarray(colored / normalizer, dtype=float)
+
+    @staticmethod
+    def _softmax_weights(scores: np.ndarray, temperature: float) -> np.ndarray:
+        """Stable score weights; infinite temperature approaches a uniform mean."""
+        if temperature <= 0.0:
+            raise ValueError("temperature must be positive")
+        values = np.asarray(scores, dtype=float)
+        if not np.all(np.isfinite(values)):
+            raise ValueError("scores must be finite")
+        logits = (values - float(np.max(values))) / temperature
+        weights = np.exp(logits)
+        return np.asarray(weights / weights.sum(), dtype=float)
+
+    @staticmethod
+    def _shift_sequences(sequences: np.ndarray) -> np.ndarray:
+        """Receding-horizon shift, repeating the last action at the open tail."""
+        return np.concatenate([sequences[:, 1:], sequences[:, -1:]], axis=1)
 
     def plan(self, state: LatentState, goal: Subgoal | None = None) -> Action:
         if self._warm_mean is not None:  # shift last plan by one step
             mean = np.concatenate([self._warm_mean[1:], self._warm_mean[-1:]], axis=0)
         else:
             mean = np.zeros((self.horizon, self.action_dim))
-        std = np.full((self.horizon, self.action_dim), 0.5 * (self.action_high - self.action_low))
+        # iCEM's fixed initial sigma is 0.5 in normalized [-1, 1] action
+        # coordinates: one quarter of the physical action range.
+        std = np.full((self.horizon, self.action_dim), 0.25 * (self.action_high - self.action_low))
+        keep_count = min(
+            self.elites,
+            int(np.ceil(self.keep_elite_fraction * self.elites)),
+        )
+        carried = (
+            self._shift_sequences(self._warm_elites[:keep_count])
+            if self._warm_elites is not None
+            else np.empty((0, self.horizon, self.action_dim))
+        )
+        best_sequence: np.ndarray | None = None
+        best_score = -np.inf
+        elite = np.empty((0, self.horizon, self.action_dim))
         for _ in range(self.iterations):
-            noise = self._rng.normal(size=(self.candidates, self.horizon, self.action_dim))
-            sequences = np.clip(mean + std * noise, self.action_low, self.action_high)
+            carried = carried[: self.candidates]
+            fresh_count = self.candidates - len(carried)
+            noise = self._sample_colored_noise(fresh_count)
+            fresh = np.clip(mean + std * noise, self.action_low, self.action_high)
+            sequences = np.concatenate([fresh, carried], axis=0)
             scores = self._imagined_returns(state, sequences)
-            elite = sequences[np.argsort(scores)[-self.elites :]]
-            mean = elite.mean(axis=0)
-            std = np.maximum(elite.std(axis=0), 0.05)
+            best_index = int(np.argmax(scores))
+            if float(scores[best_index]) > best_score:
+                best_score = float(scores[best_index])
+                best_sequence = sequences[best_index].copy()
+            elite_indices = np.argsort(scores)[-self.elites :][::-1]
+            elite = sequences[elite_indices]
+            elite_scores = scores[elite_indices]
+            weights = self._softmax_weights(elite_scores, self.temperature)
+            mean = np.sum(weights[:, None, None] * elite, axis=0)
+            variance = np.sum(weights[:, None, None] * (elite - mean) ** 2, axis=0)
+            std = np.maximum(np.sqrt(variance), 0.05)
+            carried = elite[:keep_count].copy()
+        assert best_sequence is not None  # iterations >= 1, candidates >= elites >= 1
         self._warm_mean = mean
-        return Action(data=mean[0].copy())
+        self._warm_elites = elite.copy()
+        return Action(data=best_sequence[0].copy())
 
     def _imagined_returns(self, state: LatentState, sequences: np.ndarray) -> np.ndarray:
         """Score (K,H,action_dim) candidate sequences by imagined discounted reward,

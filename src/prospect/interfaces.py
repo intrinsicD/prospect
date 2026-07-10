@@ -108,7 +108,7 @@ class OptionModel(Protocol):
 
 @runtime_checkable
 class Planner(Protocol):
-    """Flat planning in imagination (R1): MPC/CEM/search over the world model."""
+    """Flat planning in imagination (R1): iCEM/MPC/search over the world model."""
 
     def plan(self, state: LatentState, goal: Subgoal | None = None) -> Action: ...
 

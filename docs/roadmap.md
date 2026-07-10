@@ -8,7 +8,7 @@ criteria precise even while the eval body is a TODO.
 |-------|------|-------------|---------------------|----------|
 | P0 | Scaffold | this repo | imports clean, smoke tests green (`GATES["P0"]`, registered) | — |
 | P1 | Flat world model + calibrated uncertainty | `FlatWorldModel` | latent 1-step beats a persistence/linear baseline; epistemic falls with data while aleatoric persists on a stochastic variant | R1, R4 |
-| P2 | Planning beats reaction | `FlatPlanner` (MPC/CEM) | imagined MPC beats a model-free baseline at **equal env-step budget** | R1 |
+| P2 | Planning beats reaction | `FlatPlanner` (iCEM/MPC) | imagined MPC beats a model-free baseline at **equal env-step budget** | R1 |
 | P3 | VoE + curriculum + replay | `SurpriseCompetenceMonitor`, `ReplayBuffer` | expected-vs-violated surprise differential reliable over seeds; curiosity beats random exploration | R3 (R7 groundwork) |
 | P4 | Skills + router | `SkillRouter` | simulate-to-select picks the right skill above baseline; misapplication flagged by a surprise spike | R5 |
 | P5 | Hierarchical planning | `JumpyOptionModel`, `HierarchicalManager` | two-level planning beats flat on a long-horizon task at **equal compute** | R2 |

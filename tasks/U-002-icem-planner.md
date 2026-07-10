@@ -1,6 +1,6 @@
 # U-002 — iCEM planner: colored noise + keep/shift elites + execute-best + softmax weighting
 
-- **Status:** ready
+- **Status:** done
 - **Phase:** U (upgrade track; re-gates against P2/P5)
 - **Requirements:** R1, R2
 - **ADRs:** ADR-0001, ADR-0006/0007 (the epistemic penalty is untouched — proposal
@@ -38,7 +38,9 @@ Constructor gains `colored_beta: float = 2.0`, `keep_elite_fraction: float = 0.3
 ## Approach (brief)
 - Colored noise: scale the white-noise FFT along the horizon axis by `f^(-beta/2)` and
   inverse-FFT (numpy.fft, ~10 lines) — temporally correlated candidates, the single
-  largest contributor in iCEM's ablation.
+  largest contributor in iCEM's ablation. Use iCEM's fixed initial `σ=0.5` in
+  normalized action coordinates so correlated trajectories do not saturate the
+  physical action range.
 - Keep-elites: carry a fraction of the previous iteration's elites into the next
   candidate pool; shift-elites: seed the next MPC step's pool with the shifted elite set
   (the warm start at planning.py:62 already shifts the mean — extend it to the pool).
@@ -48,12 +50,12 @@ Constructor gains `colored_beta: float = 2.0`, `keep_elite_fraction: float = 0.3
   (uses score magnitude the current unweighted average throws away).
 
 ## Acceptance criteria
-- [ ] Colored-noise sampling, keep/shift elites, execute-best, softmax elite update all
+- [x] Colored-noise sampling, keep/shift elites, execute-best, softmax elite update all
       in the one loop; unit test confirms colored samples are temporally correlated
       (lag-1 autocorrelation > white-noise baseline).
-- [ ] **P2 gate PASS with margin ≥ current** on every seed (measured, not assumed);
+- [x] **P2 gate PASS with margin ≥ current** on every seed (measured, not assumed);
       `make gate-all` green.
-- [ ] `make test` green, `make lint` clean, `make typecheck` clean.
+- [x] `make test` green, `make lint` clean, `make typecheck` clean.
 
 ## Test plan
 - Unit (tests/test_planner.py): autocorrelation of sampled sequences; execute-best
@@ -63,9 +65,33 @@ Constructor gains `colored_beta: float = 2.0`, `keep_elite_fraction: float = 0.3
   `make gate PHASE=P5`, `make gate-all`.
 
 ## Docs-sync checklist
-- [ ] Status → done; gate margin before/after recorded below.
-- [ ] architecture.md/planning docstring: "flat MPC/CEM" → iCEM note.
-- [ ] `docs/sota-review-2026-07.md`: mark U-002 shipped.
+- [x] Status → done; gate margin before/after recorded below.
+- [x] architecture.md/planning docstring: "flat MPC/CEM" → iCEM note.
+- [x] `docs/sota-review-2026-07.md`: mark U-002 shipped.
 
 ## Gate result
-<paste the GateResult once run>
+
+The first complete four-feature loop retained CEM's inherited initial standard
+deviation (`σ=1.0` in normalized action coordinates). With beta-2 noise this made
+whole trajectories saturate the action limits: P2 blocked on seed 1 (`-66.02` vs
+the `-64.99` baseline). Restoring iCEM's fixed `σ=0.5` normalized proposal scale
+removed that failure without adding a knob or changing the reward/epistemic score.
+
+Final `make gate PHASE=P2`: **PASS**. The comparison floor is the stronger of the
+model-free and random returns (model-free on all three seeds). “Before” is the
+immediately preceding U-001 report, `P2-20260710T131536Z.json`.
+The full-ratchet P2 evidence is `P2-20260710T140315Z.json`.
+
+| seed | U-001 return | U-001 margin | U-002 return | U-002 margin | margin Δ |
+|------|-------------:|-------------:|-------------:|-------------:|---------:|
+| 0 | -46.15 | 17.26 | -45.23 | 18.19 | **+0.92** |
+| 1 | -64.28 | 0.71 | -62.95 | 2.04 | **+1.33** |
+| 2 | -59.58 | 2.30 | -56.73 | 5.15 | **+2.85** |
+
+Median P2 return is `-56.73` vs model-free `-63.41` vs random `-67.57`; the
+planner wins every seed. `make gate PHASE=P5`: **PASS**, hierarchy returns
+`[-9.1, -4.2, -4.7]` vs compute-matched flat `[-49.2, -43.3, -35.2]` at about
+729 member-forwards/step. `make test`: 131 passed, 1 skipped; lint and mypy clean.
+Final `make gate-all` (P0–P14): **PASS**. Its P9 composition check improves to
+`-16.3` vs reactive `-73.1`, with planning worth `+56.8` return and every sentinel
+healthy.

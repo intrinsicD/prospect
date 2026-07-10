@@ -52,7 +52,8 @@ design's health is that additions plug into this backbone.
   reward + uncertainty (R1, R4). Multi-step imagination uses TS∞: one trajectory
   per ensemble member, so horizon epistemic is propagated member spread rather
   than disagreement recomputed around a fictitious mean trajectory (U-001).
-- **planning.py** — flat MPC/CEM over those member trajectories, with optional
+- **planning.py** — flat iCEM/MPC over those member trajectories: colored proposals,
+  retained/shifted elites, execute-best, and a softmax-weighted update, with optional
   accumulated-epistemic horizon truncation (R1); the hierarchical manager over
   a *jumpy* option-model + VoE-triggered termination (R2).
 - **voe.py** — calibrated surprise; epistemic/aleatoric split; competence/mastery
