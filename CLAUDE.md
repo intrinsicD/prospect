@@ -8,6 +8,10 @@ agent. This file is the contract for how to work here. Read it fully before edit
 - `docs/requirements.md` — R1–R8 and the traceability table (requirement → module → ADR → gate).
 - `docs/roadmap.md` — phases P0–P8 and their kill-gates.
 - `docs/adr/` — the locked decisions. Do not silently contradict an ADR.
+- `docs/sota-review-2026-07.md` — the 2026 literature check: what is already best-practice
+  (don't "modernize" it), the ready upgrade tasks (U-001…U-012), and the deferred ones
+  (U-101…U-112) with the trigger that promotes each. Consult it before proposing to swap a
+  component "for a newer one" — the review likely already weighed it.
 
 ## The one idea you must not break
 A predictive world model is the spine; **prediction error (violation of
@@ -51,6 +55,16 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 - **docs-sync** — Update whatever you invalidated: the requirement traceability row,
   the task status, an ADR's status, the architecture doc. **Code and docs must not
   drift.** A change to behaviour that leaves docs stale is incomplete.
+- **upgrade-triggers** — At docs-sync, re-scan the deferred upgrade tasks
+  (`tasks/U-1NN-*.md`, listed in the backlog's *Upgrade track*). Each has a **Trigger**:
+  a measurable condition (a new gate's shape, a regression, a store/library size, a
+  simplification sprint). If the work you just did makes a trigger true — e.g. you added a
+  sparse/long-horizon gate (U-101), or a gate report blames uniform sampling (U-103), or
+  the option library grew past K^depth (U-104) — **promote that task**: flip its Status
+  `deferred → ready`, update its backlog row, and note the observation that fired it. This
+  is how "generality is earned by a gate" (rule 1) is enforced for the upgrade track: don't
+  build a deferred item early, but don't let a fired trigger sit unnoticed either. Ready
+  upgrades (`U-0NN`) are taken like any other top unblocked backlog item.
 - **core conventions** — Python ≥3.11, full type hints (enforced: `make typecheck`
   must be clean), `ruff` clean, tests green. New public surface satisfies a
   `Protocol` in `interfaces.py` and gets a typed conformance assertion in

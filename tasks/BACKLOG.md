@@ -184,6 +184,45 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > what watching can't teach.
 - **P14-001** · `done` · R5,R7 · Observe → repeat: reproduce a demonstrated behavior the agent never performed itself (imitation-from-observation). Core `imitation.ObservationImitator` (satisfies `interfaces.ImitationLearner`): watch an expert's *observations only* → recover its actions (inverse dynamics) → clone a closed-loop policy → reproduce. **Numpy gate P14 PASS** on `PendulumSwingup` (reproduces score 0.99, recovery R² 1.0, shuffled control 0.12, beats cloning-own-random by 1.0; all sentinels healthy) — ships (`bench/SHIPPED` ratchets P0–P14). **Demonstrated on real DMC swingup** (BH-001 §B, ADR-0012): inverse-dyn imitation **45.3 vs from-scratch 6.4** (7×), shuffled 0.1. **Latent-route reliability fix (Part 2, ADR-0010):** the P13 route's separate calibration extrapolated with a systematic bias (and recovery R² didn't predict reproduction); **watch-then-ground** (`LatentActionModel.ground` — action-free pretrain + supervised grounding) fixes it and **beats from-scratch inverse dynamics in the low-label regime** (46 vs 33 at 512 labels) — watching as a low-data prior for control. Then **explore** (P3-002) fills what watching can't teach. Runtime layer on top: real-YouTube + live-webcam (non-gated).
 
+## Upgrade track — SOTA review 2026-07 (`docs/sota-review-2026-07.md`)
+> A full literature check of every component (2023–2026). Verdict: the architecture is
+> **not broadly outdated** — most choices match or anticipate best practice (no SOTA world
+> model even offers the epistemic/aleatoric split this design is built on). These tasks are
+> the exceptions: **U-001…U-012** are *ready* (measurably behind the literature, all cheap
+> at this scale); **U-101…U-112** are *deferred* with an explicit **Trigger** each — the
+> **upgrade-triggers** workflow step (CLAUDE.md) re-checks every trigger at docs-sync and
+> promotes a deferred task to `ready` only when its condition is observed (ADR-0005:
+> generality is earned by a gate, not built ahead). The upgrade track does not block the
+> P-series; take a ready U-task like any other top unblocked item.
+
+### Ready (measurably behind → adopt; each re-gates the phases it touches)
+- **U-001** · `ready` · R1,R2,R3 · Trajectory-sampling (TS∞) rollouts + uncertainty-gated truncation — replace mean-latent imagination; propagate horizon uncertainty. **Highest-value.** Re-gates P1/P2/P5.
+- **U-002** · `ready` · R1,R2 · iCEM planner — colored noise + keep/shift elites + execute-best + softmax elite weighting; replace vanilla white-noise CEM. Re-gates P2/P5.
+- **U-003** · `ready` · R2,R3,R8 · Adaptive conformal (ACI) calibration of VoE thresholds (termination + retrieval gate); forgetting floor stays frozen. Re-gates P5/P8/P9.
+- **U-004** · `ready` · R7 · Hybrid FIFO+reservoir replay eviction — fix the FIFO-vs-anti-forgetting contradiction. Re-gates P3/P7.
+- **U-005** · `ready` · R8,R1 · k>1 distance-kernel-weighted retrieval blending (replace nearest-1 substitution); doubles as the poisoning defense. Re-gates P8/P9/P10.
+- **U-006** · `ready` · R1,R4 · Multi-step (unrolled) dynamics loss term — attack compounding rollout error (the named R1 limiter). Re-gates P1.
+- **U-007** · `ready` · R1,R3,R4,R7,R8 · Latent-space Mahalanobis density as a second OOD signal (DDU-style), complementing the P9-005 pre-encoder score. Re-gates P9.
+- **U-008** · `ready` · R1,R3,R4 · Gate probe: latent-space epistemic vs ground-truth state-space error (guards the latent-attractor risk). New standing sentinel from P1.
+- **U-009** · `ready` · R7,R1 · Gate probe: endpoint-swap state-leakage test for latent actions (identifiability certificate). Re-gates P13.
+- **U-010** · `ready` · R7,R5 · Grounding labels *during* latent-action training (not only post-hoc). Re-gates P13/P14.
+- **U-011** · `ready` · R2,R3 · Fix hierarchy penalty discounting + epistemic-gated option termination (align code with ADR-0002). Re-gates P5.
+- **U-012** · `ready` · R6 · Docs: correct the codec label ("Perceiver-IO" → ImageBind/BCT) + add rejected-alternative/validation citations to the ADRs. Docs-only.
+
+### Deferred (right upgrade, wrong time — promote when the Trigger fires)
+- **U-101** · `deferred` · R1,R2 · TD-learned terminal value bootstrapping the CEM score. **Trigger:** a gated sparse/long-horizon task enters the roadmap.
+- **U-102** · `deferred` · R1,R4 · LeJEPA/SIGReg replacing EMA+stop-grad+VICReg (SimNorm fallback). **Trigger:** the anti-collapse stack blocks a gate / needs retuning, or a simplification sprint.
+- **U-103** · `deferred` · R7 · Epistemic-prioritized replay sampling. **Trigger:** a nonstationarity/adaptation gate shows uniform sampling as the limiter.
+- **U-104** · `deferred` · R2 · CEM/beam search over option sequences. **Trigger:** the option library outgrows exhaustive K^depth (≈ K>6 at depth 3).
+- **U-105** · `deferred` · R1,R3,R4 · Last-layer Laplace epistemic. **Trigger:** measured evidence 5-member disagreement is too coarse *after* U-007/U-001.
+- **U-106** · `deferred` · R2,R3 · CUSUM/change-point option termination. **Trigger:** gate metrics show termination chattering on aleatoric spikes.
+- **U-107** · `deferred` · R7 · Continual backprop + plasticity diagnostics (ReDo). **Trigger:** a plasticity gate exists, or results show failure to re-learn after detected forgetting.
+- **U-108** · `deferred` · R7,R8 · Episodic→semantic consolidation pathway. **Trigger:** a gate needs facts the agent distills from its own experience (not harness-written).
+- **U-109** · `deferred` · R5,R7 · Predict-then-invert imitation (PIDM). **Trigger:** an imitation gate is marginal at its demo budget.
+- **U-110** · `deferred` · R5,R2 · Unsupervised skill discovery (METRA-class). **Trigger:** the roadmap adds a skill-discovery phase (options no longer harness-authored).
+- **U-111** · `deferred` · R2 · Jumpy-model cross-timescale consistency loss. **Trigger:** compounding jump error is measured at depth.
+- **U-112** · `deferred` · R6 · FCT-style old→new latent migration adapter. **Trigger:** codec distillation misses a P6 swap tolerance (the retrain-fallback is about to fire).
+
 ## Out-of-band — optional harder-benchmark tier (non-gated, ADR-0011)
 > Not a phase and not on the P14 critical path: a fenced credibility probe that runs the
 > *unchanged* core on real MuJoCo (DeepMind Control Suite) via the `bench.Environment`
