@@ -6,9 +6,57 @@ learning-progress curriculum that owns the ADR-0007 mode flag) and P7-001
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite, sqrt
 
 from .interfaces import CompetenceMonitor
 from .types import Competence, LatentState, Mode, Prediction, Surprise, Transition
+
+
+class AdaptiveThreshold:
+    """Online adaptive-conformal threshold with a target exceedance rate.
+
+    Before each update, consumers compare their score with :attr:`value`.  The
+    update then raises the threshold after a trigger and lowers it after a
+    non-trigger, using the task's decaying ``eta / sqrt(t)`` policy to reduce
+    late-stream oscillation around the target quantile (U-003).
+    """
+
+    def __init__(self, alpha: float, eta: float, *, initial_value: float = 0.0) -> None:
+        if not isfinite(alpha) or not 0.0 < alpha < 1.0:
+            raise ValueError("alpha must be finite and in (0, 1)")
+        if not isfinite(eta) or eta <= 0.0:
+            raise ValueError("eta must be finite and positive")
+        if not isfinite(initial_value):
+            raise ValueError("initial_value must be finite")
+        self.alpha = alpha
+        self.eta = eta
+        self._value = initial_value
+        self._updates = 0
+        self._triggers = 0
+
+    @property
+    def value(self) -> float:
+        """The threshold to use for the next score."""
+        return self._value
+
+    @property
+    def updates(self) -> int:
+        """Number of nominal scores consumed."""
+        return self._updates
+
+    @property
+    def trigger_rate(self) -> float:
+        """Online pre-update exceedance rate over the consumed stream."""
+        return self._triggers / self._updates if self._updates else 0.0
+
+    def update(self, score: float) -> None:
+        """Consume one score after testing it against the current value."""
+        if not isfinite(score):
+            raise ValueError("score must be finite")
+        triggered = int(score > self._value)
+        self._updates += 1
+        self._triggers += triggered
+        self._value += self.eta / sqrt(self._updates) * (triggered - self.alpha)
 
 
 @dataclass

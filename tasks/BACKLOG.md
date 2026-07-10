@@ -188,7 +188,7 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > A full literature check of every component (2023–2026). Verdict: the architecture is
 > **not broadly outdated** — most choices match or anticipate best practice (no SOTA world
 > model even offers the epistemic/aleatoric split this design is built on). These tasks are
-> the exceptions: **U-001/U-002 are shipped**; **U-003…U-012** are *ready* (measurably behind
+> the exceptions: **U-001…U-003 are shipped**; **U-004…U-012** are *ready* (measurably behind
 > the literature, all cheap at this scale); **U-101…U-112** are *deferred* with an
 > explicit **Trigger** each — the
 > **upgrade-triggers** workflow step (CLAUDE.md) re-checks every trigger at docs-sync and
@@ -204,9 +204,14 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 - **U-002** · `done` · R1,R2 · iCEM planner: beta-2 colored proposals, keep/shift
   elites, execute-best, and softmax-weighted elite moments. P2 improves the prior
   per-seed margins by `[+0.92, +1.33, +2.85]`; P5 and `make gate-all` remain green.
+- **U-003** · `done` · R2,R3,R8 · Separate decaying-step ACI policies: P5 option
+  termination α=1%, P8 retrieval α=10%, P9 planning retrieval α=.01% over 100k-score
+  nominal calibration/audit streams, and PointMass retrieval α=1%. Independent
+  nominal audits pass; consumers still receive floats, runtime CEM crossings remain
+  separately distance-gated before substitution, and the forgetting latch stays
+  frozen. P5/P8/P9 and the full P0–P14 ratchet PASS.
 
 ### Ready (measurably behind → adopt; each re-gates the phases it touches)
-- **U-003** · `ready` · R2,R3,R8 · Adaptive conformal (ACI) calibration of VoE thresholds (termination + retrieval gate); forgetting floor stays frozen. Re-gates P5/P8/P9.
 - **U-004** · `ready` · R7 · Hybrid FIFO+reservoir replay eviction — fix the FIFO-vs-anti-forgetting contradiction. Re-gates P3/P7.
 - **U-005** · `ready` · R8,R1 · k>1 distance-kernel-weighted retrieval blending (replace nearest-1 substitution); doubles as the poisoning defense. Re-gates P8/P9/P10.
 - **U-006** · `ready` · R1,R4 · Multi-step (unrolled) dynamics loss term — attack compounding rollout error (the named R1 limiter). Re-gates P1.

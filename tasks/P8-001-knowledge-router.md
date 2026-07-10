@@ -47,8 +47,9 @@ source. Retrieved items carry `Provenance` (P0-008).
 - Gate eval (`bench/evals/p8_knowledge.py`, `@gate_check("P8")`, run `p8` carrying
   all four sentinels): train the model on `|omega| <= REGION` only; a store holds
   correct (state,action)->next-latent facts across the FULL range. Per test query:
-  the model predicts; the router gates on `pred.epistemic` (threshold = a held-out
-  epistemic quantile); confident -> parametric mean, uncertain -> retrieved answer.
+  the model predicts; the router gates on `pred.epistemic` (ACI-calibrated to
+  α=.10 on held-out seen-region epistemic by U-003); confident -> parametric mean,
+  uncertain -> retrieved answer.
   Compare 1-step MSE: gated vs no-retrieval (model alone) vs always-retrieve;
   report the retrieval rate. Pass-progress: gated << no-retrieval on every seed.
 

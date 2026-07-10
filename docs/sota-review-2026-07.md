@@ -3,8 +3,8 @@
 A full review of every architecture component against the 2023–2026 literature
 (arXiv, GitHub, OpenReview), answering one question per component: *is this part
 clearly outdated, and if so what replaces it — or is it already at (or ahead of)
-current best practice?* Every finding became a task: **U-001/U-002 are shipped**, ready
-upgrades are **U-003…U-012**, and deferred (trigger-gated) upgrades are
+current best practice?* Every finding became a task: **U-001…U-003 are shipped**, ready
+upgrades are **U-004…U-012**, and deferred (trigger-gated) upgrades are
 **U-101…U-112** — see the upgrade track in `tasks/BACKLOG.md` and the
 **upgrade-triggers** workflow step in `CLAUDE.md`.
 
@@ -15,17 +15,17 @@ The architecture is *not* broadly outdated. No current SOTA world model
 produces the epistemic/aleatoric split all six VoE jobs consume; where the field
 needs an epistemic signal it bolts on exactly what this repo already has — a
 probabilistic ensemble. There is no wholesale replacement to make. Twelve actionable
-upgrades were identified (U-001/U-002 now shipped; ten remain ready), a separate dozen
+upgrades were identified (U-001…U-003 now shipped; nine remain ready), a separate dozen
 are right-but-not-yet (deferred with explicit triggers), and three code/doc
 inconsistencies surfaced during the read.
 
-## Measurably behind → upgrade tasks (U-001/U-002 shipped)
+## Measurably behind → upgrade tasks (U-001…U-003 shipped)
 
 | Task | Component | Finding (why replace) | Key sources |
 |------|-----------|----------------------|-------------|
 | U-001 · **shipped** | world_model/planning rollouts | Mean-latent imagination understated multi-step uncertainty; per-member TS∞ propagation + optional accumulated-epistemic truncation now ships, guarded by a strict OOD horizon-spread sentinel | [PETS](https://arxiv.org/abs/1805.12114) · [MACURA](https://arxiv.org/abs/2405.19014) · [Infoprop](https://arxiv.org/abs/2501.16918) |
 | U-002 · **shipped** | FlatPlanner | Vanilla white-noise CEM was replaced by beta-2 colored proposals, keep/shift elites, execute-best, and softmax-weighted elite moments; a reference iCEM proposal scale prevents correlated trajectories saturating the action bounds | [iCEM](https://arxiv.org/abs/2008.06389) · [Pink Noise](https://openreview.net/forum?id=hQ9V5QN27eS) · [TD-MPC2](https://arxiv.org/abs/2310.16828) |
-| U-003 | voe/planning/memory thresholds | Fixed NLL thresholds have no false-alarm semantics and drift as the model improves; adaptive conformal inference gives a controlled trigger rate, distribution-free, in ~2 lines | [ACI](https://arxiv.org/abs/2106.00170) · [decaying-step ACI](https://arxiv.org/pdf/2402.01139) · [conformal failure detection](https://arxiv.org/pdf/2503.08558) |
+| U-003 · **shipped** | voe/planning/memory thresholds | One-shot termination-surprise and epistemic-retrieval cutoffs became separate decaying-step ACI policies with independent nominal audits; P9 planning uses a measurable 0.01% tail over 100k-score calibration/audit streams because CEM amplifies one-step crossings, while the forgetting latch stays fixed | [ACI](https://arxiv.org/abs/2106.00170) · [decaying-step ACI](https://arxiv.org/pdf/2402.01139) · [conformal failure detection](https://arxiv.org/pdf/2503.08558) |
 | U-004 | ReplayBuffer eviction | FIFO eviction contradicts the anti-forgetting purpose (everything older than capacity is gone exactly when rehearsal needs it); hybrid FIFO+reservoir is the continual-learning standard, validated inside world-model agents | [WMAR](https://arxiv.org/abs/2401.16650) · [accumulate-don't-replace](https://arxiv.org/abs/2404.01413) |
 | U-005 | retrieval readout | Nearest-1 hard substitution is noise- and poison-sensitive; k=2–3 distance-kernel-weighted blending against the model's own prediction is the converged answer of the kNN-LM, episodic-control and RAG-security literatures | [kNN-LM gating](https://arxiv.org/abs/2210.15859) · [PoisonedRAG](https://arxiv.org/abs/2402.07867) · [RobustRAG](https://arxiv.org/abs/2405.15556) |
 | U-006 | world_model training | One-step training + multi-step consumption is the classic compounding-error mismatch (the repo's own named "main limiter on R1"); current practice adds an unrolled multi-step loss term | [V-JEPA 2-AC](https://arxiv.org/abs/2506.09985) |

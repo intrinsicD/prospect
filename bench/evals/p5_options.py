@@ -6,8 +6,8 @@ router's flat one-step-composed rollout on every seed.
 
 P5-002's capability — two-level planning beats flat at EQUAL compute: the
 manager searches option sequences over the jumpy model and re-plans when an
-option ends (by horizon or a VoE spike, threshold calibrated to the held-out
-q99 one-step surprise). Compute is counted in ensemble member-forward passes
+option ends (by horizon or a VoE spike, threshold ACI-calibrated to a 1% nominal
+false-alarm rate). Compute is counted in ensemble member-forward passes
 per environment step, VoE monitoring charged to the hierarchy; the flat CEM
 arm's candidate count is derived at runtime to match the hierarchy's measured
 budget, and a full-compute flat reference is reported for context (not gated).
@@ -30,8 +30,10 @@ from prospect.agent import Agent
 from prospect.planning import FlatPlanner, HierarchicalManager, JumpyOptionModel
 from prospect.skills import SkillRouter
 from prospect.types import LatentState, Option, Transition
+from prospect.voe import AdaptiveThreshold
 from prospect.world_model import FlatWorldModel
 
+from ..calibration import audit_threshold, calibrate_threshold, exceedance_rate
 from ..gates import GateResult, SentinelResult, gate_check, sentinel_check
 from ..loop import run_episode
 from ..runlog import RUNS_DIR, RunLog, latest_run, read_run
@@ -48,6 +50,9 @@ EP_LEN, EVAL_EPISODES, MANAGER_DEPTH = 100, 10, 3
 OPTION_HORIZON = 3  # finer than P4's: bang-bang control near the target needs cadence
 MEMBERS = 5  # ensemble size, the unit of compute accounting
 ENTROPY_FLOOR, DURATION_FLOOR, DPRIME_FLOOR = 0.3, 1.0, 0.5
+TERMINATION_ALPHA = 0.01
+TERMINATION_AUDIT_TOLERANCE = 0.006
+CALIBRATION_EPISODES = 1700  # 5,100 scores -> 4,080 online decisions at alpha=.01
 
 
 def _skills() -> list[Option]:
@@ -98,14 +103,16 @@ def _option_transitions(
     return transitions
 
 
-def _surprise_threshold(model: FlatWorldModel, skills: list[Option], seed: int) -> float:
-    """q99 of one-step surprise measured DURING option execution — the reference
+def _surprise_scores(
+    model: FlatWorldModel, skills: list[Option], rng_seed: int
+) -> list[float]:
+    """Nominal one-step surprise DURING option execution — the reference
     distribution VoE termination actually sees (random-walk held-out data is the
     wrong distribution: controlled trajectories surprise differently, and a
     threshold calibrated there cut healthy options at ~2 of 5 steps)."""
-    rng = np.random.default_rng(seed + 33)
-    surprises = []
-    for _ in range(30):
+    rng = np.random.default_rng(rng_seed)
+    surprises: list[float] = []
+    for _ in range(CALIBRATION_EPISODES):
         env = _env()
         env.reset(seed=0)
         obs = env.set_state(float(rng.uniform(-np.pi, np.pi)), float(rng.uniform(-6.0, 6.0)))
@@ -116,7 +123,15 @@ def _surprise_threshold(model: FlatWorldModel, skills: list[Option], seed: int) 
             expected = model.predict(latent, option.policy(latent))
             obs, _, _ = env.step(option.policy(latent))
             surprises.append(-expected.log_prob(model.encode_target(obs.data).z))
-    return float(np.quantile(surprises, 0.99))
+    return surprises
+
+
+def _surprise_calibration(
+    model: FlatWorldModel, skills: list[Option], seed: int
+) -> tuple[AdaptiveThreshold, list[float]]:
+    surprises = _surprise_scores(model, skills, seed + 33)
+    tracker = calibrate_threshold(surprises, alpha=TERMINATION_ALPHA)
+    return tracker, surprises
 
 
 def _hierarchical_episode(
@@ -196,6 +211,7 @@ def check_p5() -> GateResult:
     hier_wins: list[bool] = []
     hier_returns_all: list[float] = []
     matched_returns_all: list[float] = []
+    calibration_valid: list[bool] = []
     for seed in SEEDS:
         train = _collect(TRAIN_N, seed)
         heldout = _collect(256, seed + 500)
@@ -235,9 +251,19 @@ def check_p5() -> GateResult:
                     f"flat_rollout_mse_s{seed}": flat_mse}
 
         # ---- P5-002: two-level vs compute-matched flat planning ----
-        manager = HierarchicalManager(jumpy, skills, depth=MANAGER_DEPTH,
-                                      uncertainty_penalty=1.0,
-                                      surprise_threshold=_surprise_threshold(model, skills, seed))
+        termination, nominal_scores = _surprise_calibration(model, skills, seed)
+        audit_scores = _surprise_scores(model, skills, seed + 1033)
+        audit_rate, audit_tolerance, audit_valid = audit_threshold(
+            audit_scores, termination, tolerance=TERMINATION_AUDIT_TOLERANCE
+        )
+        calibration_valid.append(audit_valid)
+        manager = HierarchicalManager(
+            jumpy,
+            skills,
+            depth=MANAGER_DEPTH,
+            uncertainty_penalty=1.0,
+            surprise_threshold=termination.value,
+        )
         usage_all: dict[str, int] = {}
         durations_all: list[int] = []
         landings_all: dict[str, list[np.ndarray]] = {}
@@ -280,6 +306,17 @@ def check_p5() -> GateResult:
             f"hier_cost_per_step_s{seed}": float(hier_cost_per_step),
             f"matched_flat_cost_per_step_s{seed}": float(matched_cost_per_step),
             f"voe_terminations_s{seed}": float(total_terminations),
+            f"termination_alpha_s{seed}": termination.alpha,
+            f"termination_eta_s{seed}": termination.eta,
+            f"termination_threshold_s{seed}": termination.value,
+            f"termination_calibration_updates_s{seed}": float(termination.updates),
+            f"nominal_termination_online_rate_s{seed}": termination.trigger_rate,
+            f"nominal_termination_retrospective_rate_s{seed}": exceedance_rate(
+                nominal_scores, termination.value
+            ),
+            f"nominal_termination_audit_rate_s{seed}": audit_rate,
+            f"nominal_termination_audit_tolerance_s{seed}": audit_tolerance,
+            f"nominal_termination_audit_valid_s{seed}": float(audit_valid),
             f"option_usage_entropy_s{seed}": entropy,
             f"option_mean_duration_s{seed}": mean_duration,
             f"option_min_dprime_s{seed}": min_dprime,
@@ -289,20 +326,23 @@ def check_p5() -> GateResult:
 
     jumpy_beats_flat = all(j < f for j, f in zip(jumpy_mses, flat_mses, strict=True))
     two_level_wins = all(hier_wins)
+    calibration_met = all(calibration_valid)
     metrics |= {"jumpy_landing_mse_median": float(np.median(jumpy_mses)),
                 "flat_rollout_mse_median": float(np.median(flat_mses)),
                 "jumpy_beats_flat": float(jumpy_beats_flat),
                 "jumpy_data_cost_env_steps": float(EXECUTIONS * _skills()[0].horizon),
-                "two_level_beats_matched_flat": float(two_level_wins)}
+                "two_level_beats_matched_flat": float(two_level_wins),
+                "termination_calibration_met": float(calibration_met)}
     detail = (
         f"two-level return per seed {[round(r, 1) for r in hier_returns_all]} vs "
         f"compute-matched flat {[round(r, 1) for r in matched_returns_all]} "
         f"(~{metrics[f'hier_cost_per_step_s{SEEDS[0]}']:.0f} member-forwards/step) — "
         f"{'WINS on every seed' if two_level_wins else 'does NOT win on every seed'}; "
         f"jumpy landing MSE beats composed flat rollout on every seed: "
-        f"{'YES' if jumpy_beats_flat else 'NO'}"
+        f"{'YES' if jumpy_beats_flat else 'NO'}; independent nominal termination-rate "
+        f"audit: {'MET' if calibration_met else 'NOT MET'}"
     )
-    return GateResult(phase="P5", passed=two_level_wins, metrics=metrics,
+    return GateResult(phase="P5", passed=two_level_wins and calibration_met, metrics=metrics,
                       seeds=list(SEEDS), detail=detail)
 
 

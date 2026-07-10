@@ -254,8 +254,9 @@ class RetrievalAugmentedWorldModel:
     (as the router's epistemic `threshold` is). `reliability_radius=None` keeps the legacy
     substitute-and-zero behaviour (the 1-step P8 role, where queries are real states).
 
-    Contract: interfaces.WorldModel. `retrievals`/`calls` count the gated retrievals
-    (the run-level evidence that retrieval fired where the model was uncertain)."""
+    Contract: interfaces.WorldModel. Instrumentation separates `calls` (candidate
+    predictions scored), `gate_hits` (epistemic threshold exceedances), and `retrievals`
+    (distance-covered facts actually substituted)."""
 
     def __init__(
         self, base: WorldModel, router: UncertaintyMemoryRouter,
@@ -266,6 +267,7 @@ class RetrievalAugmentedWorldModel:
         self._reliability_radius = reliability_radius
         self.retrievals = 0
         self.calls = 0
+        self.gate_hits = 0
 
     def predict(self, state: LatentState, action: Action) -> Prediction:
         mean, var, epi, ale, rew = self._rows(
@@ -366,11 +368,13 @@ class RetrievalAugmentedWorldModel:
             raise ValueError("member_latents shape does not match the base member rollout")
 
         self.calls += candidates
+        gate_mask = epistemic > self._router.threshold
+        self.gate_hits += int(np.sum(gate_mask))
         source = self._router.route(None, float(np.max(epistemic)) if candidates else 0.0)
         if source is None:
             return MemberRollout(next_states, variances, rewards, epistemic)
 
-        for candidate in np.nonzero(epistemic > self._router.threshold)[0]:
+        for candidate in np.nonzero(gate_mask)[0]:
             base_epistemic = float(epistemic[candidate])
             mean_key = np.concatenate([query_states[:, candidate].mean(axis=0), act[candidate]])
             items = source.query(mean_key)
@@ -419,13 +423,15 @@ class RetrievalAugmentedWorldModel:
             ale = np.array([p.aleatoric for p in preds], dtype=float)
             rew = np.array([p.reward for p in preds], dtype=float)
         self.calls += len(latents)
+        gate_mask = epi > self._router.threshold
+        self.gate_hits += int(np.sum(gate_mask))
         # Which rows the router would retrieve for: gating is monotone in epistemic, so
         # one route() probe fixes the selected source and the threshold — then the mask
         # is vectorized and only the uncertain rows touch the store (the hot path).
         source = self._router.route(None, float(np.max(epi)) if len(epi) else 0.0)
         if source is None:
             return mean, var, epi, ale, rew  # nothing uncertain enough / nothing trusted
-        for i in np.nonzero(epi > self._router.threshold)[0]:
+        for i in np.nonzero(gate_mask)[0]:
             key = np.concatenate([latents[i], actions[i]])
             items = source.query(key)
             if not items:

@@ -27,6 +27,7 @@ from prospect.planning import FlatPlanner
 from prospect.types import Action, KnowledgeItem, LatentState, Observation, Provenance, Transition, Trust
 from prospect.world_model import FlatWorldModel
 
+from ..calibration import audit_threshold, calibrate_threshold, exceedance_rate
 from ..envs import PointMass
 from ..loop import run_episode
 from .p2_planner import _PolicyAgent
@@ -35,6 +36,7 @@ GEN_SEEDS = [0, 1]
 OBS_DIM, ACT_DIM = 4, 2
 V_REGION, V_FULL, POS_RANGE = 2.0, 6.0, 2.0  # trained |v| <= V_REGION; store/test span V_FULL
 TRAIN_N, TEST_N, PROBE_N = 4096, 300, 200
+CALIBRATION_N, CALIBRATION_AUDIT_N = 5000, 5000
 # STORE_N is dimension-adequate on purpose (P9-006). The retrieval key is 6-D
 # (4 latent + 2 action); nearest-neighbour recall in a continuous key space suffers the
 # curse of dimensionality — the store's density must scale with the key-space dimension
@@ -47,7 +49,8 @@ STORE_N = 40000
 GEN_STEPS, BATCH = 2000, 64  # PointMass's 4-dim dynamics + reward head need more data
 GEN_HORIZON = 6              # recalibrated planning horizon for this env (was 20 on Pendulum)
 EP_LEN_GEN, EVAL_EP_GEN = 60, 2
-RETRIEVE_MULT_GEN = 2.0     # retrieve above 2x the max seen epistemic (P9 conservative gate)
+RETRIEVAL_ALPHA_GEN = 0.01  # conservative nominal gate-hit rate on env #2
+RETRIEVAL_AUDIT_TOLERANCE_GEN = 0.006
 RETRIEVE_MARGIN = 1.2       # gated MSE must beat no-retrieval by at least this factor
 UNCERTAINTY_FLOOR = 3.0     # high-error-decile epistemic must exceed this x median on env #2
 
@@ -156,6 +159,7 @@ def generalizes() -> Generalization:
     """
     wm_mses, persist_mses, planner_rets, random_rets, gated_mses, none_mses = [], [], [], [], [], []
     unc_ratios: list[float] = []
+    calibration_valid: list[bool] = []
     metrics: dict[str, float] = {}
     for seed in GEN_SEEDS:
         # P1 + P2: one model on the visited distribution (random rollouts).
@@ -185,11 +189,22 @@ def generalizes() -> Generalization:
         # 3. uncertainty-gated retrieval beats no-retrieval (P8) — a SEPARATE model
         # trained on a limited region so it is confident there and uncertain outside.
         region_model = _train(_fresh_model(seed + 7), _region_data(V_REGION, TRAIN_N, seed), seed)
-        region_held = _region_data(V_REGION, PROBE_N, seed + 300)
+        region_held = _region_data(V_REGION, CALIBRATION_N, seed + 300)
         store = _store(region_model, _region_data(V_FULL, STORE_N, seed + 50))
-        seen_epi = sorted(
-            region_model.predict(region_model.encode(t.state.z), t.action).epistemic for t in region_held)
-        router = UncertaintyMemoryRouter([store], threshold=RETRIEVE_MULT_GEN * seen_epi[-1])
+        seen_epi = [
+            region_model.predict(region_model.encode(t.state.z), t.action).epistemic
+            for t in region_held
+        ]
+        retrieval = calibrate_threshold(seen_epi, alpha=RETRIEVAL_ALPHA_GEN)
+        audit_epi = [
+            region_model.predict(region_model.encode(t.state.z), t.action).epistemic
+            for t in _region_data(V_REGION, CALIBRATION_AUDIT_N, seed + 400)
+        ]
+        audit_rate, audit_tolerance, audit_valid = audit_threshold(
+            audit_epi, retrieval, tolerance=RETRIEVAL_AUDIT_TOLERANCE_GEN
+        )
+        calibration_valid.append(audit_valid)
+        router = UncertaintyMemoryRouter([store], threshold=retrieval.value)
         none_err, gated_err, epi, retrieved = [], [], [], 0
         for t in _region_data(V_FULL, TEST_N, seed + 200):
             pred = region_model.predict(region_model.encode(t.state.z), t.action)
@@ -221,20 +236,35 @@ def generalizes() -> Generalization:
             f"gen_planner_return_s{seed}": planner_ret, f"gen_random_return_s{seed}": random_ret,
             f"gen_retrieval_none_mse_s{seed}": none_mse, f"gen_retrieval_gated_mse_s{seed}": gated_mse,
             f"gen_retrieval_rate_s{seed}": retrieved / TEST_N, f"gen_uncertainty_ratio_s{seed}": ratio,
+            f"gen_retrieval_calls_s{seed}": float(TEST_N),
+            f"gen_retrieval_gate_hits_s{seed}": float(retrieved),
+            f"gen_retrieval_alpha_s{seed}": retrieval.alpha,
+            f"gen_retrieval_eta_s{seed}": retrieval.eta,
+            f"gen_retrieval_threshold_s{seed}": retrieval.value,
+            f"gen_retrieval_calibration_updates_s{seed}": float(retrieval.updates),
+            f"gen_nominal_retrieval_online_rate_s{seed}": retrieval.trigger_rate,
+            f"gen_nominal_retrieval_retrospective_rate_s{seed}": exceedance_rate(
+                seen_epi, retrieval.value
+            ),
+            f"gen_nominal_retrieval_audit_rate_s{seed}": audit_rate,
+            f"gen_nominal_retrieval_audit_tolerance_s{seed}": audit_tolerance,
+            f"gen_nominal_retrieval_audit_valid_s{seed}": float(audit_valid),
         }
     # Median criteria (P2-style, robust to a lucky random start on one seed).
     wm_med, persist_med = float(np.median(wm_mses)), float(np.median(persist_mses))
     planner_med, random_med = float(np.median(planner_rets)), float(np.median(random_rets))
     gated_med, none_med = float(np.median(gated_mses)), float(np.median(none_mses))
     unc_med = float(np.median(unc_ratios))
+    calibration_met = all(calibration_valid)
     metrics |= {"gen_wm_mse_median": wm_med, "gen_persist_mse_median": persist_med,
                 "gen_planner_return_median": planner_med, "gen_random_return_median": random_med,
                 "gen_retrieval_gated_mse_median": gated_med, "gen_retrieval_none_mse_median": none_med,
-                "gen_uncertainty_ratio_median": unc_med}
+                "gen_uncertainty_ratio_median": unc_med,
+                "gen_retrieval_calibration_met": float(calibration_met)}
     return Generalization(
         prediction_met=wm_med < persist_med,
         planning_met=planner_med > random_med,
         uncertainty_met=unc_med >= UNCERTAINTY_FLOOR,
-        retrieval_met=gated_med * RETRIEVE_MARGIN <= none_med,
+        retrieval_met=gated_med * RETRIEVE_MARGIN <= none_med and calibration_met,
         metrics=metrics,
     )

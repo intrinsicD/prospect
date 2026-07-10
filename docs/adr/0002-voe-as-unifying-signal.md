@@ -28,8 +28,9 @@ all six jobs listed in `docs/architecture.md`.
   subclassing.)*
 - **Contract:** the surprise signal itself is `types.Surprise` — total NLL plus its
   epistemic/aleatoric attribution — never a bare float; consumers gate on
-  `.epistemic`, not the undecomposed total (the same rule as `Prediction`, one level
-  up). Transitions collected while executing a skill set `Transition.option`, so
+  `.epistemic`, not the undecomposed total (option termination's current total-NLL
+  gate is the named U-011 nonconformance). Transitions collected while executing a
+  skill set `Transition.option`, so
   competence is attributable per skill. *(Amended by P0-002.)*
 - Consumers can conflict over the signal's *sign* — planning avoids epistemic
   uncertainty while curiosity seeks it; that arbitration is decided in ADR-0007
@@ -49,6 +50,17 @@ all six jobs listed in `docs/architecture.md`.
   a skill's *prediction error* at mastery and fires when it rises; mastery still
   keys on epistemic (learned = low uncertainty). This resolves the P0-010-flagged
   forgetting-under-shift concern for the "I forgot" case. *(Amended by P7-001.)*
+- **P5 termination and P8/P9 retrieval thresholds use separate adaptive-conformal
+  calibrators** (U-003). Each harness chooses a nominal exceedance target, warm-starts
+  from a disjoint nominal pilot, applies the causal decaying-step update to later
+  nominal scores, and audits the resulting float threshold on independent nominal
+  data before passing it to the unchanged planning/memory consumer. P9's integrated
+  planning path uses a much rarer, longer-stream target because CEM amplifies
+  otherwise-benign one-step crossings; its separate cross-environment arm uses a 1%
+  nominal target. Runtime CEM gate hits are not the nominal rate—the distance gate
+  separately controls fact substitution. Failure/OOD evaluation scores
+  are never fed back, and the forgetting detector's latched mastered-error floor
+  remains fixed so persistent degradation cannot be normalized away. *(Amended by U-003.)*
 - **Epistemic is distance-aware, not ensemble-disagreement alone** (P9-005). The
   *confidently-wrong* failure has a second consequence beyond forgetting: ensemble
   disagreement under-detects out-of-distribution inputs, because the tanh encoder

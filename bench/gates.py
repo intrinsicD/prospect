@@ -120,7 +120,8 @@ _register(
     "P5",
     "Hierarchical planning",
     "Two-level (jumpy option-model) planning beats flat planning on a long-horizon "
-    "task at EQUAL compute.",
+    "task at EQUAL compute, AND the adaptive option-termination threshold passes an "
+    "independent nominal exceedance-rate audit.",
 )
 _register(
     "P6",
@@ -140,7 +141,8 @@ _register(
     "Knowledge bases",
     "Uncertainty-gated retrieval improves accuracy vs no-retrieval on the use-case "
     "benchmark, AND performance is robust to a poisoned/low-trust source (provenance "
-    "respected).",
+    "respected), AND the adaptive retrieval threshold passes an independent nominal "
+    "exceedance-rate audit.",
 )
 _register(
     "P9",
@@ -150,9 +152,12 @@ _register(
     "signal both sets the planner's explore/exploit coefficient AND gates retrieval; "
     "a leave-one-out ablation confirms the load-bearing component (planning) matters "
     "(each component's marginal control value recorded — a harmful marginal is a "
-    "reported finding); the core capabilities (prediction, planning, AND the epistemic "
-    "uncertainty signal itself) generalize to a second, structurally different "
-    "environment with the same core; and all applicable collapse sentinels stay healthy.",
+    "reported finding), AND integrated retrieval is distance-gated and not harmful; "
+    "the integrated adaptive retrieval threshold passes an independent nominal "
+    "exceedance-rate audit; the core capabilities (prediction, planning, epistemic "
+    "uncertainty, AND calibrated retrieval) generalize to a second, structurally "
+    "different environment with the same core; and all applicable collapse sentinels "
+    "stay healthy.",
 )
 _register(
     "P10",

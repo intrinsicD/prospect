@@ -39,7 +39,7 @@ monitor hook already produces).
   `predict_option`; score = Σ γ^(elapsed duration)·reward − λ·Σ epistemic;
   return the first option of the argmax sequence. `should_terminate`: one-step
   surprise `-prediction.log_prob(observed)` above a threshold the harness
-  calibrates from held-out surprise quantiles.
+  ACI-calibrates to α=.01 on nominal option-execution surprise (U-003).
 - Compute accounting (the criterion's "equal compute"): planning cost counted in
   ensemble member-forward passes per environment step, VoE monitoring charged to
   the hierarchy. The flat arm's CEM parameters are derived at runtime to match
@@ -99,10 +99,11 @@ FULL-compute flat reference (−36.6/−47.3/−19.8 at ~3840 member-forwards/st
 5x the budget) on every seed — temporal abstraction wins outright here, not
 just at parity. `gate-all`: 6 shipped gates green (~3m30s).
 
-**What it took (two diagnosed issues):** (1) the VoE termination threshold was
+**What it took (historical, before U-003; two diagnosed issues):** (1) the VoE termination threshold was
 first calibrated on random-walk held-out surprise — the wrong reference
 distribution for controlled trajectories — and cut healthy options at ~2 of 5
-steps; recalibrating on option-execution stepwise surprise (q99) restored real
+steps; recalibrating on option-execution stepwise surprise (then q99, now
+superseded by U-003's α=.01 ACI policy) restored real
 temporal abstraction (durations 2.6–2.9 of horizon 3, terminations present but
 not dominant). (2) One seed's easy episodes were lost not on planning but on the
 option set's control resolution — bang-bang ±2 cannot hold a target the way

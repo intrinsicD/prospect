@@ -64,6 +64,7 @@ from prospect.types import KnowledgeItem, LatentState, Observation, Provenance, 
 from prospect.voe import LearningProgressCurriculum, SurpriseCompetenceMonitor
 from prospect.world_model import FlatWorldModel
 
+from ..calibration import audit_threshold, calibrate_threshold, exceedance_rate
 from ..gates import GateResult, gate_check
 from ..loop import run_episode
 from ..runlog import RUNS_DIR, RunLog
@@ -78,15 +79,18 @@ from .p9_generalization import generalizes
 RUN_ID = "p9"
 SEEDS = [0, 1, 2]
 TRAIN_N, STORE_N, PROBE_N = 4096, 3000, 256
-RETRIEVE_MULT = 2.0           # retrieve only above 2x the MAX seen epistemic (see below)
+CALIBRATION_N, CALIBRATION_AUDIT_N = 100000, 100000
+RETRIEVAL_ALPHA = 0.0001      # CEM amplifies one-step crossings; target a measurable 0.01%
+RETRIEVAL_AUDIT_TOLERANCE = 0.00015
 RELIABILITY_MULT = 4.0        # trust a retrieved fact only within 4x the store's coverage
                               # distance — distance-gated retrieval into planning (P9-007)
 EVAL_EPISODES = 2             # control episodes averaged per condition
-# Why conservative (RETRIEVE_MULT on the max, not P8's 90th-percentile quantile):
+# Why conservative (0.01%, not P8's 10% nominal rate):
 # retrieval helps 1-step prediction (P8) but a low gate fires ~55% of the time inside
 # CEM rollouts, overriding half the planner's dynamics with nearest-neighbour facts
 # that are misaligned at rollout depth — which *degrades* control. Gating retrieval to
-# states genuinely beyond training keeps it a rare, safe correction. (P9-002 quantifies
+# the nominal 0.01% tail keeps it a rare, safe correction with explicit false-alarm
+# semantics and enough calibration data to observe the target tail. (P9-002 quantifies
 # the trade-off across gate settings.)
 MASTERY_SLACK = 5.0           # mastery_epistemic = this x the model's seen epistemic floor
 MONITOR_UPDATES = 40          # seen-region transitions fed to the monitor (>= min_updates)
@@ -151,11 +155,14 @@ def check_p9() -> GateResult:
     log = RunLog(RUN_ID)
     metrics: dict[str, float] = {}
     controls, one_signal, composed_ret, bare_ret, ablation_ok = [], [], [], [], []
+    calibration_valid: list[bool] = []
     marg_table: dict[str, list[float]] = {c: [] for c in ("planning", "retrieval", "exploit_penalty")}
     for seed in SEEDS:
         # 1. pre-train the world model on the seen region (+ sentinel logging on run p9)
         train = _region_data(REGION, TRAIN_N, seed)
         heldout = _region_data(REGION, PROBE_N, seed + 500)
+        calibration = _region_data(REGION, CALIBRATION_N, seed + 600)
+        calibration_audit = _region_data(REGION, CALIBRATION_AUDIT_N, seed + 700)
         ood = _region_data(FULL, PROBE_N, seed + 900)
         model = FlatWorldModel(seed=seed)
         rng = np.random.default_rng(seed + 1)
@@ -170,13 +177,35 @@ def check_p9() -> GateResult:
 
         # 2. store + uncertainty-gated router + distance-gate radius (P9-007)
         store = _online_store(model, _region_data(FULL, STORE_N, seed + 50))
-        seen_epi = sorted(model.predict(model.encode(t.state.z), t.action).epistemic for t in heldout)
-        threshold = RETRIEVE_MULT * seen_epi[-1]  # 2x the most-uncertain seen state
+        seen_epi = [
+            model.predict(model.encode(t.state.z), t.action).epistemic for t in calibration
+        ]
+        retrieval = calibrate_threshold(seen_epi, alpha=RETRIEVAL_ALPHA)
+        audit_epi = [
+            model.predict(model.encode(t.state.z), t.action).epistemic
+            for t in calibration_audit
+        ]
+        audit_rate, audit_tolerance, audit_valid = audit_threshold(
+            audit_epi, retrieval, tolerance=RETRIEVAL_AUDIT_TOLERANCE
+        )
+        # Although a finite 100k audit can contain zero events at alpha=.0001,
+        # release policy deliberately requires measurable online and audit tails so
+        # an inert threshold cannot pass as calibrated.
+        online_valid = (
+            retrieval.trigger_rate > 0.0
+            and abs(retrieval.trigger_rate - retrieval.alpha) <= RETRIEVAL_AUDIT_TOLERANCE
+        )
+        calibration_is_valid = audit_valid and audit_rate > 0.0 and online_valid
+        calibration_valid.append(calibration_is_valid)
+        threshold = retrieval.value
         router = UncertaintyMemoryRouter([store], threshold=threshold)
         radius = _reliability_radius(model, store, ood)  # trust only close (real) facts
 
         # 3. monitor -> mastery -> curriculum EXPLOIT (the same epistemic signal, other job)
-        monitor, curriculum = _mastered_curriculum(model, heldout, float(np.median(seen_epi)))
+        seen_floor = float(np.median([
+            model.predict(model.encode(t.state.z), t.action).epistemic for t in heldout
+        ]))
+        monitor, curriculum = _mastered_curriculum(model, heldout, seen_floor)
         mode_coeff = curriculum.uncertainty_coefficient()
         mastered = monitor.is_mastered(SurpriseCompetenceMonitor.DEFAULT_SKILL)
 
@@ -188,7 +217,12 @@ def check_p9() -> GateResult:
         agent_bare = Agent(encode=_encoder(model), planner=FlatPlanner(model, seed=seed),
                            world_model=model, monitor=monitor, curriculum=curriculum)
         composed = _control_return(agent_full, seed)
-        rate = augmented.retrievals / max(augmented.calls, 1)  # read before augmented is reused
+        calls = augmented.calls  # read before the augmented model is reused
+        gate_rate = augmented.gate_hits / calls if calls else 0.0
+        rate = augmented.retrievals / calls if calls else 0.0
+        distance_acceptance = (
+            augmented.retrievals / augmented.gate_hits if augmented.gate_hits else 0.0
+        )
         bare = _control_return(agent_bare, seed)
         reactive = _control_return(_PolicyAgent(_random_policy(seed)), seed)
         applied = planner_full.uncertainty_penalty  # set live inside act() from the curriculum
@@ -218,6 +252,24 @@ def check_p9() -> GateResult:
             f"reactive_return_s{seed}": reactive,
             f"no_penalty_return_s{seed}": no_penalty,
             f"retrieval_rate_s{seed}": rate,
+            f"retrieval_gate_rate_s{seed}": gate_rate,
+            f"retrieval_distance_acceptance_s{seed}": distance_acceptance,
+            f"retrieval_calls_s{seed}": float(calls),
+            f"retrieval_gate_hits_s{seed}": float(augmented.gate_hits),
+            f"retrieval_accepted_s{seed}": float(augmented.retrievals),
+            f"retrieval_alpha_s{seed}": retrieval.alpha,
+            f"retrieval_eta_s{seed}": retrieval.eta,
+            f"retrieval_threshold_s{seed}": retrieval.value,
+            f"retrieval_calibration_updates_s{seed}": float(retrieval.updates),
+            f"nominal_retrieval_online_rate_s{seed}": retrieval.trigger_rate,
+            f"nominal_retrieval_online_valid_s{seed}": float(online_valid),
+            f"nominal_retrieval_retrospective_rate_s{seed}": exceedance_rate(
+                seen_epi, retrieval.value
+            ),
+            f"nominal_retrieval_audit_rate_s{seed}": audit_rate,
+            f"nominal_retrieval_audit_tolerance_s{seed}": audit_tolerance,
+            f"nominal_retrieval_audit_valid_s{seed}": float(audit_valid),
+            f"nominal_retrieval_calibration_valid_s{seed}": float(calibration_is_valid),
             f"exploit_coefficient_s{seed}": mode_coeff,
             f"mastered_s{seed}": float(mastered),
             f"marginal_planning_s{seed}": marg["planning"],
@@ -246,6 +298,7 @@ def check_p9() -> GateResult:
     # capabilities generalize to a second environment. Recorded-not-gated: the negligible
     # exploit-penalty (ADR-0008).
     controls_met, one_signal_met, ablation_met = all(controls), all(one_signal), all(ablation_ok)
+    calibration_met = all(calibration_valid)
     composed_med, bare_med = float(np.median(composed_ret)), float(np.median(bare_ret))
     reactive_med = float(np.median([metrics[f"reactive_return_s{s}"] for s in SEEDS]))
     rate_med = float(np.median([metrics[f"retrieval_rate_s{s}"] for s in SEEDS]))
@@ -254,12 +307,13 @@ def check_p9() -> GateResult:
     # marginal must clear -MARGIN. Distance-gating keeps far (fictional) rollout facts
     # from overriding the dynamics, so this holds instead of the old negative marginal.
     retrieval_safe = marg_med["retrieval"] >= -MARGIN
-    passed = (controls_met and one_signal_met and ablation_met and generalizes_met
+    passed = (controls_met and one_signal_met and ablation_met and calibration_met and generalizes_met
               and retrieval_safe)
     metrics |= {"composed_return_median": composed_med, "retrieval_off_return_median": bare_med,
                 "reactive_return_median": reactive_med, "retrieval_rate_median": rate_med,
                 "controls_met": float(controls_met), "one_signal_met": float(one_signal_met),
-                "ablation_met": float(ablation_met), "retrieval_safe": float(retrieval_safe)}
+                "ablation_met": float(ablation_met), "retrieval_safe": float(retrieval_safe),
+                "retrieval_calibration_met": float(calibration_met)}
     metrics |= {f"marginal_{c}_median": m for c, m in marg_med.items()}
     table = ", ".join(f"{c} {m:+.1f} ({classify(m)})" for c, m in marg_med.items())
     gen_note = (f"prediction {'✓' if gen.prediction_met else '✗'} + planning "
@@ -270,7 +324,8 @@ def check_p9() -> GateResult:
         f"composed agent controls end-to-end: return {composed_med:.1f} vs reactive "
         f"{reactive_med:.1f} ({'beats every seed' if controls_met else 'FAILS'}); one epistemic "
         f"signal drives exploit-mode AND retrieval in one run "
-        f"({'MET' if one_signal_met else 'NOT MET'}). ablation marginal control value: {table}. "
+        f"({'MET' if one_signal_met else 'NOT MET'}); nominal retrieval calibration/audit "
+        f"{'MET' if calibration_met else 'NOT MET'}. ablation marginal control value: {table}. "
         f"cross-env: {gen_note}. retrieval into planning is distance-gated (P9-007): marginal "
         f"{marg_med['retrieval']:+.1f} ({classify(marg_med['retrieval'])}, "
         f"{'safe' if retrieval_safe else 'HARMFUL'}) — far facts no longer override rollout "

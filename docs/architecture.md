@@ -21,8 +21,9 @@ distractors (that is requirement R4).
 Surprise is computed as the negative log-likelihood of the observed outcome under
 the predicted distribution (never raw L2), with epistemic isolated from aleatoric.
 In code the signal is `types.Surprise` — the total NLL carrying its
-epistemic/aleatoric attribution (P0-002); consumers gate on `.epistemic`, never on
-the undecomposed total. The same quantity is reused as:
+epistemic/aleatoric attribution (P0-002). Uncertainty consumers gate on
+`.epistemic`; option termination currently gates total NLL, the named U-011
+exception. The same quantity is reused as:
 
 | # | Job | Requirement | Lives in |
 |---|-----|-------------|----------|
@@ -30,8 +31,20 @@ the undecomposed total. The same quantity is reused as:
 | 2 | Mastery test — expected-vs-violated differential | R3 | voe |
 | 3 | Skill-trust gate — select skill by predicted-outcome-under-uncertainty | R5 | skills |
 | 4 | Re-planning interrupt — terminate an option on a surprise spike | R2 | planning |
-| 5 | Forgetting detector — rising surprise on a mastered skill → rehearse | R7 | voe, memory |
+| 5 | Forgetting detector — rising prediction error on a mastered skill → rehearse | R7 | voe, memory |
 | 6 | Retrieval trigger — high uncertainty → query a knowledge source | R8 | memory, knowledge |
+
+U-003 gives jobs 4 and 6 explicit nominal exceedance-rate semantics in the
+P5/P8/P9 harnesses: separate ACI trackers target 1% for option termination and P9
+cross-environment one-step retrieval, 0.01% for P9 retrieval inside planning, and 10%
+for P8 retrieval. A disjoint nominal pilot warm-starts each
+tracker, later nominal scores update it causally with `eta_0 / sqrt(t)`, and an
+independent nominal stream audits the published float threshold before the unchanged
+planning/memory consumer uses it. P9 needs a much rarer, long-stream target because
+CEM amplifies otherwise-benign one-step crossings. These α values govern nominal
+calibration streams, not runtime CEM gate-hit rates; P9's separate distance gate
+controls which crossings become fact substitutions. Failure/OOD evaluation scores
+do not feed back; job 5's forgetting latch is intentionally fixed.
 
 Two of these jobs pull the signal in opposite directions: planning is *repelled*
 from epistemic uncertainty (ADR-0006's exploitation control) while the curiosity

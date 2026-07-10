@@ -244,11 +244,13 @@ def test_retrieval_augments_only_when_uncertain() -> None:  # P9-001
     confident = RetrievalAugmentedWorldModel(_EpiModel(0.2), router)  # 0.2 <= 0.5
     passthrough = confident.predict(state, action)
     assert list(passthrough.mean) == [1.0, 0.0] and confident.retrievals == 0  # base, no retrieval
+    assert confident.gate_hits == 0
 
     uncertain = RetrievalAugmentedWorldModel(_EpiModel(0.9), router)  # 0.9 > 0.5 -> retrieve
     corrected = uncertain.predict(state, action)
     assert list(corrected.mean) == [9.0, 9.0]  # the retrieved fact stands in for the guess
     assert corrected.epistemic == 0.0 and uncertain.retrievals == 1 and uncertain.calls == 1
+    assert uncertain.gate_hits == 1
     assert isinstance(uncertain, interfaces.WorldModel)
 
 
@@ -277,7 +279,7 @@ def test_member_retrieval_requires_distance_coverage_for_every_particle() -> Non
     # Each particle is squared-distance 4 from the fact, outside radius 2: the
     # mean query alone is insufficient evidence, so the base particles stand.
     assert not np.allclose(rollout.states, 9.0)
-    assert augmented.retrievals == 0 and augmented.calls == 1
+    assert augmented.gate_hits == 1 and augmented.retrievals == 0 and augmented.calls == 1
 
 
 def test_augmented_imagine_propagates_the_base_member_trajectories() -> None:
@@ -301,12 +303,13 @@ def test_retrieval_distance_gated_in_planning() -> None:  # P9-007
     far = RetrievalAugmentedWorldModel(_EpiModel(0.9), router, reliability_radius=2.0)
     far_pred = far.predict(LatentState(z=np.array([5.0, 5.0])), action)
     assert list(far_pred.mean) == [6.0, 5.0]  # base (state + [1,0]), not the fact
-    assert far.retrievals == 0 and far_pred.epistemic == 0.9  # untouched, no free pass
+    assert far.gate_hits == 1 and far.retrievals == 0
+    assert far_pred.epistemic == 0.9  # untouched, no free pass
 
     # A CLOSE query (key-distance 1.0 <= radius 2.0): substitute, but carry HONEST
     # distance-scaled epistemic (0.9 * dist/radius) instead of the certain epi=0.
     near = RetrievalAugmentedWorldModel(_EpiModel(0.9), router, reliability_radius=2.0)
     near_pred = near.predict(LatentState(z=np.array([1.0, 0.0])), action)
-    assert list(near_pred.mean) == [9.0, 9.0] and near.retrievals == 1  # trusted fact stands in
+    assert list(near_pred.mean) == [9.0, 9.0] and near.gate_hits == near.retrievals == 1
     assert 0.0 < near_pred.epistemic < 0.9  # not zeroed: reliability = closeness
     assert abs(near_pred.epistemic - 0.9 * (1.0 / 2.0)) < 1e-12

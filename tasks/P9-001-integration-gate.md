@@ -107,6 +107,11 @@ vs 55% at P8's threshold) reduced but did not remove the cost. This is reported 
 finding, not tuned away — quantifying it and finding a non-destructive way to bring
 retrieval into planning is P9-002's first ablation.
 
+**Superseded threshold policy (U-003):** the fixed `2× max` cutoff above is the
+historical diagnosis. P9 now uses α=.0001 decaying-step ACI on a long nominal
+seen-region epistemic stream, with measurable online crossings and a target-sensitive
+independent audit; the distance gate remains the separate fact-acceptance check.
+
 **Perf note:** `SemanticStore.query` re-stacked its key matrix on every call — fine
 for P8's few-hundred queries, fatal in CEM planning (hundreds of thousands). Caching
 the stacked matrix (invalidated on `write`) cut the gate from 13m to ~2m20s.

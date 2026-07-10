@@ -18,7 +18,7 @@ from prospect.types import (
     Surprise,
     Transition,
 )
-from prospect.voe import LearningProgressCurriculum, SurpriseCompetenceMonitor
+from prospect.voe import AdaptiveThreshold, LearningProgressCurriculum, SurpriseCompetenceMonitor
 
 
 def _pred(epistemic: float, aleatoric: float) -> Prediction:
@@ -53,6 +53,69 @@ def test_attribution_follows_the_uncertainty_source() -> None:
     aleatoric_dominated = monitor.surprise(_pred(0.1, 0.9), observed)
     assert epistemic_dominated.epistemic == pytest.approx(0.9 * epistemic_dominated.total)
     assert aleatoric_dominated.aleatoric == pytest.approx(0.9 * aleatoric_dominated.total)
+
+
+def test_adaptive_threshold_controls_the_tail_rate_and_tracks_a_shift() -> None:
+    alpha = 0.1
+    tracker = AdaptiveThreshold(alpha=alpha, eta=0.5)
+    rng = np.random.default_rng(7)
+    before = rng.normal(size=5_000)
+    after = rng.normal(loc=3.0, size=10_000)
+    triggered: list[bool] = []
+
+    for score in before:
+        triggered.append(float(score) > tracker.value)
+        tracker.update(float(score))
+    settled_before = tracker.value
+    for score in after:
+        triggered.append(float(score) > tracker.value)
+        tracker.update(float(score))
+
+    assert settled_before == pytest.approx(float(np.quantile(before, 1.0 - alpha)), abs=0.15)
+    assert tracker.value == pytest.approx(float(np.quantile(after, 1.0 - alpha)), abs=0.15)
+    assert float(np.mean(triggered[-5_000:])) == pytest.approx(alpha, abs=0.015)
+
+
+def test_adaptive_threshold_uses_strict_pre_update_decisions_and_decaying_steps() -> None:
+    tracker = AdaptiveThreshold(alpha=0.25, eta=2.0, initial_value=1.0)
+    tracker.update(1.0)  # equality is not a trigger: 1 - 2 * .25
+    assert tracker.value == pytest.approx(0.5)
+    assert tracker.trigger_rate == 0.0
+
+    tracker.update(0.6)  # judged against 0.5, then eta / sqrt(2) is applied
+    assert tracker.value == pytest.approx(0.5 + 2.0 / np.sqrt(2.0) * 0.75)
+    assert tracker.updates == 2
+    assert tracker.trigger_rate == pytest.approx(0.5)
+
+
+def test_adaptive_threshold_controls_a_one_percent_tail() -> None:
+    alpha = 0.01
+    tracker = AdaptiveThreshold(alpha=alpha, eta=0.5)
+    scores = np.random.default_rng(17).normal(size=50_000)
+    triggered: list[bool] = []
+
+    for score in scores:
+        triggered.append(float(score) > tracker.value)
+        tracker.update(float(score))
+
+    assert tracker.value == pytest.approx(float(np.quantile(scores, 1.0 - alpha)), abs=0.08)
+    assert float(np.mean(triggered[-25_000:])) == pytest.approx(alpha, abs=0.002)
+
+
+@pytest.mark.parametrize(
+    ("alpha", "eta", "message"),
+    [(0.0, 0.1, "alpha"), (1.0, 0.1, "alpha"), (0.1, 0.0, "eta")],
+)
+def test_adaptive_threshold_rejects_invalid_configuration(
+    alpha: float, eta: float, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        AdaptiveThreshold(alpha=alpha, eta=eta)
+    tracker = AdaptiveThreshold(alpha=0.1, eta=0.1)
+    with pytest.raises(ValueError, match="score"):
+        tracker.update(float("nan"))
+    with pytest.raises(ValueError, match="initial_value"):
+        AdaptiveThreshold(alpha=0.1, eta=0.1, initial_value=float("inf"))
 
 
 def test_unseen_skill_is_maximally_unknown() -> None:
@@ -146,10 +209,17 @@ def test_is_forgetting_lifecycle() -> None:
         monitor.update(_transition(0.02, skill, error=0.005))
     assert monitor.is_mastered(skill) is True
     assert monitor.is_forgetting(skill) is False  # mastered and accurate -> not forgetting
+    mastered_error = monitor._skills[skill].mastered_error
+    # U-003 adapts termination/retrieval gates, never this latched reference.
+    tracker = AdaptiveThreshold(alpha=0.1, eta=0.5)
+    for score in np.linspace(0.0, 10.0, 100):
+        tracker.update(float(score))
+    assert monitor._skills[skill].mastered_error == mastered_error
     # The skill decays: the model is now CONFIDENTLY WRONG — epistemic stays low
     # but prediction error climbs. Epistemic alone would miss this.
     for _ in range(30):
         monitor.update(_transition(0.02, skill, error=1.0))
+    assert monitor._skills[skill].mastered_error == mastered_error
     assert monitor.is_forgetting(skill) is True  # error risen far above the mastered floor
 
 

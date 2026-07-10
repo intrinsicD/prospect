@@ -7,8 +7,8 @@ from a knowledge store where it is uncertain. The model is trained on a LIMITED
 region of the pendulum's state space (|omega| <= REGION), so it is confident there
 and uncertain outside it; a `SemanticStore` holds correct (state,action)->
 next-latent facts across the FULL range (the knowledge base). Per test query the
-`UncertaintyMemoryRouter` gates on the model's `prediction.epistemic` (threshold =
-a held-out seen-region epistemic quantile).
+`UncertaintyMemoryRouter` gates on the model's `prediction.epistemic` (threshold
+ACI-calibrated to a 10% exceedance rate on held-out seen-region scores).
 
 Accuracy half (P8-001): gated 1-step MSE beats model-alone (no-retrieval) on every
 seed — and typically beats ALWAYS-retrieve too, because gating keeps the model's
@@ -34,6 +34,7 @@ from prospect.memory import SemanticStore, UncertaintyMemoryRouter
 from prospect.types import Action, KnowledgeItem, LatentState, Provenance, Transition, Trust
 from prospect.world_model import FlatWorldModel
 
+from ..calibration import audit_threshold, calibrate_threshold, exceedance_rate
 from ..envs import Pendulum
 from ..gates import GateResult, gate_check
 from ..runlog import RUNS_DIR, RunLog
@@ -46,7 +47,9 @@ SEEDS = [0, 1, 2]
 GRAVITY, DAMPING, DT = 10.0, 0.2, 0.2
 REGION, FULL = 4.0, 8.0  # trained |omega| <= REGION; store & test span |omega| <= FULL
 TRAIN_N, STORE_N, TEST_N, PROBE_N = 4096, 3000, 400, 256
-EPISTEMIC_QUANTILE = 0.9  # retrieve above the 90th-percentile seen-region epistemic
+CALIBRATION_N, CALIBRATION_AUDIT_N = 2000, 2000
+RETRIEVAL_ALPHA = 0.1  # nominal seen-region epistemic gate-hit rate
+RETRIEVAL_AUDIT_TOLERANCE = 0.03
 IMPROVEMENT_MARGIN = 1.5  # gated MSE must beat no-retrieval by at least this factor
 POISON_SCALE = 0.5  # noise added to the poisoned store's answers (target-latent units)
 POISON_HARM_FACTOR = 2.0  # trust-blind retrieval from the poison must be >= this x worse
@@ -122,7 +125,7 @@ def check_p8() -> GateResult:
     (RUNS_DIR / RUN_ID / "metrics.jsonl").unlink(missing_ok=True)
     log = RunLog(RUN_ID)
     metrics: dict[str, float] = {}
-    beats_no_retrieval, robust = [], []
+    beats_no_retrieval, robust, calibration_valid = [], [], []
     for seed in SEEDS:
         train = _region_data(REGION, TRAIN_N, seed)
         heldout = _region_data(REGION, PROBE_N, seed + 500)  # in-distribution (seen region)
@@ -141,9 +144,20 @@ def check_p8() -> GateResult:
         facts = _region_data(FULL, STORE_N, seed + 50)
         store = _build_store(model, facts)
         poisoned = _build_poisoned_store(model, facts, seed + 70)
-        seen_epistemic = sorted(
-            model.predict(model.encode(t.state.z), t.action).epistemic for t in heldout)
-        threshold = seen_epistemic[int(EPISTEMIC_QUANTILE * len(seen_epistemic))]
+        calibration_epistemic = [
+            model.predict(model.encode(t.state.z), t.action).epistemic
+            for t in _region_data(REGION, CALIBRATION_N, seed + 600)
+        ]
+        retrieval = calibrate_threshold(calibration_epistemic, alpha=RETRIEVAL_ALPHA)
+        audit_epistemic = [
+            model.predict(model.encode(t.state.z), t.action).epistemic
+            for t in _region_data(REGION, CALIBRATION_AUDIT_N, seed + 700)
+        ]
+        audit_rate, audit_tolerance, audit_valid = audit_threshold(
+            audit_epistemic, retrieval, tolerance=RETRIEVAL_AUDIT_TOLERANCE
+        )
+        calibration_valid.append(audit_valid)
+        threshold = retrieval.value
         # P8-001 accuracy path (a single trusted store); P8-002 robustness paths over a
         # poisoned UNTRUSTED source: trust-blind (ignores provenance — a P8-001-style
         # agent), provenance-respecting alone, and provenance-respecting alongside the
@@ -190,13 +204,25 @@ def check_p8() -> GateResult:
             f"gated_mse_s{seed}": gated_mse,
             f"always_retrieve_mse_s{seed}": always_mse,
             f"retrieval_rate_s{seed}": rate,
+            f"retrieval_alpha_s{seed}": retrieval.alpha,
+            f"retrieval_eta_s{seed}": retrieval.eta,
+            f"retrieval_threshold_s{seed}": retrieval.value,
+            f"retrieval_calibration_updates_s{seed}": float(retrieval.updates),
+            f"nominal_retrieval_online_rate_s{seed}": retrieval.trigger_rate,
+            f"nominal_retrieval_retrospective_rate_s{seed}": exceedance_rate(
+                calibration_epistemic, retrieval.value
+            ),
+            f"nominal_retrieval_audit_rate_s{seed}": audit_rate,
+            f"nominal_retrieval_audit_tolerance_s{seed}": audit_tolerance,
+            f"nominal_retrieval_audit_valid_s{seed}": float(audit_valid),
             f"poison_blind_mse_s{seed}": blind_mse,
             f"poison_respecting_mse_s{seed}": resp_mse,
             f"poison_mixed_mse_s{seed}": mixed_mse,
         }
 
     accuracy_met, robustness_met = all(beats_no_retrieval), all(robust)
-    passed = accuracy_met and robustness_met
+    calibration_met = all(calibration_valid)
+    passed = accuracy_met and robustness_met and calibration_met
 
     def med(key: str) -> float:
         return float(np.median([metrics[f"{key}_s{s}"] for s in SEEDS]))
@@ -209,13 +235,15 @@ def check_p8() -> GateResult:
                 "always_retrieve_mse_median": always_med, "retrieval_rate_median": rate_med,
                 "poison_blind_mse_median": blind_med, "poison_respecting_mse_median": resp_med,
                 "poison_mixed_mse_median": mixed_med, "accuracy_half_met": float(accuracy_met),
-                "robustness_half_met": float(robustness_met)}
+                "robustness_half_met": float(robustness_met),
+                "retrieval_calibration_met": float(calibration_met)}
     detail = (
         f"accuracy: gated {gated_med:.4f} vs no-retrieval {none_med:.4f} "
         f"(>= x{IMPROVEMENT_MARGIN}/seed: {'MET' if accuracy_met else 'NOT MET'}) vs always "
         f"{always_med:.4f}, retrieval {rate_med:.0%}. "
         f"robustness: trust-blind swallows poison {blind_med:.4f} (>= x{POISON_HARM_FACTOR} "
         f"worse), provenance-respecting stays {resp_med:.4f} (<= no-retrieval) and trust-ordered "
-        f"mixed recovers {mixed_med:.4f}: {'MET' if robustness_met else 'NOT MET'}"
+        f"mixed recovers {mixed_med:.4f}: {'MET' if robustness_met else 'NOT MET'}. "
+        f"independent nominal retrieval-rate audit: {'MET' if calibration_met else 'NOT MET'}"
     )
     return GateResult(phase="P8", passed=passed, metrics=metrics, seeds=list(SEEDS), detail=detail)

@@ -49,7 +49,7 @@ from .p5_options import (
     _hierarchical_episode,
     _option_transitions,
     _skills,
-    _surprise_threshold,
+    _surprise_calibration,
 )
 
 RUN_ID = "p7"
@@ -227,8 +227,14 @@ def _log_option_diversity(model: FlatWorldModel, seed: int, log: RunLog) -> None
     for _ in range(JUMPY_STEPS):
         idx = rng.integers(0, len(train_jumps), size=JUMPY_BATCH)
         jumpy.update([train_jumps[i] for i in idx])
-    manager = HierarchicalManager(jumpy, skills, depth=MANAGER_DEPTH, uncertainty_penalty=1.0,
-                                  surprise_threshold=_surprise_threshold(model, skills, seed))
+    termination, _ = _surprise_calibration(model, skills, seed)
+    manager = HierarchicalManager(
+        jumpy,
+        skills,
+        depth=MANAGER_DEPTH,
+        uncertainty_penalty=1.0,
+        surprise_threshold=termination.value,
+    )
     usage_all: dict[str, int] = {}
     durations_all: list[int] = []
     landings_all: dict[str, list[np.ndarray]] = {}
