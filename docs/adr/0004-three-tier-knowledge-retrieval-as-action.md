@@ -49,9 +49,10 @@ data, never instruction** — it must never override the agent's goals.
   *provenance* (who said it), not content inspection — a poison *detector* would be a
   new, separately-gated capability. *(Added by P8-002.)*
 - **Retrieval-as-lookup obeys the curse of dimensionality** (P9-006). Rule 2 retrieves
-  the nearest fact in a continuous key space (here `concat(latent, action)`), so the
-  store's *density* must scale with the key-space *dimension* or the nearest fact is too
-  far to be a right answer. Measured on env #2 (PointMass, a 6-D key): a sparse store
+  a small nearest neighborhood in a continuous key space (here
+  `concat(latent, action)`), so the store's *density* must scale with key-space
+  *dimension* or even the nearest coverage reference is too far to support a right
+  answer. Measured on env #2 (PointMass, a 6-D key): a sparse store
   (1500 facts) made retrieval fail to generalize (nearest-fact error 0.021 > the model's
   own 0.017), while a dimension-adequate store (40000) made it generalize (0.0135, ~22%
   better than no-retrieval) — with the *same* latent key. This corrects P9-005's
@@ -110,5 +111,18 @@ data, never instruction** — it must never override the agent's goals.
   retrieve). Measured: retrieval-into-planning went from a −3.1 (and, at a stronger
   exploit penalty, −15) marginal to −0.3 (negligible, safe); composed control improved
   (−23.6 → −9.7) and the entangled exploit-penalty marginal recovered (−6.0 → −1.6). The
-  1-step P8/P9-006 retrieval role (queries are *real* states, in coverage) is unchanged:
-  `reliability_radius=None` keeps substitute-and-trust there. *(Added by P9-007.)*
+  1-step P8/P9-006 retrieval role (queries are *real* states, in coverage) originally
+  kept substitute-and-trust; U-005 supersedes that readout below. *(Added by P9-007.)*
+- **Accepted lookup uses ranked aggregation blended with the model** (U-005).
+  `SemanticStore` and `ExternalKnowledgeSource` return the ranked top three neighbors;
+  consumers apply a store-calibrated `softmax(-squared_distance / τ)` and blend the
+  aggregated answer with the model by distance reliability. With a hard coverage
+  radius, neighbors outside it are excluded (for TS∞ they must cover every member),
+  `λ = max(0, 1 - distance/radius)`, and residual epistemic is
+  `epi × (1 - λ)`. Without a hard radius, `exp(-distance/τ)` supplies soft reliability.
+  Thus one noisy/poisoned neighbor cannot control an accepted answer, while the
+  epistemic trigger, provenance/trust ordering, and P9-007 radius remain unchanged
+  outer gates. External neighbors are each encoded through the codec before aggregation.
+  Measured: P8 gated MSE improved 0.00761→0.00504, PointMass retrieval improved
+  0.01230→0.00687, and retrieval's P9 planning marginal moved −3.31→+1.42; the P10
+  codec path remains above its 2× competence bar. *(Added by U-005.)*

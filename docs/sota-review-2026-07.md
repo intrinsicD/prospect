@@ -3,8 +3,8 @@
 A full review of every architecture component against the 2023–2026 literature
 (arXiv, GitHub, OpenReview), answering one question per component: *is this part
 clearly outdated, and if so what replaces it — or is it already at (or ahead of)
-current best practice?* Every finding became a task: **U-001…U-004 are shipped**, ready
-upgrades are **U-005…U-012**, and deferred (trigger-gated) upgrades are
+current best practice?* Every finding became a task: **U-001…U-005 are shipped**, ready
+upgrades are **U-006…U-012**, and deferred (trigger-gated) upgrades are
 **U-101…U-112** — see the upgrade track in `tasks/BACKLOG.md` and the
 **upgrade-triggers** workflow step in `CLAUDE.md`.
 
@@ -15,11 +15,11 @@ The architecture is *not* broadly outdated. No current SOTA world model
 produces the epistemic/aleatoric split all six VoE jobs consume; where the field
 needs an epistemic signal it bolts on exactly what this repo already has — a
 probabilistic ensemble. There is no wholesale replacement to make. Twelve actionable
-upgrades were identified (U-001…U-004 now shipped; eight remain ready), a separate dozen
+upgrades were identified (U-001…U-005 now shipped; seven remain ready), a separate dozen
 are right-but-not-yet (deferred with explicit triggers), and three code/doc
 inconsistencies surfaced during the read.
 
-## Measurably behind → upgrade tasks (U-001…U-004 shipped)
+## Measurably behind → upgrade tasks (U-001…U-005 shipped)
 
 | Task | Component | Finding (why replace) | Key sources |
 |------|-----------|----------------------|-------------|
@@ -27,7 +27,7 @@ inconsistencies surfaced during the read.
 | U-002 · **shipped** | FlatPlanner | Vanilla white-noise CEM was replaced by beta-2 colored proposals, keep/shift elites, execute-best, and softmax-weighted elite moments; a reference iCEM proposal scale prevents correlated trajectories saturating the action bounds | [iCEM](https://arxiv.org/abs/2008.06389) · [Pink Noise](https://openreview.net/forum?id=hQ9V5QN27eS) · [TD-MPC2](https://arxiv.org/abs/2310.16828) |
 | U-003 · **shipped** | voe/planning/memory thresholds | One-shot termination-surprise and epistemic-retrieval cutoffs became separate decaying-step ACI policies with independent nominal audits; P9 planning uses a measurable 0.01% tail over 100k-score calibration/audit streams because CEM amplifies one-step crossings, while the forgetting latch stays fixed | [ACI](https://arxiv.org/abs/2106.00170) · [decaying-step ACI](https://arxiv.org/pdf/2402.01139) · [conformal failure detection](https://arxiv.org/pdf/2503.08558) |
 | U-004 · **shipped** | ReplayBuffer eviction | FIFO-only eviction became a fixed-budget, disjoint 60/40 recent-FIFO + Algorithm-R lifetime reservoir; a 10×-capacity churn test retains early history while P3/P7 and the full ratchet stay green | [WMAR](https://arxiv.org/abs/2401.16650) · [accumulate-don't-replace](https://arxiv.org/abs/2404.01413) |
-| U-005 | retrieval readout | Nearest-1 hard substitution is noise- and poison-sensitive; k=2–3 distance-kernel-weighted blending against the model's own prediction is the converged answer of the kNN-LM, episodic-control and RAG-security literatures | [kNN-LM gating](https://arxiv.org/abs/2210.15859) · [PoisonedRAG](https://arxiv.org/abs/2402.07867) · [RobustRAG](https://arxiv.org/abs/2405.15556) |
+| U-005 · **shipped** | retrieval readout | Nearest-1 hard substitution became ranked top-3 distance-kernel aggregation blended against the model, with radius coverage and honest residual epistemic; P8/P9/P10 and the full ratchet remain green | [kNN-LM gating](https://arxiv.org/abs/2210.15859) · [PoisonedRAG](https://arxiv.org/abs/2402.07867) · [RobustRAG](https://arxiv.org/abs/2405.15556) |
 | U-006 | world_model training | One-step training + multi-step consumption is the classic compounding-error mismatch (the repo's own named "main limiter on R1"); current practice adds an unrolled multi-step loss term | [V-JEPA 2-AC](https://arxiv.org/abs/2506.09985) |
 | U-007 | OOD/epistemic signal | The pre-encoder OOD score (P9-005) is a homebrew of the documented "feature collapse" fix but lives before the encoder; a latent-space Mahalanobis density is the literature's feature-space complement | [SNGP](https://arxiv.org/abs/2006.10108) · [DDU](https://arxiv.org/abs/2102.11582) |
 | U-008 | gates | Latent-space ensemble disagreement develops attractors and must be validated against ground-truth state-space error — only a toy-env repo can gate this cheaply | [Biased Dreams](https://arxiv.org/abs/2604.25416) |

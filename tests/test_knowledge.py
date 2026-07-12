@@ -1,5 +1,5 @@
-"""Unit tests for the external knowledge tier (P10-001): nearest-key content lookup and
-configurable trust. The content is an `Observation` (to be ingested through the codec),
+"""Unit tests for the external knowledge tier (P10-001/U-005): ranked-neighbor
+content lookup and configurable trust. Content is an `Observation` for codec ingestion,
 not a pre-digested latent — the distinction from the internal `SemanticStore`."""
 from __future__ import annotations
 
@@ -22,11 +22,16 @@ def test_external_source_returns_nearest_content() -> None:  # P10-001
     assert store.query(np.array([0.0, 0.0])) == []  # empty store answers nothing
     store.write(_fact([0.0, 0.0], [1.0, 2.0, 3.0]))
     store.write(_fact([5.0, 5.0], [9.0, 9.0, 9.0]))
-    near = store.query(np.array([0.1, -0.1]))[0]
+    store.write(_fact([1.0, 1.0], [4.0, 4.0, 4.0]))
+    store.write(_fact([10.0, 10.0], [8.0, 8.0, 8.0]))
+    neighbors = store.query(np.array([0.1, -0.1]))
+    near = neighbors[0]
+    assert len(neighbors) == 3
     assert isinstance(near.content[1], Observation)  # content is an observation, not a latent
     assert list(near.content[1].data) == [1.0, 2.0, 3.0]  # nearest key [0,0]
+    assert list(neighbors[1].content[1].data) == [4.0, 4.0, 4.0]
     assert list(store.query(np.array([4.9, 5.2]))[0].content[1].data) == [9.0, 9.0, 9.0]
-    assert len(store) == 2
+    assert len(store) == 4
 
 
 def test_external_source_is_a_knowledge_source_with_configurable_trust() -> None:  # P10-001

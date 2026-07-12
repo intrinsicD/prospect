@@ -22,7 +22,7 @@ from typing import NamedTuple
 import numpy as np
 
 from prospect.agent import Agent
-from prospect.memory import SemanticStore, UncertaintyMemoryRouter
+from prospect.memory import SemanticStore, UncertaintyMemoryRouter, blend_retrieved_items
 from prospect.planning import FlatPlanner
 from prospect.types import Action, KnowledgeItem, LatentState, Observation, Provenance, Transition, Trust
 from prospect.world_model import FlatWorldModel
@@ -31,6 +31,7 @@ from ..calibration import audit_threshold, calibrate_threshold, exceedance_rate
 from ..envs import PointMass
 from ..loop import run_episode
 from .p2_planner import _PolicyAgent
+from .p8_knowledge import _retrieval_temperature
 
 GEN_SEEDS = [0, 1]
 OBS_DIM, ACT_DIM = 4, 2
@@ -191,6 +192,13 @@ def generalizes() -> Generalization:
         region_model = _train(_fresh_model(seed + 7), _region_data(V_REGION, TRAIN_N, seed), seed)
         region_held = _region_data(V_REGION, CALIBRATION_N, seed + 300)
         store = _store(region_model, _region_data(V_FULL, STORE_N, seed + 50))
+        temperature = _retrieval_temperature(
+            store,
+            [
+                _key(region_model, t)
+                for t in _region_data(V_FULL, PROBE_N, seed + 450)
+            ],
+        )
         seen_epi = [
             region_model.predict(region_model.encode(t.state.z), t.action).epistemic
             for t in region_held
@@ -213,8 +221,11 @@ def generalizes() -> Generalization:
             source = router.route(None, pred.epistemic)
             gated = parametric
             if source is not None:
-                gated = np.asarray(store.query(_key(region_model, t))[0].content[1], dtype=float)
-                retrieved += 1
+                key = _key(region_model, t)
+                gated, reliability, _ = blend_retrieved_items(
+                    key, parametric, source.query(key), temperature
+                )
+                retrieved += int(reliability > 0.0)
             none_err.append(float(np.mean((parametric - target) ** 2)))
             gated_err.append(float(np.mean((gated - target) ** 2)))
             epi.append(pred.epistemic)
@@ -241,6 +252,7 @@ def generalizes() -> Generalization:
             f"gen_retrieval_alpha_s{seed}": retrieval.alpha,
             f"gen_retrieval_eta_s{seed}": retrieval.eta,
             f"gen_retrieval_threshold_s{seed}": retrieval.value,
+            f"gen_retrieval_kernel_temperature_s{seed}": temperature,
             f"gen_retrieval_calibration_updates_s{seed}": float(retrieval.updates),
             f"gen_nominal_retrieval_online_rate_s{seed}": retrieval.trigger_rate,
             f"gen_nominal_retrieval_retrospective_rate_s{seed}": exceedance_rate(

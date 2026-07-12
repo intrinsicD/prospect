@@ -19,6 +19,8 @@ import numpy as np
 
 from .types import KnowledgeItem, Provenance, Trust
 
+RETRIEVAL_NEIGHBORS = 3
+
 
 class InternalKnowledgeSource:
     """Curated internal store (high trust). Superseded in practice by
@@ -40,8 +42,8 @@ class ExternalKnowledgeSource:
 
     Task-unspecific (core imports no task): the harness `write`s `(key, content)` facts —
     `content` is whatever the codec ingests (e.g. an `Observation` or a raw modality
-    vector) — and `query(key)` returns the single nearest fact by key distance, or `[]`
-    when empty. Every item carries `Provenance`.
+    vector) — and `query(key)` returns up to three nearest facts ranked by key distance,
+    or `[]` when empty. Every item carries `Provenance`.
 
     `trust` defaults to **UNTRUSTED**: external content must be validated before the
     router lets it override the model's own prediction (P8-002, ADR-0004 — untrusted
@@ -73,8 +75,14 @@ class ExternalKnowledgeSource:
         if self._matrix is None:
             self._matrix = np.stack(self._keys)
         q = np.asarray(query, dtype=float)
-        nearest = int(np.argmin(np.sum((self._matrix - q) ** 2, axis=1)))
-        return [self._items[nearest]]
+        distances = np.sum((self._matrix - q) ** 2, axis=1)
+        count = min(RETRIEVAL_NEIGHBORS, len(distances))
+        if count == len(distances):
+            selected = np.arange(count)
+        else:
+            selected = np.argpartition(distances, count - 1)[:count]
+        ranked = selected[np.argsort(distances[selected], kind="stable")]
+        return [self._items[i] for i in ranked]
 
 
 class ToolSource:

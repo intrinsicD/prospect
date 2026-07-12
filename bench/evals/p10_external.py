@@ -17,7 +17,8 @@ fact. So retrieval rides the mature two-stage gate: the **uncertainty** gate dec
 to consult external knowledge (ADR-0004: an action taken only when the model is lost), and
 the **distance** gate decides whether to trust the retrieved fact (P9-007: reliability is
 closeness — a far fact at a seen query is skipped). On an accepted retrieval the
-observation is `codec.encode`d and stands in for the model's next-latent.
+ranked top-three observations are individually `codec.encode`d, distance-kernel
+aggregated, and blended with the model's next-latent (U-005).
 
 Capability half (P10-001), three criteria — all in 1-step latent MSE:
 1. **Competence extension** — on OOD queries the two-stage-gated external (codec-ingested)
@@ -46,7 +47,7 @@ import numpy as np
 
 from prospect.codec import UniversalCodec
 from prospect.knowledge import ExternalKnowledgeSource
-from prospect.memory import UncertaintyMemoryRouter
+from prospect.memory import UncertaintyMemoryRouter, blend_retrieved_items
 from prospect.types import (
     Action,
     KnowledgeItem,
@@ -64,7 +65,15 @@ from ..runlog import RUNS_DIR, RunLog
 from .p1_world_model import SEED_STEP_OFFSET, STEPS, _make_probe
 from .p3_replay import log_replay_fidelity
 from .p7_continual import _log_option_diversity
-from .p8_knowledge import FULL, REGION, TRAIN_N, _env, _key, _region_data
+from .p8_knowledge import (
+    FULL,
+    REGION,
+    TRAIN_N,
+    _env,
+    _key,
+    _region_data,
+    _retrieval_temperature,
+)
 
 RUN_ID = "p10"
 SEEDS = [0, 1, 2]
@@ -151,19 +160,30 @@ def _ingest(codec: UniversalCodec, obs: Observation) -> np.ndarray:
     return np.asarray(codec.encode(obs).z, dtype=float)
 
 
+def _ingest_content(codec: UniversalCodec, content: object) -> np.ndarray:
+    if not isinstance(content, Observation):
+        raise TypeError("external retrieval content must be an Observation")
+    return _ingest(codec, content)
+
+
 def _routed_latent(router: UncertaintyMemoryRouter, key: np.ndarray, epistemic: float,
-                   radius: float, codec: UniversalCodec, fallback: np.ndarray) -> tuple[np.ndarray, bool]:
+                   radius: float, temperature: float, codec: UniversalCodec,
+                   fallback: np.ndarray) -> tuple[np.ndarray, bool]:
     """The two-stage gate for one router config: CONSULT external when uncertain (route
     respects trust), then TRUST the fact only when close (distance gate, P9-007). Returns
     (latent, ingested); on no-consult or a far fact it falls back to the model's own."""
     source = router.route(None, epistemic)
     if source is None:
         return fallback, False  # confident, or nothing clears the trust floor
-    item = source.query(key)[0]
-    within = float(np.sum((key - np.asarray(item.content[0], dtype=float)) ** 2)) <= radius
-    if not within:
-        return fallback, False
-    return _ingest(codec, item.content[1]), True
+    blended, reliability, _ = blend_retrieved_items(
+        key,
+        fallback,
+        source.query(key),
+        temperature,
+        radius,
+        answer_transform=lambda content: _ingest_content(codec, content),
+    )
+    return blended, reliability > 0.0
 
 
 def _reliability_radius(model: FlatWorldModel, store: ExternalKnowledgeSource,
@@ -200,7 +220,11 @@ def _seed_metrics(seed: int, log: RunLog) -> dict[str, float]:
     facts = _ood_data(STORE_N, seed + 50)
     store = _external_store(model, facts)
     poisoned = _poisoned_store(model, facts, seed + 70)  # same keys, corrupted content (P10-002)
-    radius = _reliability_radius(model, store, _ood_data(PROBE_N, seed + 900))
+    retrieval_probes = _ood_data(PROBE_N, seed + 900)
+    radius = _reliability_radius(model, store, retrieval_probes)
+    temperature = _retrieval_temperature(
+        store, [_key(model, t) for t in retrieval_probes]
+    )
     seen_epi = sorted(model.predict(model.encode(t.state.z), t.action).epistemic for t in heldout)
     threshold = seen_epi[int(EPISTEMIC_QUANTILE * len(seen_epi))]
     # P10-001 capability path (a single trusted store); P10-002 robustness paths over a
@@ -226,21 +250,59 @@ def _seed_metrics(seed: int, log: RunLog) -> dict[str, float]:
         model_mean = np.asarray(pred.mean, dtype=float)
         model_err.append(err(model_mean, target))
 
-        clean_item = store.query(key)[0]
-        content: Observation = clean_item.content[1]
+        clean_items = store.query(key)
         consult = clean_router.route(None, pred.epistemic) is not None  # uncertainty gate (ADR-0004)
-        within = float(np.sum((key - np.asarray(clean_item.content[0], dtype=float)) ** 2)) <= radius
-        ingest = consult and within  # + distance gate (P9-007)
-        clean_latent = _ingest(codec, content)
-        gated_err.append(err(clean_latent if ingest else model_mean, target))
-        nodist_err.append(err(clean_latent if consult else model_mean, target))  # no distance gate
-        corrupt = Observation(modality=content.modality,
-                              data=content.data + rng_c.normal(0.0, CORRUPT_SCALE, size=content.data.shape))
-        corrupt_err.append(err(_ingest(codec, corrupt) if ingest else model_mean, target))
+        clean_latent, clean_reliability, _ = blend_retrieved_items(
+            key,
+            model_mean,
+            clean_items,
+            temperature,
+            radius,
+            answer_transform=lambda content: _ingest_content(codec, content),
+        )
+        ingest = consult and clean_reliability > 0.0  # + distance gate (P9-007)
+        gated_err.append(err(clean_latent if consult else model_mean, target))
+        # Infinite radius is the no-distance-gate ablation: every ranked neighbor is
+        # eligible and the readout fully trusts their kernel aggregate.
+        nodist_latent, _, _ = blend_retrieved_items(
+            key,
+            model_mean,
+            clean_items,
+            temperature,
+            np.inf,
+            answer_transform=lambda content: _ingest_content(codec, content),
+        )
+        nodist_err.append(err(nodist_latent if consult else model_mean, target))
+
+        def corrupt_content(content: object) -> np.ndarray:
+            if not isinstance(content, Observation):
+                raise TypeError("external retrieval content must be an Observation")
+            corrupt = Observation(
+                modality=content.modality,
+                data=content.data
+                + rng_c.normal(0.0, CORRUPT_SCALE, size=content.data.shape),
+            )
+            return _ingest(codec, corrupt)
+
+        corrupt_latent, _, _ = blend_retrieved_items(
+            key,
+            model_mean,
+            clean_items,
+            temperature,
+            radius,
+            answer_transform=corrupt_content,
+        )
+        corrupt_err.append(err(corrupt_latent if consult else model_mean, target))
         # P10-002: the same two-stage gate under each trust config.
-        blind_err.append(err(_routed_latent(blind_router, key, pred.epistemic, radius, codec, model_mean)[0], target))
-        resp_err.append(err(_routed_latent(resp_router, key, pred.epistemic, radius, codec, model_mean)[0], target))
-        mixed_err.append(err(_routed_latent(mixed_router, key, pred.epistemic, radius, codec, model_mean)[0], target))
+        blind_err.append(err(_routed_latent(
+            blind_router, key, pred.epistemic, radius, temperature, codec, model_mean
+        )[0], target))
+        resp_err.append(err(_routed_latent(
+            resp_router, key, pred.epistemic, radius, temperature, codec, model_mean
+        )[0], target))
+        mixed_err.append(err(_routed_latent(
+            mixed_router, key, pred.epistemic, radius, temperature, codec, model_mean
+        )[0], target))
         consulted.append(consult)
         ingested.append(ingest)
         is_ood.append(abs(float(t.state.z[2])) > REGION)  # obs = [cos, sin, omega]
@@ -264,6 +326,7 @@ def _seed_metrics(seed: int, log: RunLog) -> dict[str, float]:
         f"blind_mse_s{seed}": float(np.mean(blind_e)),
         f"respecting_mse_s{seed}": float(np.mean(resp_e)),
         f"mixed_mse_s{seed}": float(np.mean(mixed_e)),
+        f"retrieval_kernel_temperature_s{seed}": temperature,
         f"seen_ingest_rate_s{seed}": sub(ingest_a.astype(float), ~ood_a),
         f"ood_ingest_rate_s{seed}": sub(ingest_a.astype(float), ood_a),
     }

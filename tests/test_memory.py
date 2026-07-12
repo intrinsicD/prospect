@@ -13,6 +13,7 @@ from prospect.memory import (
     RetrievalAugmentedWorldModel,
     SemanticStore,
     UncertaintyMemoryRouter,
+    blend_retrieved_items,
 )
 from prospect.types import (
     Action,
@@ -177,11 +178,49 @@ def test_semantic_store_returns_nearest_fact_with_provenance() -> None:
     assert store.query(np.array([0.0, 0.0])) == []  # empty store
     store.write(_fact([0.0, 0.0], [1.0]))
     store.write(_fact([5.0, 5.0], [2.0]))
-    [near] = store.query(np.array([0.2, -0.1]))
+    near_items = store.query(np.array([0.2, -0.1]))
+    near = near_items[0]
+    assert len(near_items) == 2  # up to k=3, ranked nearest first
     assert near.content[1][0] == 1.0  # nearest to [0,0]
     assert near.provenance is not None
-    [far] = store.query(np.array([4.8, 5.1]))
+    far = store.query(np.array([4.8, 5.1]))[0]
     assert far.content[1][0] == 2.0
+
+
+def test_distance_kernel_blend_bounds_one_poisoned_neighbor() -> None:
+    query = np.array([0.0, 0.0, 0.0])
+    fallback = np.array([1.0, 1.0])
+    poisoned = _fact([0.0, 0.0, 0.0], [9.0, 9.0])
+    clean_1 = _fact([0.1, 0.0, 0.0], [1.0, 1.0])
+    clean_2 = _fact([-0.1, 0.0, 0.0], [1.0, 1.0])
+    blended, reliability, weights = blend_retrieved_items(
+        query, fallback, [poisoned, clean_1, clean_2], temperature=1.0
+    )
+    assert reliability == 1.0  # exact nearest hit; robustness comes from k aggregation
+    assert np.isclose(weights.sum(), 1.0)
+    assert np.linalg.norm(blended - fallback) < np.linalg.norm(
+        np.asarray(poisoned.content[1], dtype=float) - fallback
+    )
+
+    legacy, legacy_reliability, legacy_weights = blend_retrieved_items(
+        query, fallback, [poisoned], temperature=1e-12
+    )
+    assert legacy_reliability == 1.0 and np.allclose(legacy, poisoned.content[1])
+    assert np.array_equal(legacy_weights, np.ones(1))
+
+
+def test_distance_kernel_boundary_keeps_model_prediction() -> None:
+    fallback = np.array([2.0, -1.0])
+    blended, reliability, weights = blend_retrieved_items(
+        np.array([1.0, 0.0]),
+        fallback,
+        [_fact([0.0, 0.0], [9.0, 9.0])],
+        temperature=1.0,
+        reliability_radius=1.0,
+    )
+    assert reliability == 0.0
+    assert np.array_equal(blended, fallback)
+    assert np.array_equal(weights, np.ones(1))
 
 
 def test_router_gates_on_epistemic() -> None:
@@ -333,10 +372,10 @@ def test_retrieval_distance_gated_in_planning() -> None:  # P9-007
     assert far.gate_hits == 1 and far.retrievals == 0
     assert far_pred.epistemic == 0.9  # untouched, no free pass
 
-    # A CLOSE query (key-distance 1.0 <= radius 2.0): substitute, but carry HONEST
-    # distance-scaled epistemic (0.9 * dist/radius) instead of the certain epi=0.
+    # A CLOSE query (key-distance 1.0 <= radius 2.0): blend halfway toward the fact
+    # and carry HONEST residual epistemic (0.9 * dist/radius), never certain epi=0.
     near = RetrievalAugmentedWorldModel(_EpiModel(0.9), router, reliability_radius=2.0)
     near_pred = near.predict(LatentState(z=np.array([1.0, 0.0])), action)
-    assert list(near_pred.mean) == [9.0, 9.0] and near.gate_hits == near.retrievals == 1
+    assert list(near_pred.mean) == [5.5, 4.5] and near.gate_hits == near.retrievals == 1
     assert 0.0 < near_pred.epistemic < 0.9  # not zeroed: reliability = closeness
     assert abs(near_pred.epistemic - 0.9 * (1.0 / 2.0)) < 1e-12

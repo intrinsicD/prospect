@@ -37,10 +37,11 @@ generalize to a second environment:
 Retrieval into planning was a *negative* ablation marginal (it helps 1-step prediction
 per P8, but overriding the planner's rollout dynamics with a nearest-neighbour fact
 corrupts multi-step optimisation — the P9-002 finding). P9-007 fixes it by *distance-
-gating* the substitution: at rollout depth the query is an imagined latent far from any
-real fact, so its nearest fact is fiction; retrieving it only where a *close* (trusted)
-fact exists, with honest distance-scaled epistemic instead of a certain `epi=0`, removes
-the model-exploitation seam. The marginal is now not harmful (gated in criterion 3).
+gating* the readout: at rollout depth the query is an imagined latent far from any real
+fact, so its nearest fact is fiction. U-005 then replaces accepted nearest-1 substitution
+with top-3 distance-kernel aggregation blended against the model; only radius-covered
+neighbors contribute, and honest residual epistemic remains. The marginal is now not
+harmful (gated in criterion 3).
 
 MEASURED, NOT GATED — the finding (ADR-0008): the exploit-penalty ablation marginal is
 ~negligible. Not tuned away; a reported composition limit.
@@ -72,7 +73,7 @@ from .p1_world_model import SEED_STEP_OFFSET, STEPS, _make_probe
 from .p2_planner import EP_LEN, _PolicyAgent, _random_policy
 from .p3_replay import log_replay_fidelity
 from .p7_continual import _log_option_diversity
-from .p8_knowledge import FULL, REGION, _env, _key, _region_data
+from .p8_knowledge import FULL, REGION, _env, _key, _region_data, _retrieval_temperature
 from .p9_ablation import MARGIN, classify, marginals
 from .p9_generalization import generalizes
 
@@ -200,6 +201,7 @@ def check_p9() -> GateResult:
         threshold = retrieval.value
         router = UncertaintyMemoryRouter([store], threshold=threshold)
         radius = _reliability_radius(model, store, ood)  # trust only close (real) facts
+        temperature = _retrieval_temperature(store, [_key(model, t) for t in ood])
 
         # 3. monitor -> mastery -> curriculum EXPLOIT (the same epistemic signal, other job)
         seen_floor = float(np.median([
@@ -210,7 +212,12 @@ def check_p9() -> GateResult:
         mastered = monitor.is_mastered(SurpriseCompetenceMonitor.DEFAULT_SKILL)
 
         # 4. compose the full agent (plan over the retrieval-augmented model) + baselines
-        augmented = RetrievalAugmentedWorldModel(model, router, reliability_radius=radius)
+        augmented = RetrievalAugmentedWorldModel(
+            model,
+            router,
+            reliability_radius=radius,
+            kernel_temperature=temperature,
+        )
         planner_full = FlatPlanner(augmented, seed=seed)
         agent_full = Agent(encode=_encoder(model), planner=planner_full, world_model=model,
                            monitor=monitor, curriculum=curriculum)
@@ -232,8 +239,16 @@ def check_p9() -> GateResult:
         # penalty pinned to 0). Marginal value = composed - ablated (see p9_ablation).
         agent_no_penalty = Agent(
             encode=_encoder(model), world_model=model, monitor=monitor,
-            planner=FlatPlanner(RetrievalAugmentedWorldModel(model, router, reliability_radius=radius),
-                                seed=seed, uncertainty_penalty=0.0))
+            planner=FlatPlanner(
+                RetrievalAugmentedWorldModel(
+                    model,
+                    router,
+                    reliability_radius=radius,
+                    kernel_temperature=temperature,
+                ),
+                seed=seed,
+                uncertainty_penalty=0.0,
+            ))
         no_penalty = _control_return(agent_no_penalty, seed)
         marg = marginals(composed, {"planning": reactive, "retrieval": bare,
                                     "exploit_penalty": no_penalty})
@@ -260,6 +275,7 @@ def check_p9() -> GateResult:
             f"retrieval_alpha_s{seed}": retrieval.alpha,
             f"retrieval_eta_s{seed}": retrieval.eta,
             f"retrieval_threshold_s{seed}": retrieval.value,
+            f"retrieval_kernel_temperature_s{seed}": temperature,
             f"retrieval_calibration_updates_s{seed}": float(retrieval.updates),
             f"nominal_retrieval_online_rate_s{seed}": retrieval.trigger_rate,
             f"nominal_retrieval_online_valid_s{seed}": float(online_valid),

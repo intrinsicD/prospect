@@ -8,7 +8,9 @@ region of the pendulum's state space (|omega| <= REGION), so it is confident the
 and uncertain outside it; a `SemanticStore` holds correct (state,action)->
 next-latent facts across the FULL range (the knowledge base). Per test query the
 `UncertaintyMemoryRouter` gates on the model's `prediction.epistemic` (threshold
-ACI-calibrated to a 10% exceedance rate on held-out seen-region scores).
+ACI-calibrated to a 10% exceedance rate on held-out seen-region scores); accepted
+queries aggregate the ranked top three facts with a store-calibrated distance kernel
+and blend that result with the model prediction (U-005).
 
 Accuracy half (P8-001): gated 1-step MSE beats model-alone (no-retrieval) on every
 seed — and typically beats ALWAYS-retrieve too, because gating keeps the model's
@@ -30,7 +32,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from prospect.memory import SemanticStore, UncertaintyMemoryRouter
+from prospect.interfaces import KnowledgeSource
+from prospect.memory import SemanticStore, UncertaintyMemoryRouter, blend_retrieved_items
 from prospect.types import Action, KnowledgeItem, LatentState, Provenance, Transition, Trust
 from prospect.world_model import FlatWorldModel
 
@@ -96,28 +99,51 @@ def _build_poisoned_store(
     model: FlatWorldModel, facts: list[Transition], seed: int
 ) -> SemanticStore:
     """An UNTRUSTED store over the same keys as the clean store, but whose answers are
-    corrupted (large noise) — a plausible poisoned/low-trust source (P8-002). Its
-    provenance is UNTRUSTED, so a provenance-respecting router must never let it
-    override the model's own prediction (ADR-0004: untrusted content is data)."""
+    corrupted by one coherent source-level bias — a plausible poisoned/low-trust
+    source (P8-002) that k-neighbor aggregation cannot average away. Its provenance
+    is UNTRUSTED, so a provenance-respecting router must never let it override the
+    model's own prediction (ADR-0004: untrusted content is data)."""
     rng = np.random.default_rng(seed)
     store = SemanticStore(trust=Trust.UNTRUSTED)
+    offset: np.ndarray | None = None
     for t in facts:
         correct = np.asarray(model.encode_target(t.next_state.z).z, dtype=float)
-        poison = correct + rng.normal(0.0, POISON_SCALE, size=correct.shape)
+        if offset is None:
+            direction = rng.normal(size=correct.shape)
+            offset = POISON_SCALE * direction / float(np.sqrt(np.mean(direction**2)))
+        poison = correct + offset
         store.write(KnowledgeItem(content=(_key(model, t), poison),
                                   provenance=Provenance(source="poisoned", trust=Trust.UNTRUSTED)))
     return store
 
 
 def _routed_answer(
-    router: UncertaintyMemoryRouter, key: np.ndarray, epistemic: float, parametric: np.ndarray
+    router: UncertaintyMemoryRouter,
+    key: np.ndarray,
+    epistemic: float,
+    parametric: np.ndarray,
+    temperature: float,
 ) -> np.ndarray:
     """The answer a provenance-respecting agent uses: the router's chosen source's
-    fact when it retrieves, else the model's own prediction (`route() -> None`)."""
+    distance-kernel blend when it retrieves, else its parametric prediction."""
     source = router.route(None, epistemic)
     if source is None:
         return parametric
-    return np.asarray(source.query(key)[0].content[1], dtype=float)
+    blended, _, _ = blend_retrieved_items(
+        key, parametric, source.query(key), temperature
+    )
+    return blended
+
+
+def _retrieval_temperature(source: KnowledgeSource, queries: list[np.ndarray]) -> float:
+    """Median k-th-neighbor squared distance: a store-scale kernel calibration."""
+    scales: list[float] = []
+    for query in queries:
+        items = source.query(query)
+        if items:
+            key = np.asarray(items[-1].content[0], dtype=float)
+            scales.append(float(np.sum((query - key) ** 2)))
+    return max(float(np.median(scales)), float(np.finfo(float).eps))
 
 
 @gate_check("P8")
@@ -144,6 +170,7 @@ def check_p8() -> GateResult:
         facts = _region_data(FULL, STORE_N, seed + 50)
         store = _build_store(model, facts)
         poisoned = _build_poisoned_store(model, facts, seed + 70)
+        temperature = _retrieval_temperature(store, [_key(model, t) for t in ood])
         calibration_epistemic = [
             model.predict(model.encode(t.state.z), t.action).epistemic
             for t in _region_data(REGION, CALIBRATION_N, seed + 600)
@@ -176,18 +203,28 @@ def check_p8() -> GateResult:
             pred = model.predict(model.encode(t.state.z), t.action)
             target = np.asarray(model.encode_target(t.next_state.z).z, dtype=float)
             parametric = np.asarray(pred.mean, dtype=float)
-            clean_answer = np.asarray(store.query(key)[0].content[1], dtype=float)
+            clean_answer, _, _ = blend_retrieved_items(
+                key, parametric, store.query(key), temperature
+            )
             retrieved += int(pred.epistemic > threshold)
             none_err.append(float(np.mean((parametric - target) ** 2)))
             gated_err.append(float(np.mean(
-                (_routed_answer(gated_router, key, pred.epistemic, parametric) - target) ** 2)))
+                (_routed_answer(
+                    gated_router, key, pred.epistemic, parametric, temperature
+                ) - target) ** 2)))
             always_err.append(float(np.mean((clean_answer - target) ** 2)))
             blind_err.append(float(np.mean(
-                (_routed_answer(blind_router, key, pred.epistemic, parametric) - target) ** 2)))
+                (_routed_answer(
+                    blind_router, key, pred.epistemic, parametric, temperature
+                ) - target) ** 2)))
             resp_err.append(float(np.mean(
-                (_routed_answer(respecting_router, key, pred.epistemic, parametric) - target) ** 2)))
+                (_routed_answer(
+                    respecting_router, key, pred.epistemic, parametric, temperature
+                ) - target) ** 2)))
             mixed_err.append(float(np.mean(
-                (_routed_answer(mixed_router, key, pred.epistemic, parametric) - target) ** 2)))
+                (_routed_answer(
+                    mixed_router, key, pred.epistemic, parametric, temperature
+                ) - target) ** 2)))
         none_mse, gated_mse = float(np.mean(none_err)), float(np.mean(gated_err))
         always_mse, rate = float(np.mean(always_err)), retrieved / len(test)
         blind_mse, resp_mse, mixed_mse = (
@@ -207,6 +244,7 @@ def check_p8() -> GateResult:
             f"retrieval_alpha_s{seed}": retrieval.alpha,
             f"retrieval_eta_s{seed}": retrieval.eta,
             f"retrieval_threshold_s{seed}": retrieval.value,
+            f"retrieval_kernel_temperature_s{seed}": temperature,
             f"retrieval_calibration_updates_s{seed}": float(retrieval.updates),
             f"nominal_retrieval_online_rate_s{seed}": retrieval.trigger_rate,
             f"nominal_retrieval_retrospective_rate_s{seed}": exceedance_rate(

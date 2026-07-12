@@ -5,7 +5,7 @@ UncertaintyMemoryRouter in P8-001; trust-ordered routing in P8-002.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
 
@@ -20,6 +20,82 @@ from .types import (
     Transition,
     Trust,
 )
+
+RETRIEVAL_NEIGHBORS = 3
+
+
+def _nearest_indices(distances: np.ndarray, k: int = RETRIEVAL_NEIGHBORS) -> np.ndarray:
+    """Return up to ``k`` nearest indices, sorting only the small selected set."""
+    count = min(k, len(distances))
+    if count == 0:
+        return np.empty(0, dtype=int)
+    if count == len(distances):
+        selected = np.arange(count)
+    else:
+        selected = np.argpartition(distances, count - 1)[:count]
+    return selected[np.argsort(distances[selected], kind="stable")]
+
+
+def blend_retrieved_items(
+    query: np.ndarray,
+    fallback: np.ndarray,
+    items: Sequence[KnowledgeItem],
+    temperature: float,
+    reliability_radius: float | None = None,
+    *,
+    answer_transform: Callable[[object], np.ndarray] | None = None,
+    coverage_queries: np.ndarray | None = None,
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """Distance-kernel aggregate ``items`` and blend it with ``fallback`` (U-005).
+
+    The returned tuple is ``(prediction, reliability, weights)``. Kernel weights are
+    a stable ``softmax(-squared_distance / temperature)``. With a reliability radius,
+    only facts covering every supplied query are eligible and reliability decreases
+    linearly from one at an exact hit to zero at the boundary. Without a hard radius,
+    the kernel scale supplies a soft reliability ``exp(-nearest / temperature)``.
+    """
+    base = np.asarray(fallback, dtype=float)
+    if not items:
+        return base.copy(), 0.0, np.empty(0, dtype=float)
+    if not np.isfinite(temperature) or temperature <= 0.0:
+        raise ValueError("retrieval kernel temperature must be finite and positive")
+    if reliability_radius is not None and reliability_radius <= 0.0:
+        raise ValueError("retrieval reliability radius must be positive")
+
+    q = np.asarray(query, dtype=float)
+    keys = np.stack([np.asarray(item.content[0], dtype=float) for item in items])
+    kernel_distances = np.sum((keys - q) ** 2, axis=1)
+    eligible = np.ones(len(items), dtype=bool)
+    coverage_distances = kernel_distances
+    if reliability_radius is not None:
+        coverage = q.reshape(1, -1) if coverage_queries is None else np.asarray(
+            coverage_queries, dtype=float
+        ).reshape(-1, q.size)
+        coverage_distances = np.max(
+            np.sum((coverage[:, None, :] - keys[None, :, :]) ** 2, axis=2), axis=0
+        )
+        eligible = coverage_distances <= reliability_radius
+    if not np.any(eligible):
+        return base.copy(), 0.0, np.empty(0, dtype=float)
+
+    selected_items = [item for item, keep in zip(items, eligible, strict=True) if keep]
+    selected_distances = kernel_distances[eligible]
+    logits = -(selected_distances - float(np.min(selected_distances))) / temperature
+    weights = np.exp(logits)
+    weights /= float(np.sum(weights))
+    transform = answer_transform or (lambda answer: np.asarray(answer, dtype=float))
+    answers = np.stack(
+        [np.asarray(transform(item.content[1]), dtype=float) for item in selected_items]
+    )
+    retrieved = np.tensordot(weights, answers, axes=(0, 0))
+
+    nearest = float(np.min(coverage_distances[eligible]))
+    if reliability_radius is None:
+        reliability = float(np.exp(-nearest / temperature))
+    else:
+        reliability = max(0.0, 1.0 - nearest / reliability_radius)
+    blended = (1.0 - reliability) * base + reliability * retrieved
+    return np.asarray(blended, dtype=float), reliability, weights
 
 
 class ReplayBuffer:
@@ -180,8 +256,8 @@ class SemanticStore:
     A fact's `content` is a `(key, answer)` pair — the query key it answers and the
     answer it holds (knowledge-as-tokens, ADR-0004: the answer is a next-latent in
     the model's own space, a drop-in for the model's prediction). `query(key)`
-    returns the single nearest fact by key distance (or `[]` when empty). Every
-    item carries `Provenance` (P0-008).
+    returns up to three nearest facts ranked by key distance (or `[]` when empty).
+    Every item carries `Provenance` (P0-008).
 
     `trust` is the store's source-level provenance floor (P8-002): `HIGH` by default
     (the internal distilled store), but a test/adversarial store can be built at a
@@ -219,8 +295,8 @@ class SemanticStore:
         if not self._items:
             return []
         q = np.asarray(query, dtype=float)
-        nearest = int(np.argmin(np.sum((self._key_matrix() - q) ** 2, axis=1)))
-        return [self._items[nearest]]
+        distances = np.sum((self._key_matrix() - q) ** 2, axis=1)
+        return [self._items[i] for i in _nearest_indices(distances)]
 
 
 class UncertaintyMemoryRouter:
@@ -266,36 +342,40 @@ class RetrievalAugmentedWorldModel:
     into regions its parametric model has not learned.
 
     Wraps a base model + an `UncertaintyMemoryRouter`. For each (state, action): if the
-    base prediction's epistemic clears the router's gate, retrieve the nearest fact —
-    a next-latent in the base model's own space, keyed by `concat(latent, action)` — and
-    substitute it; otherwise return the base prediction unchanged. The planner (which
-    duck-types `predict_batch`) plans over this transparently.
+    base prediction's epistemic clears the router's gate, retrieve up to three nearby
+    facts — next-latents keyed by `concat(latent, action)` — aggregate them with a
+    distance kernel, and blend that answer with the model prediction (U-005). Otherwise
+    return the base prediction unchanged. The planner (which duck-types `predict_batch`)
+    plans over this transparently.
 
-    **Distance-gated substitution (P9-007).** A retrieved fact is trusted only when it is
+    **Distance-gated blending (P9-007/U-005).** A retrieved fact is trusted only when it is
     *close* to the query. Inside a planner's imagination rollout the queries are imagined
     latents that, at depth, wander far from any real stored transition; substituting the
     nearest (far, misaligned) fact there corrupts multi-step control — the P9-002 finding.
     So when `reliability_radius` is set, a would-be retrieval whose nearest-fact key
     distance exceeds the radius is *skipped* (the model's own prediction stands), and an
-    accepted retrieval carries **honest epistemic scaled by distance** (`epi ×
-    min(1, dist/radius)`: an exact hit is trusted, a boundary hit keeps the model's
-    uncertainty) instead of the certainty (`epi = 0`) that let CEM exploit the retrieval
-    seam. Reliability = closeness (the P9-006 distance-as-reliability insight, now gating
-    *whether* to retrieve). The radius is calibrated to the store's coverage by the caller
-    (as the router's epistemic `threshold` is). `reliability_radius=None` keeps the legacy
-    substitute-and-zero behaviour (the 1-step P8 role, where queries are real states).
+    accepted retrieval blends toward the aggregated fact by the same closeness and carries
+    **honest residual epistemic** (`epi × (1 - reliability)`: an exact hit trusts the
+    aggregate, a boundary hit keeps the model and its uncertainty). Reliability =
+    closeness (the P9-006 insight). The radius and distance-kernel temperature are
+    calibrated to store coverage by the caller. Without a hard radius, kernel distance
+    supplies a soft reliability rather than reverting to hard substitution.
 
     Contract: interfaces.WorldModel. Instrumentation separates `calls` (candidate
     predictions scored), `gate_hits` (epistemic threshold exceedances), and `retrievals`
-    (distance-covered facts actually substituted)."""
+    (distance-covered aggregates actually blended)."""
 
     def __init__(
         self, base: WorldModel, router: UncertaintyMemoryRouter,
         reliability_radius: float | None = None,
+        kernel_temperature: float = 1.0,
     ) -> None:
+        if not np.isfinite(kernel_temperature) or kernel_temperature <= 0.0:
+            raise ValueError("retrieval kernel temperature must be finite and positive")
         self._base = base
         self._router = router
         self._reliability_radius = reliability_radius
+        self._kernel_temperature = kernel_temperature
         self.retrievals = 0
         self.calls = 0
         self.gate_hits = 0
@@ -406,33 +486,30 @@ class RetrievalAugmentedWorldModel:
             return MemberRollout(next_states, variances, rewards, epistemic)
 
         for candidate in np.nonzero(gate_mask)[0]:
-            base_epistemic = float(epistemic[candidate])
             mean_key = np.concatenate([query_states[:, candidate].mean(axis=0), act[candidate]])
             items = source.query(mean_key)
             if not items:
                 continue
-            fact_key, answer = items[0].content
-            residual_epistemic = 0.0
-            if self._reliability_radius is not None:
-                member_keys = np.concatenate(
-                    [
-                        query_states[:, candidate],
-                        np.repeat(act[candidate][None, :], member_count, axis=0),
-                    ],
-                    axis=1,
-                )
-                distances = np.sum(
-                    (member_keys - np.asarray(fact_key, dtype=float)) ** 2, axis=1
-                )
-                max_distance = float(np.max(distances))
-                if max_distance > self._reliability_radius:
-                    continue
-                residual_epistemic = base_epistemic * min(
-                    1.0, max_distance / self._reliability_radius
-                )
-            next_states[:, candidate] = np.asarray(answer, dtype=float)
+            member_keys = np.concatenate(
+                [
+                    query_states[:, candidate],
+                    np.repeat(act[candidate][None, :], member_count, axis=0),
+                ],
+                axis=1,
+            )
+            blended, reliability, _ = blend_retrieved_items(
+                mean_key,
+                next_states[:, candidate],
+                items,
+                self._kernel_temperature,
+                self._reliability_radius,
+                coverage_queries=member_keys,
+            )
+            if reliability <= 0.0:
+                continue
+            next_states[:, candidate] = blended
             self.retrievals += 1
-            epistemic[candidate] = residual_epistemic
+            epistemic[candidate] *= 1.0 - reliability
         return MemberRollout(next_states, variances, rewards, epistemic)
 
     def _rows(
@@ -467,14 +544,16 @@ class RetrievalAugmentedWorldModel:
             items = source.query(key)
             if not items:
                 continue
-            fact_key, answer = items[0].content
-            if self._reliability_radius is not None:  # distance-gated (P9-007)
-                dist = float(np.sum((key - np.asarray(fact_key, dtype=float)) ** 2))
-                if dist > self._reliability_radius:
-                    continue  # far fact = fiction at rollout depth; keep the model
-                epi[i] *= min(1.0, dist / self._reliability_radius)  # honest: reliability=closeness
-            else:
-                epi[i] = 0.0  # legacy 1-step role: the fact stands in as a confident guess
-            mean[i] = np.asarray(answer, dtype=float)
+            blended, reliability, _ = blend_retrieved_items(
+                key,
+                mean[i],
+                items,
+                self._kernel_temperature,
+                self._reliability_radius,
+            )
+            if reliability <= 0.0:
+                continue
+            mean[i] = blended
+            epi[i] *= 1.0 - reliability
             self.retrievals += 1
         return mean, var, epi, ale, rew

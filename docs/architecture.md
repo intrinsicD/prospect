@@ -43,7 +43,7 @@ independent nominal stream audits the published float threshold before the uncha
 planning/memory consumer uses it. P9 needs a much rarer, long-stream target because
 CEM amplifies otherwise-benign one-step crossings. These α values govern nominal
 calibration streams, not runtime CEM gate-hit rates; P9's separate distance gate
-controls which crossings become fact substitutions. Failure/OOD evaluation scores
+controls which crossings become radius-covered top-3 fact blends. Failure/OOD scores
 do not feed back; job 5's forgetting latch is intentionally fixed.
 
 Two of these jobs pull the signal in opposite directions: planning is *repelled*
@@ -78,7 +78,8 @@ design's health is that additions plug into this backbone.
   only competence-gated (mastered) skills are offered upward (R5).
 - **memory.py** — episodic replay with disjoint recent-FIFO + lifetime-reservoir
   retention, plus *generative* replay (rehearsal); a semantic store whose read side
-  is a `KnowledgeSource` (one query verb, P0-008), and an
+  is a `KnowledgeSource` (one query verb, P0-008), ranked top-3 distance-kernel
+  retrieval blended against the model prediction, and an
   uncertainty-gated, **provenance-respecting** router over the memory tiers: it may
   decline to retrieve (`None` = answer parametrically), and it selects among sources
   by `trust` — highest-trust above a `min_trust` floor wins, so an untrusted source
@@ -122,9 +123,10 @@ retrieval and tool-use as actions the planner selects, gated by uncertainty. See
 - Retrieval quality and trust of external sources — *and where retrieval is safe to
   apply*: the P9 integration gate found retrieval helps 1-step prediction (P8) yet
   **degraded multi-step planning** when it overrode the planner's rollout dynamics with
-  far, misaligned facts (P9-002). P9-007 fixed this by **distance-gating** the
-  substitution (trust a fact only within a coverage radius, with honest distance-scaled
-  epistemic) — the marginal is now negligible/safe and *gated* (ADR-0004/0008).
+  far, misaligned facts (P9-002). P9-007 fixed the outer trust decision with a coverage
+  radius; U-005 makes the accepted readout a **distance-kernel top-3 blend** against the
+  model, excluding uncovered neighbors and retaining honest residual epistemic. The
+  retrieval marginal is now `+1.4` (safe/neutral) and *gated* (ADR-0004/0008).
 - **Composing parts that each pass their own gate can still fail as a whole** — the
   reason Phase 9 validates the assembled agent, not just the components (ADR-0008).
 - **Single-environment overfit** — capabilities are validated on a *second*,
