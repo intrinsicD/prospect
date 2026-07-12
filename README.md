@@ -54,10 +54,14 @@ make tree        # see the layout
 3. Take the top unblocked task in `tasks/BACKLOG.md`. Phases P0–P14 are shipped
    (`bench/SHIPPED`). For worked examples, `tasks/P1-001-flat-world-model.md` shows an
    implementation phase and `tasks/P14-001-observe-repeat-imitation.md` a recent one.
+4. For novel research directions, load
+   `.agents/skills/prospect-research-ideation/SKILL.md`; route any selected idea
+   through a task, ADR when needed, and a benchmark gate before implementation.
 
 ## Layout
 ```
 CLAUDE.md            agent operating manual (start here)
+.agents/skills/       project-scoped research-ideation workflow
 docs/                architecture, requirements, roadmap
 docs/adr/            locked architecture decisions
 tasks/               backlog, task template, specified tasks

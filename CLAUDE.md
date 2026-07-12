@@ -13,6 +13,13 @@ agent. This file is the contract for how to work here. Read it fully before edit
   deferred ones (U-101…U-112) with the trigger that promotes each. Consult it before
   proposing to swap a component "for a newer one" — the review likely already weighed it.
 
+## Research-ideation route
+- **prospect-research-ideation** — For novel, unconventional, cross-domain, or
+  potentially publishable research directions, load
+  `.agents/skills/prospect-research-ideation/SKILL.md`. The skill proposes and
+  adversarially audits candidates; a selected idea must enter the task, ADR, and
+  benchmark-gate workflow below before implementation.
+
 ## The one idea you must not break
 A predictive world model is the spine; **prediction error (violation of
 expectation) is the single signal** reused for learning, mastery-testing,

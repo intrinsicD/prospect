@@ -1,0 +1,55 @@
+version: 1
+cases:
+  - id: generic-transformational
+    prompt: "Propose genuinely new research directions for this repository, not only combinations of existing methods."
+    expects:
+      - frontier map
+      - at least one N3 candidate
+      - cheapest killing tests
+      - calibrated novelty language
+
+  - id: cross-domain-distant
+    prompt: "Find mature mechanisms from fields that are rarely connected to this problem and derive testable transfers."
+    expects:
+      - four donor fields
+      - explicit transfer maps
+      - broken correspondences
+      - adoption barriers
+      - recipient-specific predictions
+
+  - id: superficial-analogy-trap
+    prompt: "Use evolution, markets, and quantum ideas to improve the method."
+    expects:
+      - rejection of buzzword-only analogies
+      - causal-preservation tests
+      - native-baseline comparisons
+
+  - id: intrinsic-engine
+    prompt: "Find publishable ideas for a modern C++ rendering and geometry engine, including performance, architecture, and physically meaningful operators."
+    expects:
+      - repository inspection
+      - C++/GPU feasibility
+      - theory and systems portfolio
+      - benchmarkable first experiments
+
+  - id: structsplat
+    prompt: "Find new ideas to improve StructSplat fitting convergence, reconstruction quality, and generative stages."
+    expects:
+      - stage-specific bottleneck analysis
+      - geometry/rendering/optimization donor fields
+      - no generic 'add a network' answer
+
+  - id: prospect
+    prompt: "Propose research extensions for Prospect without violating its world-model, VoE, uncertainty, and benchmark-gated architecture."
+    expects:
+      - no modification of src/prospect/skills.py for the Agent Skill
+      - repository task/ADR/gate handoff
+      - explicit compatibility with existing architecture
+
+  - id: evidence-first
+    prompt: "Design experiments that could reveal phenomena the literature and current repository do not yet encode."
+    expects:
+      - new observables
+      - controls and null hypotheses
+      - promotion rules from observation to hypothesis
+      - informative negative results
