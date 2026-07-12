@@ -1,0 +1,8 @@
+sessions:
+  - id: "2026-07-10_001"
+    date: "2026-07-10"
+    summary: "Audited U-002 tests, pool invariants, P2 margins, and short-horizon FFT normalization."
+    turn_count: 2
+    events_count: 6
+    claims_touched: []
+    open_threads: 2

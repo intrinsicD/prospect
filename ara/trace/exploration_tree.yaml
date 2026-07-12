@@ -1,0 +1,31 @@
+tree:
+  - id: N01
+    type: experiment
+    title: "U-002 deterministic colored-noise autocorrelation probe"
+    provenance: ai-executed
+    timestamp: "2026-07-10T15:43+02:00"
+    evidence:
+      - "src/prospect/planning.py::_sample_colored_noise"
+      - "Inline NumPy probe, seed 1729, 2048 candidates"
+    result: >
+      At horizon 32, beta=2 raw lag-1 correlation was 0.8919 versus 0.0023 for
+      beta=0; after the planner's action clipping, the corresponding candidate-pool
+      correlations were 0.8701 versus 0.0048. Existing focused planner tests passed
+      7/7; no long gate was run.
+    status: resolved
+  - id: N02
+    type: experiment
+    title: "U-002 short-horizon colored-noise normalization probe"
+    provenance: ai-executed
+    timestamp: "2026-07-10T15:45+02:00"
+    evidence:
+      - "src/prospect/planning.py::_sample_colored_noise"
+      - "Inline NumPy probes, 50000 candidates per horizon"
+    result: >
+      The zero-DC, per-trajectory-normalized FFT sampler produced beta=2 lag-1
+      correlations of -1.000, -0.500, -0.178, and -0.010 at horizons 2-5 and
+      collapsed horizon-2 values to exactly +/-1. Replacing zero DC with the
+      lowest resolved frequency and dividing by the FFT filter kernel's L2 norm
+      preserved marginal standard deviation near 1.000 and produced correlations
+      0.228, 0.345, and 0.579 at horizons 4, 5, and 8 respectively.
+    status: resolved

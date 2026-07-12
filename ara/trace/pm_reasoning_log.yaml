@@ -1,0 +1,11 @@
+entries:
+  - turn: "2026-07-10_001#1"
+    notes:
+      - "Routed the deterministic autocorrelation probe as N01 because it produced quantitative results."
+      - "Staged O01-O03 because the user requested an audit but did not affirm the inferred test and margin semantics."
+      - "Did not crystallize any observation: no affirmation, abandonment, empirical researcher comment, or downstream artifact commitment occurred."
+  - turn: "2026-07-10_001#2"
+    notes:
+      - "Routed the short-horizon FFT comparison as N02 because it produced quantitative before/after results."
+      - "Staged O04 as a normalization heuristic; the parent agent adopted it in an uncommitted implementation, but no user closure signal occurred."
+      - "Did not duplicate O02: the constant-candidate pool constraint already captures the keep/shift compute invariant."
