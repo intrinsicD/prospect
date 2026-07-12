@@ -9,3 +9,10 @@ entries:
       - "Routed the short-horizon FFT comparison as N02 because it produced quantitative before/after results."
       - "Staged O04 as a normalization heuristic; the parent agent adopted it in an uncommitted implementation, but no user closure signal occurred."
       - "Did not duplicate O02: the constant-candidate pool constraint already captures the keep/shift compute invariant."
+  - turn: "2026-07-12_001#1"
+    notes:
+      - "Routed the reproducible unit/type/lint/skill validation as N03 and the user's commit-all direction as decision N04."
+      - "Crystallized O01-O04 via artifact commitment: U-002's committed tests, planner implementation, and gate record now depend on each observation."
+      - "Used K01-K02 for constraint IDs because the manager schema defines the constraint layer but does not reserve a prefix."
+      - "Did not stage new interpretive claims; this turn validated and committed existing work."
+      - "Did not stale-flag observations after only two calendar days; all four instead reached closure through committed artifacts."

@@ -9,5 +9,6 @@
 - [Problem](logic/problem.md)
 - [Claims](logic/claims.md)
 - [Heuristics](logic/solution/heuristics.md)
+- [Constraints](logic/solution/constraints.md)
 - [Exploration tree](trace/exploration_tree.yaml)
 - [Evidence](evidence/README.md)

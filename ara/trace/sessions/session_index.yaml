@@ -6,3 +6,10 @@ sessions:
     events_count: 6
     claims_touched: []
     open_threads: 2
+  - id: "2026-07-12_001"
+    date: "2026-07-12"
+    summary: "Validated and committed U-005, the research-ideation skill, and the initial ARA record."
+    turn_count: 1
+    events_count: 6
+    claims_touched: []
+    open_threads: 0

@@ -10,9 +10,9 @@ observations:
     context: "Read-only U-002 acceptance and unit-test audit."
     potential_type: heuristic
     bound_to: [N01]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H01"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O02
     timestamp: "2026-07-10T15:43+02:00"
@@ -24,9 +24,9 @@ observations:
     context: "Audit of keep/shift elite semantics against the P5 gate."
     potential_type: constraint
     bound_to: []
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K01"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O03
     timestamp: "2026-07-10T15:43+02:00"
@@ -39,9 +39,9 @@ observations:
     context: "Inspection of bench/results/P2-20260710T131536Z.json."
     potential_type: constraint
     bound_to: []
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K02"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O04
     timestamp: "2026-07-10T15:45+02:00"
@@ -55,7 +55,7 @@ observations:
     context: "Read-only U-002 algorithm and state-shape audit."
     potential_type: heuristic
     bound_to: [N02]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H02"
+    crystallized_via: artifact-commitment
     stale: false

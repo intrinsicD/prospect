@@ -29,3 +29,33 @@ tree:
       preserved marginal standard deviation near 1.000 and produced correlations
       0.228, 0.345, and 0.579 at horizons 4, 5, and 8 respectively.
     status: resolved
+  - id: N03
+    type: experiment
+    title: "U-005 and research-tooling worktree validation"
+    provenance: ai-executed
+    timestamp: "2026-07-12T22:59+02:00"
+    evidence:
+      - "ara/evidence/validation-2026-07-12.md"
+      - "tasks/U-005-knn-retrieval-blending.md"
+    result: >
+      The full unit suite passed 147 tests with one skip; the focused memory and
+      knowledge suite passed 24 tests; Ruff, mypy over 71 source files, and the
+      research-ideation skill self-test all passed. The full P0-P14 ratchet was not
+      rerun because U-005 already records its successful gate reports.
+    status: resolved
+  - id: N04
+    type: decision
+    title: "Commit U-005 and the project research artifacts"
+    provenance: user
+    timestamp: "2026-07-12T22:59+02:00"
+    choice: >
+      Commit every current worktree change, marking U-005 shipped and retaining the
+      project-scoped research-ideation skill and agent-native research record.
+    alternatives:
+      - "Leave the worktree uncommitted."
+      - "Omit one or both untracked research-artifact trees."
+    evidence:
+      - N03
+      - "tasks/U-005-knn-retrieval-blending.md"
+      - "commits 970565f, afcf8f3, and dd57f66"
+    status: resolved
