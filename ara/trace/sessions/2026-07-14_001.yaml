@@ -1,0 +1,153 @@
+session:
+  id: "2026-07-14_001"
+  date: "2026-07-14"
+  started: "2026-07-14T01:52+02:00"
+  last_turn: "2026-07-14T01:52+02:00"
+  turn_count: 1
+  summary: "Completed OL-002, localized material transition and reward stacks, rejected a stable prefix knee, and kept implementation tasks inactive."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: N18
+    routing: direct
+    provenance: user
+    summary: "Committed to the proposed P3 component-localization experiment from the grounded research prompt."
+  - turn: 1
+    type: experiment
+    id: N19
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran OL-001; all scientific checks reached parity but a universal-newline verifier defect caused terminal failure."
+  - turn: 1
+    type: dead_end
+    id: N20
+    routing: direct
+    provenance: ai-executed
+    summary: "Preserved OL-001 after its text-mode CRLF verifier check rejected canonical bytes."
+  - turn: 1
+    type: pivot
+    id: N21
+    routing: direct
+    provenance: ai-executed
+    summary: "Moved to a fully bound OL-002 administrative rerun without claiming replication independence."
+  - turn: 1
+    type: experiment
+    id: N22
+    routing: direct
+    provenance: ai-executed
+    summary: "Localized material transition and learned-reward stacks under eight verified formal blocks."
+  - turn: 1
+    type: dead_end
+    id: N23
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected penalty, member propagation, and target/online refresh as primary fixture blockers."
+  - turn: 1
+    type: dead_end
+    id: N24
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected a stable monotone oracle-prefix recovery knee."
+  - turn: 1
+    type: question
+    id: N25
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened the k=8 versus k=12 reward/transition interaction question."
+  - turn: 1
+    type: observation
+    id: O11
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the transition-stack failure claim as C01 after the sealed result committed to its frozen classification."
+  - turn: 1
+    type: observation
+    id: O12
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the independent learned-reward-stack result as C02."
+  - turn: 1
+    type: observation
+    id: O13
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged learned-tail compensation for reward-ranking error as an unresolved mechanism hypothesis."
+  - turn: 1
+    type: observation
+    id: O14
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the one-experiment/no-double-count administrative boundary as K04."
+  - turn: 1
+    type: observation
+    id: O15
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the no-minimum-prefix-depth interpretation bound as K05."
+  - turn: 1
+    type: observation
+    id: O16
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged a common-bank reward-ranking and learned-tail decomposition as the next smallest experiment."
+
+ai_actions:
+  - turn: 1
+    action: >
+      Re-grounded the continuation in the live transformational-research prompt,
+      portfolio P3 program, sealed BC-001 result, current repository APIs, and existing
+      task/production boundaries.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 1
+    action: >
+      Froze, implemented, and independently audited the non-gated oracle ladder,
+      including eight formal blocks, saved-parent replay, wrapper parity, common-bank
+      ranking audits, component contrasts, prefix stop rules, semantic verification,
+      and focused tests.
+    provenance: ai-executed
+    files_changed:
+      - "bench/oracle_ladder/"
+      - "tests/test_oracle_ladder.py"
+      - "docs/research/2026-07-14-oracle-prefix-ladder-protocol.md"
+  - turn: 1
+    action: >
+      Preserved the OL-001 terminal verifier failure, forensically isolated universal-
+      newline translation, and executed a fresh OL-002 administrative full rerun with
+      machine-checked scientific equality and explicit no-double-count semantics.
+    provenance: ai-executed
+    files_changed:
+      - "bench/oracle_ladder/results/OL-001/"
+      - "bench/oracle_ladder_v2/"
+      - "tests/test_oracle_ladder_v2.py"
+      - "docs/research/2026-07-14-ol001-verifier-failure.md"
+      - "docs/research/2026-07-14-oracle-prefix-ladder-ol002-protocol.md"
+  - turn: 1
+    action: >
+      Verified 172 unit tests with one skip, Ruff, mypy over 87 source files, worktree
+      whitespace, all isolated P0-P14 benchmark gates, and the sealed BC-001 package;
+      no OL-002 rerun or production mutation was performed during final validation.
+    provenance: ai-executed
+    files_changed: []
+
+claims_touched:
+  - id: C01
+    action: crystallized
+    turn: 1
+  - id: C02
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "Continue with your proposed next experiment. Ground yourself with the current state and the previous prompt for the real research."
+
+open_threads:
+  - "Test reward-ranking alignment and learned-tail transition effects on common candidate banks across oracle-prefix depth."
+  - "Keep U-006 inactive until the transition-stack bundle is separated enough to identify an implementation target."
+  - "Do not count OL-001 and OL-002 as independent evidence or infer a minimum recovery depth from their shared outcome."
+  - "Perform a deeper donor/recipient novelty audit before treating the job-compatibility polytope as N3."
+
+ai_suggestions_pending:
+  - "Run the bounded depth-conditioned reward/transition alignment audit before MuJoCo replication or planner-search intervention."

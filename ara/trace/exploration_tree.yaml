@@ -59,3 +59,353 @@ tree:
       - "tasks/U-005-knn-retrieval-blending.md"
       - "commits 970565f, afcf8f3, and dd57f66"
     status: resolved
+  - id: N05
+    type: question
+    title: "When does predictive coverage become useful control support?"
+    provenance: ai-suggested
+    timestamp: "2026-07-13T17:40+02:00"
+    description: >
+      Identify a falsifiable repository-native mechanism that explains why reaching
+      more or higher-reward states can fail to improve downstream model-based control,
+      while preserving Prospect's current planner, model, and benchmark contracts.
+    status: open
+  - id: N06
+    type: experiment
+    title: "BH-001 point-coverage and downstream-return reanalysis"
+    provenance: ai-executed
+    timestamp: "2026-07-13T17:40+02:00"
+    evidence:
+      - "ara/evidence/bh001-coverage-return-reanalysis-2026-07-13.md"
+      - "bench/hard/results/BH-001-report.json::curiosity"
+    result: >
+      Across the six random/curious arm-seed rows, maximum reached reward and
+      downstream return had Pearson r=-0.8640 (exact two-sided permutation p=0.0292)
+      and Spearman rho=-0.7714 (p=0.1028). Curiosity raised maximum reward and lowered
+      return in all three paired seeds, but the exact two-sided three-pair sign test was
+      p=0.25. The small arm-confounded result is hypothesis-generating only.
+    status: resolved
+  - id: N07
+    type: dead_end
+    title: "Broad reliability-percolation control coverage as a novelty claim"
+    provenance: ai-executed
+    timestamp: "2026-07-13T17:40+02:00"
+    hypothesis: >
+      Reliability percolation and control-cut coverage form a broadly novel predictive
+      exploration primitive.
+    failure_mode: >
+      Learned graph planning, coverability and sequence-coverage theory, path/cut
+      analysis, and conformal reachability already occupy the broad conceptual space.
+    lesson: >
+      Retain only the narrow, unestablished conjecture that correlated transition
+      reliability may create a measurable threshold with finite-size scaling in a
+      matched Prospect fixture.
+    evidence:
+      - "docs/research/2026-07-13-predictive-reliability-portfolio.md#111-final-novelty-disposition"
+    status: resolved
+  - id: N08
+    type: dead_end
+    title: "Continuous trajectory syndrome as a broad novelty claim"
+    provenance: ai-executed
+    timestamp: "2026-07-13T17:40+02:00"
+    hypothesis: >
+      Treating world-model failures as continuous trajectory syndromes is itself a
+      broadly novel diagnostic theory.
+    failure_mode: >
+      Existing world-action consistency and fault-diagnosis work already provides the
+      broad residual and syndrome vocabulary.
+    lesson: >
+      A potentially useful contribution must be narrowed to a formal Prospect-head
+      diagnosability and isolability matrix tied to distinct repairs.
+    evidence:
+      - "docs/research/2026-07-13-predictive-reliability-portfolio.md#111-final-novelty-disposition"
+    status: resolved
+  - id: N09
+    type: dead_end
+    title: "Artifact-bound proof evidence as a broad novelty claim"
+    provenance: ai-executed
+    timestamp: "2026-07-13T17:40+02:00"
+    hypothesis: >
+      Binding benchmark evidence to the exact artifact that earned a phase is a major
+      novel research mechanism.
+    failure_mode: >
+      Provenance, attestations, and assertion-based continuous assurance already make
+      the broad proposal infrastructure-level rather than a research novelty.
+    lesson: >
+      Only counterfactual revocation and minimal-witness semantics remain plausible as
+      a narrow research question after direct comparison with assurance frameworks.
+    evidence:
+      - "docs/research/2026-07-13-predictive-reliability-portfolio.md#111-final-novelty-disposition"
+    status: resolved
+  - id: N10
+    type: pivot
+    title: "From broad mechanism claims to a matched causal coverage assay"
+    provenance: ai-executed
+    timestamp: "2026-07-13T17:40+02:00"
+    from: >
+      Implementing or naming a new coverage, syndrome, or proof mechanism from the
+      initial transformational candidates.
+    to: >
+      First run BridgeControl, a non-gated 2x2x2 fixture that independently manipulates
+      bottleneck-edge presence, local action-effect rank, and transition density while
+      holding point coverage and compute contracts fixed.
+    trigger: >
+      The BH-001 confound prevented causal selection among mechanisms, and adversarial
+      prior-art review destroyed three broad novelty claims.
+    status: resolved
+  - id: N11
+    type: decision
+    title: "Execute BridgeControl as the proposed next experiment"
+    provenance: user
+    timestamp: "2026-07-13T21:29+02:00"
+    choice: >
+      Continue from the repository-grounded research prompt by implementing and running
+      the proposed non-gated BridgeControl experiment against the live repository state.
+    alternatives:
+      - "Leave BridgeControl as a paper design."
+      - "Implement a production coverage mechanism before causal validation."
+    evidence:
+      - N10
+      - "User direction: continue with your proposed next experiment."
+    status: resolved
+  - id: N12
+    type: dead_end
+    title: "Colocated bridge/rank BridgeControl design"
+    provenance: ai-executed
+    timestamp: "2026-07-13T21:29+02:00"
+    hypothesis: >
+      A fixture that colocates bridge and action-rank interventions and compensates
+      action marginals near the goal can identify their separate causal effects.
+    failure_mode: >
+      Adversarial design review showed that bridge support, local rank, and goal-side
+      training support changed together, so a return contrast would not identify the
+      intended factors.
+    lesson: >
+      Put the directed-door intervention and the rank/density interventions in disjoint
+      regions, and match coordinate-wise action marginals without a goal compensator.
+    evidence:
+      - "docs/research/2026-07-13-bridge-control-protocol.md#timing-and-anti-harking-record"
+    status: resolved
+  - id: N13
+    type: pivot
+    title: "Redesign BridgeControl around disjoint interventions"
+    provenance: ai-executed
+    timestamp: "2026-07-13T21:29+02:00"
+    from: >
+      A confounded fixture with colocated bridge/rank support and five exploratory
+      learner blocks.
+    to: >
+      One bridge-only directed door, a disjoint post-bridge rank/density strip, matched
+      action marginals, and eight fresh formal learner/planner blocks; development seed
+      97 remained excluded.
+    trigger: >
+      The design audit found factor leakage, and five paired blocks cannot attain a
+      two-sided exact sign-test level below 0.05.
+    status: resolved
+  - id: N14
+    type: experiment
+    title: "BC-001 deterministic manipulation and integrity screen"
+    provenance: ai-executed
+    timestamp: "2026-07-13T21:29+02:00"
+    evidence:
+      - "bench/bridge_control/results/BC-001/protocol.json"
+      - "bench/bridge_control/results/BC-001/dataset-manifest.json"
+      - "ara/evidence/bridge-control-bc001-2026-07-13.md"
+    result: >
+      All eight 896-row primary cells matched x-region-by-lane counts, nuisance
+      multisets, and coordinate-wise action histograms. Bridge edges were exactly 0
+      versus 16, local action minimum singular value 0 versus 0.67082, and unique
+      controllable support 1 versus 8. Ten datasets, including two named controls,
+      regenerated under their semantic hashes.
+    status: resolved
+  - id: N15
+    type: experiment
+    title: "BC-001 sequential control screen"
+    provenance: ai-executed
+    timestamp: "2026-07-13T21:29+02:00"
+    evidence:
+      - "bench/bridge_control/results/BC-001/BC-001-results.json"
+      - "bench/bridge_control/results/BC-001/BC-001-report.md"
+      - "ara/evidence/bridge-control-bc001-2026-07-13.md"
+    result: >
+      Across 32 fixed starts per arm, exact dynamics/reward succeeded 32/32, the
+      designated balanced learned arm succeeded 2/32, and random succeeded 0/32. The
+      frozen 80% learned-control floor failed, so BC-001 stopped before seven remaining
+      factorial cells or negative-control training. A joint exact-transition,
+      learned-reward, zero-epistemic diagnostic succeeded 27/32; it rules out reward as
+      the sole blocker but does not separate transition, representation, and epistemic
+      effects.
+    status: resolved
+  - id: N16
+    type: dead_end
+    title: "BC-001 as a causal assay for active T1"
+    provenance: ai-executed
+    timestamp: "2026-07-13T21:29+02:00"
+    hypothesis: >
+      After one permitted redesign, the current FlatWorldModel and FlatPlanner can
+      solve the fully balanced BridgeControl arm well enough to estimate bridge, rank,
+      and density effects.
+    failure_mode: >
+      The balanced arm achieved 6.25% success against the frozen 80% floor despite the
+      exact-model control achieving 100%.
+    lesson: >
+      Retire BC-001 and T1 as the active mechanism program under the predeclared rule;
+      report no structural effect and do not rescue the assay with post-hoc cells,
+      thresholds, or hyperparameters.
+    evidence:
+      - N15
+      - "docs/research/2026-07-13-predictive-reliability-portfolio.md#9-pre-execution-pareto-frontier-and-post-execution-disposition"
+    status: resolved
+  - id: N17
+    type: pivot
+    title: "From causal coverage factorial to simulator-oracle localization"
+    provenance: ai-executed
+    timestamp: "2026-07-13T21:29+02:00"
+    from: >
+      Estimating bridge, action-rank, and density effects with BC-001.
+    to: >
+      Evidence Program P3: isolate learned transition/representation/uncertainty
+      rollout, reward, and proposal/search components before selecting another
+      mechanism experiment; the ready U-006 multi-step-loss task is relevant but was
+      not activated or modified.
+    trigger: >
+      The balanced positive control failed while the exact control passed, and the
+      joint exact-transition/zero-epistemic diagnostic produced a large but
+      non-identifying rescue.
+    status: resolved
+  - id: N18
+    type: decision
+    title: "Execute the P3 BridgeControl localization precursor"
+    provenance: user
+    timestamp: "2026-07-14T01:52+02:00"
+    choice: >
+      Continue from the repository-grounded transformational-research prompt and
+      current BC-001 state by executing the proposed component-isolating oracle ladder.
+    alternatives:
+      - "Activate U-006 directly from the bundled BC-001 rescue."
+      - "Retry BridgeControl structural factors or tune the failed controller."
+      - "Leave P3 as an unexecuted portfolio design."
+    evidence:
+      - N17
+      - "docs/research/2026-07-13-transformational-research-prompt.md"
+      - "docs/research/2026-07-13-predictive-reliability-portfolio.md#evidence-program-p3--simulator-oracle-localization-ladder"
+    status: resolved
+  - id: N19
+    type: experiment
+    title: "OL-001 one-shot oracle-ladder run"
+    provenance: ai-executed
+    timestamp: "2026-07-14T01:52+02:00"
+    evidence:
+      - "bench/oracle_ladder/results/OL-001/"
+      - "docs/research/2026-07-14-oracle-prefix-ladder-protocol.md"
+      - "docs/research/2026-07-14-ol001-verifier-failure.md"
+    result: >
+      The eight-seed numeric run completed and its deterministic semantic rerun matched
+      models, traces, scores, decisions, and raw CSV bytes. The terminal verifier then
+      failed only because universal-newline text translation compared normalized LF
+      text with the canonical CRLF string. OL-001 remains a preserved failed namespace
+      and its outcomes are not independently accepted.
+    status: resolved
+  - id: N20
+    type: dead_end
+    title: "Accept OL-001 through a universal-newline text check"
+    provenance: ai-executed
+    timestamp: "2026-07-14T01:52+02:00"
+    hypothesis: >
+      Reading the emitted CRLF CSV as text and comparing it with the canonical CRLF
+      renderer validates the artifact written by the one-shot experiment.
+    failure_mode: >
+      `Path.read_text()` normalized CRLF to LF, so byte-identical canonical output was
+      rejected after every scientific verification check had passed.
+    lesson: >
+      Preserve the failed identifier, bind its hashes, make byte/rendering semantics
+      explicit, and use a fresh administrative rerun identifier rather than patching or
+      accepting a failed one-shot artifact in place.
+    evidence:
+      - N19
+      - "docs/research/2026-07-14-ol001-verifier-failure.md"
+    status: resolved
+  - id: N21
+    type: pivot
+    title: "From failed OL-001 packaging to the OL-002 administrative rerun"
+    provenance: ai-executed
+    timestamp: "2026-07-14T01:52+02:00"
+    from: >
+      A terminally failed OL-001 namespace whose scientific results cannot be accepted
+      under the one-shot protocol.
+    to: >
+      A full OL-002 rerun that changes only identifiers and canonical CSV newlines,
+      machine-checks all inherited scientific fields, and explicitly forbids treating
+      matching outcomes as independent evidence.
+    trigger: >
+      Forensic byte comparison isolated a verifier-only newline defect after all model,
+      trace, score, and decision checks passed.
+    status: resolved
+  - id: N22
+    type: experiment
+    title: "OL-002 component-isolating simulator-oracle ladder"
+    provenance: ai-executed
+    timestamp: "2026-07-14T01:52+02:00"
+    evidence:
+      - "bench/oracle_ladder_v2/results/OL-002/OL-002-results.json"
+      - "bench/oracle_ladder_v2/results/OL-002/OL-002-report.md"
+      - "bench/oracle_ladder_v2/results/OL-002/artifact-manifest.json"
+      - "ara/evidence/oracle-ladder-ol002-2026-07-14.md"
+    result: >
+      All eight replay/parity blocks and the exact ceiling passed. The frozen decision
+      classified a mixed transition-stack and reward-stack failure: exact-target
+      transitions improved 8/8 seeds, closed 79.35% of the oracle-return gap, and raised
+      success from 6.25% to 84.375%; exact reward then improved 8/8 seeds and raised
+      success to 100%. Penalty removal, TS-infinity versus recursive mean, and online
+      versus target refresh were not material. The full prefix curve ran but established
+      no minimum recovery depth.
+    status: resolved
+  - id: N23
+    type: dead_end
+    title: "Penalty, member propagation, or refresh interface as the primary blocker"
+    provenance: ai-executed
+    timestamp: "2026-07-14T01:52+02:00"
+    hypothesis: >
+      The BC-001 failure is primarily explained by the epistemic penalty coefficient,
+      TS-infinity member propagation, or the online-versus-target refresh interface.
+    failure_mode: >
+      The frozen contrasts were not material: penalty removal closed 1.36% of the gap,
+      recursive mean versus TS-infinity closed -25.73%, and online versus target refresh
+      closed 10.93%; none improved fixed-bank median normalized regret.
+    lesson: >
+      Do not select uncertainty-penalty tuning, member-propagation changes, or refresh-
+      interface changes from this fixture; the material evidence is instead bound to
+      the transition stack and learned reward stack.
+    evidence:
+      - N22
+      - "ara/evidence/oracle-ladder-ol002-2026-07-14.md#frozen-component-contrasts"
+    status: resolved
+  - id: N24
+    type: dead_end
+    title: "A stable monotone compounding-error recovery knee"
+    provenance: ai-executed
+    timestamp: "2026-07-14T01:52+02:00"
+    hypothesis: >
+      Increasing the exact-transition prefix produces a stable monotone recovery curve
+      with an identifiable minimum depth.
+    failure_mode: >
+      Success was nonmonotonic across k=1,2,4,8,12, and seven of eight seed returns
+      reversed from k=8 to k=12; the frozen no-knee rule therefore returned no minimum.
+    lesson: >
+      Treat prefix depth as interacting with learned reward ranking and the learned
+      transition tail until a new experiment separates them; do not infer a simple
+      rollout-error threshold.
+    evidence:
+      - N22
+      - "ara/evidence/oracle-ladder-ol002-2026-07-14.md#prefix-ladder"
+    status: resolved
+  - id: N25
+    type: question
+    title: "Why does the eight-step oracle prefix outperform the full transition oracle?"
+    provenance: ai-suggested
+    timestamp: "2026-07-14T01:52+02:00"
+    description: >
+      Determine whether the k=8 versus k=12 reversal comes from learned-reward ranking
+      error, beneficial compensation by the learned transition tail, candidate-bank
+      composition, or another interaction, using common candidates and without yet
+      activating U-006 or a search intervention.
+    status: open

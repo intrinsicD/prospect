@@ -59,3 +59,181 @@ observations:
     promoted_to: "logic/solution/heuristics.md:H02"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O05
+    timestamp: "2026-07-13T17:40+02:00"
+    provenance: ai-suggested
+    content: >
+      In the six BH-001 curiosity rows, maximum reached reward is negatively associated
+      with downstream return when arms are pooled, but arm confounding, n=6, and the
+      weak paired test make the result insufficient for a causal coverage claim.
+    context: "Direct reanalysis of committed BH-001 JSON before candidate selection."
+    potential_type: claim
+    bound_to: [N06]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O06
+    timestamp: "2026-07-13T17:40+02:00"
+    provenance: ai-suggested
+    content: >
+      The useful exploration object may be connected, action-conditioned, locally
+      reliable transition support rather than isolated point visitation or maximum
+      reached reward.
+    context: "Evidence-dependent hypothesis after the BH-001 reanalysis and assumption surgery."
+    potential_type: concept
+    bound_to: [N05, N06, N07]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O07
+    timestamp: "2026-07-13T17:40+02:00"
+    provenance: ai-suggested
+    content: >
+      Before implementing a production coverage mechanism, use BridgeControl: a
+      matched 2x2x2 bottleneck-edge by local-action-rank by density fixture with
+      unchanged FlatWorldModel and FlatPlanner, five seeds, and explicit positive and
+      negative controls.
+    context: "Pareto selection of the smallest experiment that separates structural coverage explanations."
+    potential_type: heuristic
+    bound_to: [N05, N06, N10]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H03"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O08
+    timestamp: "2026-07-13T17:40+02:00"
+    provenance: ai-suggested
+    content: >
+      Existing BH curiosity evidence cannot distinguish transition topology, action
+      excitation, local density, uncertainty arbitration, and planner-search failure
+      because collection arm changes multiple factors together.
+    context: "Audit of what the committed hard-benchmark report can and cannot identify."
+    potential_type: constraint
+    bound_to: [N06, N10]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O09
+    timestamp: "2026-07-13T21:29+02:00"
+    provenance: ai-suggested
+    content: >
+      A causal coverage factorial must pass both an exact-model control and its
+      designated fully balanced learned control before training or interpreting the
+      remaining cells; after one allowed redesign, failure should stop the assay.
+    context: >
+      BC-001 protocol implementation and sequential control screen; the stop branch is
+      enforced in code and the seven remaining cells were not trained.
+    potential_type: heuristic
+    bound_to: [N14, N15, N16]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H04"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O10
+    timestamp: "2026-07-13T21:29+02:00"
+    provenance: ai-suggested
+    content: >
+      The BC-001 exact-transition diagnostic also switches from learned latent rollouts
+      to raw exact state and sets epistemic to zero. Its 27/32 rescue can rule out the
+      learned reward head as the sole blocker, but cannot uniquely attribute failure to
+      transition error, representation, or uncertainty handling.
+    context: >
+      Post-stop adversarial interpretation audit of the localization rung.
+    potential_type: constraint
+    bound_to: [N15, N17]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K03"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O11
+    timestamp: "2026-07-13T21:29+02:00"
+    provenance: ai-suggested
+    content: >
+      The large joint hybrid rescue makes the learned
+      transition/representation/uncertainty rollout bundle the leading BC-001 failure
+      suspect, but the responsible component and its relevance beyond this fixture are
+      unresolved.
+    context: >
+      Interpretation of exact, balanced learned, and joint hybrid control outcomes.
+    potential_type: claim
+    bound_to: [N15, N17]
+    promoted: true
+    promoted_to: "logic/claims.md:C01"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O12
+    timestamp: "2026-07-14T01:52+02:00"
+    provenance: ai-suggested
+    content: >
+      On exact online-refresh BridgeControl paths, replacing learned reward with exact
+      reward improves all eight formal seeds, closes the remaining oracle-return gap,
+      and raises success from 84.375% to 100%; the identified unit is learned reward
+      composed with online encoding, not reward-head weights alone.
+    context: "OL-002 frozen reward-stack contrast and causal-boundary audit."
+    potential_type: claim
+    bound_to: [N22]
+    promoted: true
+    promoted_to: "logic/claims.md:C02"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O13
+    timestamp: "2026-07-14T01:52+02:00"
+    provenance: ai-suggested
+    content: >
+      The nonmonotonic oracle-prefix curve may arise from an interaction in which a
+      partially learned transition tail accidentally compensates for ranking errors in
+      learned reward; OL-002 does not identify that mechanism.
+    context: >
+      Hypothesis generated by k=8 reaching 96.875% success while the k=12 exact-
+      transition/learned-reward endpoint reaches 84.375%, with 7/8 seed reversals.
+    potential_type: claim
+    bound_to: [N22, N24, N25]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O14
+    timestamp: "2026-07-14T01:52+02:00"
+    provenance: ai-suggested
+    content: >
+      OL-002 was frozen after OL-001 numeric outcomes were visible and changes only
+      administrative identifiers plus canonical CSV newlines; the two namespaces are
+      one experiment and cannot supply independent replication evidence.
+    context: "Administrative full-rerun protocol after the OL-001 verifier defect."
+    potential_type: constraint
+    bound_to: [N19, N20, N21, N22]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K04"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O15
+    timestamp: "2026-07-14T01:52+02:00"
+    provenance: ai-suggested
+    content: >
+      OL-002 cannot report a minimum oracle-prefix recovery depth because the frozen
+      no-knee rule rejects the 7/8 seed-level return reversal from k=8 to k=12 despite
+      both aggregate endpoints passing recovery.
+    context: "Application of the predeclared prefix-ladder decision rule."
+    potential_type: constraint
+    bound_to: [N22, N24]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K05"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O16
+    timestamp: "2026-07-14T01:52+02:00"
+    provenance: ai-suggested
+    content: >
+      Before activating U-006 or a planner-search intervention, the next smallest
+      experiment should measure true-versus-learned reward ranking and learned-tail
+      transition error on common candidate banks at each oracle-prefix depth.
+    context: "Proposed follow-up after OL-002 localized two interacting stacks but no stable depth knee."
+    potential_type: heuristic
+    bound_to: [N22, N24, N25]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

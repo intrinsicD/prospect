@@ -1,0 +1,213 @@
+session:
+  id: "2026-07-13_001"
+  date: "2026-07-13"
+  started: "2026-07-13T17:40+02:00"
+  last_turn: "2026-07-13T21:29+02:00"
+  turn_count: 2
+  summary: "Executed BC-001, stopped its causal factorial at the failed learned positive control, retired active T1, and pivoted to simulator-oracle localization."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: N05
+    routing: direct
+    provenance: ai-suggested
+    summary: "Asked when predictive coverage becomes reliable downstream control support."
+  - turn: 1
+    type: experiment
+    id: N06
+    routing: direct
+    provenance: ai-executed
+    summary: "Reanalyzed six committed BH-001 arm-seed rows and bounded the result as non-causal."
+  - turn: 1
+    type: dead_end
+    id: N07
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected broad reliability-percolation/control-cut novelty."
+  - turn: 1
+    type: dead_end
+    id: N08
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected broad continuous-trajectory-syndrome novelty."
+  - turn: 1
+    type: dead_end
+    id: N09
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected broad artifact-bound proof novelty."
+  - turn: 1
+    type: pivot
+    id: N10
+    routing: direct
+    provenance: ai-executed
+    summary: "Pivoted from mechanism implementation to a matched causal BridgeControl assay."
+  - turn: 1
+    type: observation
+    id: O05
+    routing: staged
+    provenance: ai-suggested
+    summary: "Pooled BH-001 point coverage is anti-associated with return but severely confounded."
+  - turn: 1
+    type: observation
+    id: O06
+    routing: staged
+    provenance: ai-suggested
+    summary: "Useful coverage may be connected, action-conditioned reliable transition support."
+  - turn: 1
+    type: observation
+    id: O07
+    routing: staged
+    provenance: ai-suggested
+    summary: "BridgeControl is the smallest proposed discriminating next experiment."
+  - turn: 1
+    type: observation
+    id: O08
+    routing: staged
+    provenance: ai-suggested
+    summary: "Current curiosity evidence cannot identify which coverage mechanism failed."
+  - turn: 2
+    type: decision
+    id: N11
+    routing: direct
+    provenance: user
+    summary: "Committed to execute the proposed non-gated BridgeControl experiment."
+  - turn: 2
+    type: dead_end
+    id: N12
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected the first colocated bridge/rank design as causally confounded."
+  - turn: 2
+    type: pivot
+    id: N13
+    routing: direct
+    provenance: ai-executed
+    summary: "Separated door and stabilization interventions and increased the formal design to eight blocks."
+  - turn: 2
+    type: experiment
+    id: N14
+    routing: direct
+    provenance: ai-executed
+    summary: "Verified all eight factor cells, two controls, and matched manipulation diagnostics before returns."
+  - turn: 2
+    type: experiment
+    id: N15
+    routing: direct
+    provenance: ai-executed
+    summary: "Exact succeeded 32/32, balanced learned 2/32, random 0/32; stop rule prevented factorial estimation."
+  - turn: 2
+    type: dead_end
+    id: N16
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired BC-001 and active T1 after the learned positive control failed following one redesign."
+  - turn: 2
+    type: pivot
+    id: N17
+    routing: direct
+    provenance: ai-executed
+    summary: "Pivoted from structural-factor estimation to the P3 simulator-oracle localization ladder."
+  - turn: 2
+    type: observation
+    id: O07
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized the user-approved matched-assay-before-mechanism heuristic as H03."
+  - turn: 2
+    type: observation
+    id: O09
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the sequential exact/learned positive-control stop rule as H04."
+  - turn: 2
+    type: observation
+    id: O10
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the joint-oracle attribution boundary as K03."
+  - turn: 2
+    type: observation
+    id: O11
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged transition/representation/uncertainty rollout as the unresolved leading failure bundle."
+
+ai_actions:
+  - turn: 1
+    action: >
+      Authored a reusable repository-grounded transformational-research prompt that
+      requires assumption surgery, independent generation lanes, direct computation,
+      primary-source novelty audit, falsifiers, and structural validation.
+    provenance: ai-executed
+    files_changed:
+      - "docs/research/2026-07-13-transformational-research-prompt.md"
+  - turn: 1
+    action: >
+      Executed the prompt against the repository: mapped implemented and reserved
+      claims, recomputed BH-001 coverage-return statistics, generated and scored a
+      candidate portfolio, audited primary literature, and selected a non-gated
+      BridgeControl experiment without modifying production code or benchmark status.
+    provenance: ai-executed
+    files_changed:
+      - "docs/research/2026-07-13-predictive-reliability-portfolio.md"
+      - "ara/evidence/bh001-coverage-return-reanalysis-2026-07-13.md"
+  - turn: 1
+    action: >
+      Ran the research-portfolio structural validator and its self-test, and checked
+      both research documents for whitespace errors.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 2
+    action: >
+      Implemented the non-gated BridgeControl fixture, deterministic 2x2x2 datasets,
+      sequential-control experiment, report renderer, CLI, and eight integrity tests
+      without changing production source or gate definitions.
+    provenance: ai-executed
+    files_changed:
+      - "bench/bridge_control/"
+      - "tests/test_bridge_control.py"
+      - "docs/research/2026-07-13-bridge-control-protocol.md"
+  - turn: 2
+    action: >
+      Ran BC-001 under eight fresh blocks, applied the frozen stop rule, published the
+      negative result and plots, and updated the research portfolio's post-execution
+      disposition without estimating forbidden factorial effects.
+    provenance: ai-executed
+    files_changed:
+      - "bench/bridge_control/results/BC-001/"
+      - "docs/research/2026-07-13-predictive-reliability-portfolio.md"
+  - turn: 2
+    action: >
+      Added source snapshots, deterministic regeneration, raw-row and stop-rule checks,
+      rendered-artifact verification, and a complete artifact manifest after independent
+      audits exposed the dirty-worktree provenance gap and overstrong hybrid attribution.
+    provenance: ai-executed
+    files_changed:
+      - "bench/bridge_control/experiment.py"
+      - "bench/bridge_control/report.py"
+      - "tests/test_bridge_control.py"
+  - turn: 2
+    action: >
+      Verified the sealed package, ran 155 unit tests with one skip, passed Ruff and
+      mypy, validated all 15 isolated P0-P14 gate reports, and passed the portfolio
+      structural validator.
+    provenance: ai-executed
+    files_changed: []
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "Create the prompt for you to use the research skill and do real research, then use the prompt in this repository."
+  - turn: 2
+    excerpt: "Continue with your proposed next experiment. Ground yourself with the current state and the previous prompt for the real research."
+
+open_threads:
+  - "Run P3 component-isolating simulator-oracle diagnostics before selecting another mechanism experiment."
+  - "Keep T1 inactive and do not retry the BC-001 factorial without a newly justified assay and explicit direction."
+  - "Perform a deeper donor/recipient novelty audit before treating the job-compatibility polytope as N3."
+
+ai_suggestions_pending:
+  - "Use the P3 ladder to separate transition/representation error, epistemic penalties, reward error, and planner search; U-006 is relevant but not activated."
