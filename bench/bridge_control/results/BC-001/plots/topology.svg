@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="260" viewBox="0 0 760 260">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#c53030"/></marker></defs>
+<text x="30" y="25" font-family="sans-serif" font-size="16">BridgeControl causal layout</text>
+<line x1="88" y1="95" x2="140" y2="95" stroke="#718096" stroke-width="2"/>
+<line x1="176" y1="95" x2="228" y2="95" stroke="#718096" stroke-width="2"/>
+<line x1="264" y1="95" x2="316" y2="95" stroke="#718096" stroke-width="2"/>
+<line x1="352" y1="95" x2="404" y2="95" stroke="#c53030" stroke-width="5" marker-end="url(#arrow)"/>
+<line x1="440" y1="95" x2="492" y2="95" stroke="#718096" stroke-width="2"/>
+<line x1="528" y1="95" x2="580" y2="95" stroke="#718096" stroke-width="2"/>
+<line x1="616" y1="95" x2="668" y2="95" stroke="#718096" stroke-width="2"/>
+<circle cx="70" cy="95" r="18" fill="#edf2f7" stroke="#4a5568"/>
+<text x="70" y="100" text-anchor="middle" font-family="sans-serif" font-size="12">0</text>
+<circle cx="158" cy="95" r="18" fill="#edf2f7" stroke="#4a5568"/>
+<text x="158" y="100" text-anchor="middle" font-family="sans-serif" font-size="12">1</text>
+<circle cx="246" cy="95" r="18" fill="#edf2f7" stroke="#4a5568"/>
+<text x="246" y="100" text-anchor="middle" font-family="sans-serif" font-size="12">2</text>
+<circle cx="334" cy="95" r="18" fill="#edf2f7" stroke="#4a5568"/>
+<text x="334" y="100" text-anchor="middle" font-family="sans-serif" font-size="12">3</text>
+<circle cx="422" cy="95" r="18" fill="#edf2f7" stroke="#4a5568"/>
+<text x="422" y="100" text-anchor="middle" font-family="sans-serif" font-size="12">4</text>
+<circle cx="510" cy="95" r="18" fill="#bee3f8" stroke="#4a5568"/>
+<text x="510" y="100" text-anchor="middle" font-family="sans-serif" font-size="12">5</text>
+<circle cx="598" cy="95" r="18" fill="#bee3f8" stroke="#4a5568"/>
+<text x="598" y="100" text-anchor="middle" font-family="sans-serif" font-size="12">6</text>
+<circle cx="686" cy="95" r="18" fill="#edf2f7" stroke="#4a5568"/>
+<text x="686" y="100" text-anchor="middle" font-family="sans-serif" font-size="12">7</text>
+<text x="340" y="58" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#c53030">B: observed directed door</text>
+<text x="555" y="145" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#2b6cb0">R,D: disjoint stabilization strip</text>
+<text x="380" y="215" text-anchor="middle" font-family="sans-serif" font-size="12">Off-lane decoy nodes exist at every x region</text>
+</svg>

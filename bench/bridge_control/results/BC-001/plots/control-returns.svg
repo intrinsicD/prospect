@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="440" viewBox="0 0 920 440">
+<rect width="100%" height="100%" fill="white"/>
+<text x="70" y="22" font-family="sans-serif" font-size="16">BC-001 control returns by learner/planner block</text>
+<line x1="70" y1="355.0" x2="880" y2="355.0" stroke="#edf2f7" stroke-width="1"/>
+<text x="62" y="359.0" text-anchor="end" font-family="sans-serif" font-size="10">-24.5</text>
+<line x1="70" y1="275.0" x2="880" y2="275.0" stroke="#edf2f7" stroke-width="1"/>
+<text x="62" y="279.0" text-anchor="end" font-family="sans-serif" font-size="10">-16.9</text>
+<line x1="70" y1="195.0" x2="880" y2="195.0" stroke="#edf2f7" stroke-width="1"/>
+<text x="62" y="199.0" text-anchor="end" font-family="sans-serif" font-size="10">-9.4</text>
+<line x1="70" y1="115.0" x2="880" y2="115.0" stroke="#edf2f7" stroke-width="1"/>
+<text x="62" y="119.0" text-anchor="end" font-family="sans-serif" font-size="10">-1.8</text>
+<line x1="70" y1="35.0" x2="880" y2="35.0" stroke="#edf2f7" stroke-width="1"/>
+<text x="62" y="39.0" text-anchor="end" font-family="sans-serif" font-size="10">5.7</text>
+<line x1="70" y1="95.9" x2="880" y2="95.9" stroke="#a0aec0" stroke-width="1"/>
+<g><title>seed 0: 4.940</title><circle cx="129.2" cy="43.6" r="4" fill="#2f855a"/></g>
+<g><title>seed 1: 5.344</title><circle cx="141.2" cy="39.3" r="4" fill="#2f855a"/></g>
+<g><title>seed 2: 5.096</title><circle cx="153.2" cy="41.9" r="4" fill="#2f855a"/></g>
+<g><title>seed 3: 5.477</title><circle cx="165.2" cy="37.9" r="4" fill="#2f855a"/></g>
+<g><title>seed 4: 5.748</title><circle cx="177.2" cy="35.0" r="4" fill="#2f855a"/></g>
+<g><title>seed 5: 5.421</title><circle cx="189.2" cy="38.5" r="4" fill="#2f855a"/></g>
+<g><title>seed 6: 5.135</title><circle cx="201.2" cy="41.5" r="4" fill="#2f855a"/></g>
+<g><title>seed 7: 5.023</title><circle cx="213.2" cy="42.7" r="4" fill="#2f855a"/></g>
+<line x1="119.2" y1="40.0" x2="223.2" y2="40.0" stroke="#2f855a" stroke-width="4"/>
+<text x="171.2" y="390" text-anchor="middle" font-family="sans-serif" font-size="12">Exact</text>
+<g><title>seed 0: 1.510</title><circle cx="331.8" cy="79.9" r="4" fill="#2b6cb0"/></g>
+<g><title>seed 1: -5.415</title><circle cx="343.8" cy="153.3" r="4" fill="#2b6cb0"/></g>
+<g><title>seed 2: -3.012</title><circle cx="355.8" cy="127.8" r="4" fill="#2b6cb0"/></g>
+<g><title>seed 3: -6.793</title><circle cx="367.8" cy="167.9" r="4" fill="#2b6cb0"/></g>
+<g><title>seed 4: -6.646</title><circle cx="379.8" cy="166.3" r="4" fill="#2b6cb0"/></g>
+<g><title>seed 5: 0.477</title><circle cx="391.8" cy="90.8" r="4" fill="#2b6cb0"/></g>
+<g><title>seed 6: 0.019</title><circle cx="403.8" cy="95.7" r="4" fill="#2b6cb0"/></g>
+<g><title>seed 7: -2.301</title><circle cx="415.8" cy="120.3" r="4" fill="#2b6cb0"/></g>
+<line x1="321.8" y1="125.2" x2="425.8" y2="125.2" stroke="#2b6cb0" stroke-width="4"/>
+<text x="373.8" y="390" text-anchor="middle" font-family="sans-serif" font-size="12">Balanced learned</text>
+<g><title>seed 0: 4.116</title><circle cx="534.2" cy="52.3" r="4" fill="#805ad5"/></g>
+<g><title>seed 1: 3.301</title><circle cx="546.2" cy="60.9" r="4" fill="#805ad5"/></g>
+<g><title>seed 2: 2.209</title><circle cx="558.2" cy="72.5" r="4" fill="#805ad5"/></g>
+<g><title>seed 3: 3.784</title><circle cx="570.2" cy="55.8" r="4" fill="#805ad5"/></g>
+<g><title>seed 4: 5.173</title><circle cx="582.2" cy="41.1" r="4" fill="#805ad5"/></g>
+<g><title>seed 5: 3.172</title><circle cx="594.2" cy="62.3" r="4" fill="#805ad5"/></g>
+<g><title>seed 6: 3.828</title><circle cx="606.2" cy="55.3" r="4" fill="#805ad5"/></g>
+<g><title>seed 7: 1.926</title><circle cx="618.2" cy="75.5" r="4" fill="#805ad5"/></g>
+<line x1="524.2" y1="59.5" x2="628.2" y2="59.5" stroke="#805ad5" stroke-width="4"/>
+<text x="576.2" y="390" text-anchor="middle" font-family="sans-serif" font-size="12">Exact transition + reward, epi=0</text>
+<g><title>seed 0: -24.459</title><circle cx="736.8" cy="355.0" r="4" fill="#718096"/></g>
+<g><title>seed 1: -18.770</title><circle cx="748.8" cy="294.7" r="4" fill="#718096"/></g>
+<g><title>seed 2: -19.846</title><circle cx="760.8" cy="306.1" r="4" fill="#718096"/></g>
+<g><title>seed 3: -24.343</title><circle cx="772.8" cy="353.8" r="4" fill="#718096"/></g>
+<g><title>seed 4: -18.520</title><circle cx="784.8" cy="292.1" r="4" fill="#718096"/></g>
+<g><title>seed 5: -22.081</title><circle cx="796.8" cy="329.8" r="4" fill="#718096"/></g>
+<g><title>seed 6: -19.854</title><circle cx="808.8" cy="306.2" r="4" fill="#718096"/></g>
+<g><title>seed 7: -19.333</title><circle cx="820.8" cy="300.7" r="4" fill="#718096"/></g>
+<line x1="726.8" y1="317.3" x2="830.8" y2="317.3" stroke="#718096" stroke-width="4"/>
+<text x="778.8" y="390" text-anchor="middle" font-family="sans-serif" font-size="12">Random</text>
+</svg>

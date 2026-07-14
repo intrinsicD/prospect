@@ -1,0 +1,14 @@
+{
+  "artifacts": {
+    "BC-001-report.md": "7763a7d05ae719ef502b3f9a4c33dfbdc279728c25b48fe6474b5b453651bf8f",
+    "BC-001-results.json": "3b1a6b092929bf27eb5fb9a46c32fdb358f02e526a23ddd25d55014c99f7e30f",
+    "BC-001-runs.csv": "f2924fc3ad1300233060c5cd7d11f3ae972aca1c181ed409dda506af88c9da1e",
+    "dataset-manifest.json": "30b01e4b58a202ed6e1b749636fc7a95c0295ecabfb8dd8b87d9476846590f3c",
+    "plots/balanced-final-states.svg": "e3cd11e25cc1ef183f1eeda2e3f30e384af4e7debc7ad110d106b28d915c8286",
+    "plots/control-returns.svg": "c3c065ec06dfbaeb4dc0c49a8f9b2b02234237d9096cbd67bd9f000e38c31fe3",
+    "plots/topology.svg": "18ffaf346b8700f74cb55cbdfa15b07a56a9aed61f16f38688a256b7eda6a3d0",
+    "protocol.json": "fdd38d452860dea2652996aa2c209b21e2141336d4b50d41a5f8152ae845e844"
+  },
+  "experiment_id": "BC-001",
+  "schema_version": "bridge-control-v1"
+}

@@ -1,0 +1,105 @@
+{
+  "controls": {
+    "balanced_must_beat_random": true,
+    "balanced_success_rate_min": 0.8,
+    "exact_success_rate_min": 0.95,
+    "stop_before_factorial_if_control_fails": true
+  },
+  "development_seed_excluded": 97,
+  "evaluation": {
+    "fixed_starts": [
+      [
+        -0.9,
+        -0.28,
+        -0.75
+      ],
+      [
+        -0.9,
+        -0.2,
+        0.5
+      ],
+      [
+        -0.9,
+        0.2,
+        -0.25
+      ],
+      [
+        -0.9,
+        0.28,
+        0.75
+      ]
+    ],
+    "steps": 14,
+    "success": {
+      "goal_y": 0.25,
+      "x_min": 0.75,
+      "y_tolerance": 0.2
+    }
+  },
+  "experiment_id": "BC-001",
+  "factorial": {
+    "bridge_edges": [
+      0,
+      16
+    ],
+    "rank_min_singular": [
+      0.05,
+      0.5
+    ],
+    "unique_controllable_support": [
+      1,
+      8
+    ]
+  },
+  "learner": {
+    "action_dim": 2,
+    "batch_size": 64,
+    "class": "prospect.world_model.FlatWorldModel",
+    "ensemble": 5,
+    "hidden": 48,
+    "latent_dim": 6,
+    "obs_dim": 3,
+    "steps": 1800
+  },
+  "model_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "parent_portfolio": "docs/research/2026-07-13-predictive-reliability-portfolio.md",
+  "parent_prompt": "docs/research/2026-07-13-transformational-research-prompt.md",
+  "planner": {
+    "action_high": 1.0,
+    "action_low": -1.0,
+    "candidates": 64,
+    "class": "prospect.planning.FlatPlanner",
+    "elites": 8,
+    "horizon": 12,
+    "iterations": 3,
+    "uncertainty_penalty": 0.03
+  },
+  "protocol_document": "docs/research/2026-07-13-bridge-control-protocol.md",
+  "protocol_document_sha256": "1faa31ae04b97540f6fd781e722ea8ea0dacfe59ce0e40e4b7046f8cba49fa40",
+  "schema_version": "bridge-control-v1",
+  "source_sha256": {
+    "bench/bridge_control/__init__.py": "4f793586ac1b35b617d63b92cdf9d7fb276d3a6b435b3540480bec47c8bdf4d7",
+    "bench/bridge_control/__main__.py": "0689c0518fa6c60ed4a656e6ebe7d6b5f7f19442922a65151c6a953b551810bc",
+    "bench/bridge_control/experiment.py": "9be88d49401c226b1a873cbcb2979d3e0f2ad595d56b0bf146a5f4212b68b224",
+    "bench/bridge_control/fixture.py": "9d288c792ede66e9df750587222c10b5747572ded0a9ebb71d3988ff2f53684b",
+    "bench/bridge_control/report.py": "f529e3585fd099194b7a571189b93005598c6088757e57785c792d99ad4e61ea",
+    "docs/research/2026-07-13-bridge-control-protocol.md": "1faa31ae04b97540f6fd781e722ea8ea0dacfe59ce0e40e4b7046f8cba49fa40",
+    "docs/research/2026-07-13-predictive-reliability-portfolio.md": "7060bafef9fda3e2a42a0f0c19b435aa8e5ccc7d1815df034641632b194b88bd",
+    "docs/research/2026-07-13-transformational-research-prompt.md": "a2b9c6374b4d218347f4fcbf3c4b6afca9ef958231b62dee86d426652d43300a",
+    "src/prospect/agent.py": "3b18a9257491f33e7855293d29b2aaa0af45d6b34392e691293cefc4184214a6",
+    "src/prospect/planning.py": "8e55c57878f40f3652a502ff24f9cc7ee103062ba67f3227de8bbb3a4db11daf",
+    "src/prospect/types.py": "8657cd4a6fa60bb5dae36d43905424c61cdb3cf35e459e152a87a1bbbfa0c6e8",
+    "src/prospect/world_model.py": "6503efd1ca01ae9dd653f80efd19a56dd280ad6d44318c3cdca04e933481e8d6",
+    "tests/test_bridge_control.py": "23e1e914e36f21d2237615253ff7fae4109e4a51a372487fd43d198083903ddf"
+  },
+  "status": "frozen_control_validation"
+}
