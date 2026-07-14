@@ -42,3 +42,10 @@ entries:
       - "Kept O05, O06, and O08 staged because the BridgeControl fixture still does not resolve the original BH-001 arm confound or establish a general control-support concept."
       - "Bound all OL-002 claims to the authored fixture, preserved OL-001 as a terminal failure, and explicitly prevented double-counting the administrative rerun."
       - "Added no stale flags: every unpromoted observation is at most one session-day old or remains part of an open research thread."
+  - turn: "2026-07-14_001#2"
+    notes:
+      - "Routed reproducible repository and sealed-artifact validation as experiment N26 and the user's commit-all direction as decision N27, matching the established commit-handoff precedent."
+      - "Recorded BC-001, the paired OL namespaces, and the consolidated ARA as separate commits because the failed OL-001 namespace is a forensic dependency of OL-002 while the ARA is a downstream synthesis."
+      - "Did not stage new interpretive content: this turn validated and committed existing research rather than changing its meaning."
+      - "Left O05, O06, O08, O13, and O16 unpromoted; commit organization supplies no empirical resolution or researcher affirmation for those open interpretations."
+      - "Added no stale flags because all unpromoted observations remain within one session-day or an explicitly open research thread."

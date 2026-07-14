@@ -22,8 +22,8 @@ sessions:
     open_threads: 3
   - id: "2026-07-14_001"
     date: "2026-07-14"
-    summary: "Completed OL-002, localized transition and reward stacks, and rejected a stable prefix knee."
-    turn_count: 1
-    events_count: 14
+    summary: "Completed and committed BC-001/OL-002, localized transition and reward stacks, and rejected a stable prefix knee."
+    turn_count: 2
+    events_count: 16
     claims_touched: [C01, C02]
     open_threads: 4

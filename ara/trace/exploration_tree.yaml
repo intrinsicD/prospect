@@ -409,3 +409,37 @@ tree:
       composition, or another interaction, using common candidates and without yet
       activating U-006 or a search intervention.
     status: open
+  - id: N26
+    type: experiment
+    title: "Predictive-reliability artifact validation"
+    provenance: ai-executed
+    timestamp: "2026-07-14T07:15+02:00"
+    evidence:
+      - "Full .venv unit suite and focused BridgeControl/oracle-ladder tests"
+      - "bench/bridge_control/results/BC-001/artifact-manifest.json"
+      - "bench/oracle_ladder_v2/results/OL-002/artifact-manifest.json"
+    result: >
+      The full unit suite passed 172 tests with one skip, the focused research tests
+      passed 25/25, Ruff passed, and mypy reported no issues across 87 source files.
+      The sealed BC-001 and OL-002 packages each returned verified_results; the OL-002
+      check completed its deterministic semantic replay. Secret/path scans found no
+      credentials, and generated caches remained ignored.
+    status: resolved
+  - id: N27
+    type: decision
+    title: "Commit the predictive-reliability research chain"
+    provenance: user
+    timestamp: "2026-07-14T07:15+02:00"
+    choice: >
+      Commit every current worktree change while preserving separate boundaries for
+      BC-001, the paired OL-001/OL-002 localization ladder, and the consolidated ARA
+      findings.
+    alternatives:
+      - "Leave the completed research chain uncommitted."
+      - "Collapse the experiment implementations and research record into one commit."
+      - "Omit the sealed result packages or agent-native research record."
+    evidence:
+      - N26
+      - "User direction: commit all changes appropriately."
+      - "commits b5fc2ce, 58326c7, and c2356ed"
+    status: resolved

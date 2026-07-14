@@ -2,9 +2,9 @@ session:
   id: "2026-07-14_001"
   date: "2026-07-14"
   started: "2026-07-14T01:52+02:00"
-  last_turn: "2026-07-14T01:52+02:00"
-  turn_count: 1
-  summary: "Completed OL-002, localized material transition and reward stacks, rejected a stable prefix knee, and kept implementation tasks inactive."
+  last_turn: "2026-07-14T07:15+02:00"
+  turn_count: 2
+  summary: "Completed and committed the BC-001/OL-002 research chain, localized material transition and reward stacks, and kept implementation tasks inactive."
 
 events_logged:
   - turn: 1
@@ -91,6 +91,18 @@ events_logged:
     routing: staged
     provenance: ai-suggested
     summary: "Staged a common-bank reward-ranking and learned-tail decomposition as the next smallest experiment."
+  - turn: 2
+    type: experiment
+    id: N26
+    routing: direct
+    provenance: ai-executed
+    summary: "Validated the full suite, focused research tests, static checks, and both sealed accepted result packages."
+  - turn: 2
+    type: decision
+    id: N27
+    routing: direct
+    provenance: user
+    summary: "Committed every worktree change in experiment-level and research-record boundaries."
 
 ai_actions:
   - turn: 1
@@ -130,6 +142,27 @@ ai_actions:
       no OL-002 rerun or production mutation was performed during final validation.
     provenance: ai-executed
     files_changed: []
+  - turn: 2
+    action: >
+      Audited all tracked and untracked changes, checked for secrets and generated
+      files, passed the full and focused test suites plus Ruff and mypy, and completed
+      deterministic verification of the sealed BC-001 and OL-002 packages.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 2
+    action: >
+      Committed BC-001, the paired OL-001/OL-002 localization ladder, and their
+      consolidated ARA evidence in three logical commits without pushing.
+    provenance: ai-executed
+    files_changed:
+      - "bench/bridge_control/"
+      - "bench/oracle_ladder/"
+      - "bench/oracle_ladder_v2/"
+      - "docs/research/"
+      - "tests/test_bridge_control.py"
+      - "tests/test_oracle_ladder.py"
+      - "tests/test_oracle_ladder_v2.py"
+      - "ara/"
 
 claims_touched:
   - id: C01
@@ -142,6 +175,8 @@ claims_touched:
 key_context:
   - turn: 1
     excerpt: "Continue with your proposed next experiment. Ground yourself with the current state and the previous prompt for the real research."
+  - turn: 2
+    excerpt: "commit all changes appropriately"
 
 open_threads:
   - "Test reward-ranking alignment and learned-tail transition effects on common candidate banks across oracle-prefix depth."
