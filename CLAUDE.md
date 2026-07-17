@@ -68,6 +68,13 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 - **benchmark** — Run the phase gate: `make gate PHASE=Px`. A task that advances a
   phase must move its gate toward — or into — green. If you can't measure it, it
   isn't done.
+- **validation-receipt** — At task completion, always persist the confirmed last-run
+  validation results in the task file: timestamp, exact command, outcome/counts,
+  tested source state, and any result-relevant environment versions. A later handoff,
+  commit, merge, or push must inspect and cite that receipt. Do not rerun a confirmed
+  check when its relevant source and environment inputs are unchanged; rerun only
+  when the receipt is missing/incomplete, a bound input changed, the last run failed,
+  or the user explicitly requests fresh validation.
 - **docs-sync** — Update whatever you invalidated: the requirement traceability row,
   the task status, an ADR's status, the architecture doc. **Code and docs must not
   drift.** A change to behaviour that leaves docs stale is incomplete.
@@ -112,6 +119,8 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
 - [ ] Satisfies the task's interface (a `Protocol` in `interfaces.py`).
 - [ ] Meets every acceptance criterion in the task file.
 - [ ] `make test` green; `make lint` clean; `make typecheck` clean.
+- [ ] Task file contains a confirmed last-run validation receipt that binds the exact
+      commands and outcomes to the tested source/environment state.
 - [ ] Phase gate run; result recorded in the task file. If the gate newly passes,
       the phase is appended to `bench/SHIPPED` in the same commit (the CI ratchet
       re-runs every shipped gate).
