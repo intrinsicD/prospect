@@ -1,6 +1,6 @@
 # Architecture
 
-Prospect is an adaptive-agent research runtime whose central claim must be
+Prospect is an adaptive-agent runtime whose central claim must be
 demonstrable as a causal chain:
 
 > the agent collected this experience, changed persistent state because of that
@@ -13,9 +13,8 @@ for every epistemic concept. Prediction, uncertainty, surprise, information gain
 decision value, learning, knowledge, and retention have different definitions and
 different evidence.
 
-ADR-0014 is the governing decision. The superseded P-series implementation and
-tests were removed from the active tree; Git history preserves their research
-record without retaining compatibility constraints.
+This document is the canonical system definition. Code, tests, and experiments
+must implement or explicitly challenge it.
 
 ## System state
 
@@ -124,7 +123,9 @@ Persistence uses a manifest over component-owned byte states. The coordinator
 binds versions, media types, sizes, and hashes and performs atomic local
 replacement. The caller must declare the resume boundary and supply every
 stateful component; the generic coordinator cannot prove component completeness.
-See `docs/runtime-substrate.md`. Exact mid-episode restoration is not claimed.
+Exact mid-episode restoration is not claimed: it additionally requires the
+environment, recurrent belief, pending action, external side effects, and random
+number generator state.
 
 ## Decision policy
 
@@ -145,9 +146,9 @@ Hard constraint violations are not made selectable by a sufficiently large
 utility. Retrieval, external queries, tools, and experiments enter through this
 same candidate-action interface; they may not invisibly overwrite a prediction.
 
-## Independent evidence ladder
+## Evidence ladder
 
-The E-series reports each row separately:
+Each experiment reports each row separately:
 
 | Gate | Claim | Required comparison |
 |---|---|---|
@@ -162,19 +163,10 @@ Passing E3 does not imply E4. Reload parity alone does not imply E5. The complet
 lifecycle statement is permitted only when every row passes an independently
 audited protocol.
 
-The current exact reference report does not pass this ladder. Its numeric
-predicates execute, but E2/E3 are reference-only and E4/E5 are blocked because
-the rows use different agents, the “learning” is task-local belief assimilation,
-behavior is evaluated analytically, and the checkpoint omits canonical custody.
-
-## Cutover boundary
-
-The old flat modules, tests, evaluator registry, and regression ratchet are not
-part of the active repository. A historical mechanism may return only through an
-explicit new adapter that supplies every required identity, distribution,
-calibration, version, and persistence fact. An adapter must fail rather than
-invent missing provenance or pretend a scalar forecast is a qualified
-distribution.
+Exact finite references may validate individual semantics but do not establish
+the complete ladder unless the same agent, learner, experience ancestry,
+executed held-out behavior, interference path, and restored state form one
+continuous causal chain.
 
 ## Open engineering boundaries
 

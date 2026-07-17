@@ -48,4 +48,4 @@ Score each dimension from 0–4.
 
 - 0: ignores architecture and workflow
 - 2: mentions constraints
-- 4: grounded in files and hands selected ideas into the repository's normal task/ADR/benchmark process
+- 4: grounded in live files and hands selected ideas into a bounded benchmark experiment with frozen controls and a killing criterion

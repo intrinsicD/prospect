@@ -1,0 +1,459 @@
+{
+  "decoded_media": {
+    "video_10993": {
+      "audio_samples_24khz": 809472,
+      "ffprobe": {
+        "format": {
+          "duration": "33.728000"
+        },
+        "programs": [],
+        "streams": [
+          {
+            "avg_frame_rate": "3701/125",
+            "codec_name": "h264",
+            "codec_type": "video",
+            "duration": "33.707106",
+            "height": 1080,
+            "index": 0,
+            "nb_frames": "998",
+            "r_frame_rate": "3701/125",
+            "width": 1920
+          },
+          {
+            "avg_frame_rate": "0/0",
+            "channels": 2,
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "duration": "33.728000",
+            "index": 1,
+            "nb_frames": "1583",
+            "r_frame_rate": "0/0",
+            "sample_rate": "48000"
+          }
+        ]
+      },
+      "file_size_bytes": 91078692,
+      "frame_count_2fps": 67
+    },
+    "video_1580": {
+      "audio_samples_24khz": 821760,
+      "ffprobe": {
+        "format": {
+          "duration": "34.240000"
+        },
+        "programs": [],
+        "streams": [
+          {
+            "avg_frame_rate": "30009/1000",
+            "codec_name": "h264",
+            "codec_type": "video",
+            "duration": "34.223066",
+            "height": 1080,
+            "index": 0,
+            "nb_frames": "1027",
+            "r_frame_rate": "30009/1000",
+            "width": 1920
+          },
+          {
+            "avg_frame_rate": "0/0",
+            "channels": 2,
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "duration": "34.240000",
+            "index": 1,
+            "nb_frames": "1607",
+            "r_frame_rate": "0/0",
+            "sample_rate": "48000"
+          }
+        ]
+      },
+      "file_size_bytes": 20523562,
+      "frame_count_2fps": 68
+    },
+    "video_2564": {
+      "audio_samples_24khz": 762368,
+      "ffprobe": {
+        "format": {
+          "duration": "31.765000"
+        },
+        "programs": [],
+        "streams": [
+          {
+            "avg_frame_rate": "29949/1000",
+            "codec_name": "h264",
+            "codec_type": "video",
+            "duration": "31.753982",
+            "height": 1080,
+            "index": 0,
+            "nb_frames": "951",
+            "r_frame_rate": "29949/1000",
+            "width": 1920
+          },
+          {
+            "avg_frame_rate": "0/0",
+            "channels": 2,
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "duration": "31.765000",
+            "index": 1,
+            "nb_frames": "1491",
+            "r_frame_rate": "0/0",
+            "sample_rate": "48000"
+          }
+        ]
+      },
+      "file_size_bytes": 36790707,
+      "frame_count_2fps": 64
+    },
+    "video_3501": {
+      "audio_samples_24khz": 839168,
+      "ffprobe": {
+        "format": {
+          "duration": "34.965000"
+        },
+        "programs": [],
+        "streams": [
+          {
+            "avg_frame_rate": "30009/1000",
+            "codec_name": "h264",
+            "codec_type": "video",
+            "duration": "34.956180",
+            "height": 1080,
+            "index": 0,
+            "nb_frames": "1049",
+            "r_frame_rate": "30009/1000",
+            "width": 1920
+          },
+          {
+            "avg_frame_rate": "0/0",
+            "channels": 2,
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "duration": "34.965000",
+            "index": 1,
+            "nb_frames": "1641",
+            "r_frame_rate": "0/0",
+            "sample_rate": "48000"
+          }
+        ]
+      },
+      "file_size_bytes": 18717639,
+      "frame_count_2fps": 70
+    },
+    "video_6860": {
+      "audio_samples_24khz": 838144,
+      "ffprobe": {
+        "format": {
+          "duration": "34.923000"
+        },
+        "programs": [],
+        "streams": [
+          {
+            "avg_frame_rate": "7503/250",
+            "codec_name": "h264",
+            "codec_type": "video",
+            "duration": "34.919366",
+            "height": 1080,
+            "index": 0,
+            "nb_frames": "1048",
+            "r_frame_rate": "7503/250",
+            "width": 1920
+          },
+          {
+            "avg_frame_rate": "0/0",
+            "channels": 2,
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "duration": "34.923000",
+            "index": 1,
+            "nb_frames": "1639",
+            "r_frame_rate": "0/0",
+            "sample_rate": "48000"
+          }
+        ]
+      },
+      "file_size_bytes": 22082352,
+      "frame_count_2fps": 70
+    },
+    "video_8241": {
+      "audio_samples_24khz": 629760,
+      "ffprobe": {
+        "format": {
+          "duration": "26.240000"
+        },
+        "programs": [],
+        "streams": [
+          {
+            "avg_frame_rate": "14913/500",
+            "codec_name": "h264",
+            "codec_type": "video",
+            "duration": "26.218735",
+            "height": 1080,
+            "index": 0,
+            "nb_frames": "782",
+            "r_frame_rate": "14913/500",
+            "width": 1920
+          },
+          {
+            "avg_frame_rate": "0/0",
+            "channels": 2,
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "duration": "26.240000",
+            "index": 1,
+            "nb_frames": "1232",
+            "r_frame_rate": "0/0",
+            "sample_rate": "48000"
+          }
+        ]
+      },
+      "file_size_bytes": 15780090,
+      "frame_count_2fps": 52
+    },
+    "video_874": {
+      "audio_samples_24khz": 841728,
+      "ffprobe": {
+        "format": {
+          "duration": "35.072000"
+        },
+        "programs": [],
+        "streams": [
+          {
+            "avg_frame_rate": "29607/1000",
+            "codec_name": "h264",
+            "codec_type": "video",
+            "duration": "35.059277",
+            "height": 720,
+            "index": 0,
+            "nb_frames": "1038",
+            "r_frame_rate": "29607/1000",
+            "width": 1280
+          },
+          {
+            "avg_frame_rate": "0/0",
+            "channels": 2,
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "duration": "35.072000",
+            "index": 1,
+            "nb_frames": "1646",
+            "r_frame_rate": "0/0",
+            "sample_rate": "48000"
+          }
+        ]
+      },
+      "file_size_bytes": 6377635,
+      "frame_count_2fps": 70
+    },
+    "video_9253": {
+      "audio_samples_24khz": 613888,
+      "ffprobe": {
+        "format": {
+          "duration": "25.579000"
+        },
+        "programs": [],
+        "streams": [
+          {
+            "avg_frame_rate": "5983/200",
+            "codec_name": "h264",
+            "codec_type": "video",
+            "duration": "25.572455",
+            "height": 1080,
+            "index": 0,
+            "nb_frames": "765",
+            "r_frame_rate": "5983/200",
+            "width": 1920
+          },
+          {
+            "avg_frame_rate": "0/0",
+            "channels": 2,
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "duration": "25.579000",
+            "index": 1,
+            "nb_frames": "1201",
+            "r_frame_rate": "0/0",
+            "sample_rate": "48000"
+          }
+        ]
+      },
+      "file_size_bytes": 13228873,
+      "frame_count_2fps": 51
+    }
+  },
+  "environment": {
+    "ffmpeg": {
+      "path": "/usr/bin/ffmpeg",
+      "sha256": "ed16af623947494a72e284b6eb8ff225f2da22b38b5d5069c2fd4b4ba3384e41",
+      "size_bytes": 342488,
+      "version": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers"
+    },
+    "ffprobe": {
+      "path": "/usr/bin/ffprobe",
+      "sha256": "272f6ebc634a63d9c8b4ca68e964119d980f25154e5aa2c35e5487da48e9a58f",
+      "size_bytes": 191888,
+      "version": "ffprobe version 6.1.1-3ubuntu5 Copyright (c) 2007-2023 the FFmpeg developers"
+    },
+    "numpy": "2.1.3",
+    "platform": "Linux-6.14.0-37-generic-x86_64-with-glibc2.39",
+    "python": "3.12.9",
+    "requested_device": "cuda",
+    "torch": {
+      "cublas_workspace_config": ":4096:8",
+      "cuda_runtime": "12.8",
+      "cudnn_benchmark": false,
+      "cudnn_deterministic": true,
+      "cudnn_version": 91002,
+      "deterministic_algorithms": true,
+      "driver_version": "590.48.01",
+      "gpu": {
+        "compute_capability": [
+          8,
+          6
+        ],
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 3050",
+        "total_memory_bytes": 8199143424
+      },
+      "nvidia_smi": {
+        "path": "/usr/bin/nvidia-smi",
+        "sha256": "78c2d203c12619673ddd5ae9c487a79689c9461de40a9b948f3f4615f26dba29",
+        "size_bytes": 1260192,
+        "version": "NVIDIA-SMI version  : 590.48.01"
+      },
+      "version": "2.9.0+cu128"
+    }
+  },
+  "media": {
+    "audio_channels": 1,
+    "audio_sample_rate": 24000,
+    "frame_height": 64,
+    "frame_rate": 2,
+    "frame_width": 64,
+    "letterboxed": true
+  },
+  "models": {
+    "snac": {
+      "batch_size": 8,
+      "cublas_workspace_config": ":4096:8",
+      "decode_seed": 12004,
+      "determinism_checks": 63,
+      "deterministic_algorithms": true,
+      "device": "cuda",
+      "dtype": "torch.float16",
+      "inference_seconds": 20.48861903899524,
+      "load_seconds": 0.13333902900194516,
+      "model_id": "hubertsiuzdak/snac_24khz",
+      "parameter_count": 19842914,
+      "repeat_atol": 1e-06,
+      "repeat_rtol": 1e-06,
+      "requested_revision": "d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec",
+      "resolved_revision": "d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec",
+      "seed_schedule": "SNAC_DECODE_SEED + chunk_start",
+      "snapshot_files": {
+        "config.json": "e119b9366d4f5e73c6ca5f31137c4ff361578bbb132953a5203afe037c4012be",
+        "pytorch_model.bin": "4b8164cc6606bfa627f1a784734c1e539891518f1191ed9194fe1e3b9b4bff40"
+      },
+      "versions": {
+        "snac": "1.2.1",
+        "torch": "2.9.0+cu128"
+      },
+      "warmed_batch_sizes": [
+        1,
+        2,
+        3,
+        7,
+        8
+      ]
+    },
+    "t5": {
+      "device": "cpu",
+      "dtype": "torch.float32",
+      "inference_seconds": 8.334448758003418,
+      "load_seconds": 0.0954922910023015,
+      "mask_placement": "sha256('MM-001|{video_id}|{timestamp:.1f}')",
+      "model_id": "google/t5-efficient-tiny",
+      "parameter_count": 15570688,
+      "requested_revision": "3441d7e8bf3f89841f366d39452b95200416e4a9",
+      "resolved_revision": "3441d7e8bf3f89841f366d39452b95200416e4a9",
+      "snapshot_files": {
+        "config.json": "d476f0355bb02b6420dd589ba788db8a67f5ebbb4da1ffd020a4b093ece4f403",
+        "generation_config.json": "f5a1c7e2be8092018d8835128987edf0111637dd98e90599cc80310fef75d95a",
+        "pytorch_model.bin": "b840cd5afdcc806b8175fed5a8800a5aa8be1beb60aab8ab7f650728b122dac2",
+        "special_tokens_map.json": "4720c0fddbe4c5991334f85ad7073d9bd0a294a8ba4641a2f8dab614ca825949",
+        "spiece.model": "d60acb128cf7b7f2536e8f38a5b18a05535c9e14c7a355904270e15b0945ea86",
+        "tokenizer.json": "88fe1105ba0554a7bf747a0da453b6d5d23c31805f915731ddb4f419bdc45e34",
+        "tokenizer_config.json": "5df5e4fbf014a967f4f7038e3863100b1f318926cd18f370b8a20645134d2ff9"
+      },
+      "task": "masked-span seq2seq teacher forcing (not identity autoencoding)",
+      "tokenizer_ids": {
+        "eos": 1,
+        "pad": 0,
+        "sentinel_0": 32099,
+        "sentinel_1": 32098
+      },
+      "versions": {
+        "torch": "2.9.0+cu128",
+        "transformers": "4.57.1"
+      }
+    },
+    "taesd": {
+      "decoder_post_map": "(sample + 1) / 2",
+      "decoder_post_map_clipping": false,
+      "device": "cuda",
+      "dtype": "torch.float16",
+      "inference_seconds": 0.5817506009771023,
+      "load_seconds": 0.025033916004758794,
+      "model_id": "madebyollin/taesd",
+      "parameter_count": 2445063,
+      "requested_revision": "614f76814bbe30edbe2e627ace1c2234c81a2c0e",
+      "resolved_revision": "614f76814bbe30edbe2e627ace1c2234c81a2c0e",
+      "rgb_input_range": [
+        0.0,
+        1.0
+      ],
+      "snapshot_files": {
+        "config.json": "3ebefd1aa96ac474cc6430fe6ea81febccf7ee82461715691ee9315c884adeef",
+        "diffusion_pytorch_model.safetensors": "db169d69145ec4ff064e49d99c95fa05d3eb04ee453de35824a6d0f325513549"
+      },
+      "versions": {
+        "diffusers": "0.35.2",
+        "torch": "2.9.0+cu128"
+      }
+    }
+  },
+  "projection_digests": {
+    "audio": "0c78770a48ca723b6ad8af9db1d495bc008d1dd7582e608e0efa4fc710ef8286",
+    "text": "4b2d568468f70dcb4282dcc25ef4e8609d400dfe7409eb12121a6f5974a0cf70",
+    "vision": "ccf87240a00a4a41c45b6c6b9da54faa9857392e7e86e180f05b2c7e283a681d"
+  },
+  "projection_seeds": {
+    "audio": 12002,
+    "text": 12003,
+    "vision": 12001
+  },
+  "runtime": {
+    "ffmpeg_seconds": 8.220143263017235,
+    "total_seconds": 38.11454215000413
+  },
+  "video_ids": [
+    "video_10993",
+    "video_1580",
+    "video_2564",
+    "video_3501",
+    "video_6860",
+    "video_8241",
+    "video_874",
+    "video_9253"
+  ],
+  "window_counts": {
+    "video_10993": 63,
+    "video_1580": 64,
+    "video_2564": 59,
+    "video_3501": 65,
+    "video_6860": 65,
+    "video_8241": 48,
+    "video_874": 66,
+    "video_9253": 47
+  }
+}

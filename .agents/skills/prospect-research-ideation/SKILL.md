@@ -1,10 +1,6 @@
 ---
 name: prospect-research-ideation
-description: Generates and rigorously audits diverse, falsifiable research directions for Prospect's predictive-world-model agent, including assumption surgery, new primitives and evidence programs, cross-domain mechanism transfer, and adversarial prior-art review. Use for novel research ideas, research roadmaps, unexplored agent or world-model algorithms, high-risk/high-reward experiments, or publishable extensions that may enter Prospect's task, ADR, and benchmark-gate workflow. Do not use for ordinary feature brainstorming or implementation of an already selected method.
-license: MIT
-metadata:
-  author: Alexander Dieckmann
-  version: "1.0.0"
+description: Generates and rigorously audits diverse, falsifiable research directions for Prospect's adaptive agent, including assumption surgery, new primitives and evidence programs, cross-domain mechanism transfer, and adversarial prior-art review. Use for novel research ideas, unexplored agent or world-model algorithms, high-risk/high-reward experiments, or publishable extensions that may enter Prospect's experiment and benchmark workflow. Do not use for ordinary feature brainstorming or implementation of an already selected method.
 ---
 
 # Research Ideation (Transformational)
@@ -18,15 +14,13 @@ metadata:
 
 > **Repository fit.** This skill is the ideation *front end* for the research
 > mission. It proposes and audits; it does not modify `src/prospect/`, the benchmark
-> harness, or task state. A selected candidate enters Prospect's normal process as
-> a bounded task based on `tasks/TEMPLATE.md`, linked to the relevant requirement,
-> ADR, and kill-gate. Hard-to-reverse or contract-changing choices require an ADR
-> before code. Put task-specific environments, datasets, scorers, and experiments in
-> `bench/`; keep `src/prospect/` task-agnostic and protocol-driven. The smallest
-> decisive experiment, a named baseline, collapse sentinels, and the regression
-> ratchet turn a *candidate*-novel idea into evidence. Consult the live backlog and
-> SOTA review first, preserve the `Prediction` uncertainty contract, and never
-> fabricate prior art, results, or novelty claims.
+> harness, or repository state. A selected candidate enters Prospect as one
+> bounded experiment under `bench/`, with a predeclared claim, named baselines,
+> controls, budgets, killing criterion, and generated outputs under `results/`.
+> Put reusable inputs in `datasets/` with provenance and checksums; keep
+> `src/prospect/` task-agnostic and protocol-driven. Update
+> `docs/architecture.md` only when stable system semantics change. Never fabricate
+> prior art, results, or novelty claims.
 
 ## Mission
 
@@ -51,7 +45,9 @@ Use this skill when the request concerns research ideation, scientific hypothese
 
 Do not use it for ordinary product features, small optimizations, routine refactoring, or direct implementation of a method the user has already chosen.
 
-This skill proposes and audits research. It does not automatically modify production code. A selected candidate must enter the repository's normal issue, task, ADR, review, and benchmark process first.
+This skill proposes and audits research. It does not automatically modify
+production code. A selected candidate must first become a bounded experiment
+with a protocol, controls, and abandonment rule.
 
 ## Required resources
 
@@ -96,7 +92,10 @@ State unresolved assumptions instead of silently inventing them.
 
 ## 1. Repository and frontier map
 
-Inspect the actual repository before ideating. Read its architecture, current methods, tests, benchmarks, issues/tasks, and research notes. Do not treat the optional repository profile as authoritative when it conflicts with files in the repo.
+Inspect the actual repository before ideating. Read its architecture, current
+methods, tests, reference benchmarks, datasets, and existing experiment code.
+Do not treat the optional repository profile as authoritative when it conflicts
+with files in the repo.
 
 Construct a compact frontier map. For each important prior method or repository component, capture:
 

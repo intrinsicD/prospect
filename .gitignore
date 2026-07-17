@@ -7,14 +7,18 @@ dist/
 build/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 .DS_Store
 
-# Generated benchmark outputs and evidence are artifacts, not source.
+# Generated experiment outputs are not source.
 bench/runs/
 bench/**/results/
-ara/evidence/
+results/
+artifacts/
 
-# Binary and packaged data belong in external artifact storage.
+# Binary and packaged data are ignored outside the curated datasets tree.
 *.npz
 *.npy
 *.so
@@ -60,6 +64,10 @@ ara/evidence/
 *.avi
 *.mkv
 *.pdf
+
+# Curated dataset payloads and their provenance are versioned.
+!datasets/
+!datasets/**
 
 # local agent/session state
 .claude/

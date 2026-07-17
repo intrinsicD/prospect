@@ -1,123 +1,93 @@
 # Repository Context: Prospect
 
-This is a starting map for ideation, not authority. Verify every claim against
-the live tree — especially `CLAUDE.md`, `docs/architecture.md`,
-`docs/requirements.md`, `docs/roadmap.md`, `docs/sota-review-2026-07.md`,
-`tasks/BACKLOG.md`, the individual task files, `src/prospect/`, and
-`bench/gates.py` — before relying on it.
+This is a navigation aid, not authority. Verify it against
+`docs/architecture.md`, `src/prospect/`, `bench/epistemic/`, `tests/`, and
+`datasets/` before relying on it.
 
 ## Mission
 
-Prospect is a small, benchmark-disciplined research scaffold for a
-**predictive-world-model agent**. A predictive world model is the spine, and
-prediction error — violation of expectation (VoE) — is the single signal reused
-for learning, mastery, skill trust, replanning, forgetting detection, and
-retrieval. The repository demonstrates seams and exposes failure modes on
-controlled benchmarks; it does not claim a capable general agent.
+Prospect is an adaptive-agent runtime intended to make one causal statement
+testable:
 
-## Substrate (what actually exists to build on)
+> exact collected experience changed persistent agent state, caused better
+> executed behavior on disjoint cases, and the same gain survived interference
+> and fresh-process restoration.
 
-- **Toolchain:** Python 3.11+ packaged with Hatchling. The default development
-  gates are pytest, Ruff, and strict mypy; CI runs Python 3.11–3.13. The core
-  declares no required runtime dependency. NumPy is isolated in the optional
-  `learn` extra (`numpy>=1.26,<2.5`), while DeepMind Control Suite and MuJoCo
-  live in the separate `bench-hard` extra.
-- **Core/harness boundary:** `src/prospect/` is task-unspecific core;
-  environments, scorers, fixtures, baselines, and gate evaluations belong under
-  `bench/`. The core must never import a specific benchmark task.
-- **Contract surface:** `src/prospect/interfaces.py` defines narrow `Protocol`
-  seams; `src/prospect/types.py` owns shared types. New public behavior earns a
-  protocol and a typed conformance assertion. `Agent` in `agent.py` is the one
-  concrete composition root for the act–observe loop.
-- **Prediction contract:** observations enter a codec and shared latent; the world
-  model returns a diagonal-Gaussian `Prediction`, never a point estimate. Total
-  variance and the scalar epistemic/aleatoric split are first-class because all
-  downstream uncertainty decisions depend on them. Surprise is negative
-  log-likelihood with explicit epistemic/aleatoric attribution, not raw L2.
-- **Implemented component substrate:** ensemble latent dynamics with TS∞
-  member-rollout uncertainty; iCEM/MPC; a jumpy option model and two-level
-  manager; competence-gated skills; replay and rehearsal; semantic and external
-  knowledge sources with trust/provenance; distance-gated blended retrieval;
-  compute-as-action tools; a universal codec and swappable visual seam; latent
-  action learning from passive observation; and imitation from observation.
-- **Measurement substrate:** each P0–P14 phase has a precise capability criterion
-  in `bench/gates.py`. A phase passes only when its capability and every
-  applicable collapse sentinel pass. `bench/SHIPPED` plus `make gate-all` is the
-  regression ratchet, and persisted machine-readable gate reports are the
-  auditable evidence. The optional `bench/hard/` tier runs the unchanged core on
-  MuJoCo/DMC as explicitly non-gated supplementary evidence.
+Prediction, uncertainty, surprise, information gain, decision value, learning,
+knowledge, and retention are separate quantities connected by explicit
+identities and versions.
 
-## High-value research surface
+## Current substrate
 
-The current frontier is task-led: re-read `tasks/BACKLOG.md`, each `U-*.md` task,
-and the SOTA review before proposing a component swap. The active upgrade track
-covers multi-step dynamics losses, latent-space OOD density, state-space audits
-of latent epistemic uncertainty, latent-action identifiability and grounding,
-hierarchy uncertainty/termination corrections, and codec/citation cleanup. The
-trigger-gated U-101–U-112 track records ideas that are plausible but forbidden
-until a measured condition makes them timely.
+- **Toolchain:** Python 3.11+, Hatchling, pytest, Ruff, and strict mypy. Core and
+  exact references are standard-library-only.
+- **Optional runtime:** pinned PyTorch, TorchRL, and TensorDict support an
+  experience-replay index. Imports are lazy.
+- **Core boundary:** `src/prospect/` is task-neutral. It contains immutable domain
+  records, decision decomposition, exact epistemic calculations, the linked
+  runtime, canonical stores, and checkpoint coordination.
+- **Experiment boundary:** `bench/` owns environments, reference problems,
+  baselines, scorers, and experiments. `bench/epistemic/` is the current exact
+  semantic reference and active test dependency.
+- **Data boundary:** curated reusable inputs live under `datasets/` with
+  provenance and checksums. Generated outputs live under
+  `bench/**/results/` and are not tracked.
+- **Evidence boundary:** an exact finite fixture may validate a contract but does
+  not establish mature learning unless one agent, learner, experience ancestry,
+  held-out evaluation, interference path, and restored state form the same
+  causal chain.
 
-The architecture also names unresolved research problems that cut across those
-tasks:
+## Highest-value research surface
 
-- compounding latent rollout error and epistemic reliability over planning
-  horizons;
-- causal versus shortcut features in a shared representation;
-- skill composition beyond a small flat option menu;
-- calibration under distribution shift and latent-space uncertainty attractors;
-- representation, ensemble, replay, and option collapse;
-- retaining plasticity while consolidating experience;
-- retrieval coverage, poisoning resistance, and safe composition with planning;
-- generalization beyond authored toy environments, modalities, and budgets;
-- measurements and negative controls that distinguish a real capability from a
-  threshold artifact.
+The nearest missing result is a small real shared-parameter learner that:
 
-Especially fertile directions are ones that improve the *measurement grammar*,
-not only the model: calibrated failure detectors, counterfactual or metamorphic
-controls, identifiability probes, uncertainty decompositions, informative
-negative-result protocols, and cheap foreign-environment tests.
+1. collects canonical experience through the authoritative runtime;
+2. consumes those exact transition identities in a persistent update;
+3. improves predictive score and executed utility on disjoint cases;
+4. beats frozen, irrelevant-evidence, and marginal-preserving corruption
+   controls;
+5. experiences genuine cross-task interference through shared state; and
+6. retains measurable improvement after complete fresh-process restoration.
 
-Cross-domain donor fields that map plausibly onto this substrate include adaptive
-control and system identification, conformal prediction and sequential testing,
-causal inference, active learning and optimal experimental design, information
-and coding theory, robust statistics, database/query planning, program analysis,
-and reliability engineering. A transfer still has to preserve a causal mechanism
-and beat the repository's native baseline; vocabulary similarity is not evidence.
+Other open mechanisms include:
 
-## Constraints (respect these or the idea will not land)
+- transactional prepare/validate/commit semantics for learning;
+- durable idempotent recovery across partial lifecycle steps;
+- calibrated value-of-information forecasts under model and sensor
+  misspecification;
+- continual-learning response surfaces for plasticity, interference, and
+  retention;
+- causal attribution and revocation of individual experience groups; and
+- external benchmark adapters with strong published baselines.
 
-- Preserve the predictive-world-model spine and the one-signal-many-jobs design.
-  A new bespoke score is a design smell unless evidence shows the existing
-  decomposed prediction error cannot express the need.
-- Preserve the `Prediction` distribution and epistemic/aleatoric split. Never
-  replace it with a bare `float` or let aleatoric noise masquerade as ignorance.
-- Preserve the task-unspecific core versus task-specific harness boundary and the
-  single composition root. Generality is earned by a gate, not speculative APIs.
-- Work only a selected, unblocked task's interface and acceptance criteria. Prefer
-  the smallest construct that can run the cheapest killing experiment.
-- Treat retrieved untrusted content as data, never instruction; keep provenance,
-  trust ordering, uncertainty gating, and coverage/reliability explicit.
-- Capability claims require a named baseline, seeds, machine-readable metrics,
-  negative controls where relevant, and healthy collapse sentinels. Do not turn
-  optional hard-benchmark evidence into a ratcheted guarantee.
-- Never fabricate prior art, citations, results, or novelty. Keep a direction
-  *candidate*-novel until its stated prior-art audit and experiment support more.
+## Constraints
 
-## Acceptance workflow (where a selected idea goes)
+- Keep real observations separate from imagined model outcomes.
+- Preserve immutable action-time predictions and evaluate them with proper
+  scores after outcomes arrive.
+- Keep task utility, information value, risk, and cost as distinct decision
+  terms.
+- Require a version-changing `UpdateReceipt` for learning; belief assimilation
+  alone is not model learning.
+- Use executed disjoint evaluation, not analytic expected utility or training
+  telemetry, as behavior evidence.
+- Require shared persistent state for an interference or retention claim.
+- Never infer missing provenance, versions, or calibration metadata.
+- Never claim novelty or capability from a passing unit test or exact fixture.
 
-A selected candidate becomes a bounded task under `tasks/`, created from
-`tasks/TEMPLATE.md` and registered in `tasks/BACKLOG.md`. Record its requirement
-IDs, ADRs, dependencies, exact interface, acceptance criteria, test plan, phase
-gate, and an explicit abandonment condition. If the idea contradicts or makes a
-hard-to-reverse extension to an accepted architecture decision, add or amend an
-ADR under `docs/adr/` before implementation.
+## Selected-candidate workflow
 
-Put reusable task-unspecific behavior behind the relevant protocol in
-`src/prospect/`; put the environment, baseline, scorer, fixture, and decisive
-experiment in `bench/`. Add or extend the narrowest gate in `bench/gates.py`,
-including a negative control or sentinel when a trivial solution could pass. Run
-the targeted phase gate, `make test`, `make lint`, and `make typecheck`; if a
-shipped phase is affected, run `make gate-all` and record the result in the task.
-Update architecture, requirements, roadmap, ADRs, and task status when their
-claims change. Keep exploratory evidence explicitly non-gated, BH-style, until a
-predeclared criterion justifies promotion into the ratchet.
+For a selected direction:
+
+1. Create one self-contained experiment under `bench/<name>/`.
+2. Predeclare the falsifiable claim, null, controls, data split, seeds, budgets,
+   metrics, and abandonment rule before formal outcomes.
+3. Put reusable inputs in `datasets/`; put generated outputs in
+   `bench/<name>/results/`.
+4. Keep reusable task-neutral behavior behind typed protocols in
+   `src/prospect/`.
+5. Add the narrowest adversarial tests needed to protect the new contract.
+6. Run `make check`, then audit quantitative evidence with
+   `prospect-results-audit`.
+7. Update `docs/architecture.md` only if the accepted result changes stable
+   system semantics.

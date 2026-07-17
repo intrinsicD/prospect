@@ -1,143 +1,139 @@
 ---
 name: prospect-results-audit
-description: Adversarial referee pass ("scientist pass") over Prospect's gate, experiment, capability, and causal-mechanism claims. Use before a quantitative or capability claim enters README.md, docs/roadmap.md, or ara/logic/claims.md; after any gate, formal experiment, or evidence session; before promoting a phase, task, default, or sealed result; when reviewing a results-bearing PR or commit; or whenever numbers lack an independent semantic verification. Do not use for generating new research directions (that is the prospect-research-ideation skill).
-license: MIT
-metadata:
-  version: "1.0.0"
+description: Performs an adversarial referee pass over Prospect experiment, capability, and causal-mechanism claims. Use after a quantitative experiment or evidence session, before promoting any learning/improvement/retention claim, while reviewing a results-bearing change, or whenever reported numbers lack independent semantic verification. Do not use for generating new research directions.
 ---
 
-# Results Audit ("scientist pass")
+# Results Audit
 
-> **Provenance.** Distilled 2026-07-15 from Prospect's own evidence history:
-> the BC-001 read-only audit that strengthened artifact binding and narrowed an
-> over-attributed localization claim; OL-001 and PI-001's terminal report-
-> canonicalization failures; PI-002's tuple/list semantic-verifier failure; and
-> the rule that an administrative rerun is the same scientific experiment, not
-> an independent result. It also incorporates the sibling-repository referee
-> pattern for correcting claims after apparently successful runs.
+Act as an independent referee. Assume the producing session made a mistake in
+protocol, data custody, control construction, accounting, statistics, or claim
+wording and try to find it. The output is corrected evidence and bounded claims,
+not reassurance.
 
-## Stance
+## 1. Inventory claims
 
-Act as a referee, not the producing investigator. Assume the session made a
-mistake in the protocol, artifact graph, arithmetic, control, or wording and
-hunt for it. The deliverable is corrected evidence, narrower claims, and
-truthful gate/task state, never reassurance. Report "confirmed" only after
-filling the claim table and binding every row to independently checked evidence.
+List every quantitative, causal, generality, capability, and retention statement
+in the changed code, tests, architecture, README, and experiment report.
 
-## When to run
+For each claim record:
 
-- Before a quantitative, causal, generality, or capability claim enters
-  `README.md`, `docs/roadmap.md`, or `ara/logic/claims.md`.
-- After a phase gate, non-gated benchmark, formal research experiment, or ARA
-  evidence session produces numbers.
-- Before adding a phase to `bench/SHIPPED`, promoting a task/default, accepting
-  a sealed package, or reviewing a results-bearing PR.
-- On request: "audit", "referee pass", "scientist pass", "verify the claims".
-- Periodically over old claims and parent packages, not only the newest result.
+- exact wording and scope;
+- development versus disjoint/held-out status;
+- source, dataset, configuration, model, and evaluator identities;
+- raw evidence package;
+- verification command; and
+- current disposition: asserted, supported, weakened, refuted, or unresolved.
 
-## Procedure
+A claim with no explicit scope or raw evidence is already a finding.
 
-### 1. Inventory the claims
+## 2. Recompute from raw outcomes
 
-Sweep the changed `README.md`, `docs/roadmap.md`, `docs/requirements.md`, ADRs,
-task files, `bench/results/`, experiment-local `bench/**/results/`,
-`docs/research/`, `ara/logic/claims.md`, and `ara/evidence/`. Build:
+Reconstruct metrics and decisions from raw rows or tensors rather than report
+prose. Verify checksums, data membership, source/config versions, split
+identities, checkpoint components, and causal ancestry. Run both a fast
+structural verifier and an independent semantic recomputation when available.
 
-| # | Claim (one sentence) | Scope/kind | Evidence package | Semantically verified now? |
-|---|---|---|---|---|
+Report rendering, schema validity, and green unit tests do not replace semantic
+recomputation.
 
-Kind is one of: gated capability, non-gated mechanism, measured diagnostic, or
-asserted. State scope explicitly: authored fixture versus foreign environment,
-development versus held-out, replay versus fresh confirmation. An asserted row
-or a claim whose scope is absent is already a finding.
+## 3. Bind the causal chain
 
-### 2. Recompute from raw artifacts
+For a learning claim, verify that the same continuous chain contains:
 
-Reconstruct decisions from result JSON/CSV/tensors, not from report prose. Run
-the package's fast verifier and, where defined, its full semantic verifier that
-re-trains or regenerates outcomes. Compare canonical serialized values rather
-than raw Python container types. Verify `artifact-manifest.json`, input/source
-hashes, nested parent receipts, model fingerprints, and copied protocols. A
-final verifier failure invalidates the package even when its numbers look right.
+1. canonical collected experience IDs;
+2. transition IDs derived from those experiences;
+3. an `UpdateReceipt` that consumed those transitions and changed declared
+   persistent versions;
+4. a frozen post-update snapshot;
+5. executed evaluation on disjoint cases at matched budget;
+6. frozen, irrelevant-evidence, and corruption controls;
+7. genuine shared-state interference; and
+8. a complete checkpoint restored in a fresh process.
 
-### 3. Bind claims to executed checks
+Reject a chain assembled from different agents, learners, task-local independent
+slots, analytic utility, or an in-process round trip.
 
-Gated claims bind to the exact `bench/gates.py` criterion, recorded seeds,
-sentinels, and a fresh `make gate PHASE=Px`; shipped-capability claims also bind
-to `make gate-all`. `make gate` may exit successfully while reporting BLOCKED,
-so inspect the persisted `GateResult.passed` value and detail, not only shell
-status. Formal non-gated claims bind to their package verifier,
-targeted tests, and immutable raw artifacts. Record whether a gate evaluation
-replayed a persisted artifact or actually retrained. Pending optional-dependency
-or long-run checks remain pending; never restate them in the past tense.
+## 4. Audit protocol parity
 
-### 4. Audit protocol and configuration parity
+Confirm that the executed claim, environment, data bytes, split, model and
+evaluator seeds, budgets, thresholds, branch rule, dependency versions, and
+source state match the frozen protocol. Development or replay data may not
+silently become confirmatory evidence.
 
-Confirm the executed phase/experiment ID, environment/task, dataset bytes,
-model and evaluator seeds, train/development/confirmatory split, update and
-planner budgets, thresholds, branch rule, parent identity, source snapshot, and
-dependency versions match the claim. Replay/hypothesis-generating seeds must not
-silently become confirmatory evidence. A formal defect receives a new identifier;
-never repair or overwrite a sealed package in place.
+Give a defective formal run a new run identifier. Do not repair a result package
+in place during the same study.
 
-### 5. Recompute accounting and statistics
+## 5. Recompute accounting and statistics
 
-Check equal environment steps, planner/model evaluations, tool or retrieval
-calls, horizons, and wall-clock scope. Keep oracle-only diagnostic compute
-separate from the learned planner budget. Recompute paired-seed deltas, gap
-closure, success counts, ratios, intervals, and decision predicates from raw
-rows. Do not double-count an administrative rerun (for example OL-001/OL-002)
-as replication, or treat starts/calls from one model seed as independent seeds.
+Check equal environment steps, model evaluations, tool calls, horizons,
+training updates, and wall-clock scope. Recompute paired deltas, intervals,
+success counts, calibration, proper scores, utility/regret, plasticity,
+forgetting, and retention from the raw data. Do not treat correlated rows,
+timestamps, or repeated starts as independent samples.
 
-### 6. Audit controls and interpretation
+## 6. Audit controls
 
-Require the predeclared positive/negative controls and every applicable collapse
-sentinel to pass before interpreting the primary endpoint. A diagnostic cannot
-rescue a failed primary gate. Distinguish "failed to establish" from "proved
-absent", mechanism evidence from production capability, a real-media preflight
-from multimodal learning, and supplementary DMC evidence from the numpy gate
-ratchet. Check that poisoned/shuffled/permuted controls change only the intended
-factor and preserve budgets and denominators.
+Require every predeclared positive/negative control and collapse sentinel to
+behave as intended before interpreting the primary endpoint. Verify that
+shuffled, poisoned, irrelevant, or ablated controls change only the intended
+factor and preserve marginals, budgets, and denominators where required.
 
-### 7. State environment and artifact limits
+A secondary metric cannot rescue a failed primary rule or control.
 
-List exactly what ran in this session: tests, gate evaluation, fast verification,
-semantic regeneration, optional DMC/multimodal workloads, or only artifact
-inspection. State unavailable extras and unopened confirmatory data. A stored
-report plus green unit tests is not semantic regeneration; a non-gated result is
-not a shipped gate.
+## 7. State limits
 
-### 8. Dispose of every claim in the same change
+List exactly what ran and what did not: unit tests, structural checks, semantic
+regeneration, training, disjoint evaluation, interference, checkpoint restore,
+external benchmark, or artifact inspection only. Keep optional or unavailable
+work explicitly pending.
 
-For each row: **confirm** (evidence and scope remain valid), **narrow** (rewrite
-to the supported fixture, endpoint, or maturity), or **retire** (remove the
-claim but preserve its history). Update `ara/logic/claims.md`, matching
-`ara/evidence/`, result report, roadmap/README/task/gate state as applicable in
-the same commit. Failed sealed artifacts remain immutable and linked from their
-replacement; negative results stay first-class.
+Use precise language:
 
-### 9. Report
+- “failed to establish” rather than “proved absent”;
+- “fixture-specific mechanism evidence” rather than “agent capability”;
+- “reload parity” rather than “retention” without interference and behavior;
+- “apparently novel under the searched scope” rather than absolute novelty.
 
-End with the claim table, verifier commands and outcomes, corrections made,
-items still unverified and why, unopened/unused evidence, and explicit follow-up
-experiments or task updates. Separate supported, refuted, and unresolved claims.
+## 8. Dispose of each claim
 
-## Anti-patterns (hard nos)
+Assign one disposition:
 
-- Tuning a threshold, seed set, branch, or control after seeing formal outcomes.
-- Repairing, deleting, or overwriting a failed sealed package.
-- Treating report rendering or manifest success as semantic verification.
-- Counting administrative reruns as independent evidence.
-- Promoting a non-gated, toy-fixture, development, or preflight result into a
-  general capability claim.
-- Letting a secondary metric rescue a failed primary rule or control precondition.
-- Reporting remembered numbers without replaying their raw source and predicate.
+- **confirm** — raw evidence, semantics, and scope all survive;
+- **narrow** — rewrite to the supported endpoint, fixture, or maturity;
+- **retire** — remove the unsupported statement; or
+- **unresolved** — name the missing evidence and next decisive check.
+
+Apply matching corrections to the result report, README, architecture, tests, or
+code in the same change. Do not leave a stronger claim elsewhere.
+
+## 9. Report
+
+End with:
+
+- the claim table and dispositions;
+- commands run and outcomes;
+- independent recomputations;
+- corrections made;
+- unverified evidence and why;
+- unused or unopened data;
+- explicit follow-up tests; and
+- a one-sentence verdict on what the experiment actually establishes.
+
+## Hard prohibitions
+
+- Tune thresholds, controls, seeds, or branches after formal outcomes.
+- Treat training loss or internal uncertainty reduction as external improvement.
+- Count administrative reruns as independent evidence.
+- Promote an exact fixture, development split, or analytic expectation into a
+  general capability.
+- Let a secondary endpoint rescue a failed primary endpoint.
+- Report remembered numbers without reopening their raw source.
 
 ## Repository anchors
 
-`CLAUDE.md` — benchmark-gated workflow and definition of done ·
-`bench/gates.py`, `bench/SHIPPED`, `bench/results/` — gate criteria, ratchet,
-and reports · `bench/**/results/*/artifact-manifest.json` — sealed evidence
-graphs · `docs/research/` — frozen protocols and failure records ·
-`ara/logic/claims.md`, `ara/evidence/` — bounded claims and proof packages ·
-`Makefile` — exact verification entry points.
+- `docs/architecture.md` — canonical semantics and evidence ladder.
+- `src/prospect/` — linked runtime and persistent-state implementation.
+- `bench/epistemic/` — exact reference semantics, not a mature capability proof.
+- `bench/<experiment>/results/` — generated raw evidence for a new experiment.
+- `datasets/` — curated inputs and checksums.
+- `tests/` and `Makefile` — executable verification surfaces.

@@ -40,10 +40,11 @@ cases:
       - no generic 'add a network' answer
 
   - id: prospect
-    prompt: "Propose research extensions for Prospect without violating its world-model, VoE, uncertainty, and benchmark-gated architecture."
+    prompt: "Propose research extensions for Prospect without collapsing its linked lifecycle, uncertainty semantics, or causal evidence contract."
     expects:
-      - no modification of src/prospect/skills.py for the Agent Skill
-      - repository task/ADR/gate handoff
+      - correct project-skill and runtime boundaries
+      - bounded bench experiment handoff
+      - curated dataset and generated-result separation
       - explicit compatibility with existing architecture
 
   - id: evidence-first
