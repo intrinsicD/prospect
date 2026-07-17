@@ -12,6 +12,13 @@ from bench.world_model_lifecycle import verify as verify_module
 from bench.world_model_lifecycle.planning import run_pendulum_conformance
 
 
+def test_implementation_manifest_ignores_generated_attempt_source_copies() -> None:
+    paths = {str(row["path"]) for row in binding_module.implementation_files()}
+
+    assert "bench/world_model_lifecycle/binding.py" in paths
+    assert not any(path.startswith("bench/world_model_lifecycle/results/") for path in paths)
+
+
 def _rehash_conformance(report: dict[str, object]) -> None:
     body = dict(report)
     body.pop("report_sha256", None)

@@ -89,10 +89,19 @@ def source_is_clean() -> bool:
 
 
 def implementation_files() -> list[dict[str, object]]:
+    tracked_python = [
+        REPO / relative
+        for relative in git_output(
+            "ls-files",
+            "--",
+            "src/prospect",
+            "bench",
+            "tests",
+        ).splitlines()
+        if relative.endswith(".py")
+    ]
     candidates = [
-        *sorted((REPO / "src" / "prospect").rglob("*.py")),
-        *sorted((REPO / "bench").rglob("*.py")),
-        *sorted((REPO / "tests").rglob("*.py")),
+        *tracked_python,
         REPO / "Makefile",
         REPO / "pyproject.toml",
         LOCKFILE,
