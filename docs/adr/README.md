@@ -20,3 +20,4 @@ Format: Status · Context · Decision · Consequences.
 | 0010 | Learning from action-free observation via latent-action inference | Accepted |
 | 0011 | Optional, non-gated harder-benchmark tier (real MuJoCo control) | Accepted |
 | 0012 | Imitation from observation: recover actions to reproduce a demo | Accepted |
+| 0013 | Two-tier storage for research artifacts | Accepted |

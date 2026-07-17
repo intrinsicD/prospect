@@ -44,7 +44,7 @@ criteria precise even while the eval body is a TODO.
 > Deliberately outside the P-series: `dm_control` is the optional `[bench-hard]` extra,
 > `bench/hard/` is never imported by the gate registry, and it runs only via
 > `make bench-hard` (or a manual CI job) — the numpy-only `gate-all` ratchet is untouched.
-> The deliverable is a committed **report** (`bench/hard/results/`), not a gate. See
+> The deliverable is an externally archived **report** (`bench/hard/results/`), not a gate. See
 > ADR-0011 for why the reproducible core CI stays numpy-only and this stays optional.
 >
 > The probe surfaced that **cartpole-swingup** fails (random data never reaches the upright

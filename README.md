@@ -57,15 +57,18 @@ make tree        # see the layout
 4. For novel research directions, load
    `.agents/skills/prospect-research-ideation/SKILL.md`; route any selected idea
    through a task, ADR when needed, and a benchmark gate before implementation.
+5. Before accepting results or promoting a claim, phase, or default, load
+   `.agents/skills/prospect-results-audit/SKILL.md` for an independent scientist pass.
 
 ## Layout
 ```
 CLAUDE.md            agent operating manual (start here)
-.agents/skills/       project-scoped research-ideation workflow
+.agents/skills/       project-scoped research-ideation and results-audit workflows
 docs/                architecture, requirements, roadmap
 docs/adr/            locked architecture decisions
 tasks/               backlog, task template, specified tasks
 src/prospect/        task-unspecific CORE (interfaces + one file per component)
 bench/               task-specific HARNESS: kill-gates (the fitness function) + the Environment seam
+artifact-pointers/   checksums and retrieval metadata for externally stored artifacts
 tests/               unit + conformance tests
 ```

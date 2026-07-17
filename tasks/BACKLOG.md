@@ -248,6 +248,40 @@ Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it u
 > *unchanged* core on real MuJoCo (DeepMind Control Suite) via the `bench.Environment`
 > seam. Kept out of the numpy-only gated CI by construction (see ADR-0011).
 
-- **BH-001** · `done` · R1 (evidence) · Harder-benchmark probe. `DMCEnvironment` adapter (`bench/hard/`, satisfies `bench.Environment`) drives the unchanged `FlatWorldModel`/`FlatPlanner`/`Agent` on real MuJoCo; re-runs the **P2 claim** (MPC-over-a-learned-model vs a budget-matched CEM-ES baseline) at P2's own settings. **NON-gated** — `[bench-hard]` extra, never imported by the gate registry, `make bench-hard` / manual CI only; the deliverable is a committed report (`bench/hard/results/`). See the task file for the honest reading (the toy MBRL win is *not* a decisive win on cartpole at equal budget; harder 2-D-action tasks are below this budget's resolution). Does not block P14.
+- **BH-001** · `done` · R1 (evidence) · Harder-benchmark probe. `DMCEnvironment` adapter (`bench/hard/`, satisfies `bench.Environment`) drives the unchanged `FlatWorldModel`/`FlatPlanner`/`Agent` on real MuJoCo; re-runs the **P2 claim** (MPC-over-a-learned-model vs a budget-matched CEM-ES baseline) at P2's own settings. **NON-gated** — `[bench-hard]` extra, never imported by the gate registry, `make bench-hard` / manual CI only; the deliverable is an externally archived report (`bench/hard/results/`). See the task file for the honest reading (the toy MBRL win is *not* a decisive win on cartpole at equal budget; harder 2-D-action tasks are below this budget's resolution). Does not block P14.
 - **BH-001 §A** · `done` · R1,R3 (evidence) · Curiosity study (`bench/hard/curiosity.py`): swaps the probe's random collection for the P3-002 curiosity curriculum on swingup. **Finding:** curiosity reaches the upright region random data can't (max reward 0.24→0.70) but does *not* convert that to exploit control (MBRL 6.4→2.1) — exploration necessary, not sufficient, at feasible budgets (3× budget still worse). Motivates B. Non-gated.
 - **P14-001 / BH-001 §B** · `done` (non-gated demonstration) · R5,R7 · Imitation from observation on swingup (`bench/hard/imitation.py`, ADR-0012) — see the Phase 12+ P14 row above. The pair A/B is the honest arc: exploration reaches the goal region, a demonstration hands over the behaviour.
+
+## Active real-multimodal research diagnostics (non-gated)
+
+- **MM-009** · `terminal-invalid` · R1,R4,R6 · Causal deformation/appearance prediction on
+  the authenticated MM-007 R64 panel. Fit only `previous -> current`, freeze the
+  prediction in a target-absent per-row sandbox, then score `current -> future`; a new
+  MM-001 successor is forbidden unless historical and future support hold jointly on
+  the experiment-owned 6/8 causal gate and every isolation/null control passes.
+  Supersedes the untouched MM-008 target-aware real route without reclassifying MM-001
+  through MM-007. The one-shot attempt failed before parent parsing/detachment because
+  recursive MM-003 PCA verification was BLAS-thread-sensitive and the cgroup launcher
+  resolved the venv interpreter to base Python. No prediction or target score exists;
+  neither scientific branch is licensed and MM-010 remains reserved.
+- **LCV-001** · `done` (`PASS`, independently audited) · infrastructure closure · New-identity, non-scientific
+  sealed-lineage/runtime preflight. Authenticate a complete immutable MM-007 copy and
+  only the frame/normalizer semantics a successor consumes, without importing,
+  recursively verifying, or refitting MM-001--MM-007. Bind the lexical venv entry,
+  terminal executable, NumPy/OpenBLAS bytes, observed thread count, and numeric canary.
+  The one-shot canonical package passed structural and supervised semantic replay,
+  all 25 controls, cleanup, and two independent scientist audits. This licenses only
+  pre-real construction/audit of fresh MM-011 after runtime revalidation and sealed
+  receipt copying; it does not license scoring or a capability claim.
+- **MM-011** · `terminal-pre-real-no-go` · R1,R4,R6 · LCV-backed finite-grid causal
+  deformation/appearance candidate. Its frozen six-cell generated sensitivity audit
+  completed and replayed bit-exact before any real frame was opened. All three
+  half-step affine cells and both null controls passed; 1/2/3-pixel translations
+  improved forward SSE but also improved toward the previous frame, failing the
+  preregistered directionality predicate. Decision:
+  `ABANDON_FINITE_GRID_BEFORE_REAL_DATA`. The canonical MM-011 root remains absent,
+  no real prediction/score exists, and thresholds were not relaxed. A new-identity
+  continuous-registration successor must also inherit the independent audit's
+  copied-controller and durable formal/semantic cleanup requirements. MM-010 remains
+  reserved/unused; AIDE2 remains a later harness comparison requiring multiple cheap
+  evaluators and a withheld judge.

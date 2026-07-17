@@ -1,5 +1,5 @@
 .RECIPEPREFIX = >
-.PHONY: install test lint fmt typecheck gate gate-all bench-hard tree
+.PHONY: install test lint fmt typecheck gate gate-all bench-hard bench-multimodal-smoke bench-multimodal bench-multimodal-verify tree
 
 install:
 > pip install -e ".[dev,learn]" --break-system-packages
@@ -29,6 +29,16 @@ gate-all:
 # `[bench-hard]` extra (`pip install -e '.[bench-hard]'`). Never part of gate-all/CI.
 bench-hard:
 > python -m bench.hard
+
+# optional MM-001 real-media systems preflight; requires `[bench-multimodal]`
+bench-multimodal-smoke:
+> python -m bench.multimodal_preflight smoke
+
+bench-multimodal:
+> python -m bench.multimodal_preflight run
+
+bench-multimodal-verify:
+> python -m bench.multimodal_preflight verify-semantic
 
 tree:
 > find . -not -path '*/.*' -not -path '*/__pycache__/*' -type f | sort

@@ -1,0 +1,20 @@
+{
+  "binding": {
+    "config_sha256": "550d40a70850197592596e1d8608e7180c81ef4ba566fde88e6d56f94950c8cc",
+    "parent_artifact_manifest_sha256": "db0b6654ab098dc9a3ec93e4a6de8820bbe5860d44974645e9a5ee7dad1537fb",
+    "protocol_sha256": "4fd0eb48cc5f9f9b49426a4dfdcab92f9c585664879aa6fff6c5969ed9bdbb6a",
+    "source_sha256": "368eca6110c69c00bc55e0df3c21884d2ce4bff1c8982124f5cb50ce4f46a3d8"
+  },
+  "checks": {
+    "canonical_output_absent": true,
+    "claim_boundary_accepted": true,
+    "parent_pins_independently_checked": true,
+    "runtime_closure_independently_checked": true,
+    "source_tests_audited": true
+  },
+  "decision": "GO",
+  "experiment_id": "LCV-001",
+  "independent": true,
+  "reviewer": "Codex independent adversarial + semantic/frozen-binding auditors",
+  "schema_version": "lcv001-pre-real-audit-v1"
+}

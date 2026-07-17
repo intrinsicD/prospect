@@ -25,6 +25,16 @@ learn = ["numpy>=1.26,<2.5"]
 # — heavyweight, non-gated, run on demand via `make bench-hard`. State observations
 # only, so no GL/render deps are needed.
 bench-hard = ["mujoco>=3", "dm_control>=1.0"]
+# Optional real-modality systems preflight (MM-001).  Frozen neural codecs stay
+# harness-side per ADR-0009; ffmpeg is a host binary and is checked at runtime.
+# `accelerate` is intentionally omitted: these tiny checkpoints load directly,
+# avoiding another dependency for a non-gated local benchmark.
+bench-multimodal = [
+    "torch>=2.2,<3",
+    "transformers>=4.57,<5",
+    "diffusers>=0.35,<0.36",
+    "snac>=1.2,<1.3",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/prospect"]
@@ -43,7 +53,7 @@ select = ["E", "F", "B", "UP", "I"]
 # The typing rule (CLAUDE.md) is enforced, not hoped for (P0-009): protocol
 # conformance is verified statically via tests/test_conformance.py.
 [tool.mypy]
-files = ["src/prospect", "bench", "tests"]
+files = ["src/prospect", "bench", "tests", "tools"]
 mypy_path = "src"
 python_version = "3.11"
 disallow_untyped_defs = true

@@ -35,9 +35,9 @@ Add a **fenced, optional, NON-gated benchmark tier** — not a phase, not a gate
   machine* (P2's budget, planner defaults, and a budget-matched CEM-ES model-free
   baseline). Deviating from P2's settings to make MBRL look better is forbidden — that
   would defeat the probe.
-- **The deliverable is an honest report, not a pass.** Output is a committed artifact
-  (`bench/hard/results/`) with raw per-seed returns, seed spread, and matched-budget
-  deltas. There is no threshold that ships anything. A small-budget planner losing to
+- **The deliverable is an honest report, not a pass.** Output is an externally archived
+  artifact (`bench/hard/results/`) with raw per-seed returns, seed spread, and
+  matched-budget deltas. There is no threshold that ships anything. A small-budget planner losing to
   published SAC would be unremarkable; the only question asked is whether the
   model-based machine beats a model-free baseline **given the same env steps**.
 

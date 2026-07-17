@@ -1,0 +1,375 @@
+{
+  "classifications": {
+    "artifact": "invalid_LCV001_artifact",
+    "pass": "PASS",
+    "runtime": "invalid_LCV001_runtime",
+    "verifier": "invalid_LCV001_verifier"
+  },
+  "experiment_id": "LCV-001",
+  "lifecycle": {
+    "canonical_output": "bench/sealed_lineage_verifier/results/LCV-001",
+    "classified_child_return_code": 2,
+    "completion_commit": "sealed_verified_sibling_RENAME_EXCHANGE",
+    "completed_files": [
+      "prepared/LCV-001-protocol.md",
+      "prepared/config.json",
+      "prepared/pre-real-audit.json",
+      "prepared/input-manifest.json",
+      "prepared/freeze-record.json",
+      "outcomes/prepared-phase-anchor.json",
+      "prepared/inputs/MM-007/MM-007-evidence.json",
+      "prepared/inputs/MM-007/MM-007-frames-64x64.npz",
+      "prepared/inputs/MM-007/MM-007-protocol.md",
+      "prepared/inputs/MM-007/MM-007-report.md",
+      "prepared/inputs/MM-007/MM-007-results.json",
+      "prepared/inputs/MM-007/artifact-manifest.json",
+      "prepared/inputs/MM-007/formal-start.json",
+      "prepared/inputs/MM-007/input-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-004/input-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-006/MM-006-evidence.json",
+      "prepared/inputs/MM-007/inputs/MM-006/MM-006-results.json",
+      "prepared/inputs/MM-007/inputs/MM-006/artifact-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-006/input-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-006/inputs/MM-005/inputs/MM-004/MM-004-pixel-grids.npz",
+      "prepared/runtime/source/bench/__init__.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/__init__.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/__main__.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/bootstrap.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/canary_probe.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/custody.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/experiment.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/runtime_probe.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/supervisor.py",
+      "prepared/runtime/source/tests/test_lcv001_custody.py",
+      "prepared/runtime/source/tests/test_lcv001_experiment.py",
+      "prepared/runtime/source/tests/test_lcv001_runtime.py",
+      "prepared/runtime/source/tests/test_lcv001_supervisor.py",
+      "outcomes/formal-start.json",
+      "outcomes/runtime-receipt.json",
+      "outcomes/parent-closure.json",
+      "outcomes/mutation-controls.json",
+      "outcomes/provisional-result.json",
+      "outcomes/cleanup-receipt.json",
+      "outcomes/LCV-001-results.json",
+      "outcomes/LCV-001-report.md",
+      "outcomes/artifact-manifest.json"
+    ],
+    "completed_mode": "files_0444_directories_0555",
+    "postcommit_receipt_loss": "no_terminal_write_manual_inspection_no_PASS",
+    "prepared_files": [
+      "prepared/LCV-001-protocol.md",
+      "prepared/config.json",
+      "prepared/pre-real-audit.json",
+      "prepared/input-manifest.json",
+      "prepared/freeze-record.json",
+      "outcomes/prepared-phase-anchor.json",
+      "prepared/inputs/MM-007/MM-007-evidence.json",
+      "prepared/inputs/MM-007/MM-007-frames-64x64.npz",
+      "prepared/inputs/MM-007/MM-007-protocol.md",
+      "prepared/inputs/MM-007/MM-007-report.md",
+      "prepared/inputs/MM-007/MM-007-results.json",
+      "prepared/inputs/MM-007/artifact-manifest.json",
+      "prepared/inputs/MM-007/formal-start.json",
+      "prepared/inputs/MM-007/input-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-004/input-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-006/MM-006-evidence.json",
+      "prepared/inputs/MM-007/inputs/MM-006/MM-006-results.json",
+      "prepared/inputs/MM-007/inputs/MM-006/artifact-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-006/input-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-006/inputs/MM-005/inputs/MM-004/MM-004-pixel-grids.npz",
+      "prepared/runtime/source/bench/__init__.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/__init__.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/__main__.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/bootstrap.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/canary_probe.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/custody.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/experiment.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/runtime_probe.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/supervisor.py",
+      "prepared/runtime/source/tests/test_lcv001_custody.py",
+      "prepared/runtime/source/tests/test_lcv001_experiment.py",
+      "prepared/runtime/source/tests/test_lcv001_runtime.py",
+      "prepared/runtime/source/tests/test_lcv001_supervisor.py"
+    ],
+    "provisional_files": [
+      "prepared/LCV-001-protocol.md",
+      "prepared/config.json",
+      "prepared/pre-real-audit.json",
+      "prepared/input-manifest.json",
+      "prepared/freeze-record.json",
+      "outcomes/prepared-phase-anchor.json",
+      "prepared/inputs/MM-007/MM-007-evidence.json",
+      "prepared/inputs/MM-007/MM-007-frames-64x64.npz",
+      "prepared/inputs/MM-007/MM-007-protocol.md",
+      "prepared/inputs/MM-007/MM-007-report.md",
+      "prepared/inputs/MM-007/MM-007-results.json",
+      "prepared/inputs/MM-007/artifact-manifest.json",
+      "prepared/inputs/MM-007/formal-start.json",
+      "prepared/inputs/MM-007/input-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-004/input-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-006/MM-006-evidence.json",
+      "prepared/inputs/MM-007/inputs/MM-006/MM-006-results.json",
+      "prepared/inputs/MM-007/inputs/MM-006/artifact-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-006/input-manifest.json",
+      "prepared/inputs/MM-007/inputs/MM-006/inputs/MM-005/inputs/MM-004/MM-004-pixel-grids.npz",
+      "prepared/runtime/source/bench/__init__.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/__init__.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/__main__.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/bootstrap.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/canary_probe.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/custody.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/experiment.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/runtime_probe.py",
+      "prepared/runtime/source/bench/sealed_lineage_verifier/supervisor.py",
+      "prepared/runtime/source/tests/test_lcv001_custody.py",
+      "prepared/runtime/source/tests/test_lcv001_experiment.py",
+      "prepared/runtime/source/tests/test_lcv001_runtime.py",
+      "prepared/runtime/source/tests/test_lcv001_supervisor.py",
+      "outcomes/formal-start.json",
+      "outcomes/runtime-receipt.json",
+      "outcomes/parent-closure.json",
+      "outcomes/mutation-controls.json",
+      "outcomes/provisional-result.json"
+    ],
+    "required_preparation_receipt": {
+      "parent_directory_fsync": true,
+      "publication_warnings": [],
+      "status": "prepared_durable"
+    },
+    "required_commit_receipt": {
+      "atomic_exchange": true,
+      "parent_directory_fsync": true,
+      "retired_provisional_removed": true,
+      "warnings": []
+    },
+    "runtime_transport_return_codes": [
+      -2,
+      70,
+      120,
+      130
+    ],
+    "shadow_flags": [
+      "-I",
+      "-S",
+      "-B"
+    ],
+    "supervisor_return_contract": "exact_type_args_int_rc_str_channels_valid_cleanup",
+    "terminal_membership": "subset_of_provisional_files_plus_terminal_failure",
+    "workspace_allocation": "token_hex_128bit_absent_precheck_exclusive_mkdir_owned_cleanup"
+  },
+  "parent": {
+    "directory_modes": {
+      ".": 509,
+      "inputs": 509,
+      "inputs/MM-004": 509,
+      "inputs/MM-006": 509,
+      "inputs/MM-006/inputs": 509,
+      "inputs/MM-006/inputs/MM-005": 509,
+      "inputs/MM-006/inputs/MM-005/inputs": 509,
+      "inputs/MM-006/inputs/MM-005/inputs/MM-004": 509
+    },
+    "files": {
+      "MM-007-evidence.json": {
+        "bytes": 273804,
+        "mode": 420,
+        "sha256": "13dfa89e541e6122263ea9814d42fb328da303dcc74556cdaaa5d5860d99abaf"
+      },
+      "MM-007-frames-64x64.npz": {
+        "bytes": 2525160,
+        "mode": 420,
+        "sha256": "fbc79d81a06720175139f7106745bd58f8788f43cc5a2fcd10658d186909797f"
+      },
+      "MM-007-protocol.md": {
+        "bytes": 15238,
+        "mode": 420,
+        "sha256": "24bbac1855cc2b51d2a65012b9c63037637c53555b86bbad7c66a6249108a73c"
+      },
+      "MM-007-report.md": {
+        "bytes": 1086,
+        "mode": 420,
+        "sha256": "b18760128941ab2eff893b8c0afc469b92f71077d489e060d56519407990b8a2"
+      },
+      "MM-007-results.json": {
+        "bytes": 221177,
+        "mode": 420,
+        "sha256": "3c92729e1e5c18c14461e36602bdb86acd31750d9f5a85f535cd33a43fb9c47b"
+      },
+      "artifact-manifest.json": {
+        "bytes": 2678,
+        "mode": 420,
+        "sha256": "db0b6654ab098dc9a3ec93e4a6de8820bbe5860d44974645e9a5ee7dad1537fb"
+      },
+      "formal-start.json": {
+        "bytes": 2090,
+        "mode": 292,
+        "sha256": "ea5c7bda870d71ead3172c1fc6e504d6a6b02d2ba785e9fd2fc75a91c667eee3"
+      },
+      "input-manifest.json": {
+        "bytes": 43618,
+        "mode": 420,
+        "sha256": "1f83c805e6c5d75f4f1d5a2102d471c15bbc6bb787960cb5ae630bd2260faa1f"
+      },
+      "inputs/MM-004/input-manifest.json": {
+        "bytes": 31328,
+        "mode": 420,
+        "sha256": "597a8bfc9f6ae1f6ff1f0d3be456f57d768f1866a1fac59cd981dd260076dc90"
+      },
+      "inputs/MM-006/MM-006-evidence.json": {
+        "bytes": 3350469,
+        "mode": 420,
+        "sha256": "5c5ffa514ab0f0c06c8588e69b54d6c4f2f6be3a4471a0fe7a31aa1e1dd3dac2"
+      },
+      "inputs/MM-006/MM-006-results.json": {
+        "bytes": 208329,
+        "mode": 420,
+        "sha256": "c5e0737acf6030315a77b497f5d5ea78693eb8a5879399e37bdfb702e2b9f648"
+      },
+      "inputs/MM-006/artifact-manifest.json": {
+        "bytes": 2381,
+        "mode": 420,
+        "sha256": "9727eefc6c5665b5eb8cc65ae9cfab57bb4c8b3e353b747363bec5e3c2f573b0"
+      },
+      "inputs/MM-006/input-manifest.json": {
+        "bytes": 24723,
+        "mode": 420,
+        "sha256": "badd7676f1e4a60c56b59af12a1d7f82ef134e797febc86a5adcb4c33dda5cd1"
+      },
+      "inputs/MM-006/inputs/MM-005/inputs/MM-004/MM-004-pixel-grids.npz": {
+        "bytes": 409427,
+        "mode": 420,
+        "sha256": "cca261a941e68a7ddc510eee3a3af958d33b6abaf958cb5562ed6b66c22f47c8"
+      }
+    },
+    "root": "bench/multimodal_resolution_diagnostics/results/MM-007"
+  },
+  "runtime": {
+    "base_executable": "/home/alex/miniconda3/bin/python3.12",
+    "base_prefix_under_S": "/home/alex/miniconda3",
+    "canary": {
+      "bundle_sha256": "fcce45258061121edbb0ce285c0466e13862af102a86f6a56fa6bfab8db000dd",
+      "input_sha256": "5c7a7f2b2631ab921f46b0078ec13e8e85dbf01cd7b2930224d95b1ebb8f84bd",
+      "minimum_singular_gap": 0.0035610527003058223,
+      "relative_reconstruction_error": 2.8895852262160284e-15,
+      "s_sha256": "1c81aaed50b87796b3ad37821913606ea6d2fb70a83f28b07b182a8df26d1858",
+      "shape": [
+        512,
+        256
+      ],
+      "u_sha256": "7cc207a6fdcb2e0d3446fa7646ce4ed4d9137ce43d91a7131024f5f576929f97",
+      "vh_sha256": "c0aa9d926b5cdc74aaaf3df5890d8c345e2cf0f903bde39ec4b4e8c6d3a20199"
+    },
+    "dependency_closures": {
+      "numpy": {
+        "bytes": 56351948,
+        "count": 893,
+        "manifest_sha256": "e6aa4a903960766e1b227e6717957d0a62cd8022b7953a38db17a4950b242422"
+      },
+      "stdlib": {
+        "bytes": 34805888,
+        "count": 916,
+        "manifest_sha256": "6275b55cbe4b2a7453542bd2d2f91662bb355c48b4792925d7daeaf0c2ef0f59"
+      }
+    },
+    "dependency_hashes": {
+      "numpy_init": "92a46f791e453926d3292af2582b89995a289475f0eaaea71a949823200b838a",
+      "numpy_multiarray": "2bd8ea4ada756eb29d34bcb5049df8d48710721b57c2c23cbdd87d77cdf5fa77",
+      "numpy_umath_linalg": "d826c92d6a98bda58ddb2f5a6f086d9581937538c2c2aef5b8879ed43282b995",
+      "openblas": "05c9f9eb89ee68a4b9d673184fa91c99587e736392c0c2d49180a8aa5303d080",
+      "python_terminal": "d9b73f600a860cefe799d7b4d21bad64719231227c2cf326ca17ed94624841af",
+      "pyvenv_cfg": "6764aaef5351413f2ae10147dc839f27c7f1af4b9b8300338a402f3ce2f106ff"
+    },
+    "environment": {
+      "BLIS_NUM_THREADS": "1",
+      "HOME": "/nonexistent",
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C.UTF-8",
+      "MKL_NUM_THREADS": "1",
+      "NUMEXPR_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PYTHONHASHSEED": "0",
+      "PYTHONNOUSERSITE": "1",
+      "TZ": "UTC",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    },
+    "lexical_executable": "/home/alex/Documents/prospect/.venv/bin/python",
+    "numpy_version": "2.4.6",
+    "openblas_config": "OpenBLAS 0.3.31.188.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY SkylakeX MAX_THREADS=64",
+    "openblas_core": "SkylakeX",
+    "platform_receipt": "Linux-6.14.0-37-generic-x86_64-with-glibc2.39",
+    "python_version": "3.12.9",
+    "sensitivity_bundles": {
+      "base_2p1p3_threads1": "c0b4b0dde34f85cb8441446f104d1cc4b33fb55c1fe51f7afb709eeb7cf47334",
+      "base_2p1p3_threads16": "ae753e31d8a34268ae356c3216e3647036fff832786c31f59006e9575e129b3f",
+      "venv_2p4p6_threads16": "f6b21b168c3bd999df24b9a940f3d01a178c3429feb7978e5d429445c1dc7865"
+    },
+    "supervisor": {
+      "capture_limit_bytes": 8388608,
+      "cgroup_version": 2,
+      "cleanup_receipt_schema": "lcv001-cgroup-cleanup-v1",
+      "dynamic_operational_environment": [
+        "LCV001_CGROUP_ROLE",
+        "LCV001_CGROUP_UNIT"
+      ],
+      "executables": {
+        "/home/alex/miniconda3/bin/python3.12": {
+          "bytes": 30753048,
+          "mode": 509,
+          "sha256": "d9b73f600a860cefe799d7b4d21bad64719231227c2cf326ca17ed94624841af"
+        },
+        "/usr/bin/env": {
+          "bytes": 48072,
+          "mode": 493,
+          "sha256": "0aefff8f912fb75716c5d4de3b6acde93edbe8fa280fc8ee895c1226d3e373ef"
+        },
+        "/usr/bin/systemctl": {
+          "bytes": 1501304,
+          "mode": 493,
+          "sha256": "7ba82b5ba146759c710e1b80fadaa3fdbc0f9b85c8fb2c8c3196b7b1a0037ef8"
+        },
+        "/usr/bin/systemd-run": {
+          "bytes": 68392,
+          "mode": 493,
+          "sha256": "49f0bf95eb8a781b93853bf9fc981b4929dd0009f55a3e6db95534c0a2d11716"
+        }
+      },
+      "kill_mode": "control-group",
+      "kill_signal": "SIGKILL",
+      "loader_environment_overrides": {
+        "LD_AUDIT": "",
+        "LD_LIBRARY_PATH": "",
+        "LD_PRELOAD": ""
+      },
+      "runtime_max_seconds": 180,
+      "schema_version": "lcv001-systemd-cgroup-supervisor-v1",
+      "send_sigkill": true,
+      "unit_prefix": "lcv001-custody"
+    },
+    "symlink_chain": [
+      [
+        "/home/alex/Documents/prospect/.venv/bin/python",
+        "/home/alex/miniconda3/bin/python"
+      ],
+      [
+        "/home/alex/miniconda3/bin/python",
+        "python3.12"
+      ]
+    ]
+  },
+  "schema_version": "lcv001-formal-v1",
+  "semantics": {
+    "matched_identity_sha256": "d4f87867c718370cd925c8dc2a4b01cc89ff4d18f52e9d309f53b5e81e0c8f3b",
+    "matched_rows": 453,
+    "normalizer_order": "select_fold_training_current_indices_before_pool",
+    "normalizer_strides": [
+      768,
+      256,
+      32,
+      4
+    ],
+    "raw_rows": 477,
+    "scope": "frame_and_source_current_normalizer_consistency_only"
+  }
+}

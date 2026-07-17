@@ -74,7 +74,7 @@ Break-one-test experiment (a deliberately failing test added, then reverted):
 RATCHET FAILED — shipped gate(s) regressed: P0    exit≠0
 ```
 
-Green again after revert (exit 0); the green ratchet report is committed as
+Green again after revert (exit 0); the green ratchet report was archived from
 `bench/results/P0-20260703T143627Z.json`. Unit tests cover all exit paths
 (0 all-pass / 0 empty, 1 blocked, 2 malformed SHIPPED). Full suite: 36 passed;
 lint clean.

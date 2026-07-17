@@ -237,3 +237,844 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O17
+    timestamp: "2026-07-14T23:34+02:00"
+    provenance: ai-suggested
+    content: >
+      On frozen PI-003 BridgeControl, compute-matched current-state exact-reference
+      injection improves mean return but reaches only 5/8 positive seeds, 16.28%
+      oracle-gap closure, and 9.38% success; it misses every predeclared rescue threshold
+      and the action-permuted control reaches the same success, rejecting simple native
+      proposal scarcity as the primary fixture blocker.
+    context: >
+      Accepted PI-003 primary-arm decision after full semantic regeneration.
+    potential_type: claim
+    bound_to: [N29, N36, N37]
+    promoted: true
+    promoted_to: "logic/claims.md:C03"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O18
+    timestamp: "2026-07-14T23:34+02:00"
+    provenance: ai-suggested
+    content: >
+      The fixed-start injection trigger is not statewise on PI-003: exact references
+      are selected on 32/32 initial fixed banks, but across 448 online MPC calls only
+      9.598% place an injected reference in the learned first-round top elite, 7.366%
+      make one first-round best, and none retain one as final best.
+    context: >
+      Frozen action-commitment audit underlying the accepted
+      no_privileged_rescue:trigger_not_statewise classification.
+    potential_type: claim
+    bound_to: [N29, N36]
+    promoted: true
+    promoted_to: "logic/claims.md:C04"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O19
+    timestamp: "2026-07-14T23:34+02:00"
+    provenance: ai-suggested
+    content: >
+      The exploratory step pattern may reflect two separable mechanisms: learned-score
+      refinement exploits model error and replaces exact references before the first
+      action, while later visited-state shift removes their first-round ranking
+      advantage from step 2 onward.
+    context: >
+      Post-hoc step stratification selected after the frozen PI-003 decision; no
+      learned-versus-exact candidate-landscape audit has yet run.
+    potential_type: claim
+    bound_to: [N36, N38, N39]
+    promoted: true
+    promoted_to: "trace/exploration_tree.yaml:N45"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O20
+    timestamp: "2026-07-14T23:34+02:00"
+    provenance: ai-suggested
+    content: >
+      Semantic experiment verification should compare regenerated and saved structures
+      through the artifact's exact finite canonical JSON representation, with explicit
+      key ordering for human reports, so mapping order and tuple/list representation do
+      not masquerade as scientific disagreement.
+    context: >
+      PI-001 report-order and PI-002 tuple/list terminal failures followed by the
+      accepted PI-003 canonical semantic verifier.
+    potential_type: heuristic
+    bound_to: [N30, N31, N33, N34, N35, N36]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H05"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O21
+    timestamp: "2026-07-14T23:34+02:00"
+    provenance: ai-suggested
+    content: >
+      PI-001, PI-002, and PI-003 are administrative namespaces for one scientific
+      experiment: outcome-visible verifier repairs require fresh full reruns and
+      preserved hashes, but matching results cannot be counted as independent
+      replication evidence.
+    context: >
+      Two terminal verifier defects and the hash-bound PI-003 administrative rerun.
+    potential_type: constraint
+    bound_to: [N30, N31, N32, N33, N34, N35, N36]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K06"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O22
+    timestamp: "2026-07-14T23:34+02:00"
+    provenance: ai-suggested
+    content: >
+      A swapped-to-matched forward-error ratio floor is not currently a valid U-009
+      identifiability gate because the naive negative control passes more strongly than
+      the decorrelated model despite near-zero action-recovery R-squared.
+    context: >
+      Three-seed in-memory probe-validity pilot; no task or gate implementation was
+      changed and the researcher has not adjudicated the result.
+    potential_type: constraint
+    bound_to: [N40, N41]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O23
+    timestamp: "2026-07-14T23:34+02:00"
+    provenance: ai-suggested
+    content: >
+      Before adding planner compute or a mitigation, retain every iCEM candidate pool
+      at frozen step-0, step-1, and step-2 states and score identical sequences with
+      learned and exact evaluators; require learned-score ascent with exact-score or
+      rank degradation in at least 7/8 seeds to select model-exploitation work.
+    context: >
+      Smallest proposed follow-up after PI-003 rejected simple proposal scarcity and
+      its post-hoc audit separated first-call refinement from later state shift.
+    potential_type: heuristic
+    bound_to: [N36, N38, N39]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H06"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O24
+    timestamp: "2026-07-15T01:56+02:00"
+    provenance: ai-suggested
+    content: >
+      CL-001 does not establish either proposed mechanism as robust across the authored
+      fixture: within-call exploitation supports 6/12 untouched model seeds and
+      visited-state scorer shift supports 3/12, below the frozen descriptive 10/12
+      floor for each endpoint; the accepted classification is
+      neither_mechanism_supported.
+    context: >
+      Frozen one-shot CL-001 result after fast verification, independent artifact
+      audits, and exact full semantic regeneration.
+    potential_type: claim
+    bound_to: [N39, N44, N45]
+    promoted: true
+    promoted_to: "logic/claims.md:C05"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O25
+    timestamp: "2026-07-15T01:56+02:00"
+    provenance: ai-suggested
+    content: >
+      CL-001's adaptive step-0 pools show common but heterogeneous local misranking:
+      B0 is injected in 47/48 calls, C appears later and raises learned score in 48/48,
+      but C materially worsens exact value/rank in 35/48 and improves exact value in
+      11/48. Roundwise median learned/exact Spearman falls 0.744 to 0.376 to 0.319,
+      while changing candidate populations prevent a causal optimizer-exploitation
+      conclusion.
+    context: >
+      Exploratory localization from sealed CL-001 pool rows after applying the frozen
+      seed-level decisions.
+    potential_type: claim
+    bound_to: [N44, N45, N46]
+    promoted: true
+    promoted_to: "logic/claims.md:C06"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O26
+    timestamp: "2026-07-15T01:56+02:00"
+    provenance: ai-suggested
+    content: >
+      The highest-information follow-up is a cross-fitted scorer-swap audit on frozen
+      CL-001 step-0 pools: independent same-data restart models rank each generator's
+      B0 and C, exact simulation adjudicates rank-aggregated choices, and the 11
+      exact-improving calls serve as a negative control. Auditor rejection localizes
+      generator-specific exploitation; auditor agreement localizes shared bias.
+    context: >
+      Next-experiment selection after both CL-001 fixture-wide robustness endpoints
+      failed but adaptive-pool harm remained common and heterogeneous.
+    potential_type: heuristic
+    bound_to: [N44, N45, N46]
+    promoted: true
+    promoted_to: "trace/exploration_tree.yaml:N49"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O27
+    timestamp: "2026-07-15T01:56+02:00"
+    provenance: ai-suggested
+    content: >
+      CL-001's 10/12 thresholds are descriptive model-seed robustness rules, not
+      binomial p-values or evidence of environment-level generality, because all
+      restarts share one authored dataset and each endpoint is a composite mechanism
+      signature with four starts as repeated measures.
+    context: >
+      Frozen protocol boundary retained in the accepted JSON and report after
+      adversarial preflight review removed an invalid sign-null interpretation.
+    potential_type: constraint
+    bound_to: [N44]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K07"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O28
+    timestamp: "2026-07-15T08:13+02:00"
+    provenance: ai-suggested
+    content: >
+      SS-001's pairwise direction control passed all 11 exact-improving calls, but its
+      global 186-candidate rank selector materially degraded C on three calls, leaving
+      3/6 rather than the required 5/6 calibration seeds. Under the frozen branch order,
+      the 24/35 transfer and 25/35 rescue counts cannot support a mechanism claim.
+    context: >
+      Accepted SS-001 auditor_direction_control_failed result after exact full semantic
+      regeneration of all 24 formal models and raw score tensors.
+    potential_type: constraint
+    bound_to: [N46, N48, N49]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K08"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O29
+    timestamp: "2026-07-15T08:13+02:00"
+    provenance: ai-suggested
+    content: >
+      On SS-001's 35 fresh harmful calls, at least 9/12 auditors transferred C on 24,
+      rejected C on three, and the rank selector exactly rescued 25. These directional
+      counts may reflect a shared model-family landscape or finite-panel selection
+      effects, but remain descriptive because the combined calibration gate failed.
+    context: >
+      Post-decision localization of the sealed SS-001 control failure; no threshold or
+      accepted classification was changed.
+    potential_type: claim
+    bound_to: [N48, N49, N50]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O30
+    timestamp: "2026-07-15T09:31+02:00"
+    provenance: ai-suggested
+    content: >
+      Under VP-001's frozen fixed-X sensitivity rule, SS-001's 25 exact-good,
+      old-panel-selected X identities support only 3/11 source generators and 11/25
+      calls, below the required 9/11 seed floor. Their learned preference therefore
+      does not transport robustly to the held-out same-data validator panel.
+    context: >
+      Accepted VP-001 sensitivity-control result after full semantic regeneration and
+      independent exact-package audit.
+    potential_type: claim
+    bound_to: [N48, N52, N53]
+    promoted: true
+    promoted_to: "logic/claims.md:C07"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O31
+    timestamp: "2026-07-15T09:31+02:00"
+    provenance: ai-suggested
+    content: >
+      Preserve validator_fixed_X_sensitivity_control_failed as VP-001's terminal
+      classification. The one reject, one inconclusive, and one transfer target rows
+      are descriptive only and cannot be promoted to heterogeneous_target_failure or
+      either mechanism branch because the 3/11 sensitivity gate precedes them.
+    context: >
+      Frozen control-first decision replay and post-outcome interpretation audit.
+    potential_type: constraint
+    bound_to: [N50, N52, N53]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K09"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O32
+    timestamp: "2026-07-15T09:31+02:00"
+    provenance: ai-suggested
+    content: >
+      The next assay should hold each failed sensitivity state, union, and C fixed,
+      compare old-panel-selected X with an exact-better unselected Y matched on exact
+      delta/rank gain, and add an exact-worse mirror Z. Support selection conditioning
+      only if controls pass, Y reaches 9/11 source-seed support, and X remains below
+      9/11; every other valid result kills that explanation.
+    context: >
+      Highest-information follow-up after VP-001's selected-X sensitivity construct
+      failed while direction and identity controls passed.
+    potential_type: heuristic
+    bound_to: [N52, N53, N54]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O33
+    timestamp: "2026-07-15T09:50+02:00"
+    provenance: ai-suggested
+    content: >
+      The deterministic b1_r1_d8 construction is valid for exact-oracle debugging and
+      fixture-conditional pass/fail statements, but CL-001, SS-001, and VP-001 have
+      reached a same-data evidence ceiling: model restarts trained on the same 896 rows
+      are repeated measurements, not independent data replicates, and cannot establish
+      new-data robustness, model-family rather than dataset-specific bias, prevalence,
+      cross-environment generality, or episode-return improvement.
+    context: >
+      Protocol and implementation audit prompted by the researcher's question about
+      whether the current experiment chain needs a proper dataset.
+    potential_type: constraint
+    bound_to: [N44, N48, N52, N55]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O34
+    timestamp: "2026-07-15T09:50+02:00"
+    provenance: ai-suggested
+    content: >
+      A minimum data-crossed mechanism assay should use 8-12 independent dataset blocks
+      as primary units, disjoint generator/auditor training data and untouched
+      evaluation starts or dynamics per block, at least two model restarts nested
+      within each block, and a preregistered held-out learned-performance control that
+      must pass before mechanism interpretation. Exact dynamics should label outcomes
+      only after freeze; a second simulator or standard benchmark is then required for
+      cross-environment relevance.
+    context: >
+      Proposed evidence upgrade after three same-data restart panels and the earlier
+      BC-001 learned positive-control failure.
+    potential_type: heuristic
+    bound_to: [N15, N52, N54, N55]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O35
+    timestamp: "2026-07-15T10:09+02:00"
+    provenance: ai-suggested
+    content: >
+      A permissively licensed workstation-scale codec stack is available: MIT TAESD
+      for images, MIT TAEHV for causal video, MIT DAC or SNAC for audio, and Apache-2.0
+      T5-Efficient-Tiny or FLAN-T5-Small for text. Freeze these backbones, run them
+      sequentially in the benchmark harness, and train only small modality-to-shared-
+      latent adapters; keep Torch and codec dependencies out of the task-unspecific
+      core.
+    context: >
+      Hardware, repository-interface, current model-card, source-code, parameter,
+      memory, and license audit for a multimodal evidence program.
+    potential_type: architecture
+    bound_to: [N55, N56]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A01"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O36
+    timestamp: "2026-07-15T10:09+02:00"
+    provenance: ai-suggested
+    content: >
+      No pretrained pair plugs directly into Prospect's single shared LatentState:
+      image/video codecs expose spatial or spatiotemporal tensors, audio codecs expose
+      continuous tensors or hierarchical tokens, and T5 decoders condition on token
+      sequences. Thin pooling/projection and inverse adapters remain necessary. A
+      continuous audio latent such as DAC is cleaner for Prospect's diagonal-Gaussian
+      Prediction contract than treating discrete codec indices as Gaussian states.
+    context: >
+      Compatibility audit against interfaces.Codec, UniversalCodec, and the mandatory
+      probabilistic world-model output contract.
+    potential_type: constraint
+    bound_to: [N56]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K10"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O37
+    timestamp: "2026-07-15T10:09+02:00"
+    provenance: ai-suggested
+    content: >
+      Use DeepMind's CC-BY-4.0 Perception Test sample (214.9 MB MP4-with-audio plus
+      3 MB annotations) for integration only, then use its official full train and
+      validation splits for passive multimodal predictive evidence. It supplies real
+      video, audio, text questions/answers, object tracks, temporal action/sound
+      segments, and predictive/counterfactual labels, but no agent control actions.
+      MUGEN is the later controlled-world complement, not the first run: its 375K
+      aligned clips are action-rich but the official archive is 126.66 GiB and the
+      majority license is non-commercial.
+    context: >
+      Primary-source audit of small public multimodal datasets, download sizes,
+      licenses, task annotations, and relevance to passive versus action-conditioned
+      world modeling.
+    potential_type: heuristic
+    bound_to: [N55, N56]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O38
+    timestamp: "2026-07-15T13:22+02:00"
+    provenance: ai-suggested
+    content: >
+      Under MM-001's frozen eight-video Perception Test sample protocol, TAESD and SNAC
+      satisfy their representation checks, T5 fails its full parseability criterion,
+      and Prospect does not satisfy the 6/8 real-visual temporal-prediction gate. The
+      accepted result is a failure to establish temporal prediction or modality
+      substitution on this preflight, not evidence that those capabilities are
+      impossible with other data, frontends, or models.
+    context: >
+      One-shot formal MM-001 result after fast verification, full semantic regeneration,
+      and independent post-result package and branch audit.
+    potential_type: claim
+    bound_to: [N58]
+    promoted: true
+    promoted_to: "logic/claims.md:C08"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O39
+    timestamp: "2026-07-15T16:23+02:00"
+    provenance: ai-suggested
+    content: >
+      On MM-001's exact eight-video feature package, MM-002 found 0/8 support for all
+      tested world horizons and update budgets, 0/8 raw linear predictability at all
+      three horizons, and no 6/8 codec rescue. The nominal representation-integrity
+      precondition failed, so the accepted result is an inconclusive factor diagnostic,
+      not evidence that horizon, compute, update order, shared training, or temporal
+      information is generally irrelevant.
+    context: >
+      Formal MM-002 result after exact parent parity, fast verification, full semantic
+      retraining, focused checks, and independent scientific and package audits.
+    potential_type: claim
+    bound_to: [N61]
+    promoted: true
+    promoted_to: "logic/claims.md:C09"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O40
+    timestamp: "2026-07-15T17:27+02:00"
+    provenance: ai-suggested
+    content: >
+      On MM-001's exact eight-video raw TAESD package, MM-003 found 0/8 support for
+      absolute and persistence-aware residual linear prediction in all six tested
+      representations, including direct raw 256-D latents. Post-z, orthonormalization,
+      and PCA-to-32 also produced no healthy 6/8 world rescue, so the tested projection
+      and scale factors are not supported as proximate fixes at the frozen margins.
+    context: >
+      Accepted MM-003 result after exact raw/projection alignment, exact MM-002 parent
+      parity, fast verification, full semantic regeneration, and independent pre-marker
+      science and lifecycle/security audits.
+    potential_type: claim
+    bound_to: [N62, N64, N65]
+    promoted: true
+    promoted_to: "logic/claims.md:C10"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O41
+    timestamp: "2026-07-15T17:27+02:00"
+    provenance: ai-suggested
+    content: >
+      The next smallest discriminating assay should preserve each TAESD latent as a
+      `[4, 8, 8]` grid, expose current-minus-previous spatial changes to a tiny
+      structured predictor, and require both a synthetic-motion positive control and a
+      temporal-shuffle negative control before interpreting the eight real videos.
+    context: >
+      Next-experiment selection after MM-003 closed flat projection, score scaling,
+      basis conditioning, and unsupervised PCA as supported immediate fixes without
+      ruling out nonlinear, spatial, history-aware, or more dynamic-data explanations.
+    potential_type: heuristic
+    bound_to: [N64, N65, N66]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H07"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O42
+    timestamp: "2026-07-15T18:49+02:00"
+    provenance: ai-suggested
+    content: >
+      On MM-001's exact eight-video grids, MM-004's synthetic assay passed all 24
+      conditions, source-pixel activity passed 8/8, and every TAESD and pixel local
+      arm plus constant velocity supported 0/8. The accepted bounded branch is
+      tested_local_objective_or_horizon_failure_supported: the frozen one-second
+      local-linear assay is inadequate at its preregistered margins, without proving
+      that objective or horizon is the unique cause.
+    context: >
+      Accepted MM-004 result after exact parent parity, 71 premarker tests, two
+      independent GO reviews, fast verification, full semantic regeneration, and two
+      independent post-outcome causal-boundary audits.
+    potential_type: claim
+    bound_to: [N66, N67, N68, N69]
+    promoted: true
+    promoted_to: "logic/claims.md:C11"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O43
+    timestamp: "2026-07-15T18:49+02:00"
+    provenance: ai-suggested
+    content: >
+      Treat MM-004's terminal branch as a residual disjunction, not unique causal
+      evidence. Source activity rules out only frozen source inactivity; it does not
+      distinguish horizon, objective, locality, nonlinearity, observability, aliasing,
+      stochasticity, or concurrent representation limitations. The recommendation to
+      change horizon/objective before data is a priority ordering, not causal proof.
+    context: >
+      Post-outcome branch audit after all arms failed while activity passed and weak
+      subthreshold prediction remained in both representations.
+    potential_type: constraint
+    bound_to: [N68, N69, N70]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K11"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O44
+    timestamp: "2026-07-15T18:49+02:00"
+    provenance: ai-suggested
+    content: >
+      The fastest next discriminant is a matched pure-NumPy 0.5-second versus
+      1.0-second replay on the common 453 causal grid rows, holding folds,
+      normalization, spatial features, ridge objective, controls, and support gates
+      fixed. A short-horizon pass with a matched one-second strong fail supports a
+      one-step rollout fix; failure at both active-pixel horizons redirects to a
+      causal-warp or nonlinear objective.
+    context: >
+      Convergent independent post-outcome recommendations motivated by negative
+      past/future delta cosine on every video and constant velocity at 3.45-5.56 times
+      persistence.
+    potential_type: heuristic
+    bound_to: [N68, N69, N70]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H08"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O45
+    # CONFLICT: see logic/claims.md:C03 and trace/exploration_tree.yaml:N72
+    timestamp: "2026-07-15T19:13+02:00"
+    provenance: ai-suggested
+    content: >
+      PI-003's exact-reference injection failure shows that simple native-proposal
+      scarcity was not sufficient to explain or rescue failure under the frozen
+      authored-fixture protocol; it does not establish that scarcity was not the
+      primary contributing failure source.
+    context: "Bounded forward test independently confirmed the raw-row arithmetic, frozen thresholds, and equal evaluation budgets but found C03's causal wording stronger than the intervention supports."
+    potential_type: claim
+    bound_to: [N36, N37, N71, N72]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O46
+    timestamp: "2026-07-15T20:06+02:00"
+    provenance: ai-suggested
+    content: >
+      On the exact 453-row matched MM-005 panel, both frozen `3x3` local-linear
+      residual arms support 0/8 in TAESD and source pixels at both 0.5 and 1.0
+      seconds, and paired half-horizon advantage supports 0/8 in every arm/domain.
+      The synthetic controls pass, target-null support is 0/8, and central
+      half-second pixel activity supports 7/8. Halving the target horizon therefore
+      does not rescue this tested family on the reused eight outcome-visible videos.
+    context: >
+      Accepted after one formal run, exact parent/alignment parity, fast and semantic
+      verification of all 200 fits, MM-001 through MM-004 reverification, and three
+      independent post-outcome arithmetic, lifecycle, and protocol-parity audits.
+    potential_type: claim
+    bound_to: [N70, N73, N74, N75]
+    promoted: true
+    promoted_to: "logic/claims.md:C12"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O47
+    timestamp: "2026-07-15T20:06+02:00"
+    provenance: ai-suggested
+    content: >
+      The next discriminating visual assay should compare persistence, a causal
+      previous-to-current translation or flow applied to current, and a clearly
+      target-leaking current-to-future oracle-warp ceiling on MM-005's matched
+      half-second panel. Retain a moving-texture synthetic positive control and a
+      shuffled-history negative control. Oracle success with causal failure points to
+      insufficient temporal state or conditioning; oracle failure points to
+      non-transport appearance, resolution, occlusion, or frontend limitations.
+    context: >
+      MM-005 ruled out horizon shortening for the tested local-linear family but did
+      not establish a working nonlinear fix or teacher-free rollout capability.
+    potential_type: heuristic
+    bound_to: [N74, N75, N76]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H09"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O48
+    timestamp: "2026-07-15T23:59+02:00"
+    provenance: ai-suggested
+    content: >
+      On MM-005's exact 453 half-second rows, MM-006's valid synthetic and null
+      controls coexist with 0/8 support for every target-aware, causal, and source
+      global/quadrant translation arm in pixels and TAESD. The tested discrete 8x8
+      translation ceiling fails without establishing failure of pixel transport,
+      deformation, appearance, visibility, or causal prediction broadly.
+    context: >
+      Accepted after one formal run, package and semantic verification, parent parity,
+      and independent arithmetic, lifecycle, and scientific claim-boundary audits.
+    potential_type: claim
+    bound_to: [N76, N78, N79]
+    promoted: true
+    promoted_to: "logic/claims.md:C13"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O49
+    timestamp: "2026-07-15T23:59+02:00"
+    provenance: ai-suggested
+    content: >
+      On the same eight videos and 453 transitions, increasing physical RGB resolution
+      from R8 to R16/R32/R64 does not recover the frozen global/four-quadrant
+      translation ceiling: every higher-resolution primary quadrant arm improves 0/8
+      and supports 0/8. R32/R64 relative passes are attenuation toward persistence,
+      not absolute recovery.
+    context: >
+      Accepted MM-007 result after exact authenticated frames, one formal run, clean
+      controls/nulls, canonical fast verification, full media-redecode semantic replay,
+      and independent arithmetic/package/science audits.
+    potential_type: claim
+    bound_to: [N80, N81]
+    promoted: true
+    promoted_to: "logic/claims.md:C14"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O50
+    timestamp: "2026-07-15T23:59+02:00"
+    provenance: ai-suggested
+    content: >
+      A valid MM-008 v2 should use paired affine vector-block search and probes,
+      broadband geometry controls, exact raw stationary identity, scenario-specific
+      conditional dominance, and retained-cell/objective/endpoint evidence before any
+      real-video target-aware score is allowed.
+    context: >
+      Proposed repair after the frozen v1 synthetic calibration failed structurally
+      and 13 tests reproduced the no-go without exposing real outcomes.
+    potential_type: heuristic
+    bound_to: [N82, N83, N84]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O51
+    timestamp: "2026-07-15T23:59+02:00"
+    provenance: ai-suggested
+    content: >
+      Persistence is not a valid absolute independent-target null for unrestricted
+      gain/bias appearance fitting. With independent equal-variance source and target,
+      gain near zero plus a fitted target mean has expected residual near one variance
+      versus roughly two for source persistence; use a cross-fitted constant/shrinkage
+      comparator and pairing controls instead.
+    context: >
+      MM-008 v1 independent controls produced false complete support, and independent
+      scientific review supplied the matching squared-error calculation.
+    potential_type: constraint
+    bound_to: [N82, N83]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K12"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O52
+    timestamp: "2026-07-16T15:03+02:00"
+    provenance: ai-suggested
+    content: >
+      On the exposed PCG64(12345) fixtures, the exact-global MM-008 v2.2 scientific
+      core completes all 48 rows and 630 grid contexts, satisfies every authored bank
+      expectation, and regenerates the complete accepted evidence graph bit-for-bit.
+      Independent scalar-oracle coverage is exactly 22 contexts; 608 contexts remain
+      production-only, and no formal or general capability conclusion follows.
+    context: >
+      Development result after exact basin enumeration, complete baseline and optimized
+      recollections, exhaustive transpose parity, independent audits, and a final
+      185-pass integrated gate.
+    potential_type: claim
+    bound_to: [N87, N88, N89, N91]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O53
+    timestamp: "2026-07-16T15:03+02:00"
+    provenance: ai-suggested
+    content: >
+      When an expensive metamorphic control retains a declared subset, implement a
+      closed selective path for only that subset and require exhaustive bit-level
+      equivalence to the legacy superset before adopting it. Report exact removed work
+      separately from single-run wall-clock changes.
+    context: >
+      MM-008 selective transpose matched all 108 normative contexts while removing 228
+      unused contexts and 640,452 exact candidate reductions; before/after timing had
+      only one observation per implementation.
+    potential_type: heuristic
+    bound_to: [N89]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H10"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O54
+    timestamp: "2026-07-16T15:03+02:00"
+    provenance: ai-suggested
+    content: >
+      Equal complete-evidence roots across two administrative fresh processes establish
+      only alias-insensitive bit-value reproducibility for the executed source, machine,
+      environment, config token, exposed seed, and hash seeds. They are not independent
+      replication, sealed evidence, actual config authentication, cross-machine
+      portability, unseen-seed generalization, or capability support.
+    context: >
+      Clean-process runs at PYTHONHASHSEED 0 and 4294967295 produced the identical root
+      9044c630ae5b64119914fe42caf631ef33a9fac89dc05f9675be67c193016fa4.
+    potential_type: constraint
+    bound_to: [N91]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K13"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O55
+    timestamp: "2026-07-16T15:03+02:00"
+    provenance: ai-suggested
+    content: >
+      Development schema primitives cannot authorize MM-008 formal config/output
+      emission until exhaustive output roles, record/context grammar, branch identity,
+      and native runtime bindings are supplied by an authoritative artifact. Syntactic
+      config hashes and ephemeral evidence must remain non-formal.
+    context: >
+      The adversarial schema model passed, but independent contract review found the
+      protocol underdetermines a unique formal schema and runtime policy.
+    potential_type: constraint
+    bound_to: [N90]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K14"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O56
+    timestamp: "2026-07-16T15:03+02:00"
+    provenance: ai-suggested
+    content: >
+      A minimal AIDE-lite pilot should compare the current sequential research policy
+      with at most three independently continuing lineages allocated by a frozen bandit
+      and fork-on-stall rule. Equal hard token/CPU budgets, isolated task capsules,
+      immutable solution-only diffs, and a one-shot withheld evaluator must determine
+      whether branch diversity improves valid artifacts rather than public-score gaming.
+    context: >
+      Transfer analysis of Weco's AIDE-squared report, the public AIDE paper/code, and
+      Prospect's existing task, gate, runlog, validator, and ARA machinery. The user
+      asked whether the work could help the model or Codex but did not adopt a pilot.
+    potential_type: architecture
+    bound_to: [N92]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O57
+    timestamp: "2026-07-16T15:28+02:00"
+    provenance: ai-suggested
+    content: >
+      Before retraining MM-001, use the development-validated exact-global fitter as
+      a causal predictor: fit deformation and appearance only from previous to
+      current R64 frames, freeze the prediction, then apply the fitted change to the
+      current frame and score the unseen future. Require synthetic motion/appearance
+      recovery, future-target isolation, history-shuffle and reversal failures, and
+      at least 6/8 videos with the frozen 20% persistence improvement before a new
+      end-to-end training benchmark. Running this on the existing targets would
+      supersede or retire their untouched formal MM-008 target-aware use.
+    context: >
+      Program audit found that v2.2 is unreachable from MM-001, full formalization
+      adds large artifact-integrity machinery without improving the eight-video
+      sample's external validity, and AIDE-squared addresses research orchestration
+      rather than the current model mechanism.
+    potential_type: heuristic
+    bound_to: [N88, N90, N91, N93, N94]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H11"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O58
+    timestamp: "2026-07-16T20:12+02:00"
+    provenance: ai-suggested
+    content: >
+      A hard experiment wall cannot be proven by killing only a lifecycle root's
+      process group or by snapshotting its `/proc` descendants when inner workers may
+      call `setsid`, double-fork, or reparent. Put the complete lifecycle in one
+      OS-owned cgroup, couple runtime expiry and interruption cleanup to that cgroup,
+      and require adversarial normal-exit, reparenting, and interruption tests.
+    context: >
+      The first MM-009 outer supervisor lost both a normal-exit nested session and a
+      double-forked timeout orphan. The replacement transient user-systemd service
+      contained both cases plus SIGINT cleanup, and the final implementation now
+      rejects direct in-process lifecycle bypass.
+    potential_type: constraint
+    bound_to: [N96, N97, N98]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K15"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O59
+    timestamp: "2026-07-17T03:05+02:00"
+    provenance: ai-suggested
+    content: >
+      On the frozen six-cell synthetic-target-only MM-011 panel, the exact v2.2
+      coarse-grid candidate passed activity, historical identification, forward
+      persistence improvement, and exact replay in all cells, and passed directionality
+      for A1-A3, but failed directionality for T1-T3 with reversal ratios 0.59482,
+      0.69081, and 0.75176 against a required value greater than 0.8. The protocol
+      decision is `ABANDON_FINITE_GRID_BEFORE_REAL_DATA`; this does not reject all
+      finite grids, continuous registration, motion prediction, or model capability.
+    context: >
+      Immutable audit and semantic receipts, separate point-loop input regeneration,
+      arithmetic replay, file-open tracing, and a clean bit-exact process reproduction.
+    potential_type: claim
+    bound_to: [N103, N104]
+    promoted: true
+    promoted_to: "logic/claims.md:C15"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O60
+    timestamp: "2026-07-17T03:05+02:00"
+    provenance: ai-suggested
+    content: >
+      Before promoting an image-registration predictor on forward persistence gain,
+      apply its repeated-direction forecast to a previous-as-future reversal and
+      require it to lose the declared improvement margin. Run this control on off-grid
+      generated motion before opening scarce real targets.
+    context: >
+      MM-011 translation cells looked strong forward but also predicted backward;
+      their nondirectional interpolation signature killed the candidate before real data.
+    potential_type: heuristic
+    bound_to: [N103, N104]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H12"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O61
+    timestamp: "2026-07-17T03:05+02:00"
+    provenance: ai-suggested
+    content: >
+      A canonical formal or semantic result is not self-authenticating when cleanup is
+      returned only through ephemeral supervisor output, cannot be cross-linked to the
+      actual child unit, or runs through live repository/bytecode imports that are not
+      in the reviewed source closure. Durable cleanup and executed controller bytes
+      are part of canonical scientific truth.
+    context: >
+      Independent pre-real code review of the unexecuted MM-011 harness after LCV
+      rehosting; the scientific candidate was separately abandoned before real data.
+    potential_type: constraint
+    bound_to: [N102]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K16"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O62
+    timestamp: "2026-07-17T03:05+02:00"
+    provenance: ai-suggested
+    content: >
+      The next generated successor should compare continuous/subpixel translation and
+      continuous affine refinement with the frozen coarse-grid reference, using fresh
+      development seeds and untouched confirmation seeds. It should preserve activity,
+      historical, forward, reversal, identity, and low-texture predicates and classify
+      failures as optimizer error, non-identifiability, or nondirectional smoothing.
+    context: >
+      Research proposal after the exact coarse grid failed the preregistered translation
+      directionality cells. No continuous-registration implementation has run yet.
+    potential_type: architecture
+    bound_to: [N105]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

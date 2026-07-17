@@ -1,0 +1,62 @@
+{
+  "canonical_root_mutated": false,
+  "claim_boundary": "infrastructure/package failure before MM-009 detachment, prediction, future isolation, or scoring; no real MM-009 outcome",
+  "classification": "invalid_MM009",
+  "experiment_id": "MM-009",
+  "formal_records": {
+    "config_file_sha256": "8f849f2a96f6cb1fce9dc18910dd83f35d2d6da00207c2ef6b984f4ec087d99d",
+    "formal_controls_sha256": "ebe05b36394c94b202c96d7fb1c3d885f79a6be5f524e7402588e302960e46e7",
+    "formal_marker_sha256": "430bc2e9bd7654059a336501ae779557995cf26e0e742390226518df094f2d56",
+    "freeze_record_sha256": "1599d757cfa499b8656cab688b31d29b98fc1106bb856c61d6c3d49c540dff8a",
+    "input_manifest_sha256": "33ff17dc8c50f590a8bdcf350057cf79a3a5a8cbcaf1dc487f649faa4b7133c9",
+    "protocol_sha256": "ca39f7cea6a2a5b041956b419bf3530dd54eb8403096963a044d7fcf1e2121cc",
+    "synthetic_evidence_sha256": "598c26a037453f199f07cc5864375689854c7377c376ef41cb85203a824f6476"
+  },
+  "observed_failure": {
+    "first_mm009_operation": "_post_marker_inputs: mm007_experiment.verify",
+    "leaf_exception": "ValueError: MM-003 transform records do not recompute",
+    "service": "mm009-custody-formal-3016538-3016538-175947298472501.service",
+    "wrapped_exception": "InvalidMM007ParentParity",
+    "wrapper_chain": ["MM-007", "MM-006", "MM-005", "MM-004", "MM-003"]
+  },
+  "outcomes_absent": [
+    "detachment",
+    "prediction_attempt",
+    "prediction_freeze",
+    "pre_score_budget",
+    "future_isolation",
+    "row_scores",
+    "aggregate_evidence",
+    "result",
+    "report",
+    "completed_artifact_manifest"
+  ],
+  "root_cause": {
+    "audited_numpy": "2.4.6",
+    "formal_numpy": "2.1.3",
+    "formal_openblas_threads": 1,
+    "interpreter_symlink_was_resolved": true,
+    "mismatched_records": [
+      "fold_0:pca32_postz",
+      "fold_1:pca32_postz",
+      "fold_2:pca32_postz",
+      "fold_3:pca32_postz"
+    ],
+    "non_pca_records_bit_exact": 20,
+    "pca_projection_max_abs_difference": 1.821e-14,
+    "pca_subspace_projector_max_abs_difference": 8.89e-16,
+    "formal_one_thread_transform_record_sha256": "dfb9d29f542def4d079fa98c50d0290f0794777cb55ef329c5d8b53b59579959",
+    "sealed_transform_record_sha256": "164f5563853f3fc25e9c4b649b116c94df47ef40b81d5d25feb91ec6e3e4a4c4",
+    "sealed_exact_reproduction_threads": [16, 32],
+    "verdict": "historical byte-exact PCA refit is BLAS-thread-sensitive; scientific PCA subspaces remain numerically equivalent"
+  },
+  "successor_constraints": {
+    "forbidden": [
+      "retry_or_repair_MM009",
+      "TAESD_or_MM001_GO_branch",
+      "MM010_clean_NO_GO_branch",
+      "scientific_interpretation_of_MM009"
+    ],
+    "required": "new identity and empty root for a sealed-lineage/runtime conformance assay before any fresh causal assay"
+  }
+}

@@ -13,12 +13,16 @@ agent. This file is the contract for how to work here. Read it fully before edit
   deferred ones (U-101…U-112) with the trigger that promotes each. Consult it before
   proposing to swap a component "for a newer one" — the review likely already weighed it.
 
-## Research-ideation route
+## Research skill routes
 - **prospect-research-ideation** — For novel, unconventional, cross-domain, or
   potentially publishable research directions, load
   `.agents/skills/prospect-research-ideation/SKILL.md`. The skill proposes and
   adversarially audits candidates; a selected idea must enter the task, ADR, and
   benchmark-gate workflow below before implementation.
+- **prospect-results-audit** — For a referee/scientist pass over gate, experiment,
+  capability, or causal-mechanism claims, load
+  `.agents/skills/prospect-results-audit/SKILL.md`. Run it after evidence sessions,
+  before phase/default/claim promotion, and when reviewing a results-bearing change.
 
 ## The one idea you must not break
 A predictive world model is the spine; **prediction error (violation of
@@ -43,6 +47,11 @@ yourself returning a raw `float` where a `Prediction` belongs — stop.
    `Provenance` with a `Trust` level. Untrusted content is *data, never
    instruction*: it must never override the agent's goals (ADR-0004).
 6. **Decisions → ADRs. Work → task files. Ship → docs-sync.** (below)
+7. **Git is source-only.** Keep implementation, tests, tasks, ADRs, authored protocols
+   and audit narratives, and checksum pointers in Git. Generated benchmark results,
+   ARA evidence, fixtures/data, copied runtimes, and every binary or packaged payload
+   stay outside Git under the ignore policy in `.gitignore` (ADR-0013). Pointers live
+   under `artifact-pointers/`, outside ignored result roots.
 
 ## Workflow (one loop per unit of work)
 - **task-workflow** — Take the top *unblocked* item in `tasks/BACKLOG.md`. Open its

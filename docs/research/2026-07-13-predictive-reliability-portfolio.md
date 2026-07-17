@@ -37,7 +37,7 @@ adaptive conformal thresholds, reservoir replay, and distance-kernel top-three
 retrieval (tasks/BACKLOG.md:199-221). The authored gates report strong narrow
 capabilities: for example, the P1 one-step model beats persistence and ridge, P2 MPC
 beats matched CEM-ES on authored Pendulum, P5 hierarchy beats a compute-matched flat
-planner, and P8 gated retrieval improves prediction. These are committed results, not
+planner, and P8 gated retrieval improves prediction. These are archived results, not
 fresh runs in this research turn.
 
 The honest foreign-environment probe is mixed. At 4,096 steps, DMC cartpole balance
@@ -134,7 +134,7 @@ to a different artifact.
 7. A scalar uncertainty magnitude identifies the cause of unreliability.
 8. A phase-level sentinel result is evidence about the artifact earning the phase.
 
-### 2.3 Reproducible computation on committed evidence
+### 2.3 Reproducible computation on archived evidence
 
 The reusable prompt required a direct computation before candidate selection. I read
 bench/hard/results/BH-001-report.json and paired the three random and three curious

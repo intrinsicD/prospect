@@ -1,0 +1,930 @@
+session:
+  id: "2026-07-15_001"
+  date: "2026-07-15"
+  started: "2026-07-15T01:56+02:00"
+  last_turn: "2026-07-15T23:59+02:00"
+  turn_count: 13
+  summary: "Sealed and audited MM-006/MM-007, rejecting discrete translation and resolution-only fixes, then stopped MM-008 v1 at a reproducible synthetic-control no-go before real scoring."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: N43
+    routing: direct
+    provenance: user
+    summary: "Directed execution of the next evidence-grounded experiment after accepted PI-003."
+  - turn: 1
+    type: experiment
+    id: N44
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran and semantically reproduced CL-001 on eight replay and 12 untouched confirmatory seeds."
+  - turn: 1
+    type: dead_end
+    id: N45
+    routing: direct
+    provenance: ai-suggested
+    summary: "Rejected the PI-003 post-hoc split as two fixture-wide robust mechanisms under frozen rules."
+  - turn: 1
+    type: question
+    id: N46
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened cross-fitted scorer adjudication of generator-specific versus shared candidate misranking."
+  - turn: 1
+    type: observation
+    id: O19
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the refuted robust two-mechanism hypothesis as dead end N45 via empirical resolution."
+  - turn: 1
+    type: observation
+    id: O23
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized adaptive-pool dual scoring as H06 after CL-001 committed it to code and evidence."
+  - turn: 1
+    type: observation
+    id: O24
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the frozen neither-mechanism decision as fixture-scoped claim C05."
+  - turn: 1
+    type: observation
+    id: O25
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged common but seed-by-start heterogeneous adaptive-pool misranking."
+  - turn: 1
+    type: observation
+    id: O26
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged a cross-fitted scorer-swap audit as the highest-information next experiment."
+  - turn: 1
+    type: observation
+    id: O27
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized CL-001's descriptive-not-inferential threshold boundary as K07."
+  - turn: 2
+    type: decision
+    id: N47
+    routing: direct
+    provenance: user
+    summary: "Directed execution of the previously proposed scorer-swap experiment."
+  - turn: 2
+    type: experiment
+    id: N48
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran and semantically reproduced SS-001 on 12 fresh generators and 12 disjoint auditors."
+  - turn: 2
+    type: dead_end
+    id: N49
+    routing: direct
+    provenance: ai-suggested
+    summary: "Rejected pairwise calibration as sufficient safety for the 186-candidate mean-rank winner."
+  - turn: 2
+    type: question
+    id: N50
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened held-out validation of SS-001's three calibration-bad frozen winners."
+  - turn: 2
+    type: observation
+    id: O25
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized fresh recurrence of the inherited harmful signature as C06."
+  - turn: 2
+    type: observation
+    id: O26
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the combined scorer-swap selector design as dead end N49 via empirical resolution."
+  - turn: 2
+    type: observation
+    id: O28
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized SS-001's non-interpretability boundary as K08."
+  - turn: 2
+    type: observation
+    id: O29
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged non-interpretable transfer and rescue counts for held-out adjudication."
+  - turn: 3
+    type: decision
+    id: N51
+    routing: direct
+    provenance: user
+    summary: "Directed execution of the proposed frozen-winner held-out validator panel."
+  - turn: 3
+    type: experiment
+    id: N52
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran and semantically reproduced VP-001 with 12 untouched validators over sealed SS-001 unions."
+  - turn: 3
+    type: dead_end
+    id: N53
+    routing: direct
+    provenance: ai-suggested
+    summary: "Rejected old-panel-selected X identities as a stable validator sensitivity control."
+  - turn: 3
+    type: question
+    id: N54
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened matched unselected-pair calibration of old-panel selection conditioning."
+  - turn: 3
+    type: observation
+    id: O30
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized failed selected-X transport under the frozen sensitivity rule as C07."
+  - turn: 3
+    type: observation
+    id: O31
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized VP-001 target non-interpretability after control failure as K09."
+  - turn: 3
+    type: observation
+    id: O32
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged matched unselected exact-better and exact-worse pair calibration."
+  - turn: 4
+    type: question
+    id: N55
+    routing: direct
+    provenance: user
+    summary: "Asked whether the current mechanism experiments require a proper dataset."
+  - turn: 4
+    type: observation
+    id: O33
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the boundary between legitimate fixture diagnostics and unsupported independent-data claims."
+  - turn: 4
+    type: observation
+    id: O34
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged an 8-12-block data-crossed mechanism design with nested model restarts and a held-out positive control."
+  - turn: 5
+    type: question
+    id: N56
+    routing: direct
+    provenance: user
+    summary: "Asked for tiny open multimodal encoder-decoder pairs and a public test dataset that fit the workstation."
+  - turn: 5
+    type: observation
+    id: O35
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged a permissive TAESD/TAEHV/DAC-or-SNAC/T5 frozen-backend architecture."
+  - turn: 5
+    type: observation
+    id: O36
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the structured-codec-latent adapter requirement and Gaussian-contract boundary."
+  - turn: 5
+    type: observation
+    id: O37
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged Perception Test for passive multimodal evidence and MUGEN as a later controlled-world complement."
+  - turn: 6
+    type: decision
+    id: N57
+    routing: direct
+    provenance: user
+    summary: "Adopted the smallest TAESD/SNAC/T5 and Perception Test sample path for a complete real-multimodal preflight."
+  - turn: 6
+    type: experiment
+    id: N58
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran, fast-verified, semantically regenerated, and independently audited formal MM-001."
+  - turn: 6
+    type: observation
+    id: O35
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized the adopted harness-side frozen tiny multimodal architecture as A01."
+  - turn: 6
+    type: observation
+    id: O36
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the structured-codec adapter boundary as K10 through executable artifact commitment."
+  - turn: 6
+    type: observation
+    id: O38
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the verified unsupported visual-temporal branch as fixture-scoped claim C08."
+  - turn: 7
+    type: experiment
+    id: N59
+    routing: direct
+    provenance: ai-executed
+    summary: "Reproduced MM-001 world and decoder-free codec parity bit-for-bit for fold 0 seed 0."
+  - turn: 8
+    type: decision
+    id: N60
+    routing: direct
+    provenance: user
+    summary: "Directed execution of the proposed feature-only MM-002 failure-isolation experiment."
+  - turn: 8
+    type: experiment
+    id: N61
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran, fast-verified, and semantically regenerated the sealed MM-002 horizon/budget/integrity/codec diagnostic."
+  - turn: 8
+    type: question
+    id: N62
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened projection-and-scale localization using the already copied raw 256-D TAESD latents."
+  - turn: 8
+    type: observation
+    id: O39
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized MM-002's no-rescue and representation-integrity boundary as fixture-scoped claim C09."
+  - turn: 9
+    type: decision
+    id: N63
+    routing: direct
+    provenance: user
+    summary: "Directed execution of the proposed MM-003 projection/scale isolation and diagnosis."
+  - turn: 9
+    type: experiment
+    id: N64
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran, fast-verified, and semantically regenerated the sealed MM-003 transform/probe/world diagnostic."
+  - turn: 9
+    type: dead_end
+    id: N65
+    routing: direct
+    provenance: ai-suggested
+    summary: "Rejected scaling, fixed-basis conditioning, random 32-D subspace choice, and PCA-to-32 as supported immediate fixes."
+  - turn: 9
+    type: question
+    id: N66
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened a positive-controlled spatial and frame-difference TAESD assay."
+  - turn: 9
+    type: observation
+    id: O40
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized MM-003's bounded no-projection/scale-fix result as C10."
+  - turn: 9
+    type: observation
+    id: O41
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the structured spatial/history-aware follow-up without committing it to implementation."
+  - turn: 10
+    type: decision
+    id: N67
+    routing: direct
+    provenance: user
+    summary: "Directed execution of the proposed MM-004 spatial/history/source-pixel diagnostic and requested a defensible fix."
+  - turn: 10
+    type: experiment
+    id: N68
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran, fast-verified, and semantically regenerated the sealed MM-004 local-grid diagnostic."
+  - turn: 10
+    type: dead_end
+    id: N69
+    routing: direct
+    provenance: ai-suggested
+    summary: "Rejected a larger spatial/history adapter or isolated TAESD replacement as the supported immediate fix."
+  - turn: 10
+    type: question
+    id: N70
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened a matched half-second versus one-second horizon replay on 453 common causal rows."
+  - turn: 10
+    type: observation
+    id: O41
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized positive-control/shuffle/source triangulation before scaling as H07."
+  - turn: 10
+    type: observation
+    id: O42
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized MM-004's bounded one-second local-predictor failure as C11."
+  - turn: 10
+    type: observation
+    id: O43
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the residual-disjunction causal boundary as K11."
+  - turn: 10
+    type: observation
+    id: O44
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the matched half-horizon replay without user adoption or artifact commitment."
+  - turn: 11
+    type: experiment
+    id: N71
+    routing: direct
+    provenance: ai-executed
+    summary: "Forward-tested the new audit rubric and independently confirmed PI-003's arithmetic, budgets, and failed rescue thresholds."
+  - turn: 11
+    type: observation
+    id: O45
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the narrower intervention-sufficiency conclusion in conflict with C03's primary-source causal wording."
+  - turn: 11
+    type: decision
+    id: N72
+    routing: direct
+    provenance: ai-suggested
+    summary: "Left the PI-003 causal-wording conflict unresolved pending researcher adjudication or stronger identification evidence."
+  - turn: 12
+    type: decision
+    id: N73
+    routing: direct
+    provenance: user
+    summary: "Directed execution of the proposed matched half-horizon diagnostic to isolate the visual failure."
+  - turn: 12
+    type: experiment
+    id: N74
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran, sealed, semantically regenerated, and independently audited MM-005 on 453 matched causal rows."
+  - turn: 12
+    type: dead_end
+    id: N75
+    routing: direct
+    provenance: ai-suggested
+    summary: "Rejected halving the horizon as the immediate fix for the tested local-linear family."
+  - turn: 12
+    type: question
+    id: N76
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened a causal-warp assay with a target-informed oracle ceiling to isolate transport from history sufficiency."
+  - turn: 12
+    type: observation
+    id: O44
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized matched-row, persistence-normalized horizon replay as H08 after MM-005 artifact commitment."
+  - turn: 12
+    type: observation
+    id: O46
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized MM-005's bounded no-half-horizon-rescue result as C12."
+  - turn: 12
+    type: observation
+    id: O47
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the causal-warp/oracle-ceiling decision tree without claiming a working fix."
+  - turn: 13
+    type: decision
+    id: N77
+    routing: direct
+    provenance: user
+    summary: "Directed autonomous evidence-led debugging through midnight without relaxing controls."
+  - turn: 13
+    type: experiment
+    id: N78
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran and audited MM-006, finding 0/8 support for every tested discrete oracle/causal/source warp arm."
+  - turn: 13
+    type: dead_end
+    id: N79
+    routing: direct
+    provenance: ai-suggested
+    summary: "Rejected the tested 8x8 global/quadrant translation family as the immediate visual fix."
+  - turn: 13
+    type: experiment
+    id: N80
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran, semantically replayed, and independently audited the R8-R64 MM-007 physical-resolution ladder."
+  - turn: 13
+    type: dead_end
+    id: N81
+    routing: direct
+    provenance: ai-suggested
+    summary: "Rejected resolution alone as sufficient to recover the frozen translation family."
+  - turn: 13
+    type: experiment
+    id: N82
+    routing: direct
+    provenance: ai-executed
+    summary: "Calibrated MM-008 v1 synthetics and reproduced structural optimizer, comparator, and isolation failures before real scoring."
+  - turn: 13
+    type: dead_end
+    id: N83
+    routing: direct
+    provenance: ai-suggested
+    summary: "Rejected scalar affine search, shared low-rank independent textures, and universal 0.90 excluded-arm margins."
+  - turn: 13
+    type: pivot
+    id: N84
+    routing: direct
+    provenance: ai-suggested
+    summary: "Pivoted the pre-real v2 design to paired affine blocks and comparator-matched controls."
+  - turn: 13
+    type: observation
+    id: O48
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized MM-006's bounded discrete-translation ceiling failure as C13."
+  - turn: 13
+    type: observation
+    id: O49
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized MM-007's bounded resolution-only failure as C14."
+  - turn: 13
+    type: observation
+    id: O50
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged paired-block and comparator-matched MM-008 v2 requirements."
+  - turn: 13
+    type: observation
+    id: O51
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the appearance-null comparator constraint as K12."
+
+ai_actions:
+  - turn: 1
+    action: >
+      Grounded the next experiment in PI-003, froze a 12-seed confirmatory protocol,
+      and strengthened it through three independent preflight reviews before formal
+      execution.
+    provenance: ai-executed
+    files_changed:
+      - "bench/candidate_landscape/"
+      - "docs/research/2026-07-15-candidate-landscape-cl001-protocol.md"
+      - "tests/test_candidate_landscape_experiment.py"
+      - "tests/test_candidate_landscape_planner.py"
+  - turn: 1
+    action: >
+      Implemented non-invasive pool capture, identical 40-plus-24 cold banks,
+      candidate identity/lineage evidence, exact trajectory/provider replay, separate
+      learned/oracle accounting, and atomic one-shot packaging without changing the
+      sealed PI-003 planner.
+    provenance: ai-executed
+    files_changed:
+      - "bench/candidate_landscape/"
+  - turn: 1
+    action: >
+      Executed CL-001 once, fast-verified every artifact and derived endpoint, obtained
+      three independent integrity/science GO reviews, and fully regenerated all 20
+      formal seeds to verified_semantic_results.
+    provenance: ai-executed
+    files_changed:
+      - "bench/candidate_landscape/results/CL-001/"
+  - turn: 1
+    action: >
+      Passed the post-result suite with 217 tests and one skip, Ruff, strict mypy over
+      113 source files, whitespace validation, and a final fast artifact verification.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 1
+    action: >
+      Added a forensic CL-001 evidence record and updated the ARA trace, staged
+      observations, claim, heuristic, and interpretation boundary without modifying
+      the sealed experiment package.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 2
+    action: >
+      Strengthened the scorer-swap proposal with fresh generator seeds 32-43, disjoint
+      auditors 20-31, complete CL-001 byte pinning, rank-only all-to-all scoring,
+      calibration precedence, atomic one-shot execution, and semantic regeneration.
+    provenance: ai-executed
+    files_changed:
+      - "bench/scorer_swap/"
+      - "docs/research/2026-07-15-scorer-swap-ss001-protocol.md"
+      - "tests/test_scorer_swap_experiment.py"
+  - turn: 2
+    action: >
+      Executed SS-001 once, obtained auditor_direction_control_failed, fast-verified the
+      sealed package, and regenerated all 24 formal models, pools, fingerprints, parity
+      records, and raw auditor score tensors exactly.
+    provenance: ai-executed
+    files_changed:
+      - "bench/scorer_swap/results/SS-001/"
+  - turn: 2
+    action: >
+      Passed 228 repository tests with one skip, Ruff, strict Mypy over 117 source
+      files, and SS-001-local format checks; preserved the unrelated 87-file repository
+      format baseline without mutation.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 2
+    action: >
+      Added the forensic SS-001 evidence record and updated the ARA trace, recurrence
+      claim, selector dead end, interpretation constraint, staged observation, and next
+      held-out validation question.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 3
+    action: >
+      Froze VP-001 after adversarial scientific and verifier preflight, implemented
+      full-union rank-only scoring for validators 44-55, closed package/result schemas,
+      and added rank, gate, tamper, and one-shot tests without modifying SS-001.
+    provenance: ai-executed
+    files_changed:
+      - "bench/validator_panel/"
+      - "docs/research/2026-07-15-validator-panel-vp001-protocol.md"
+      - "tests/test_validator_panel_experiment.py"
+  - turn: 3
+    action: >
+      Executed VP-001 once, obtained validator_fixed_X_sensitivity_control_failed,
+      fast-verified the closed 25-file package, and semantically regenerated all 12
+      validators, fingerprints, full-union score tensors, ranks, gates, and records.
+    provenance: ai-executed
+    files_changed:
+      - "bench/validator_panel/results/VP-001/"
+  - turn: 3
+    action: >
+      Passed 246 repository tests with one skip, Ruff, strict Mypy over 121 source
+      files, VP-local formatting, and an independent artifact/parent-preservation audit.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 3
+    action: >
+      Added the forensic VP-001 evidence record and updated the ARA trace, failed-
+      transport claim, target-interpretation constraint, and matched-pair follow-up.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 4
+    action: >
+      Audited the authored BridgeControl data generator, model-training reuse, sealed
+      CL-001/SS-001/VP-001 scope statements, and prior BC/BH controls to distinguish
+      fixture-level validity from independent-data and external-validity requirements.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 4
+    action: >
+      Recorded the data-validity question, same-data evidence boundary, and proposed
+      data-crossed follow-up in the research trace without changing any experiment.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 5
+    action: >
+      Audited the workstation, Prospect codec and prediction contracts, current model
+      cards and source repositories, permissive licenses, parameter counts, memory
+      profiles, and public multimodal dataset downloads with independent specialist
+      reviews. The Hugging Face Dataset Viewer API returned HTTP 503, so dataset
+      verification fell back to official cards and project repositories.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 5
+    action: >
+      Recorded the candidate frozen-backend stack, unavoidable adapter boundary, and
+      Perception Test/MUGEN evidence tiers without downloading payloads or changing
+      experiment code.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 6
+    action: >
+      Froze MM-001 before outcomes, staged and hash-authenticated the official eight-
+      video Perception Test sample and exact TAESD, SNAC, and T5 revisions, and built
+      fail-closed mixed CUDA/CPU backends, component controls, whole-video folds,
+      compact evidence packages, fast verification, and full semantic regeneration.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_preflight/"
+      - "docs/research/2026-07-15-mm001-small-real-multimodal-preflight-protocol.md"
+      - "tests/test_multimodal_preflight_backends.py"
+      - "tests/test_multimodal_preflight_core.py"
+      - "tests/test_multimodal_preflight_dataset.py"
+      - "tests/test_multimodal_preflight_experiment.py"
+      - "pyproject.toml"
+      - "Makefile"
+  - turn: 6
+    action: >
+      Closed successive independent preflight blockers before the marker, including
+      authenticated annotations/media, fail-closed causal indices, exact model/GPU
+      contracts, raw projection reconstruction, training-pairing evidence, dtype and
+      token-vocabulary schemas, zero-token T5 failure handling, and the named
+      invalid_MM001_package boundary.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_preflight/"
+      - "docs/research/2026-07-15-mm001-small-real-multimodal-preflight-protocol.md"
+      - "tests/test_multimodal_preflight_experiment.py"
+  - turn: 6
+    action: >
+      Passed 43 focused tests, 288 repository tests with one skip, Ruff, strict Mypy
+      over 131 source files, P9/P13/P14, and all 15 shipped gates before formal start;
+      independent pre-marker review returned GO.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 6
+    action: >
+      Executed formal MM-001 once, obtained
+      real_visual_temporal_prediction_not_supported, fast-verified the exact 14-file
+      package, regenerated all 477 frontend rows and 4x3 fits semantically, and obtained
+      an independent clean post-result artifact and branch audit.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_preflight/results/MM-001/"
+  - turn: 6
+    action: >
+      Added the forensic MM-001 evidence record and updated the ARA trace, architecture,
+      adapter constraint, and fixture-scoped negative claim without changing any bound
+      source, protocol, or formal artifact after execution.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 7
+    action: >
+      Audited MM-001's feature, world-model, temporal-control, codec, row-parity, and
+      copied-package interfaces for the isolated MM-002 runner, then replayed one
+      fold/seed primary fit and a decoder-free codec fit against saved parent evidence.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 8
+    action: >
+      Froze MM-002 after independent scientific and package audits, implemented the
+      isolated checkpointed runner and fail-closed lifecycle, and passed 18 focused
+      tests, Ruff, and strict Mypy over 137 source files without modifying MM-001.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_diagnostics/"
+      - "docs/research/2026-07-15-mm002-feature-only-failure-isolation-protocol.md"
+      - "tests/test_mm002_method.py"
+      - "tests/test_mm002_experiment.py"
+  - turn: 8
+    action: >
+      Executed formal MM-002 once, obtained exact 24-row world and codec parent parity,
+      sealed the 20-artifact package, fast-verified it, semantically retrained every
+      trajectory, and reverified MM-001 unchanged.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_diagnostics/results/MM-002/"
+  - turn: 8
+    action: >
+      Added the forensic MM-002 evidence record, experiment/decision/question trace,
+      and fixture-scoped C09 without changing any MM-002-bound source or formal artifact.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 9
+    action: >
+      Froze MM-003 after independent scientific and lifecycle/security audits,
+      implemented leakage-safe train-fold transforms, scale-invariant absolute and
+      residual probes, four end-to-end world arms, and a fail-closed one-shot package
+      without modifying MM-001 or MM-002.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_transform_diagnostics/"
+      - "docs/research/2026-07-15-mm003-taesd-projection-scale-isolation-protocol.md"
+      - "tests/test_mm003_method.py"
+      - "tests/test_mm003_experiment.py"
+  - turn: 9
+    action: >
+      Passed 24 focused tests, repository-wide Ruff, strict Mypy over 143 source files,
+      whitespace validation, and two independent GO reviews before formal start. A
+      full repository Pytest run was not performed for MM-003.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 9
+    action: >
+      Executed formal MM-003 once, obtained exact raw/projection alignment and parent
+      parity, sealed the 18-artifact package, fast-verified it, semantically regenerated
+      all new computations, and reverified MM-001 and MM-002 unchanged.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_transform_diagnostics/results/MM-003/"
+  - turn: 9
+    action: >
+      Added the forensic MM-003 evidence record, resolved the projection/scale question,
+      recorded the failed fix as a dead end, crystallized C10, and opened the bounded
+      spatial/history-aware follow-up without changing any sealed MM-003 artifact.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 10
+    action: >
+      Froze MM-004 after independent science and lifecycle/security audits, implemented
+      raw-grid spatial/history probes, authenticated source-pixel controls, deterministic
+      synthetic recovery, fail-closed provenance, and an exact one-shot lifecycle
+      without modifying MM-001, MM-002, or MM-003.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_spatial_diagnostics/"
+      - "docs/research/2026-07-15-mm004-spatial-history-signal-isolation-protocol.md"
+      - "tests/test_mm004_method.py"
+      - "tests/test_mm004_experiment.py"
+  - turn: 10
+    action: >
+      Passed 71 focused tests, repository-wide Ruff and formatting, strict Mypy over
+      149 source files, whitespace validation, all three parent verifiers, and two
+      independent final GO reviews before formal start. A full repository Pytest run
+      was not performed for MM-004.
+    provenance: ai-executed
+    files_changed: []
+  - turn: 10
+    action: >
+      Prepared MM-004 without outcomes, executed it exactly once, sealed the 15-file
+      package, fast-verified the accepted branch, semantically regenerated every fit,
+      and reverified MM-001 through MM-003 unchanged.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_spatial_diagnostics/results/MM-004/"
+  - turn: 10
+    action: >
+      Obtained two independent post-outcome audits, added the forensic MM-004 evidence
+      record, resolved the spatial/history question, crystallized C11/H07/K11, and
+      opened the matched half-horizon follow-up without changing any bound MM-004
+      source or formal artifact.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+
+  - turn: 11
+    action: "Adapted the latest results-audit pattern to Prospect with sealed-package semantics, fast/full verifier separation, canonical JSON replay, independent-rerun accounting, equal budgets, gate status inspection, and claim-scope controls; added project routing."
+    provenance: ai-executed
+    files_changed: [".agents/skills/prospect-results-audit/SKILL.md", ".agents/skills/README.md", "CLAUDE.md", "README.md"]
+  - turn: 11
+    action: "Validated the skill schema, routing, and whitespace, then ran the bounded PI-003 forward audit without executing tests or a new experiment."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 12
+    action: >
+      Froze and implemented MM-005 as a matched 0.5-second versus 1.0-second replay
+      with exact parent receipts, dual-horizon synthetic controls, target/history
+      shuffles, fail-closed lifecycle checks, and paired persistence-normalized gates.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_horizon_diagnostics/"
+      - "docs/research/2026-07-15-mm005-matched-half-horizon-replay-protocol.md"
+      - "tests/test_mm005_method.py"
+      - "tests/test_mm005_experiment.py"
+  - turn: 12
+    action: >
+      Passed 70 focused tests, scoped formatting/lint, repository-wide Ruff lint,
+      strict Mypy over 155 source files, whitespace validation, premarker GO reviews,
+      one formal execution, fast and semantic verification, four parent
+      reverifications, and three independent post-outcome audits. A final verifier
+      invocation isolated a `.venv` rejection to two dependency-version leaves; the
+      sealed source-only environment passed with all source and artifact hashes
+      intact. A full repository Pytest run was not performed.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_horizon_diagnostics/results/MM-005/"
+  - turn: 12
+    action: >
+      Added the forensic MM-005 evidence record, resolved the matched-horizon question,
+      recorded horizon shortening as a dead end, crystallized C12/H08, and opened the
+      bounded causal-warp ceiling follow-up without changing sealed experiment files.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 13
+    action: >
+      Implemented, presealed, executed once, sealed, fast-verified, semantically
+      regenerated, and independently audited MM-006 and MM-007 without modifying
+      their bound sources after formal markers.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_warp_diagnostics/"
+      - "bench/multimodal_resolution_diagnostics/"
+      - "docs/research/2026-07-15-mm006-causal-warp-ceiling-protocol.md"
+      - "docs/research/2026-07-15-mm007-physically-matched-resolution-protocol.md"
+      - "tests/test_mm006_method.py"
+      - "tests/test_mm006_experiment.py"
+      - "tests/test_mm007_method.py"
+      - "tests/test_mm007_experiment.py"
+  - turn: 13
+    action: >
+      Froze and adversarially audited MM-008 v1, implemented its NumPy-only method and
+      synthetic controls, passed 13 focused tests plus Ruff/Mypy/pycompile, and stopped
+      before lifecycle or real scoring when calibration exposed structural defects.
+    provenance: ai-executed
+    files_changed:
+      - "bench/multimodal_mechanism_diagnostics/method.py"
+      - "tests/test_mm008_method.py"
+      - "docs/research/2026-07-15-mm008-deformation-appearance-factorial-protocol.md"
+      - "docs/research/2026-07-15-mm008-synthetic-control-no-go.md"
+  - turn: 13
+    action: >
+      Added forensic MM-006/MM-007 evidence, resolved the causal-warp question,
+      crystallized C13/C14/K12, recorded the MM-008 v1 dead end, and opened the bounded
+      paired-block/comparator-matched v2 pivot.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+
+claims_touched:
+  - id: C05
+    action: crystallized
+    turn: 1
+  - id: C06
+    action: crystallized
+    turn: 2
+  - id: C07
+    action: crystallized
+    turn: 3
+  - id: C08
+    action: crystallized
+    turn: 6
+  - id: C09
+    action: crystallized
+    turn: 8
+  - id: C10
+    action: crystallized
+    turn: 9
+  - id: C11
+    action: crystallized
+    turn: 10
+  - id: C03
+    action: weakened
+    turn: 11
+  - id: C12
+    action: crystallized
+    turn: 12
+  - id: C13
+    action: crystallized
+    turn: 13
+  - id: C14
+    action: crystallized
+    turn: 13
+
+key_context:
+  - turn: 1
+    excerpt: "do the next experiment"
+  - turn: 2
+    excerpt: "continue with your proposed next experiment"
+  - turn: 3
+    excerpt: "continue with your proposed next experiment"
+  - turn: 4
+    excerpt: "do we actually need a proper dataset for these experiments?"
+  - turn: 5
+    excerpt: "are there tiny open vision, audio, text and video encoder-decoder pairs we can use ... which public dataset is available?"
+  - turn: 6
+    excerpt: "use the setup that is the absolute fastest (smallest) that we can use to test all our components and the whole thing"
+  - turn: 7
+    excerpt: "do the next experiment"
+  - turn: 8
+    excerpt: "continue with your proposed next experiment"
+  - turn: 9
+    excerpt: "continue with your proposed next experiment ... find exactly what is going on and why it is not working and a good fix"
+  - turn: 10
+    excerpt: "continue with your proposed next experiment ... find exactly what is going on and why it is not working and a good fix"
+  - turn: 11
+    excerpt: "User requested adapting the two latest results-audit skills into Prospect and three peer repositories."
+  - turn: 12
+    excerpt: "continue with your proposed next experiment ... find exactly what is going on and why it is not working and a good fix"
+  - turn: 13
+    excerpt: "use the time and continue with the research/debugging until midnight"
+
+open_threads:
+  - "Freeze and calibrate MM-008 v2 with paired affine blocks, broadband geometry controls, and a constant/shrinkage appearance null before any real-video scoring."
+  - "Choose whether matched-pair calibration is only a final same-data construct check or should be replaced by a data-crossed BridgeControl-v2 assay."
+  - "Use matched unselected exact-better Y and exact-worse Z pairs to test whether old-panel selection conditioning caused VP-001's fixed-X transport failure."
+  - "Determine whether the strong authored-start effect comes from controllable geometry or the nuisance coordinate before changing planner behavior."
+  - "Do not infer that either CL-001 mechanism causes episode-return failure without an intervention arm."
+  - "Keep the k=8 versus k=12 reward/transition-tail interaction open; CL-001 addresses adaptive pools, not oracle-prefix compensation."
+  - "Redesign U-009 so the endpoint-swap probe fails the naive negative control before changing a P13 gate or shipped claim."
+  - "Resolve the original BH-001 transition-support concept and arm confound beyond the stopped BridgeControl factorial."
+  - "Adjudicate N72/O45 against C03: preserve the failed rescue result but decide whether 'not the primary failure source' must narrow to intervention insufficiency."
+
+ai_suggestions_pending:
+  - "Use paired affine block search/probes and comparator-matched synthetic dominance in MM-008 v2; preserve every real-data gate and do not score real targets until controls pass."
+  - "Treat dataset or environment blocks as primary experimental units and nest model restarts within them before making another general mechanism claim."
+  - "Run matched unselected-pair calibration before interpreting VP-001's mixed target rows or claiming shared model-family bias."
+  - "If auditor behavior separates by start, use a later y-by-nuisance factorial rather than post-hoc start labels."
+  - "Retain O16's common-bank oracle-prefix audit as a separate unresolved explanation of the k=8 versus k=12 reversal."
+  - "Redesign and pilot U-009 against both decorrelated and naive controls before implementation."
+  - "Narrow C03's final sentence to 'simple native-proposal scarcity was not sufficient to explain or rescue failure under this protocol' unless stronger causal identification is supplied."

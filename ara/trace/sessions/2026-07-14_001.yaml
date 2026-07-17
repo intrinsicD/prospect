@@ -2,9 +2,9 @@ session:
   id: "2026-07-14_001"
   date: "2026-07-14"
   started: "2026-07-14T01:52+02:00"
-  last_turn: "2026-07-14T07:15+02:00"
-  turn_count: 2
-  summary: "Completed and committed the BC-001/OL-002 research chain, localized material transition and reward stacks, and kept implementation tasks inactive."
+  last_turn: "2026-07-14T23:34+02:00"
+  turn_count: 3
+  summary: "Completed a three-iteration proposal-injection loop, rejected simple proposal scarcity, localized non-statewise transfer, and exposed an invalid U-009 probe criterion."
 
 events_logged:
   - turn: 1
@@ -103,6 +103,138 @@ events_logged:
     routing: direct
     provenance: user
     summary: "Committed every worktree change in experiment-level and research-record boundaries."
+  - turn: 3
+    type: decision
+    id: N28
+    routing: direct
+    provenance: user
+    summary: "Directed creation and execution of a reusable three-iteration repository R&D prompt."
+  - turn: 3
+    type: experiment
+    id: N29
+    routing: direct
+    provenance: ai-executed
+    summary: "Reverified OL-002 and reproduced the 32/32 fixed-bank proposal-injection trigger."
+  - turn: 3
+    type: experiment
+    id: N30
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran PI-001; numeric work completed but terminal report-order verification failed."
+  - turn: 3
+    type: dead_end
+    id: N31
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected insertion-order-dependent report rendering as a valid terminal check."
+  - turn: 3
+    type: pivot
+    id: N32
+    routing: direct
+    provenance: ai-executed
+    summary: "Moved to a hash-bound PI-002 full rerun with canonical report order."
+  - turn: 3
+    type: experiment
+    id: N33
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran PI-002; fast verification passed but raw tuple/list semantic equality failed."
+  - turn: 3
+    type: dead_end
+    id: N34
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected raw language-container equality for JSON artifact semantics."
+  - turn: 3
+    type: pivot
+    id: N35
+    routing: direct
+    provenance: ai-executed
+    summary: "Moved to a full PI-003 rerun with exact finite canonical-JSON comparison."
+  - turn: 3
+    type: experiment
+    id: N36
+    routing: direct
+    provenance: ai-executed
+    summary: "Accepted PI-003 after semantic replay; privileged injection failed every rescue threshold."
+  - turn: 3
+    type: dead_end
+    id: N37
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected simple native proposal scarcity as the primary frozen-fixture blocker."
+  - turn: 3
+    type: experiment
+    id: N38
+    routing: direct
+    provenance: ai-executed
+    summary: "Exploratory step audit isolated step-0 refinement loss and step-2 statewise transfer loss."
+  - turn: 3
+    type: question
+    id: N39
+    routing: direct
+    provenance: ai-suggested
+    summary: "Opened an iteration-wise learned-versus-exact candidate-landscape audit."
+  - turn: 3
+    type: experiment
+    id: N40
+    routing: direct
+    provenance: ai-executed
+    summary: "Piloted U-009 and found its naive negative control passes the proposed ratio more strongly."
+  - turn: 3
+    type: dead_end
+    id: N41
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected the current endpoint-swap error-ratio criterion as a P13 gate."
+  - turn: 3
+    type: experiment
+    id: N42
+    routing: direct
+    provenance: ai-executed
+    summary: "Validated 200 tests with one skip, Ruff, mypy, whitespace, and both PI-003 verifiers."
+  - turn: 3
+    type: observation
+    id: O17
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized fixture-scoped proposal-scarcity rejection as C03."
+  - turn: 3
+    type: observation
+    id: O18
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the fixed-bank versus online statewise-transfer failure as C04."
+  - turn: 3
+    type: observation
+    id: O19
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged model exploitation plus visited-state shift as an exploratory mechanism hypothesis."
+  - turn: 3
+    type: observation
+    id: O20
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized canonical artifact-domain semantic verification as H05."
+  - turn: 3
+    type: observation
+    id: O21
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized one-experiment accounting for PI-001/PI-002/PI-003 as K06."
+  - turn: 3
+    type: observation
+    id: O22
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the U-009 ratio invalidity pending researcher adjudication or a redesigned probe."
+  - turn: 3
+    type: observation
+    id: O23
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the iteration-wise dual-scoring candidate audit as the next smallest experiment."
 
 ai_actions:
   - turn: 1
@@ -163,6 +295,60 @@ ai_actions:
       - "tests/test_oracle_ladder.py"
       - "tests/test_oracle_ladder_v2.py"
       - "ara/"
+  - turn: 3
+    action: >
+      Grounded the live repository, authored a reusable evidence-driven three-iteration
+      R&D prompt, and maintained a durable iteration ledger without changing production
+      source, task state, ADRs, gates, or sealed parent artifacts.
+    provenance: ai-executed
+    files_changed:
+      - "docs/research/2026-07-14-evidence-driven-rd-loop-prompt.md"
+      - "docs/research/2026-07-14-three-iteration-rd-ledger.md"
+  - turn: 3
+    action: >
+      Reproduced the OL-002 injection trigger, implemented a compute-matched
+      exact-reference provider and injectable iCEM research planner, and added focused
+      parity, provider, trigger, experiment, and verifier tests.
+    provenance: ai-executed
+    files_changed:
+      - "bench/proposal_injection/"
+      - "tests/test_proposal_injection_experiment.py"
+      - "tests/test_proposal_injection_planner.py"
+      - "tests/test_proposal_injection_providers.py"
+      - "tests/test_proposal_injection_trigger.py"
+  - turn: 3
+    action: >
+      Preserved PI-001 and PI-002 terminal verifier failures, executed hash-bound full
+      administrative reruns, and accepted PI-003 only after exact canonical semantic
+      regeneration of all formal models and outcomes.
+    provenance: ai-executed
+    files_changed:
+      - "bench/proposal_injection_v2/"
+      - "bench/proposal_injection_v3/"
+      - "docs/research/2026-07-14-pi001-verifier-failure.md"
+      - "docs/research/2026-07-14-pi002-semantic-verifier-failure.md"
+      - "docs/research/2026-07-14-proposal-injection-pi001-protocol.md"
+      - "docs/research/2026-07-14-proposal-injection-pi002-protocol.md"
+      - "docs/research/2026-07-14-proposal-injection-pi003-protocol.md"
+      - "tests/test_proposal_injection_v2.py"
+      - "tests/test_proposal_injection_v3.py"
+  - turn: 3
+    action: >
+      Added an explicitly post-hoc step-stratified commitment audit and ran an
+      independent in-memory U-009 negative-control pilot, leaving both interpretations
+      bounded and keeping U-009 inactive.
+    provenance: ai-executed
+    files_changed:
+      - "bench/proposal_injection/posthoc.py"
+      - "bench/proposal_injection_v3/results/PI-003-posthoc-step-audit.json"
+      - "tests/test_proposal_injection_posthoc.py"
+  - turn: 3
+    action: >
+      Passed the full environment-pinned suite with 200 tests and one skip, Ruff, mypy
+      over 107 source files, git diff whitespace checks, and PI-003 fast and full
+      semantic verification.
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched:
   - id: C01
@@ -171,18 +357,30 @@ claims_touched:
   - id: C02
     action: crystallized
     turn: 1
+  - id: C03
+    action: crystallized
+    turn: 3
+  - id: C04
+    action: crystallized
+    turn: 3
 
 key_context:
   - turn: 1
     excerpt: "Continue with your proposed next experiment. Ground yourself with the current state and the previous prompt for the real research."
   - turn: 2
     excerpt: "commit all changes appropriately"
+  - turn: 3
+    excerpt: "create a prompt to do real research/development in this repository; use that prompt; iterate 3 times"
 
 open_threads:
-  - "Test reward-ranking alignment and learned-tail transition effects on common candidate banks across oracle-prefix depth."
-  - "Keep U-006 inactive until the transition-stack bundle is separated enough to identify an implementation target."
-  - "Do not count OL-001 and OL-002 as independent evidence or infer a minimum recovery depth from their shared outcome."
+  - "Predeclare and run the iteration-wise learned-versus-exact candidate-landscape audit at frozen step-0, step-1, and step-2 states."
+  - "Keep the k=8 versus k=12 reward/transition-tail interaction open; PI-003 rejects simple scarcity but does not explain the reversal."
+  - "Keep U-006 inactive until learned-score exploitation and visited-state shift are separated enough to identify an implementation target."
+  - "Redesign U-009 so the endpoint-swap probe fails the naive negative control before changing a P13 gate or shipped claim."
+  - "Resolve the original BH-001 transition-support concept and arm confound beyond the stopped BridgeControl factorial."
   - "Perform a deeper donor/recipient novelty audit before treating the job-compatibility polytope as N3."
 
 ai_suggestions_pending:
-  - "Run the bounded depth-conditioned reward/transition alignment audit before MuJoCo replication or planner-search intervention."
+  - "Run the bounded iteration-wise learned/exact candidate audit before adding planner compute or a mitigation."
+  - "Redesign and pilot U-009 against both decorrelated and naive controls before implementation."
+  - "Retain O16's common-bank oracle-prefix audit as a separate unresolved explanation of the k=8 versus k=12 reversal."

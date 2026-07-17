@@ -22,8 +22,22 @@ sessions:
     open_threads: 3
   - id: "2026-07-14_001"
     date: "2026-07-14"
-    summary: "Completed and committed BC-001/OL-002, localized transition and reward stacks, and rejected a stable prefix knee."
-    turn_count: 2
-    events_count: 16
-    claims_touched: [C01, C02]
-    open_threads: 4
+    summary: "Completed BC-001/OL-002 and a verified three-iteration PI-003 loop, rejecting simple proposal scarcity and exposing an invalid U-009 probe criterion."
+    turn_count: 3
+    events_count: 38
+    claims_touched: [C01, C02, C03, C04]
+    open_threads: 6
+  - id: "2026-07-15_001"
+    date: "2026-07-15"
+    summary: "Sealed and audited MM-006/MM-007, rejecting discrete translation and resolution-only fixes, then stopped MM-008 v1 at a reproducible synthetic-control no-go before real scoring."
+    turn_count: 13
+    events_count: 78
+    claims_touched: [C03, C05, C06, C07, C08, C09, C10, C11, C12, C13, C14]
+    open_threads: 9
+  - id: "2026-07-16_001"
+    date: "2026-07-16"
+    summary: "Stopped MM-009 as infrastructure-invalid, passed LCV-001 lineage/runtime closure, then rejected MM-011's coarse causal grid on a generated directionality gate before real data."
+    turn_count: 6
+    events_count: 34
+    claims_touched: [C15]
+    open_threads: 3

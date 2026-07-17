@@ -35,8 +35,9 @@ multi-criterion gates aren't forced through a single `metric: float`.
   Same for `SentinelResult`.
 - **Persistence:** `run_gate` writes `bench/results/<phase>-<timestamp>.json`
   (criterion, metrics, pass/health flags, seeds, run-id) and still returns/prints the
-  report. Gitignore `bench/results/`? **No** — results are the record the docs-sync
-  step cites; keep them committed (small JSON).
+  report. Generated reports are ignored and preserved through external artifact
+  storage; docs-sync records the bounded conclusion and external checksum rather than
+  committing run output.
 - **P0 gate:** register it — check = smoke suite green (run `pytest -q` via
   `subprocess`; passed ⇔ exit 0). Roadmap already names this criterion.
 - **Friendly errors:** unknown phase → message listing valid phases, exit nonzero, no
@@ -78,7 +79,8 @@ First passing gate of the project — `make gate PHASE=P0`:
 ```
 
 (The skip is `test_p0_gate_passes_against_real_suite` guarding against recursion
-inside the gate's own pytest run.) Persisted report:
-`bench/results/P0-20260703T133757Z.json` (committed). Friendly-error checks:
+inside the gate's own pytest run.) The persisted local report was
+`bench/results/P0-20260703T133757Z.json`; result trees are now ignored and externally
+archived. Friendly-error checks:
 `make gate PHASE=P9` and bare `make gate` → message + exit 2, no traceback.
 Full suite: 31 passed; lint clean.

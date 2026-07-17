@@ -443,3 +443,1433 @@ tree:
       - "User direction: commit all changes appropriately."
       - "commits b5fc2ce, 58326c7, and c2356ed"
     status: resolved
+  - id: N28
+    type: decision
+    title: "Execute a reusable three-iteration repository R&D loop"
+    provenance: user
+    timestamp: "2026-07-14T23:34+02:00"
+    choice: >
+      Create a prompt for real research and development in the live repository, execute
+      it, and iterate exactly three times, requesting direction whenever a material
+      choice cannot be grounded from repository evidence.
+    alternatives:
+      - "Author a prompt without executing it."
+      - "Run a single unstructured experiment."
+      - "Pause before using the repository's predeclared research branches."
+    evidence:
+      - "User direction: create a prompt, use it, and iterate three times."
+      - "docs/research/2026-07-14-evidence-driven-rd-loop-prompt.md"
+    status: resolved
+  - id: N29
+    type: experiment
+    title: "Iteration-1 OL-002 trigger reproduction"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    also_depends_on: [N22, N25, N28]
+    evidence:
+      - "bench/proposal_injection/results/PI-001-trigger.json"
+      - "bench/oracle_ladder_v2/results/OL-002/OL-002-results.json"
+      - "ara/evidence/proposal-injection-pi003-2026-07-14.md#iteration-1-trigger"
+    result: >
+      OL-002 reverified under NumPy 2.4.6. Exact references ranked in the learned top
+      eight and were selected on all 32/32 fixed model-seed/start banks, while native
+      zero-penalty closed-loop success remained 6.25%, reproducing the frozen
+      proposal-injection trigger. Fixed-bank quality did not predict the k=8 versus
+      k=12 closed-loop ordering.
+    status: resolved
+  - id: N30
+    type: experiment
+    title: "PI-001 formal proposal-injection run"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    evidence:
+      - "bench/proposal_injection/results/PI-001/"
+      - "docs/research/2026-07-14-proposal-injection-pi001-protocol.md"
+      - "docs/research/2026-07-14-pi001-verifier-failure.md"
+    result: >
+      Training, all primary arms, conditional branch selection, and numeric artifact
+      writes completed, but the one-shot terminal Markdown verifier rejected the
+      package because rescue records appeared in different insertion and sorted-key
+      orders. PI-001 remains preserved and supplies no independently accepted result.
+    status: resolved
+  - id: N31
+    type: dead_end
+    title: "Insertion-order-dependent report verification"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    hypothesis: >
+      A report rendered directly from an in-memory decision mapping will reproduce
+      after the mapping is serialized to sorted-key JSON and decoded.
+    failure_mode: >
+      The saved report inherited insertion order while regenerated JSON inherited
+      lexicographic key order; identical rescue records exchanged positions and caused
+      terminal PI-001 failure.
+    lesson: >
+      Canonicalize report record order explicitly, preserve the failed identifier and
+      hashes, and rerun under a fresh administrative namespace without claiming an
+      independent replication.
+    evidence:
+      - N30
+      - "docs/research/2026-07-14-pi001-verifier-failure.md"
+    status: resolved
+  - id: N32
+    type: pivot
+    title: "From failed PI-001 packaging to PI-002"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    from: >
+      A numerically complete PI-001 namespace invalidated by its terminal report-order
+      check.
+    to: >
+      A full PI-002 administrative rerun with lexicographically canonical report
+      records, failed-artifact hash binding, and unchanged scientific fields.
+    trigger: >
+      Forensic comparison isolated mapping order as the sole terminal report mismatch.
+    status: resolved
+  - id: N33
+    type: experiment
+    title: "PI-002 administrative proposal-injection rerun"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    evidence:
+      - "bench/proposal_injection_v2/results/PI-002/"
+      - "docs/research/2026-07-14-proposal-injection-pi002-protocol.md"
+      - "docs/research/2026-07-14-pi002-semantic-verifier-failure.md"
+    result: >
+      The fresh run passed protocol, input, parent, CSV, report, decision, and manifest
+      checks. Its separately invoked full semantic regeneration then failed raw row
+      equality because regenerated provider score tuples were compared with
+      JSON-decoded lists. Canonical rows, parity, decisions, and executed arms matched;
+      PI-002 nevertheless remains unaccepted under its one-shot rule.
+    status: resolved
+  - id: N34
+    type: dead_end
+    title: "Raw Python container equality as semantic artifact verification"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    hypothesis: >
+      Direct equality between regenerated in-memory structures and JSON-decoded
+      structures is a valid semantic comparison for the experiment artifact.
+    failure_mode: >
+      JSON maps tuples to arrays decoded as lists, so `tuple != list` rejected
+      identical ordered finite values after every scientific field had regenerated.
+    lesson: >
+      Compare semantic artifacts through their exact canonical serialization domain;
+      reject non-finite or content-changing values rather than treating language-level
+      container types as scientific semantics.
+    evidence:
+      - N33
+      - "docs/research/2026-07-14-pi002-semantic-verifier-failure.md"
+    status: resolved
+  - id: N35
+    type: pivot
+    title: "From failed PI-002 semantics to PI-003"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    from: >
+      A scientifically unchanged PI-002 package invalidated by raw tuple/list semantic
+      comparison.
+    to: >
+      A full PI-003 administrative rerun that normalizes both sides through exact,
+      finite, sorted-key JSON before equality and changes no scientific field.
+    trigger: >
+      A second full regeneration established canonical equality for every compared
+      field and isolated the failure to Python container representation.
+    status: resolved
+  - id: N36
+    type: experiment
+    title: "PI-003 compute-matched exact-reference proposal injection"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    also_depends_on: [N29, N30, N33]
+    evidence:
+      - "bench/proposal_injection_v3/results/PI-003/PI-003-results.json"
+      - "bench/proposal_injection_v3/results/PI-003/PI-003-report.md"
+      - "docs/research/2026-07-14-proposal-injection-pi003-protocol.md"
+      - "ara/evidence/proposal-injection-pi003-2026-07-14.md"
+    result: >
+      PI-003 passed full semantic regeneration. Privileged injection improved mean
+      return from -2.660520 to -1.368870 but produced only 5/8 positive seeds, 16.28%
+      oracle-gap closure, and 9.38% success; the action-permuted control also produced
+      5/8 positive seeds and 9.38% success. Neither met the frozen 7/8, 50%, and 80%
+      rescue thresholds, so enlarged native search was not run. The accepted
+      classification is no_privileged_rescue:trigger_not_statewise.
+    status: resolved
+  - id: N37
+    type: dead_end
+    title: "Simple native proposal scarcity as the primary BridgeControl blocker"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    hypothesis: >
+      Native iCEM mainly fails because it does not propose useful sequences; inserting
+      exact-simulator reference elites into the unchanged learned candidate budget
+      should rescue closed-loop control.
+    failure_mode: >
+      Privileged injection missed every frozen rescue threshold and did not separate
+      success from the action-permuted control; only 9.598% of 448 calls placed any
+      injected reference in the learned first-round top elite and none retained an
+      injected final best.
+    lesson: >
+      Do not spend the next iteration on enlarged native search. Separate learned-score
+      refinement from visited-state shift before selecting a planner-side mechanism.
+    evidence:
+      - N36
+      - "ara/evidence/proposal-injection-pi003-2026-07-14.md#primary-results"
+    status: resolved
+  - id: N38
+    type: experiment
+    title: "Exploratory PI-003 step-stratified commitment audit"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    evidence:
+      - "bench/proposal_injection_v3/results/PI-003-posthoc-step-audit.json"
+      - "bench/proposal_injection/posthoc.py"
+    result: >
+      First-round top-elite transfer was 100% over 32 step-0 calls, 34.375% over 32
+      step-1 calls, and 0% at every step from 2 through 13. Learned refinement retained
+      an injected final best in 0% of calls at every step. This analysis was selected
+      after the accepted PI-003 decision and remains exploratory.
+    status: resolved
+  - id: N39
+    type: question
+    title: "Does learned iCEM refinement exploit model error before state shift?"
+    provenance: ai-suggested
+    timestamp: "2026-07-14T23:34+02:00"
+    also_depends_on: [N25, N36, N38]
+    description: >
+      At frozen initial, step-1, and step-2 visited states, retain each iCEM candidate
+      pool and compare learned and exact scores and ranks for identical sequences. Test
+      whether learned-score ascent reduces exact quality in at least 7/8 seeds already
+      at step 0, separately from later visited-state shift.
+    status: resolved
+  - id: N40
+    type: experiment
+    title: "U-009 endpoint-swap probe-validity pilot"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    evidence:
+      - "ara/evidence/u009-probe-validity-pilot-2026-07-14.md"
+      - "tasks/U-009-latent-action-leakage-probe.md"
+    result: >
+      Across seeds 0-2, the decorrelated model's swapped/matched error ratios were
+      1743, 775, and 184, but the naive negative control scored still larger ratios of
+      5779, 4949, and 12223. Action-recovery R-squared did separate the models:
+      0.859/0.857/0.614 versus 0.002/0.036/0.007. The proposed ratio therefore failed
+      its designated negative control in this exploratory pilot.
+    status: resolved
+  - id: N41
+    type: dead_end
+    title: "Endpoint-swap error ratio as the current U-009 gate criterion"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    hypothesis: >
+      A high swapped-to-matched forward-error ratio certifies action-identifiable
+      latents and remains near one for a naive state-leaking bottleneck.
+    failure_mode: >
+      The naive negative control passed more strongly than the decorrelated model on
+      all three pilot seeds even though action-recovery R-squared showed the intended
+      opposite separation.
+    lesson: >
+      Keep U-009 inactive and redesign the probe so its naive negative control fails
+      before adding a P13 gate or changing shipped identifiability claims.
+    evidence:
+      - N40
+      - "ara/evidence/u009-probe-validity-pilot-2026-07-14.md"
+    status: resolved
+  - id: N42
+    type: experiment
+    title: "Three-iteration R&D artifact validation"
+    provenance: ai-executed
+    timestamp: "2026-07-14T23:34+02:00"
+    evidence:
+      - "Full .venv unit suite"
+      - "PI-003 fast and semantic verifiers"
+      - "Ruff, mypy, and git diff whitespace checks"
+    result: >
+      The full environment-pinned suite passed 200 tests with one skip, Ruff passed,
+      mypy reported no issues across 107 source files, and the worktree whitespace
+      check passed. PI-003 returned verified_results and verified_semantic_results.
+      No production source was changed.
+    status: resolved
+  - id: N43
+    type: decision
+    title: "Execute the candidate-landscape follow-up"
+    provenance: user
+    timestamp: "2026-07-15T01:56+02:00"
+    choice: >
+      Execute the next repository-grounded experiment after PI-003, allowing the
+      existing accepted result and research record to determine the concrete design.
+    alternatives:
+      - "Leave the candidate-landscape audit as an open question."
+      - "Add planner compute or a mitigation before localizing the scoring failure."
+      - "Redirect to an unrelated active task."
+    evidence:
+      - N36
+      - N38
+      - N39
+      - "User direction: do the next experiment."
+    status: resolved
+  - id: N44
+    type: experiment
+    title: "CL-001 learned-versus-exact candidate-landscape audit"
+    provenance: ai-executed
+    timestamp: "2026-07-15T01:56+02:00"
+    also_depends_on: [N36, N38, N39, N43]
+    evidence:
+      - "bench/candidate_landscape/results/CL-001/CL-001-results.json"
+      - "bench/candidate_landscape/results/CL-001/CL-001-report.md"
+      - "bench/candidate_landscape/results/CL-001/artifact-manifest.json"
+      - "docs/research/2026-07-15-candidate-landscape-cl001-protocol.md"
+      - "ara/evidence/candidate-landscape-cl001-2026-07-15.md"
+    result: >
+      The one-shot 20-seed package passed fast verification, three independent audits,
+      and full semantic regeneration. Untouched seeds 8-19 supplied 12 confirmatory
+      units; replay seeds 0-7 were excluded. Within-call exploitation supported 6/12
+      seeds and visited-state scorer shift supported 3/12, each below the frozen 10/12
+      descriptive robustness floor, yielding neither_mechanism_supported. At start
+      level the signatures occurred in 35/48 and 20/48 pairs respectively, exposing
+      substantial seed-by-start heterogeneity rather than uniform absence.
+    status: resolved
+  - id: N45
+    type: dead_end
+    title: "Two fixture-wide robust mechanisms behind PI-003 transfer loss"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T01:56+02:00"
+    hypothesis: >
+      PI-003's post-hoc pattern reflects two robust separable mechanisms: learned iCEM
+      refinement systematically replaces an injected round-0 best with an exact-worse
+      candidate, and step-2 visited states systematically worsen learned-versus-exact
+      rank residual for exact-useful references.
+    failure_mode: >
+      Under CL-001's joint per-start, 3/4-within-seed, and 10/12-confirmatory-seed
+      rules, only 6/12 seeds supported within-call exploitation and 3/12 supported
+      statewise shift. Neither predeclared fixture-wide mechanism passed despite common
+      start-level occurrences.
+    lesson: >
+      Do not promote the PI-003 post-hoc split to a uniform planner explanation. The
+      next audit must explain generator-model and authored-start heterogeneity before
+      selecting optimizer defenses or state-source interventions.
+    evidence:
+      - N44
+      - "ara/evidence/candidate-landscape-cl001-2026-07-15.md"
+    status: resolved
+  - id: N46
+    type: question
+    title: "Are exact-bad refinements generator-specific or shared across models?"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T01:56+02:00"
+    also_depends_on: [N44, N45]
+    description: >
+      On the frozen CL-001 step-0 pools, use untouched independent same-data auditor
+      models to rank each generator's B0 and C sequences. Determine whether auditors
+      reject exact-bad C choices, indicating generator-specific optimizer exploitation,
+      or reproduce them, indicating a shared architecture/data bias; aggregate ranks
+      rather than comparing raw score scales across models.
+    status: unresolved
+  - id: N47
+    type: decision
+    title: "Execute the proposed scorer-swap experiment"
+    provenance: user
+    timestamp: "2026-07-15T08:13+02:00"
+    choice: >
+      Continue with the previously proposed experiment, using repository evidence and
+      preflight review to fix the concrete protocol before formal execution.
+    alternatives:
+      - "Leave the scorer-swap question open."
+      - "Implement an optimizer defense before localizing cross-model ranking behavior."
+      - "Redirect to an unrelated repository task."
+    evidence:
+      - N44
+      - N45
+      - N46
+      - "User direction: continue with your proposed next experiment."
+    status: resolved
+  - id: N48
+    type: experiment
+    title: "SS-001 prospective cross-seed scorer swap"
+    provenance: ai-executed
+    timestamp: "2026-07-15T08:13+02:00"
+    also_depends_on: [N44, N45, N46, N47]
+    evidence:
+      - "bench/scorer_swap/results/SS-001/SS-001-results.json"
+      - "bench/scorer_swap/results/SS-001/SS-001-report.md"
+      - "bench/scorer_swap/results/SS-001/artifact-manifest.json"
+      - "docs/research/2026-07-15-scorer-swap-ss001-protocol.md"
+      - "ara/evidence/scorer-swap-ss001-2026-07-15.md"
+    result: >
+      The atomic one-shot experiment used fresh generator seeds 32-43 and disjoint
+      auditor seeds 20-31, passed fast verification, and regenerated all 24 models and
+      raw tensors exactly. The inherited harmful signature recurred on 35/48 calls and
+      at least 2/4 starts for 11/12 fresh generators, passing only the frozen recurrence
+      gate. The combined calibration gate passed 3/6 rather than 5/6 seeds, yielding
+      auditor_direction_control_failed; mechanism and rescue branches are therefore
+      non-interpretable. Repository validation passed 228 tests with one skip, Ruff,
+      and strict Mypy across 117 source files.
+    status: resolved
+  - id: N49
+    type: dead_end
+    title: "Mean-rank union winner as a calibrated mechanism selector"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T08:13+02:00"
+    hypothesis: >
+      Pairwise auditor preference for exact-better C over B0 is sufficient calibration
+      for selecting the global minimum mean-rank candidate over each 186-sequence union,
+      allowing the same panel to localize mechanism transfer and exact rescue.
+    failure_mode: >
+      All 11 exact-improving controls met the 9/12 pairwise C-over-B0 rule, but the
+      global selector chose a materially exact-worse third candidate on seed/start 8/0,
+      10/0, and 11/2. Those failures reduced the combined control to 3/6 seeds and made
+      every frozen mechanism/rescue branch non-interpretable.
+    lesson: >
+      Do not treat pairwise direction calibration as safety evidence for an adaptive
+      winner selected from 186 candidates. Diagnose the frozen winners with an untouched
+      validator panel that performs no new selection before revising the mechanism test.
+    evidence:
+      - N48
+      - "ara/evidence/scorer-swap-ss001-2026-07-15.md"
+    status: resolved
+  - id: N50
+    type: question
+    title: "Are SS-001's bad rank winners panel-specific or shared?"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T08:13+02:00"
+    also_depends_on: [N46, N48, N49]
+    description: >
+      Freeze SS-001's selected X, C, and B0 candidates, then use untouched validator
+      seeds 44-55 to rank the existing unions without selecting new candidates. Test
+      whether validators reject all three calibration-bad X choices, indicating finite-
+      panel winner's curse, or reproduce them, indicating a same-data model-family blind
+      spot; retain mixed outcomes as heterogeneous and never retroactively reclassify
+      SS-001.
+    status: open
+  - id: N51
+    type: decision
+    title: "Execute the frozen-winner held-out validator panel"
+    provenance: user
+    timestamp: "2026-07-15T09:31+02:00"
+    choice: >
+      Continue with the proposed next experiment by scoring SS-001's frozen B0, C,
+      and X identities with untouched validators, without selecting new candidates or
+      changing SS-001's accepted classification.
+    alternatives:
+      - "Leave SS-001's panel-specific-versus-shared question open."
+      - "Revise SS-001 directly from its visible target rows."
+      - "Implement an optimizer defense before validating the frozen winners."
+    evidence:
+      - N48
+      - N49
+      - N50
+      - "User direction: continue with your proposed next experiment."
+    status: resolved
+  - id: N52
+    type: experiment
+    title: "VP-001 held-out frozen-winner validator panel"
+    provenance: ai-executed
+    timestamp: "2026-07-15T09:31+02:00"
+    also_depends_on: [N48, N49, N50, N51]
+    evidence:
+      - "bench/validator_panel/results/VP-001/VP-001-results.json"
+      - "bench/validator_panel/results/VP-001/VP-001-report.md"
+      - "bench/validator_panel/results/VP-001/artifact-manifest.json"
+      - "docs/research/2026-07-15-validator-panel-vp001-protocol.md"
+      - "ara/evidence/validator-panel-vp001-2026-07-15.md"
+    result: >
+      The atomic one-shot panel used untouched validators 44-55, passed fast and full
+      semantic verification, and preserved the byte-pinned SS-001 parent. Direction
+      passed 6/6 source seeds and every target passed C-over-B0 12/12, but the fixed-X
+      sensitivity control supported only 3/11 rather than the required 9/11 source
+      seeds, yielding validator_fixed_X_sensitivity_control_failed. Target rows split
+      into one held-out rejection, one inconclusive result, and one transfer, but the
+      failed preceding control makes the target panel non-interpretable. Repository
+      validation passed 246 tests with one skip, Ruff, and strict Mypy over 121 files.
+    status: resolved
+  - id: N53
+    type: dead_end
+    title: "Old-panel-selected X identities as a validator sensitivity control"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T09:31+02:00"
+    hypothesis: >
+      SS-001's 25 exact-good, old-panel-selected X identities provide a stable enough
+      positive control for a disjoint same-data validator panel to interpret the three
+      calibration-bad target winners.
+    failure_mode: >
+      Only 11/25 calls and 3/11 source generators passed the frozen X-over-C rule,
+      against a required 9/11 seed gate, despite direction passing 11/11 calls and
+      byte-identical sentinels tying under every validator.
+    lesson: >
+      Do not use selected X identities as a pure sensitivity assay. Separate
+      old-panel selection status from exact direction and call context with matched
+      unselected exact-better candidates and exact-worse mirrors before interpreting
+      the mixed target rows.
+    evidence:
+      - N52
+      - "ara/evidence/validator-panel-vp001-2026-07-15.md"
+    status: resolved
+  - id: N54
+    type: question
+    title: "Does old-panel selection conditioning explain fixed-X transport failure?"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T09:31+02:00"
+    also_depends_on: [N50, N52, N53]
+    description: >
+      On the 25 sealed sensitivity unions, compare each old-panel-selected X with a
+      frozen unselected exact-better Y matched on exact delta/rank gain and an
+      exact-worse mirror Z. Determine whether a new untouched panel supports Y but not
+      X after identity, direction, and mirror controls, without computing any new
+      learned-score winner.
+    status: open
+  - id: N55
+    type: question
+    title: "What data evidence is required beyond same-data restart panels?"
+    provenance: user
+    timestamp: "2026-07-15T09:50+02:00"
+    also_depends_on: [N44, N48, N52, N54]
+    description: >
+      Determine whether the CL-001, SS-001, and VP-001 mechanism experiments require
+      a proper dataset, separating claims supported by the deterministic authored
+      b1_r1_d8 fixture from claims that require independently collected datasets,
+      held-out dynamics, or standard external benchmarks.
+    status: open
+  - id: N56
+    type: question
+    title: "Which tiny multimodal codecs and public dataset fit the workstation?"
+    provenance: user
+    timestamp: "2026-07-15T10:09+02:00"
+    also_depends_on: [N55]
+    description: >
+      Identify open pretrained encoder-decoder pairs for vision, video, audio, and
+      text that fit the available RTX 3050 8GB and 62 GiB RAM, plus a public dataset
+      suitable for testing Prospect without building the modality backbones in-house.
+    status: resolved
+  - id: N57
+    type: decision
+    title: "Adopt the smallest full multimodal preflight path"
+    provenance: user
+    timestamp: "2026-07-15T13:22+02:00"
+    choice: >
+      Use the absolute-fastest workstation-scale setup to test every current Prospect
+      component and the complete passive multimodal path: framewise TAESD vision,
+      SNAC-24k audio, T5-Efficient-Tiny text, and the official eight-video Perception
+      Test sample, with no in-house backbone training.
+    alternatives:
+      - "Build modality encoders and decoders in-house."
+      - "Start with larger pretrained backbones or a full public dataset split."
+      - "Continue synthetic-only mechanism tests without a real multimodal preflight."
+    evidence:
+      - N55
+      - N56
+      - "User direction: use the absolute fastest and smallest setup to test all components and the whole path."
+    status: resolved
+  - id: N58
+    type: experiment
+    title: "MM-001 smallest real-multimodal preflight"
+    provenance: ai-executed
+    timestamp: "2026-07-15T13:22+02:00"
+    also_depends_on: [N55, N56, N57]
+    evidence:
+      - "bench/multimodal_preflight/results/MM-001/MM-001-results.json"
+      - "bench/multimodal_preflight/results/MM-001/MM-001-report.md"
+      - "bench/multimodal_preflight/results/MM-001/artifact-manifest.json"
+      - "docs/research/2026-07-15-mm001-small-real-multimodal-preflight-protocol.md"
+      - "ara/evidence/mm001-small-real-multimodal-preflight-2026-07-15.md"
+    result: >
+      The one-shot eight-video, 477-window, four-fold by three-seed package passed fast
+      verification, full semantic regeneration, and independent post-result audit.
+      TAESD frame/image and framewise-video supported 8/8 videos and SNAC supported
+      6/8; T5 supported 0/8 because bounded greedy parseability was only 43.859%.
+      Real visual temporal dynamics, vision codec migration, audio substitution, and
+      text substitution each supported 0/8, while temporal surprise and passive agent
+      wiring supported 8/8. Every video beat ridge and normalized shuffle controls, but
+      the best world/persistence MSE ratio was 0.928 against the frozen <=0.833 rule.
+      The valid terminal branch is real_visual_temporal_prediction_not_supported; it
+      licenses no fusion, control, imitation, planning, generalization, or production
+      claim. Pre-marker controls passed 288 tests, P9/P13/P14, and all 15 shipped gates.
+    status: resolved
+  - id: N59
+    type: experiment
+    title: "MM-002 parent-parity implementation probe"
+    provenance: ai-executed
+    timestamp: "2026-07-15T15:38+02:00"
+    also_depends_on: [N58]
+    evidence:
+      - "bench/multimodal_preflight/core.py"
+      - "bench/multimodal_preflight/results/MM-001/MM-001-integration-rows.json"
+      - "Inline NumPy replay, fold 0 seed 0"
+    result: >
+      Replaying the MM-001 fold-0/seed-0 primary fit in the current runtime reproduced
+      fingerprint 7c076d75ce262bbf6b34e1849515e3236481b33b14af06d9f6e961dbce7d919b
+      exactly. The five world-ladder parity metrics were bit-identical for both held-out
+      videos. A custom codec fit that omitted every decoder-head update reproduced all
+      endpoint-relevant adapter, trunk, and normalization arrays exactly and matched
+      both held-out vision MSE and latent-alignment MSE values bit-for-bit.
+    status: resolved
+  - id: N60
+    type: decision
+    title: "Execute the proposed MM-002 failure-isolation experiment"
+    provenance: user
+    timestamp: "2026-07-15T16:23+02:00"
+    choice: >
+      Continue with the proposed fastest follow-up: reuse MM-001's sealed feature
+      package to isolate prediction horizon, world update budget, representation
+      integrity, raw linear temporal signal, codec update order, shared training, and
+      codec cycle budget before any larger dataset or frontend run.
+    alternatives:
+      - "Move directly to the full Perception Test split."
+      - "Download or train larger multimodal encoders before localizing MM-001."
+      - "Treat MM-001's negative result as sufficient without a mechanism diagnostic."
+    evidence:
+      - N58
+      - N59
+      - "User direction: continue with your proposed next experiment."
+    status: resolved
+  - id: N61
+    type: experiment
+    title: "MM-002 feature-only failure isolation"
+    provenance: ai-executed
+    timestamp: "2026-07-15T16:23+02:00"
+    also_depends_on: [N58, N59, N60]
+    evidence:
+      - "bench/multimodal_diagnostics/results/MM-002/MM-002-results.json"
+      - "bench/multimodal_diagnostics/results/MM-002/MM-002-evidence.json"
+      - "bench/multimodal_diagnostics/results/MM-002/MM-002-report.md"
+      - "bench/multimodal_diagnostics/results/MM-002/artifact-manifest.json"
+      - "docs/research/2026-07-15-mm002-feature-only-failure-isolation-protocol.md"
+      - "ara/evidence/mm002-feature-only-failure-isolation-2026-07-15.md"
+    result: >
+      The sealed 984-row diagnostic passed exact MM-001 parity, fast verification,
+      and full semantic retraining. All six world variants supported 0/8 videos; every
+      arm beat ridge on 8/8 but beat persistence by the frozen 20% margin on 0/8. Raw
+      32-D linear predictability supported 0/8 at 0.5, 1.0, and 2.0 seconds. All six
+      codec endpoints missed 6/8 (best: vision-only-600 at 1/8). The nominal full
+      baseline failed representation integrity on 21/144 probes, predominantly the
+      minimum-std floor, while predictions stayed finite and positive-variance. The
+      accepted classification is world_diagnostic_inconclusive_representation_integrity;
+      no tested horizon, budget, order, or sharing cause is established.
+    status: resolved
+  - id: N62
+    type: question
+    title: "Did the fixed 256-to-32 vision projection hide temporal signal or destabilize scale?"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T16:23+02:00"
+    also_depends_on: [N58, N61]
+    description: >
+      Before a full-split run, use MM-001's already copied raw 256-D TAESD latents to
+      compare direct raw ridge, train-fold-only standardization/PCA-to-32, and the
+      current fixed random projection under the same persistence, shuffle, and
+      representation-integrity rules. Determine whether the projection/scale seam or
+      the frozen visual data itself explains the current 0/8 linear and world results.
+    status: resolved
+  - id: N63
+    type: decision
+    title: "Execute the proposed MM-003 projection/scale isolation"
+    provenance: user
+    timestamp: "2026-07-15T17:27+02:00"
+    choice: >
+      Continue with the proposed fastest causal diagnostic, reusing the sealed raw
+      TAESD features to determine exactly whether projection, scale, basis conditioning,
+      or unsupervised 32-D subspace choice explains the failed temporal prediction.
+    alternatives:
+      - "Tune the existing 32-D projection without a controlled comparison."
+      - "Move directly to a larger dataset or visual backbone."
+      - "Accept MM-002's integrity failure without isolating the frontend seam."
+    evidence:
+      - N61
+      - N62
+      - "User direction: continue with your proposed next experiment and find what is going on and a good fix."
+    status: resolved
+  - id: N64
+    type: experiment
+    title: "MM-003 TAESD projection/scale isolation"
+    provenance: ai-executed
+    timestamp: "2026-07-15T17:27+02:00"
+    also_depends_on: [N58, N61, N62, N63]
+    evidence:
+      - "bench/multimodal_transform_diagnostics/results/MM-003/MM-003-results.json"
+      - "bench/multimodal_transform_diagnostics/results/MM-003/MM-003-evidence.json"
+      - "bench/multimodal_transform_diagnostics/results/MM-003/MM-003-report.md"
+      - "bench/multimodal_transform_diagnostics/results/MM-003/artifact-manifest.json"
+      - "docs/research/2026-07-15-mm003-taesd-projection-scale-isolation-protocol.md"
+      - "ara/evidence/mm003-taesd-projection-scale-isolation-2026-07-15.md"
+    result: >
+      The sealed 18-artifact package passed exact MM-001/MM-002 alignment and parent
+      parity, fast verification, and semantic regeneration of every transform, probe,
+      new world trajectory, integrity row, and decision. All twelve combinations of
+      six representations and absolute/residual linear predictors supported 0/8
+      videos, including direct raw 256-D TAESD latents. All four world arms supported
+      0/8 and were unhealthy; post-z, orthonormal-basis, and PCA contrasts materially
+      improved only 0/8, 1/8, and 1/8 videos. The accepted classification is
+      no_linear_full_taesd_signal_at_frozen_margin: tested projection and scale factors
+      are not supported as proximate fixes on this eight-video sample.
+    status: resolved
+  - id: N65
+    type: dead_end
+    title: "Projection, scaling, or unsupervised PCA as the immediate visual fix"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T17:27+02:00"
+    hypothesis: >
+      Train-fold z-scoring, an orthonormal basis for the inherited fixed subspace, the
+      complete raw 256-D latent, or PCA-to-32 will expose a group-general linear
+      one-second increment or restore a healthy 6/8 end-to-end world result.
+    failure_mode: >
+      Every absolute-target and residual-delta probe supported 0/8 videos, including
+      both raw-256 arms. Every world arm supported 0/8 and failed integrity; no paired
+      transform contrast reached more than 1/8 material improvements. Scale-only probe
+      pairs agreed to their frozen numerical tolerances, excluding score scale as a
+      hidden implementation effect.
+    lesson: >
+      Stop tuning the flat projection seam on this sample. Preserve spatial layout and
+      expose motion/history explicitly, with a positive control that proves the assay
+      can recover known dynamics, before increasing model size or dataset volume.
+    evidence:
+      - N64
+      - "ara/evidence/mm003-taesd-projection-scale-isolation-2026-07-15.md"
+    status: resolved
+  - id: N66
+    type: question
+    title: "Do spatial and frame-difference TAESD features expose the missing dynamics?"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T17:27+02:00"
+    also_depends_on: [N61, N64, N65]
+    description: >
+      Reuse the existing raw `[4, 8, 8]` TAESD grids and chronological inputs only.
+      First require a tiny spatial/history-aware predictor to recover a known synthetic
+      motion positive control while failing a temporal-shuffle control; then compare
+      current-grid and current-minus-previous-grid features against persistence on the
+      same eight videos. If the controlled assay still fails, test more dynamic curated
+      clips before changing the Prospect world model or scaling to the full dataset.
+    status: resolved
+  - id: N67
+    type: decision
+    title: "Execute the proposed MM-004 spatial/history isolation"
+    provenance: user
+    timestamp: "2026-07-15T18:49+02:00"
+    choice: >
+      Continue with the proposed smallest diagnostic, preserving the raw TAESD grid
+      and recent frame difference while adding source-pixel controls to determine why
+      the existing visual prediction is not working and identify a defensible fix.
+    alternatives:
+      - "Scale immediately to the full Perception Test split."
+      - "Replace or enlarge the visual frontend before testing source predictability."
+      - "Implement a larger temporal adapter without a positive-controlled probe."
+    evidence:
+      - N64
+      - N65
+      - N66
+      - "User direction: continue with your proposed next experiment and find exactly what is going on and a good fix."
+    status: resolved
+  - id: N68
+    type: experiment
+    title: "MM-004 spatial/history and source-pixel signal isolation"
+    provenance: ai-executed
+    timestamp: "2026-07-15T18:49+02:00"
+    also_depends_on: [N58, N61, N64, N65, N66, N67]
+    evidence:
+      - "bench/multimodal_spatial_diagnostics/results/MM-004/MM-004-results.json"
+      - "bench/multimodal_spatial_diagnostics/results/MM-004/MM-004-evidence.json"
+      - "bench/multimodal_spatial_diagnostics/results/MM-004/MM-004-report.md"
+      - "bench/multimodal_spatial_diagnostics/results/MM-004/artifact-manifest.json"
+      - "docs/research/2026-07-15-mm004-spatial-history-signal-isolation-protocol.md"
+      - "ara/evidence/mm004-spatial-history-signal-isolation-2026-07-15.md"
+    result: >
+      The sealed 15-file package passed 16/16 MM-003 raw-256 parent rows, 71 premarker
+      tests, two independent GO reviews, fast verification, and semantic regeneration
+      of every synthetic and real fit. The synthetic process passed all 24 conditions
+      with maximum kernel error 0.000256, and every target-shuffle global control was
+      clear. Source-pixel activity supported 8/8, but every TAESD and pixel local arm
+      plus constant velocity supported 0/8. The main TAESD arm reached the persistence
+      margin on 4/8 but history-shuffle separation on 0/8. The accepted classification
+      is tested_local_objective_or_horizon_failure_supported, bounded to this
+      one-second local-linear assay and outcome-visible sample.
+    status: resolved
+  - id: N69
+    type: dead_end
+    title: "A spatial/history adapter or TAESD replacement as the immediate fix"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T18:49+02:00"
+    hypothesis: >
+      Preserving `3x3` layout and exposing the previous-to-current difference will
+      produce robust one-second prediction, or the same predictor will work in source
+      pixels and isolate TAESD as the failing representation.
+    failure_mode: >
+      All four TAESD arms and all four matched pixel arms supported 0/8. Explicit
+      history never separated from history shuffle by 10%; pixels were active 8/8 but
+      the pixel main arm reached the 20% persistence margin on 0/8. Constant velocity
+      was 3.45-5.56 times persistence, with negative past/future delta cosine on every
+      video.
+    lesson: >
+      Do not enlarge the history adapter or replace TAESD yet. First vary only the
+      target interval on matched causal rows; if a half-second transition still fails
+      in active pixels, move to a causal-warp or nonlinear objective/model-class test.
+    evidence:
+      - N68
+      - "ara/evidence/mm004-spatial-history-signal-isolation-2026-07-15.md"
+    status: resolved
+  - id: N70
+    type: question
+    title: "Does a matched half-second horizon rescue local visual prediction?"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T18:49+02:00"
+    also_depends_on: [N68, N69]
+    description: >
+      On the common 453 rows with previous, current, `t+0.5 s`, and `t+1.0 s` grids,
+      hold representations, folds, normalization, spatial arms, ridge objective,
+      controls, and support gates fixed while varying only target interval. Support a
+      half-second rollout fix only if the short horizon passes at least 6/8, the
+      matched one-second arm supports at most 2/8, and the paired ratio improves by at
+      least 10% on 6/8; otherwise preserve an inconclusive result or redirect from
+      horizon tuning to objective/model-class isolation.
+    status: resolved
+  - id: N71
+    type: experiment
+    title: "Results-audit forward check of PI-003 C03"
+    provenance: ai-executed
+    timestamp: "2026-07-15T19:13+02:00"
+    also_depends_on: [N36, N37]
+    evidence:
+      - ".agents/skills/prospect-results-audit/SKILL.md"
+      - "bench/proposal_injection_v3/results/PI-003/PI-003-results.json"
+      - "bench/proposal_injection_v3/results/PI-003/PI-003-report.md"
+      - "ara/logic/claims.md#c03-exact-reference-injection-does-not-rescue-frozen-bridgecontrol-mpc"
+    result: >
+      Independent row arithmetic confirmed -2.660520 to -1.368870 mean return,
+      5/8 positive seeds, 16.2809% gap closure, 3/32 success, equal sequence and
+      transition-evaluation budgets, and failure of every frozen rescue threshold.
+      The failed intervention establishes that simple proposal scarcity was not
+      sufficient to rescue this fixture; it does not by itself establish that scarcity
+      was not the primary contributing failure source.
+    status: resolved
+  - id: N72
+    type: decision
+    title: "Adjudicate PI-003's causal wording"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T19:13+02:00"
+    choice: >
+      Leave the causal interpretation unresolved while preserving PI-003's confirmed
+      arithmetic and failed rescue decision; adjudicate whether C03 must narrow from
+      "not the primary failure source" to "not sufficient to explain or rescue failure."
+    alternatives:
+      - "Retain C03's current primary-source interpretation with an explicit causal argument."
+      - "Narrow C03 to the intervention-sufficiency result recorded by O45."
+      - "Run a new intervention that identifies the contribution of proposal scarcity."
+    evidence: [N36, N37, N71, O45, "ara/logic/claims.md:C03"]
+    status: unresolved
+  - id: N73
+    type: decision
+    title: "Execute the proposed matched half-horizon diagnostic"
+    provenance: user
+    timestamp: "2026-07-15T20:06+02:00"
+    choice: >
+      Continue with MM-005 to isolate why the visual predictor is failing and seek a
+      defensible fix rather than changing several model or data factors together.
+    alternatives:
+      - "Scale the dataset or encoder before resolving the horizon hypothesis."
+      - "Skip directly to a nonlinear model without a matched horizon control."
+    evidence:
+      - N68
+      - N69
+      - N70
+      - "User direction: continue with your proposed next experiment and find exactly what is going on and a good fix."
+    status: resolved
+  - id: N74
+    type: experiment
+    title: "MM-005 matched half-horizon replay"
+    provenance: ai-executed
+    timestamp: "2026-07-15T20:06+02:00"
+    also_depends_on: [N68, N69, N70, N73]
+    evidence:
+      - "bench/multimodal_horizon_diagnostics/results/MM-005/MM-005-results.json"
+      - "bench/multimodal_horizon_diagnostics/results/MM-005/MM-005-evidence.json"
+      - "bench/multimodal_horizon_diagnostics/results/MM-005/MM-005-report.md"
+      - "bench/multimodal_horizon_diagnostics/results/MM-005/artifact-manifest.json"
+      - "docs/research/2026-07-15-mm005-matched-half-horizon-replay-protocol.md"
+      - "ara/evidence/mm005-matched-half-horizon-replay-2026-07-15.md"
+    result: >
+      The sealed 14-file package contains the exact 453 matched rows and passed 70
+      focused tests, synthetic positive/negative gates, fast verification, semantic
+      regeneration of all 200 fits, four parent reverifications, and three independent
+      result audits. Every TAESD and pixel arm supports 0/8 at both horizons, and
+      paired half-horizon advantage supports 0/8 throughout. Half-second central pixel
+      activity supports 7/8. The accepted outcome-informed classification is
+      half_second_tested_spatial_local_linear_objective_failure_supported.
+    status: resolved
+  - id: N75
+    type: dead_end
+    title: "Halving the horizon as the immediate local-linear fix"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T20:06+02:00"
+    hypothesis: >
+      The one-second target is the proximate reason MM-004 fails, so holding rows,
+      folds, normalization, features, controls, and objective fixed while predicting
+      0.5 seconds ahead will rescue a local spatial arm and improve normalized paired
+      performance.
+    failure_mode: >
+      All four half-second domain/arm cells support 0/8, exactly like the matched
+      one-second cells. Paired half-horizon advantage is 0/8 everywhere, and median
+      normalized half/one ratios are 1.012-1.036 despite central pixel activity on
+      7/8 videos.
+    lesson: >
+      Stop tuning this local-linear family by horizon alone. Test nonlinear causal
+      transport against an oracle-warp ceiling before adding model scale, a new
+      frontend, or rollout claims.
+    evidence:
+      - N74
+      - "ara/evidence/mm005-matched-half-horizon-replay-2026-07-15.md"
+    status: resolved
+  - id: N76
+    type: question
+    title: "Can causal warping capture the missing forward visual change?"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T20:06+02:00"
+    also_depends_on: [N74, N75]
+    description: >
+      On the matched half-second panel, compare persistence with a causal
+      previous-to-current warp applied forward and a target-leaking
+      current-to-future oracle-warp ceiling. Use the ceiling to distinguish failure of
+      causal history/conditioning from failure of the transport objective itself,
+      before adopting warp-plus-residual training or increasing temporal context.
+    status: resolved
+  - id: N77
+    type: decision
+    title: "Continue autonomous multimodal failure isolation through midnight"
+    provenance: user
+    timestamp: "2026-07-15T23:59+02:00"
+    choice: >
+      Continue evidence-led experiments and debugging without waiting for further
+      direction, while preserving control gates and stopping any invalid experiment
+      before real-data interpretation.
+    alternatives:
+      - "Pause after MM-005 until the researcher returns."
+      - "Scale encoders or datasets before resolving the tested mechanism failure."
+    evidence:
+      - N76
+      - "User direction: use the time and continue with the research/debugging until midnight."
+    status: resolved
+  - id: N78
+    type: experiment
+    title: "MM-006 causal-warp ceiling diagnostic"
+    provenance: ai-executed
+    timestamp: "2026-07-15T23:59+02:00"
+    also_depends_on: [N74, N75, N76, N77]
+    evidence:
+      - "bench/multimodal_warp_diagnostics/results/MM-006/MM-006-results.json"
+      - "bench/multimodal_warp_diagnostics/results/MM-006/MM-006-evidence.json"
+      - "docs/research/2026-07-15-mm006-causal-warp-ceiling-protocol.md"
+      - "ara/evidence/mm006-causal-warp-ceiling-2026-07-15.md"
+    result: >
+      Synthetic controls, package verification, semantic regeneration, and independent
+      audits passed. Target-aware, causal, and source global/quadrant translation arms
+      supported 0/8 in pixels and TAESD despite central pixel activity on 7/8. Pixel
+      quadrant full fit improved 7/8 but cross-fit improved 1/8 and supported 0/8. The
+      accepted bounded classification is tested_pixel_warp_ceiling_failure_supported.
+    status: resolved
+  - id: N79
+    type: dead_end
+    title: "Discrete 8x8 translation warp as the immediate visual fix"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T23:59+02:00"
+    hypothesis: >
+      A target-aware or causal global/four-quadrant translation field will recover a
+      robust half-second visual increment where the local-linear models failed.
+    failure_mode: >
+      Every real oracle, causal, and source family supported 0/8; the strong full-fit
+      versus checkerboard-cross-fit inversion exposed target overfitting rather than a
+      usable transport ceiling.
+    lesson: >
+      Do not adopt the tested 8x8 discrete translation family. Isolate physical
+      resolution/support before attributing failure to transport broadly.
+    evidence: [N78, "ara/evidence/mm006-causal-warp-ceiling-2026-07-15.md"]
+    status: resolved
+  - id: N80
+    type: experiment
+    title: "MM-007 physically matched resolution ladder"
+    provenance: ai-executed
+    timestamp: "2026-07-15T23:59+02:00"
+    also_depends_on: [N78, N79]
+    evidence:
+      - "bench/multimodal_resolution_diagnostics/results/MM-007/MM-007-results.json"
+      - "bench/multimodal_resolution_diagnostics/results/MM-007/MM-007-evidence.json"
+      - "docs/research/2026-07-15-mm007-physically-matched-resolution-protocol.md"
+      - "ara/evidence/mm007-physically-matched-resolution-2026-07-15.md"
+    result: >
+      The one-shot sealed result passed canonical fast verification, full media-redecode
+      semantic replay, and independent arithmetic/package/science audits. R16/R32/R64
+      quadrant cross-fit improved 0/8 and supported 0/8; full support was also 0/8.
+      R32/R64 only attenuated R8 harm toward persistence. Controls and nulls passed;
+      classification physically_matched_resolution_failure_supported was reproduced.
+    status: resolved
+  - id: N81
+    type: dead_end
+    title: "Higher RGB resolution alone as the frozen translation-family fix"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T23:59+02:00"
+    hypothesis: >
+      Holding physical crop, candidates, macrocells, normalization, rows, and gates
+      fixed while increasing R8 to R16/R32/R64 will recover the translation ceiling.
+    failure_mode: >
+      Every higher-resolution primary arm improved 0/8 and supported 0/8. Relative
+      R32/R64 passes reflected reduced damage, not absolute recovery; pooled xfit ratios
+      remained 1.137, 1.062, and 1.047 at R16/R32/R64.
+    lesson: >
+      Resolution/support is not sufficient for this discrete global/quadrant family.
+      Test smooth deformation and appearance separately without ruling out other flow.
+    evidence: [N80, "ara/evidence/mm007-physically-matched-resolution-2026-07-15.md"]
+    status: resolved
+  - id: N82
+    type: experiment
+    title: "MM-008 v1 deformation-appearance synthetic calibration"
+    provenance: ai-executed
+    timestamp: "2026-07-15T23:59+02:00"
+    also_depends_on: [N80, N81]
+    evidence:
+      - "docs/research/2026-07-15-mm008-deformation-appearance-factorial-protocol.md"
+      - "docs/research/2026-07-15-mm008-synthetic-control-no-go.md"
+      - "bench/multimodal_mechanism_diagnostics/method.py"
+      - "tests/test_mm008_method.py"
+    result: >
+      Thirteen focused tests passed and faithfully reproduced a pre-real NO-GO. Scalar
+      coordinate descent missed known affine endpoints by 2-4 units while its scalar
+      probe falsely reported convergence; low-rank independent targets produced false
+      complete support; unrestricted appearance OLS invalidated persistence as an
+      independent-target null; and the universal 0.90 excluded-arm rule was
+      structurally incompatible with additive squared-error components. No real MM-008
+      target was scored.
+    status: resolved
+  - id: N83
+    type: dead_end
+    title: "MM-008 v1 scalar search and universal isolation controls"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T23:59+02:00"
+    hypothesis: >
+      Two scalar coordinate sweeps plus a scalar probe will recover the injected
+      affine family, and every incomplete arm can retain at least 90% of persistence
+      on affine-plus-appearance and independent-target controls.
+    failure_mode: >
+      A required affine escape needed a paired coefficient move; independent
+      gain/bias OLS legitimately approached a constant-target baseline near half the
+      persistence error; shared Fourier modes enabled chance geometry; and single
+      mechanisms legitimately removed large components of combined error.
+    lesson: >
+      Preserve v1 as a NO-GO. Use paired affine blocks, a richer geometry texture,
+      an appearance-appropriate constant/shrinkage null, and conditional dominance
+      rather than weakening observed thresholds.
+    evidence: [N82, "docs/research/2026-07-15-mm008-synthetic-control-no-go.md"]
+    status: resolved
+  - id: N84
+    type: pivot
+    title: "Pivot MM-008 controls to convergent blocks and comparator-matched nulls"
+    provenance: ai-suggested
+    timestamp: "2026-07-15T23:59+02:00"
+    from: "Scalar affine coordinate descent, shared seven-mode textures, and universal persistence-relative negative margins."
+    to: "Paired vector-block search/probes, broadband geometry controls, constant/shrinkage appearance nulls, and conditional dominance."
+    trigger: "N82-N83 synthetic calibration NO-GO before any real scoring."
+    also_depends_on: [N82, N83]
+    status: resolved
+  - id: N85
+    type: experiment
+    title: "MM-008 v2 optimizer-core development regression"
+    provenance: ai-executed
+    timestamp: "2026-07-16T01:06+02:00"
+    also_depends_on: [N82, N83, N84]
+    evidence:
+      - "bench/multimodal_mechanism_diagnostics/method_v2.py"
+      - "tests/test_mm008_v2_optimizer.py"
+      - "docs/research/2026-07-16-mm008-v2-robust-deformation-appearance-protocol.md"
+    result: >
+      Implemented the pure fit-only v2 grid optimizer, binary objective cache,
+      full/xfit estimates, combined carry witnesses, two-pass bias-only comparator,
+      and exhaustive oracle against protocol SHA-256 14a9f6a0. Twelve focused v2
+      development tests passed in 7.92 seconds; the unchanged v1 plus v2 suites passed
+      25/25 in 28.73 seconds. The all-pairs search recovered the exposed v1 affine
+      trap and a seed-12345 masked admissibility-wall endpoint exactly in full and
+      checkerboard cross-fit, while a 15,625-state oracle confirmed the latter global
+      endpoint. Ruff and mypy passed. This is implementation regression evidence only:
+      no frozen v2 confirmatory seed, auditor challenge, lifecycle, or real target ran.
+    status: resolved
+  - id: N86
+    type: decision
+    title: "Continue autonomous MM-008 research through the next evidence-led experiments"
+    provenance: user
+    timestamp: "2026-07-16T15:03+02:00"
+    choice: >
+      Continue research and debugging while the researcher is away, progressing through
+      the current replay, next experiments, independent audits, and robust development
+      fixes without accessing reserved or formal outcomes.
+    alternatives:
+      - "Stop after the in-process optimized replay."
+      - "Proceed directly to real or reserved scoring before development closure."
+    evidence:
+      - N85
+      - "User direction: continue with the research/debugging until midnight, including next experiments."
+    status: resolved
+  - id: N87
+    type: dead_end
+    title: "MM-008 v2.1 coordinate search as a globally reliable endpoint"
+    provenance: ai-executed
+    timestamp: "2026-07-16T15:03+02:00"
+    hypothesis: >
+      The remaining exposed-seed endpoint discrepancy is numerical tolerance,
+      nondeterminism, or a shallow coordinate-search issue that another local sweep can
+      resolve.
+    failure_mode: >
+      Exact enumeration of all 15,625 canonical states and 2,809 admissible states
+      reproduced a genuine three-block basin with a lower jointly reachable endpoint.
+      Local coordinate updates could not make the required coupled move.
+    lesson: >
+      For this bounded canonical grid, use exact-global selection as the scientific
+      reference and treat coordinate-search agreement as a diagnostic, not authority.
+    evidence:
+      - N85
+      - "ara/evidence/mm008-v22-development-validation-2026-07-16.md"
+    status: resolved
+  - id: N88
+    type: experiment
+    title: "MM-008 v2.2 exact-global exposed-seed development validation"
+    provenance: ai-executed
+    timestamp: "2026-07-16T15:03+02:00"
+    also_depends_on: [N84, N85, N86, N87]
+    evidence:
+      - "bench/multimodal_mechanism_diagnostics/"
+      - "tests/test_mm008_v22_*.py"
+      - "ara/evidence/mm008-v22-development-validation-2026-07-16.md"
+    result: >
+      Exact-global v2.2 completed 48 exposed-seed rows and 630 production grid
+      contexts, with 22 scalar-oracle and 608 explicitly production-only contexts,
+      every bank expectation, mutation/integrity/forgery controls, and two complete
+      in-memory fresh recollections matching every nested bit. A genuine production-only
+      field mutation confirmed nested-comparator reachability; the unpatched replay
+      confirmed fresh graph regeneration. Formal authority remained false and no
+      reserved, challenge, formal, or real target ran.
+    status: resolved
+  - id: N89
+    type: experiment
+    title: "MM-008 v2.2 selective transpose exhaustive parity"
+    provenance: ai-executed
+    timestamp: "2026-07-16T15:03+02:00"
+    also_depends_on: [N88]
+    evidence:
+      - "bench/multimodal_mechanism_diagnostics/transpose_v22.py"
+      - "tests/test_mm008_v22_transpose_selective.py"
+      - "ara/evidence/mm008-v22-development-validation-2026-07-16.md"
+    result: >
+      All 24 applicable rows and 108 normative retained contexts matched the legacy
+      transposed path bit-for-bit. Scoring only retained contexts removes 228 contexts,
+      exactly 640,452 scalar candidate reductions. Continuous payload equivariance was
+      not inferred; the normative property remains unique-minimum theta permutation and
+      exact context/mask mapping.
+    status: resolved
+  - id: N90
+    type: experiment
+    title: "MM-008 v2.2 development schema and formal-authority audit"
+    provenance: ai-executed
+    timestamp: "2026-07-16T15:03+02:00"
+    also_depends_on: [N88]
+    evidence:
+      - "bench/multimodal_mechanism_diagnostics/schema_model_v22.py"
+      - "tests/test_mm008_v22_schema_model.py"
+      - "ara/evidence/mm008-v22-development-validation-2026-07-16.md"
+    result: >
+      Nineteen adversarial schema tests, Ruff, and mypy passed. The development DSL is
+      cycle/depth bounded, placement strict, diagnostic bounded, and IEEE-754 exact,
+      but the protocol lacks unique exhaustive output-role and native-runtime bindings.
+      Formal config/output emission therefore remains unavailable and fail-closed.
+    status: resolved
+  - id: N91
+    type: experiment
+    title: "MM-008 v2.2 cold-process hash-randomization replay"
+    provenance: ai-executed
+    timestamp: "2026-07-16T15:03+02:00"
+    also_depends_on: [N88, N89, N90]
+    evidence:
+      - "bench/multimodal_mechanism_diagnostics/cold_digest_v22.py"
+      - "tests/test_mm008_v22_cold_digest.py"
+      - "ara/evidence/mm008-v22-development-validation-2026-07-16.md"
+    result: >
+      Two clean processes using PYTHONHASHSEED 0 and 4294967295 independently collected
+      the complete 48-row graph and produced the same alias-insensitive bit-value root,
+      9044c630ae5b64119914fe42caf631ef33a9fac89dc05f9675be67c193016fa4.
+      Both exact censuses, bank expectations, predeclared runtime/RSS guardrails, and
+      formal-authority checks passed. This tests only the two hash seeds on the same
+      source, machine, venv, config token, and exposed seed 12345.
+    status: resolved
+  - id: N92
+    type: question
+    title: "Can an AIDE-lite multi-lineage scheduler improve Prospect's research loop?"
+    provenance: user
+    timestamp: "2026-07-16T15:03+02:00"
+    also_depends_on: [N86, N91]
+    description: >
+      Evaluate whether a fixed-budget three-lineage bandit with fork-on-stall and a
+      withheld evaluator produces better one-shot artifacts than Prospect's current
+      sequential next-experiment policy. Treat this as harness optimization, not model
+      weight improvement or Codex self-modification, and require anti-reward-hacking
+      controls plus task-level held-out gates.
+    evidence:
+      - "https://www.weco.ai/blog/first-evidence-of-recursive-self-improvement"
+      - "https://arxiv.org/abs/2502.13138"
+      - "https://github.com/WecoAI/aideml"
+    status: open
+  - id: N93
+    type: question
+    title: "What should follow MM-008 v2.2 development closure?"
+    provenance: user
+    timestamp: "2026-07-16T15:28+02:00"
+    also_depends_on: [N58, N88, N90, N91, N92]
+    description: >
+      Choose whether to rerun the unchanged MM-001 training preflight, complete the
+      full formal MM-008 target-aware lifecycle, use an AIDE-squared-style research
+      harness, or run a different smallest experiment that most directly advances
+      the real multimodal model question.
+    status: open
+  - id: N94
+    type: experiment
+    title: "Read-only MM-001 fast reverification after v2.2 development"
+    provenance: ai-executed
+    timestamp: "2026-07-16T15:28+02:00"
+    also_depends_on: [N58, N88, N93]
+    evidence:
+      - "bench/multimodal_preflight/results/MM-001/MM-001-results.json"
+      - "bench/multimodal_preflight/results/MM-001/MM-001-report.md"
+      - "bench/multimodal_preflight/"
+    result: >
+      The canonical fast verifier again returned
+      `real_visual_temporal_prediction_not_supported`. MM-001 and `src/prospect`
+      import no v2.2 mechanism code; v2.2 repaired the MM-008 target-aware
+      diagnostic optimizer rather than the trained MM-001 world model. An unchanged
+      MM-001 rerun would therefore test reproduction, not a model-facing repair.
+    status: resolved
+  - id: N95
+    type: experiment
+    title: "MM-009 pre-score artifact-ceiling adversarial audit"
+    provenance: ai-executed
+    timestamp: "2026-07-16T20:05+02:00"
+    also_depends_on: [N88, N93, N94]
+    evidence:
+      - "bench/multimodal_causal_diagnostics/experiment.py"
+      - "bench/multimodal_causal_diagnostics/score_launcher.py"
+      - "bench/multimodal_causal_diagnostics/future_isolation_launcher.py"
+      - "docs/research/2026-07-16-mm009-causal-deformation-appearance-prediction-protocol.md"
+      - "tests/test_mm009_experiment.py"
+    result: >
+      A read-only pre-freeze audit found the final artifact-budget implementation
+      coherent after repair: prediction freeze precedes a hash-bound current-byte
+      snapshot; conservative reserves cover the budget, future gate, score attempt,
+      all 453 score files, evidence, result, report, and self manifest; premature later
+      outputs fail closed; child RLIMIT_FSIZE and supervisor/final canonical bounds
+      enforce every reserve; score-attempt/evidence/final-tree verification bind and
+      replay the budget. The combined synthetic experiment/future/scorer/sandbox suite
+      passed 51 tests, focused Ruff and mypy passed, and independent one-byte boundary,
+      exclusivity, and canonical-file probes passed. No MM-007 real evidence content or
+      canonical MM-009 outcome was opened. This resolves only the artifact-ceiling
+      audit dimension, not the overall pre-real authorization.
+    status: resolved
+  - id: N96
+    type: dead_end
+    title: "PID-tree supervision for the MM-009 total wall"
+    provenance: ai-executed
+    timestamp: "2026-07-16T20:12+02:00"
+    also_depends_on: [N95]
+    hypothesis: >
+      Freezing the formal root and repeatedly scanning `/proc` descendants, with PID
+      start-time checks and process-group kills, is sufficient to enforce the
+      14,400-second wall across nested worker sessions.
+    failure_mode: >
+      A nested `setsid` child survived when its root exited before ancestry scanning,
+      and a double-fork/reparent variant escaped the timeout path and wrote its delayed
+      sentinel. Process ancestry and the root process group cease to identify such
+      descendants after reparenting.
+    lesson: >
+      A lifecycle wall that must contain independently sessioned descendants needs an
+      OS-owned containment identity, not a best-effort PID ancestry snapshot. Use a
+      cgroup and test normal-root exit, timeout/reparenting, and client interruption.
+    evidence:
+      - "bench/multimodal_causal_diagnostics/experiment.py"
+      - "tests/test_mm009_experiment.py"
+    status: resolved
+  - id: N97
+    type: decision
+    title: "Use a transient user-systemd cgroup for complete MM-009 lifecycles"
+    provenance: ai-executed
+    timestamp: "2026-07-16T20:12+02:00"
+    also_depends_on: [N95, N96]
+    choice: >
+      Run each formal and semantic lifecycle in a unique cgroup-v2 user-systemd
+      service with the frozen environment, `RuntimeMaxSec`, control-group SIGKILL,
+      unconditional cleanup, and an inner role assertion before artifact access.
+    alternatives:
+      - "Retain cooperative in-process deadline checks only."
+      - "Retain `/proc` descendant scanning and process-group cleanup."
+      - "Use a cgroup wrapper without interruption cleanup or inner bypass checks."
+    evidence:
+      - N96
+      - "docs/research/2026-07-16-mm009-causal-deformation-appearance-prediction-protocol.md"
+      - "bench/multimodal_causal_diagnostics/experiment.py"
+      - "tests/test_mm009_experiment.py"
+    status: resolved
+  - id: N98
+    type: experiment
+    title: "MM-009 complete pre-freeze implementation and lifecycle audit"
+    provenance: ai-executed
+    timestamp: "2026-07-16T20:12+02:00"
+    also_depends_on: [N95, N96, N97]
+    evidence:
+      - "docs/research/2026-07-16-mm009-causal-deformation-appearance-prediction-protocol.md"
+      - "bench/multimodal_causal_diagnostics/"
+      - "tests/test_mm009_*.py"
+    result: >
+      The final adversarial pre-freeze pass found no remaining high- or medium-severity
+      implementation/protocol defect. Stable file identity, complete source closure,
+      exact evidence validators, score/future Landlock custody, complete-tree closure,
+      conservative pre-score projection, cgroup hard-wall containment, interruption
+      cancellation, and inner lifecycle-role authorization are implemented. Normal
+      root exit with a nested session, timeout with a double-forked orphan, and SIGINT
+      cleanup all denied delayed escape sentinels. The complete MM-009 synthetic/unit
+      suite passed 124 tests in 159.39 seconds; Ruff and mypy passed across 29 source
+      files. This is GO for binding the final protocol/source hashes and creating the
+      independent pre-real audit record only; it is not authorization to execute real
+      MM-009 or interpret an outcome. No canonical MM-009 output or real frame archive
+      was opened during the implementation audit.
+    status: resolved
+  - id: N99
+    type: dead_end
+    title: "MM-009 one-shot stopped at the inherited parent verifier"
+    provenance: ai-executed
+    timestamp: "2026-07-16T21:58+02:00"
+    also_depends_on: [N93, N98]
+    hypothesis: >
+      The pre-real-audited MM-009 package can enter its one-shot real causal assay
+      while preserving exact historical parent verification in the formal child.
+    failure_mode: >
+      After synthetic controls passed but before any real row was detached or scored,
+      the recursive MM-007 verifier reached MM-003's byte-exact PCA refit check. Its
+      result changed by roughly 1e-14 when MM-009 forced one-thread OpenBLAS. The
+      supervisor also resolved the reviewed lexical venv path to a different terminal
+      interpreter. MM-009 is terminal `invalid_MM009`, not a scientific NO-GO.
+    lesson: >
+      A fresh successor must authenticate only the sealed files and semantics it
+      consumes, bind lexical and terminal runtime identities, and exercise the actual
+      child environment without recursively refitting historical experiments.
+    evidence:
+      - "docs/research/2026-07-16-mm009-terminal-parent-verifier-failure.md"
+      - "docs/research/2026-07-16-mm009-terminal-parent-verifier-failure.json"
+      - "bench/multimodal_causal_diagnostics/results/MM-009/"
+    status: resolved
+  - id: N100
+    type: experiment
+    title: "LCV-001 sealed lineage/runtime closure assay"
+    provenance: ai-executed
+    timestamp: "2026-07-17T00:30+02:00"
+    also_depends_on: [N99]
+    evidence:
+      - "docs/research/2026-07-16-lcv001-canonical-pass-audit.md"
+      - "docs/research/2026-07-16-lcv001-canonical-execution-receipt.json"
+      - "bench/sealed_lineage_verifier/results/LCV-001/"
+    result: >
+      LCV-001 canonically passed on the audited host: 42 single-link regular files at
+      mode 0444, 17 directories at 0555, exact manifest and successor-facing MM-007
+      semantics, 25/25 mutation/runtime controls, a one-thread SVD/runtime closure,
+      and durable cleanup. Two independent audits accepted only authorization to
+      construct and pre-real-audit a fresh MM-011; no predictor, target, or capability
+      was evaluated.
+    status: resolved
+  - id: N101
+    type: decision
+    title: "Continue with a fresh LCV-backed causal assay and an early synthetic kill test"
+    provenance: user
+    timestamp: "2026-07-17T00:45+02:00"
+    also_depends_on: [N93, N99, N100]
+    choice: >
+      Build MM-011 as a new identity over the unchanged MM-009 scientific question,
+      replace the failed historical/runtime lineage with copied LCV-001 authority,
+      and run a preregistered generated off-grid directionality audit before opening
+      any real frame or creating the canonical MM-011 root.
+    alternatives:
+      - "Rerun unchanged MM-001 training."
+      - "Start AIDE2 before closing the active mechanism question."
+      - "Repair or reuse the terminal MM-009 root."
+    evidence:
+      - "tasks/MM-011-lcv-backed-causal-deformation-appearance-prediction.md"
+      - "docs/research/2026-07-16-mm011-lcv-backed-causal-deformation-appearance-prediction-protocol.md"
+    status: resolved
+  - id: N102
+    type: dead_end
+    title: "Unexecuted MM-011 canonical lifecycle construction"
+    provenance: ai-executed
+    timestamp: "2026-07-17T02:00+02:00"
+    also_depends_on: [N100, N101]
+    hypothesis: >
+      The mechanically rebound MM-011 controller is already sufficient to make a
+      future formal real outcome self-authenticating after its LCV parent is copied.
+    failure_mode: >
+      Independent code review found that formal and semantic cleanup existed only as
+      ephemeral CLI returns, cleanup units were not cross-linked to the actual child
+      units, and the controller could import broad live repository or bytecode roots
+      before source validation. Short-timeout accounting and a copied-parent live-root
+      dependency were repaired, but the canonical lifecycle remained NO-GO.
+    lesson: >
+      Rebuild any real successor around separate provisional/finalization roots,
+      durable unit-cross-linked cleanup receipts, and a copied bytecode-free controller
+      closure. Do not spend that work on a scientific candidate that fails an earlier
+      generated gate.
+    evidence:
+      - "docs/research/2026-07-16-mm011-offgrid-sensitivity-result-audit.md"
+      - "bench/multimodal_causal_assay/supervisor.py"
+      - "tests/test_mm011_lcv_parent.py"
+    status: resolved
+  - id: N103
+    type: experiment
+    title: "MM-011 generated off-grid directionality audit"
+    provenance: ai-executed
+    timestamp: "2026-07-17T02:45+02:00"
+    also_depends_on: [N101]
+    evidence:
+      - "docs/research/2026-07-16-mm011-offgrid-sensitivity-audit.json"
+      - "docs/research/2026-07-16-mm011-offgrid-sensitivity-semantic-verification.json"
+      - "docs/research/2026-07-16-mm011-offgrid-sensitivity-result-audit.md"
+      - "ara/evidence/mm011-offgrid-sensitivity-2026-07-16.md"
+    result: >
+      All six generated cells passed activity, historical identification, forward
+      persistence improvement, and exact replay; both null controls passed. Appearance
+      cells A1-A3 also passed directionality, but translation cells T1-T3 approached
+      the previous frame at ratios 0.59482, 0.69081, and 0.75176, violating the frozen
+      greater-than-0.8 reversal condition. A clean process reproduced the receipt
+      bit-exactly, and an independent reconstruction accepted the bounded decision
+      `ABANDON_FINITE_GRID_BEFORE_REAL_DATA`. No real frame was opened.
+    status: resolved
+  - id: N104
+    type: dead_end
+    title: "Exact v2.2 coarse-grid translation as the immediate causal predictor"
+    provenance: ai-executed
+    timestamp: "2026-07-17T02:50+02:00"
+    also_depends_on: [N103]
+    hypothesis: >
+      Strong off-grid current-to-future gains from the exact coarse deformation grid
+      reflect directionally valid extrapolation and justify a one-shot real assay.
+    failure_mode: >
+      Translation cells T1-T3 improved forward error to 0.57414, 0.62426, and 0.56189
+      of persistence, yet the identical forecasts also improved previous-as-future
+      reversal to 0.59482, 0.69081, and 0.75176. The apparent gain is compatible with
+      nondirectional interpolation or smoothing, not the preregistered causal signal.
+    lesson: >
+      Forward persistence gain alone is insufficient for image registration. Require
+      previous-as-future directionality on off-grid generated motion before real data.
+    evidence:
+      - N103
+      - "docs/research/2026-07-16-mm011-offgrid-sensitivity-result-audit.md"
+    status: resolved
+  - id: N105
+    type: pivot
+    title: "Replace the finite grid with a fresh continuous-registration assay"
+    provenance: ai-suggested
+    timestamp: "2026-07-17T03:00+02:00"
+    also_depends_on: [N102, N103, N104]
+    from: >
+      Canonical real MM-011 execution with the exact v2.2 coarse affine grid.
+    to: >
+      A new-identity generated assay comparing continuous/subpixel translation and
+      continuous affine refinement against the frozen coarse-grid reference on fresh
+      development seeds and untouched confirmation seeds, while retaining historical,
+      forward, reversal, identity, and low-texture predicates.
+    trigger: >
+      The preregistered translation coverage cells failed directionality, and the
+      unexecuted canonical harness also failed independent lifecycle review.
+    status: open
