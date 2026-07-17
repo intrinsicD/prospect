@@ -14,9 +14,11 @@ dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10"]
 # Optional mature tensor/replay substrate. The domain, runtime, and exact
 # epistemic reference evaluator remain standard-library only.
 runtime = [
-    "torch>=2.9,<2.10",
+    "torch==2.9.0",
     "torchrl==0.13.3",
     "tensordict==0.13.0",
+    "gymnasium==0.29.1",
+    "jsonschema==4.25.1",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -34,7 +36,7 @@ target-version = "py311"
 select = ["E", "F", "B", "UP", "I"]
 
 [tool.mypy]
-files = ["src/prospect", "bench/epistemic", "tests"]
+files = ["src/prospect", "bench/epistemic", "tests/test_epistemic_*.py"]
 mypy_path = "src"
 python_version = "3.11"
 disallow_untyped_defs = true
@@ -43,5 +45,5 @@ warn_return_any = true
 no_implicit_optional = true
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "torchrl.*", "tensordict.*"]
+module = ["gymnasium.*", "torch.*", "torchrl.*", "tensordict.*"]
 ignore_missing_imports = true

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from contextlib import ExitStack
 from dataclasses import dataclass
 from math import isfinite
 from typing import Never, Protocol, runtime_checkable
@@ -35,6 +36,12 @@ from .journal import (
     LifecycleJournal,
     LifecycleRecord,
     LifecycleStage,
+)
+from .learning import (
+    ModelState,
+    OwnedModel,
+    PreparedLearningUpdate,
+    TransactionalLearner,
 )
 from .state import AgentState, StateTransitionError
 
@@ -174,10 +181,11 @@ class EpistemicAgent:
         belief_updater: BeliefUpdater,
         scorer: Scorer,
         effect_assessor: EffectAssessor,
-        learner: Learner,
+        learner: Learner | TransactionalLearner,
         experience_store: ExperienceStore,
         ledger: EpistemicLedger,
         identities: CounterIdentitySource,
+        model: OwnedModel | None = None,
         replay: ReplayIndex | None = None,
         lifecycle_journal: LifecycleJournal | None = None,
     ) -> None:
@@ -187,6 +195,7 @@ class EpistemicAgent:
         self._scorer = scorer
         self._effect_assessor = effect_assessor
         self._learner = learner
+        self._model = model
         self._experience_store = experience_store
         self._ledger = ledger
         self._identities = identities
@@ -408,13 +417,65 @@ class EpistemicAgent:
         *,
         at: TimePoint,
     ) -> UpdateReceipt:
-        """Apply an explicit learner update to a declared transition sequence."""
+        """Apply one causally linked persistent update.
+
+        With an owned model configured, the learner receives only immutable
+        checkpoint bytes and prepares a candidate. All lineage, receipt, version,
+        and digest claims are validated before the live model is swapped.
+        """
 
         inputs = tuple(transitions)
         if not inputs:
             raise ValueError("learning requires at least one epistemic transition")
+        self._require_canonical_learning_inputs(inputs)
         snapshot = self._state.snapshot(self.agent_id, at)
-        receipt = self._learner.update(snapshot, inputs)
+        if self._model is None:
+            if not isinstance(self._learner, Learner):
+                raise RuntimeError("a transactional learner requires an owned model")
+            receipt = self._learner.update(snapshot, inputs)
+            self._validate_learning_receipt(snapshot, inputs, receipt)
+            self._append_and_apply_receipt(receipt)
+            return receipt
+
+        if not isinstance(self._learner, TransactionalLearner):
+            raise RuntimeError("an owned model requires a transactional learner")
+        current_model = self._model.snapshot_state()
+        if current_model.version != snapshot.model_version:
+            raise RuntimeError("owned model version does not match the frozen agent snapshot")
+        prepared = self._learner.prepare(snapshot, inputs, current_model)
+        if not isinstance(prepared, PreparedLearningUpdate):
+            raise RuntimeError("transactional learner returned an invalid prepared update")
+        receipt = prepared.receipt
+        self._validate_learning_receipt(snapshot, inputs, receipt)
+        self._validate_prepared_model_update(prepared, current_model)
+        self._commit_model_learning_transaction(
+            inputs=inputs,
+            receipt=receipt,
+            current_model=current_model,
+            candidate_model=prepared.candidate_model,
+        )
+        return receipt
+
+    def _require_canonical_learning_inputs(
+        self,
+        transitions: tuple[EpistemicTransition, ...],
+    ) -> None:
+        for transition in transitions:
+            try:
+                canonical = self._ledger.get_transition(transition.transition_id)
+            except KeyError as error:
+                raise RuntimeError(
+                    f"learning transition {transition.transition_id!r} is absent from the canonical ledger"
+                ) from error
+            if canonical is not transition:
+                raise RuntimeError("learning requires exact canonical transition objects")
+
+    def _validate_learning_receipt(
+        self,
+        snapshot: AgentSnapshot,
+        inputs: tuple[EpistemicTransition, ...],
+        receipt: UpdateReceipt,
+    ) -> None:
         if len(receipt.transitions) != len(inputs) or any(
             received is not supplied for received, supplied in zip(receipt.transitions, inputs, strict=True)
         ):
@@ -428,12 +489,92 @@ class EpistemicAgent:
             self._state.validate_update(receipt)
         except StateTransitionError as error:
             raise RuntimeError("learner returned an invalid version transition") from error
-        self._ledger.append_update(receipt)
-        try:
-            self._state.apply_update(receipt)
-        except StateTransitionError as error:
-            raise RuntimeError("prevalidated learner receipt became invalid before state apply") from error
-        return receipt
+
+    @staticmethod
+    def _validate_prepared_model_update(
+        prepared: PreparedLearningUpdate,
+        current_model: ModelState,
+    ) -> None:
+        receipt = prepared.receipt
+        candidate = prepared.candidate_model
+        if prepared.source_model_digest != current_model.digest:
+            raise RuntimeError("learner prepared the candidate from a different model digest")
+        if receipt.previous_model_version != current_model.version:
+            raise RuntimeError("learning receipt previous model version does not identify the owned model")
+        if receipt.new_model_version != candidate.version:
+            raise RuntimeError("learning receipt new model version does not identify the candidate")
+        if candidate.version == current_model.version:
+            raise RuntimeError("transactional learning must advance the model version")
+        if candidate.digest == current_model.digest:
+            raise RuntimeError("transactional learning must change the model checkpoint bytes")
+
+    def _append_and_apply_receipt(self, receipt: UpdateReceipt) -> None:
+        """Atomically commit the canonical receipt and its state transition."""
+
+        with ExitStack() as locks:
+            locks.enter_context(self._state.transaction_lock())
+            locks.enter_context(self._ledger.transaction_lock())
+            try:
+                state_update = self._state.prepare_update(receipt)
+            except StateTransitionError as error:
+                raise RuntimeError("prevalidated learner receipt became invalid before state apply") from error
+            ledger_update = self._ledger.prepare_update(receipt)
+            try:
+                self._ledger.commit_prepared_update(ledger_update)
+                self._state.commit_prepared_update(state_update)
+            except BaseException:
+                self._state.rollback_prepared_update(state_update)
+                self._ledger.rollback_prepared_update(ledger_update)
+                raise
+
+    def _commit_model_learning_transaction(
+        self,
+        *,
+        inputs: tuple[EpistemicTransition, ...],
+        receipt: UpdateReceipt,
+        current_model: ModelState,
+        candidate_model: ModelState,
+    ) -> None:
+        """Commit ledger, state, and model as one rollback-safe critical section."""
+
+        model = self._model
+        if model is None:
+            raise RuntimeError("transactional model commit requires an owned model")
+        with ExitStack() as locks:
+            # All learning commits use this order. Other runtime operations hold
+            # at most one of these locks, avoiding a cyclic acquisition path.
+            locks.enter_context(self._state.transaction_lock())
+            locks.enter_context(self._ledger.transaction_lock())
+            locks.enter_context(model.transaction_lock())
+
+            # Learner preparation deliberately happens outside the critical
+            # section. Repeating every mutable preflight here prevents that work
+            # from committing against state advanced by a concurrent interaction
+            # or learning call.
+            self._require_canonical_learning_inputs(inputs)
+            try:
+                state_update = self._state.prepare_update(receipt)
+            except StateTransitionError as error:
+                raise RuntimeError("prevalidated learner receipt became invalid before state apply") from error
+            ledger_update = self._ledger.prepare_update(receipt)
+            try:
+                swap = model.prepare_swap(current_model, candidate_model)
+            except Exception as error:
+                raise RuntimeError("prepared model candidate failed owner validation") from error
+
+            try:
+                self._ledger.commit_prepared_update(ledger_update)
+                self._state.commit_prepared_update(state_update)
+                model.commit_swap(swap)
+            except BaseException:
+                # Each compensation is a direct in-memory restore performed while
+                # all participant locks remain held. A commit wrapper that raises
+                # after applying its stage is therefore handled identically to a
+                # failure before that stage.
+                model.rollback_swap(swap)
+                self._state.rollback_prepared_update(state_update)
+                self._ledger.rollback_prepared_update(ledger_update)
+                raise
 
     def _reject_stored_step(self, context: InteractionContext) -> None:
         stored = self._find_stored_step(context)

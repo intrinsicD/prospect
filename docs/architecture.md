@@ -119,13 +119,23 @@ environment step and derives learner-specific views afterward.
 `TensorDictExperienceReplay` is an optional TorchRL sampling index and cannot
 replace them. Imagined outcomes never enter the real-experience namespace.
 
+Persistent model learning uses explicit ownership. A transactional learner
+prepares candidate bytes from an immutable model snapshot. The runtime validates
+experience ancestry, receipt versions, and predecessor/candidate digests, then
+commits the update ledger, agent learning state, and owned model inside one lock
+order. If an in-process exception occurs during commit, all three participants
+are restored before the exception escapes. This provides in-process
+failure-atomicity; it is not durable crash recovery.
+
 Persistence uses a manifest over component-owned byte states. The coordinator
 binds versions, media types, sizes, and hashes and performs atomic local
 replacement. The caller must declare the resume boundary and supply every
 stateful component; the generic coordinator cannot prove component completeness.
-Exact mid-episode restoration is not claimed: it additionally requires the
-environment, recurrent belief, pending action, external side effects, and random
-number generator state.
+WM-001 makes that declaration concrete at an episode boundary with 15 required
+model, optimizer, ledger, experience, replay, runtime, scaling, and RNG
+components, then verifies behavior in a fresh process. Exact mid-episode
+restoration is not claimed: it additionally requires the environment, recurrent
+belief, pending action, external side effects, and RNG state at that boundary.
 
 ## Decision policy
 
@@ -170,21 +180,23 @@ continuous causal chain.
 
 ## Open engineering boundaries
 
-- A neural/control backend must replace the exact finite reference without changing
-  the lifecycle semantics.
-- The learner protocol needs a transactional prepare/validate/commit boundary;
-  the current `update` call cannot guarantee that backend state and the canonical
-  receipt/state ledger advance atomically.
+- WM-001 supplies the first probabilistic neural world-model and fixed-budget
+  control backend without changing lifecycle semantics, but its collect → learn
+  → improve → retain claim remains unestablished until a formal artifact passes
+  independent audit.
 - Value-of-information estimates require their own calibration and adversarial
   controls.
 - The current in-memory lifecycle journal exposes partial completion but cannot
   automatically continue or survive restart. Durable idempotent recovery is still
-  required; atomic rollback is not a valid answer once real experience is stored.
-- Runtime multi-operation sequences are not globally serialized; concurrent
-  callers can race between preflight, append, and state application.
+  required; the transactional learning path handles in-process failures but not
+  abrupt process death between durable writes.
+- The learning commit is serialized across state, ledger, and model ownership,
+  but other runtime multi-operation sequences are not globally serialized.
+  Concurrent callers can still race across interaction-stage boundaries.
 - Exact mid-episode resume requires environment, recurrent-belief, pending-action,
   side-effect, and RNG reconciliation.
 - Continual learning must demonstrate both retention and plasticity across
-  overlapping tasks; task-keyed independent tables are only a semantic reference.
+  broader overlapping tasks; WM-001's two observed-context actuator regimes are
+  only the first bounded test.
 - External benchmark results and strong published baselines are required before
   making a capability or novelty claim.

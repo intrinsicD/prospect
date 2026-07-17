@@ -1,0 +1,8 @@
+sessions:
+  - id: "2026-07-17_001"
+    date: "2026-07-17"
+    summary: "Opened the first post-reset experiment question and staged a Pendulum world-model lifecycle candidate."
+    turn_count: 1
+    events_count: 5
+    claims_touched: []
+    open_threads: 2

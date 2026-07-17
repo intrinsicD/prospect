@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v1.json",
+  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v2.json",
   "title": "WM-001 formal implementation binding",
   "type": "object",
   "additionalProperties": false,
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.formal-binding.v1"
+      "const": "prospect.world-model-lifecycle.formal-binding.v2"
     },
     "experiment_id": {
       "const": "WM-001"
@@ -34,7 +34,7 @@
       ],
       "properties": {
         "version": {
-          "const": "1.0.0"
+          "const": "1.1.1"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -59,6 +59,8 @@
         "git_tree",
         "worktree_clean",
         "implementation_files",
+        "test_report_file",
+        "test_report_bytes",
         "test_report_sha256"
       ],
       "properties": {
@@ -79,6 +81,13 @@
           "items": {
             "$ref": "#/$defs/fileDigest"
           }
+        },
+        "test_report_file": {
+          "$ref": "#/$defs/siblingFilename"
+        },
+        "test_report_bytes": {
+          "type": "integer",
+          "minimum": 1
         },
         "test_report_sha256": {
           "$ref": "#/$defs/sha256"
@@ -138,7 +147,11 @@
         "device",
         "accelerator",
         "deterministic_algorithms",
-        "thread_count"
+        "thread_count",
+        "interop_thread_count",
+        "cuda_runtime",
+        "cuda_driver",
+        "cublas_workspace_config"
       ],
       "properties": {
         "platform": {
@@ -168,8 +181,55 @@
         "thread_count": {
           "type": "integer",
           "minimum": 1
+        },
+        "interop_thread_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cuda_runtime": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cuda_driver": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cublas_workspace_config": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "device": {
+                "const": "cuda"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "cublas_workspace_config": {
+                "const": ":4096:8"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "cublas_workspace_config": {
+                "const": null
+              }
+            }
+          }
+        }
+      ]
     },
     "environment": {
       "type": "object",
@@ -178,6 +238,8 @@
         "id",
         "wrapper_source_sha256",
         "installed_distribution_sha256",
+        "conformance_report_file",
+        "conformance_report_bytes",
         "conformance_report_sha256"
       ],
       "properties": {
@@ -189,6 +251,13 @@
         },
         "installed_distribution_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "conformance_report_file": {
+          "$ref": "#/$defs/siblingFilename"
+        },
+        "conformance_report_bytes": {
+          "type": "integer",
+          "minimum": 1
         },
         "conformance_report_sha256": {
           "$ref": "#/$defs/sha256"
@@ -248,6 +317,11 @@
     "sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "siblingFilename": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\]+$"
     },
     "fileDigest": {
       "type": "object",

@@ -1,0 +1,2146 @@
+"""End-to-end WM-001 experiment harness.
+
+This module executes the sealed causal sequence.  Formal configuration is
+accepted only at the exact protocol budgets; development configuration keeps
+the same semantics while reducing collection, behavior, and optimizer budgets.
+"""
+
+from __future__ import annotations
+
+import base64
+import gc
+import hashlib
+import json
+import os
+import platform
+import random
+import subprocess
+import sys
+import time
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import cast
+
+import numpy as np
+import torch
+
+from prospect.domain import AgentSnapshot, EpistemicTransition, TimePoint, UpdateReceipt
+
+from .artifact import atomic_write_exclusive
+from .checkpoint import (
+    CANONICAL_COMPONENT_IDS,
+    ComponentPayload,
+    canonical_json_bytes,
+    save_checkpoint,
+    snapshot_numpy_rng,
+    snapshot_python_rng,
+    snapshot_torch_accelerator_rng,
+    snapshot_torch_cpu_rng,
+)
+from .domain_graph import (
+    belief_external_reference,
+    encode_domain_graph,
+    transition_external_reference,
+    update_external_reference,
+)
+from .learning import (
+    LearningEvidence,
+    RejectedUpdateProbeLearner,
+    TransactionalWorldModelLearner,
+    WorldModelRuntime,
+)
+from .model import (
+    FixedScaling,
+    PredictiveMetrics,
+    TransitionBatch,
+    evaluate_mixture,
+)
+from .parity import (
+    compare_parity,
+    evaluate_live_state,
+    load_evaluation,
+    snapshot_planner_rng,
+)
+from .planning import (
+    CEMController,
+    analytic_pendulum_step,
+    make_learned_model_env,
+    make_true_dynamics_env,
+    run_pendulum_conformance,
+)
+from .runtime_lane import (
+    AGENT_ID,
+    CollectionEvidence,
+    EpisodeEvidence,
+    PendulumEpisodeSession,
+    PredictiveBackend,
+    PresetActionController,
+    RuntimeCustody,
+    UniformRandomController,
+    collect_episodes,
+    make_branch_learning_agent,
+    run_episode,
+    transition_arrays,
+    transition_lineage_row,
+)
+from .verify import (
+    DEVELOPMENT_SEEDS,
+    FORMAL_SEEDS,
+    PROTOCOL_PATH,
+    derive_seed,
+)
+
+TASK_A = "pendulum_normal_torque"
+TASK_B = "pendulum_reversed_torque"
+PROTOCOL_SHA256 = hashlib.sha256(PROTOCOL_PATH.read_bytes()).hexdigest()
+T_CRITICAL_DF7 = 2.364624251
+
+
+@dataclass(frozen=True, slots=True)
+class ExperimentConfig:
+    """Lane-specific execution budgets."""
+
+    lane: str
+    master_seeds: tuple[int, ...]
+    collection_episodes: int
+    validation_episodes: int
+    behavior_episodes: int
+    optimizer_steps: int
+    device: str
+
+    @classmethod
+    def development(
+        cls,
+        *,
+        master_seeds: Sequence[int] = DEVELOPMENT_SEEDS,
+        device: str | None = None,
+    ) -> ExperimentConfig:
+        return cls(
+            lane="development",
+            master_seeds=tuple(master_seeds),
+            collection_episodes=4,
+            validation_episodes=8,
+            behavior_episodes=2,
+            optimizer_steps=300,
+            device=device or ("cuda" if torch.cuda.is_available() else "cpu"),
+        )
+
+    @classmethod
+    def formal(cls, *, device: str | None = None) -> ExperimentConfig:
+        return cls(
+            lane="formal",
+            master_seeds=FORMAL_SEEDS,
+            collection_episodes=8,
+            validation_episodes=8,
+            behavior_episodes=32,
+            optimizer_steps=2000,
+            device=device or ("cuda" if torch.cuda.is_available() else "cpu"),
+        )
+
+    def validate(self) -> None:
+        if self.lane not in {"development", "formal"}:
+            raise ValueError("lane must be development or formal")
+        if self.device not in {"cpu", "cuda", "mps"}:
+            raise ValueError("unsupported execution device")
+        if self.device == "cuda" and not torch.cuda.is_available():
+            raise ValueError("CUDA was requested but is unavailable")
+        if (
+            min(
+                self.collection_episodes,
+                self.validation_episodes,
+                self.behavior_episodes,
+                self.optimizer_steps,
+            )
+            < 1
+        ):
+            raise ValueError("all execution budgets must be positive")
+        if self.validation_episodes != 8:
+            raise ValueError("raw predictive evidence requires the sealed 1,600-transition validation split")
+        if self.lane == "formal":
+            expected = self.formal(device=self.device)
+            if self != expected:
+                raise ValueError("formal WM-001 budgets or seeds differ from the sealed protocol")
+        elif not set(self.master_seeds) <= set(DEVELOPMENT_SEEDS):
+            raise ValueError("development uses an undeclared master seed")
+
+
+class OraclePredictiveBackend(PredictiveBackend):
+    """Exact separately namespaced prediction backend for the oracle control."""
+
+    version = "wm001-analytic-pendulum-v1"
+    digest = hashlib.sha256(b"WM-001|Gymnasium-Pendulum-v1|analytic-oracle-v1").hexdigest()
+
+    def predict_ensemble(
+        self,
+        observation: np.ndarray,
+        context: float,
+        action: float,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        next_observation, _, _ = analytic_pendulum_step(observation, context, [action])
+        values = next_observation.detach().cpu().numpy().astype(np.float64)
+        means = np.repeat(values[None, :], 5, axis=0)
+        variances = np.full_like(means, 1e-12)
+        return means, variances
+
+
+@dataclass(slots=True)
+class ReplicateRows:
+    """Mutable raw-evidence accumulator for one replicate."""
+
+    replicate_id: str
+    master_seed: int
+    derived_seeds: list[dict[str, object]]
+    episodes: list[dict[str, object]]
+    transitions: list[dict[str, object]]
+    updates: list[dict[str, object]]
+    optimizer_batch_manifests: list[dict[str, object]]
+    predictive_metrics: list[dict[str, object]]
+    policy_runs: list[dict[str, object]]
+    evaluated_checkpoints: list[dict[str, object]]
+    checkpoint_components: list[dict[str, object]]
+    checkpoint_archive: dict[str, object] | None = None
+    restart_parity: dict[str, object] | None = None
+
+    @classmethod
+    def create(cls, replicate_id: str, master_seed: int) -> ReplicateRows:
+        protocol = json.loads(PROTOCOL_PATH.read_text(encoding="utf-8"))
+        declarations = protocol["seed_schedule"]["namespaces"]
+        derived = [
+            {
+                "namespace": namespace,
+                "values": [derive_seed(namespace, master_seed, index) for index in range(int(declaration["count"]))],
+            }
+            for namespace, declaration in declarations.items()
+        ]
+        return cls(
+            replicate_id=replicate_id,
+            master_seed=master_seed,
+            derived_seeds=derived,
+            episodes=[],
+            transitions=[],
+            updates=[],
+            optimizer_batch_manifests=[],
+            predictive_metrics=[],
+            policy_runs=[],
+            evaluated_checkpoints=[],
+            checkpoint_components=[],
+        )
+
+    def seed(self, namespace: str, index: int = 0) -> int:
+        for row in self.derived_seeds:
+            if row["namespace"] == namespace:
+                return int(cast(list[int], row["values"])[index])
+        raise KeyError(namespace)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "replicate_id": self.replicate_id,
+            "master_seed": self.master_seed,
+            "derived_seeds": self.derived_seeds,
+            "episodes": self.episodes,
+            "transitions": self.transitions,
+            "updates": self.updates,
+            "optimizer_batch_manifests": self.optimizer_batch_manifests,
+            "predictive_metrics": self.predictive_metrics,
+            "policy_runs": self.policy_runs,
+            "evaluated_checkpoints": self.evaluated_checkpoints,
+            "checkpoint_components": self.checkpoint_components,
+            "checkpoint_archive": self.checkpoint_archive,
+            "restart_parity": self.restart_parity,
+        }
+
+
+def utc_now() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def append_policy_run(
+    rows: ReplicateRows,
+    *,
+    run_id: str,
+    task_id: str,
+    split: str,
+    condition: str,
+    checkpoint_id: str,
+    controller_kind: str,
+    controller_version: str,
+    seed_namespace: str,
+    seed_index: int,
+    seed: int,
+    reset_seeds: Sequence[int],
+    episode_ids: Sequence[str],
+    intended_actions: Sequence[float],
+    applied_actions: Sequence[float],
+    rng_start_sha256: str,
+    rng_end_sha256: str,
+    action_count: int,
+    planner_budget: dict[str, int] | None,
+) -> None:
+    """Bind a whole real-execution run to its declared RNG stream."""
+
+    if len(episode_ids) != len(reset_seeds):
+        raise RuntimeError("policy run episode IDs and reset seeds differ in length")
+    if len(intended_actions) != len(applied_actions) or len(intended_actions) != action_count:
+        raise RuntimeError("policy run action trace differs from its controller draw count")
+    trace = {
+        "episode_ids": list(episode_ids),
+        "intended": [float(value) for value in intended_actions],
+        "applied": [float(value) for value in applied_actions],
+    }
+    rows.policy_runs.append(
+        {
+            "run_id": run_id,
+            "task_id": task_id,
+            "split": split,
+            "condition": condition,
+            "checkpoint_id": checkpoint_id,
+            "controller_kind": controller_kind,
+            "controller_version": controller_version,
+            "seed_namespace": seed_namespace,
+            "seed_index": seed_index,
+            "seed": seed,
+            "reset_seeds": list(reset_seeds),
+            "episode_ids": list(episode_ids),
+            "rng_start_sha256": rng_start_sha256,
+            "rng_end_sha256": rng_end_sha256,
+            "action_count": action_count,
+            "action_trace_sha256": hashlib.sha256(canonical_json_bytes(trace)).hexdigest(),
+            "planner_budget": planner_budget,
+        }
+    )
+
+
+def append_collection_policy_run(
+    rows: ReplicateRows,
+    collection: CollectionEvidence,
+    *,
+    split: str,
+    condition: str,
+    checkpoint_id: str,
+    controller: UniformRandomController,
+    seed_namespace: str,
+    seed_index: int,
+    seed: int,
+    rng_start_sha256: str,
+    actions_before: int,
+) -> None:
+    """Preserve RNG and action-use evidence for a random collection run."""
+
+    episodes = collection.episodes
+    append_policy_run(
+        rows,
+        run_id=collection.run_id,
+        task_id=collection.task_id,
+        split=split,
+        condition=condition,
+        checkpoint_id=checkpoint_id,
+        controller_kind="uniform_random",
+        controller_version=controller.version,
+        seed_namespace=seed_namespace,
+        seed_index=seed_index,
+        seed=seed,
+        reset_seeds=[episode.reset_seed for episode in episodes],
+        episode_ids=[episode.episode_id for episode in episodes],
+        intended_actions=[action for episode in episodes for action in episode.intended_actions],
+        applied_actions=[action for episode in episodes for action in episode.applied_actions],
+        rng_start_sha256=rng_start_sha256,
+        rng_end_sha256=controller.rng_digest,
+        action_count=controller.actions_emitted - actions_before,
+        planner_budget=None,
+    )
+
+
+def preserve_evaluated_checkpoint(
+    rows: ReplicateRows,
+    *,
+    condition: str,
+    runtime: WorldModelRuntime,
+    output_directory: Path,
+) -> None:
+    """Write the exact compound model/optimizer state used by a condition."""
+
+    if any(row["condition"] == condition for row in rows.evaluated_checkpoints):
+        raise RuntimeError(f"evaluated checkpoint {condition!r} was preserved twice")
+    state = runtime.owner.snapshot_state()
+    filename = f"{rows.replicate_id}-{condition}-model-state.bin"
+    path = output_directory / filename
+    atomic_write_exclusive(path, state.payload)
+    rows.evaluated_checkpoints.append(
+        {
+            "condition": condition,
+            "model_version": state.version,
+            "parameter_sha256": runtime.digest,
+            "live_state_sha256": state.digest,
+            "media_type": "application/vnd.prospect.wm001.owned-model-state",
+            "bytes": len(state.payload),
+            "sha256": hashlib.sha256(state.payload).hexdigest(),
+            "filename": filename,
+        }
+    )
+
+
+def load_evaluated_checkpoint(
+    rows: ReplicateRows,
+    *,
+    condition: str,
+    output_directory: Path,
+    device: str,
+) -> WorldModelRuntime:
+    """Reload and revalidate one immutable evaluation state from its artifact."""
+
+    matches = [row for row in rows.evaluated_checkpoints if row.get("condition") == condition]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one preserved evaluated checkpoint for {condition!r}")
+    reference = matches[0]
+    filename = reference.get("filename")
+    if not isinstance(filename, str) or Path(filename).name != filename:
+        raise RuntimeError(f"evaluated checkpoint {condition!r} has an unsafe filename")
+    path = output_directory / filename
+    payload = path.read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()
+    if len(payload) != reference.get("bytes") or digest != reference.get("sha256"):
+        raise RuntimeError(f"evaluated checkpoint {condition!r} file reference differs")
+    if digest != reference.get("live_state_sha256"):
+        raise RuntimeError(f"evaluated checkpoint {condition!r} live-state digest differs")
+    runtime = WorldModelRuntime.from_payload(payload, device=device)
+    if (
+        runtime.version != reference.get("model_version")
+        or runtime.digest != reference.get("parameter_sha256")
+        or runtime.live_state_digest != reference.get("live_state_sha256")
+    ):
+        raise RuntimeError(f"evaluated checkpoint {condition!r} semantic identity differs")
+    return runtime
+
+
+def configure_determinism(seed: int, *, device: str) -> None:
+    """Configure every process-global RNG and deterministic Torch path."""
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(True)
+    torch.backends.cudnn.benchmark = False
+    if hasattr(torch.backends, "cuda"):
+        torch.backends.cuda.matmul.allow_tf32 = False
+    if hasattr(torch.backends, "cudnn"):
+        torch.backends.cudnn.allow_tf32 = False
+    if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
+        raise RuntimeError("deterministic CUDA requires CUBLAS_WORKSPACE_CONFIG=:4096:8 before Python starts")
+
+
+def to_transition_batch(transitions: Sequence[EpistemicTransition]) -> TransitionBatch:
+    observations, contexts, actions, targets, transition_ids = transition_arrays(transitions)
+    return TransitionBatch.from_arrays(
+        transition_ids=transition_ids,
+        observations=observations,
+        contexts=contexts,
+        actions=actions,
+        next_observations=observations + targets[:, :3],
+        rewards=targets[:, 3],
+    )
+
+
+def append_collection_rows(
+    rows: ReplicateRows,
+    collection: CollectionEvidence,
+    *,
+    split: str,
+    condition: str,
+    checkpoint_id: str,
+    learning_allowed: bool,
+    replay_writes_allowed: bool,
+    started_at: str,
+    completed_at: str,
+) -> None:
+    for episode in collection.episodes:
+        append_episode_rows(
+            rows,
+            episode,
+            split=split,
+            condition=condition,
+            checkpoint_id=checkpoint_id,
+            learning_allowed=learning_allowed,
+            replay_writes_allowed=replay_writes_allowed,
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+
+
+def append_episode_rows(
+    rows: ReplicateRows,
+    episode: EpisodeEvidence,
+    *,
+    split: str,
+    condition: str,
+    checkpoint_id: str,
+    learning_allowed: bool,
+    replay_writes_allowed: bool,
+    started_at: str,
+    completed_at: str,
+) -> None:
+    first_decision = episode.transitions[0].experience.decision
+    if first_decision is None:
+        raise ValueError("WM-001 episode has no first decision")
+    first_prediction = first_decision.selected_assessment.prediction
+    first_parameters = cast(dict[str, object], first_prediction.distribution.parameters)
+    action_trace = {
+        "intended": list(episode.intended_actions),
+        "applied": list(episode.applied_actions),
+    }
+    rows.episodes.append(
+        {
+            "episode_id": episode.episode_id,
+            "run_id": episode.transitions[0].experience.run_id,
+            "task_id": episode.task_id,
+            "split": split,
+            "condition": condition,
+            "checkpoint_id": checkpoint_id,
+            "reset_seed": episode.reset_seed,
+            "process_id": os.getpid(),
+            "model_version": first_prediction.model_version,
+            "parameter_sha256": str(first_parameters["parameter_digest"]),
+            "learning_allowed": learning_allowed,
+            "replay_writes_allowed": replay_writes_allowed,
+            "environment_steps": len(episode.transitions),
+            "return": episode.undiscounted_return,
+            "started_at_utc": started_at,
+            "completed_at_utc": completed_at,
+            "action_trace_sha256": hashlib.sha256(canonical_json_bytes(action_trace)).hexdigest(),
+            "transition_ids": [transition.transition_id for transition in episode.transitions],
+        }
+    )
+    for transition in episode.transitions:
+        lineage = transition_lineage_row(transition, split=split)
+        target = _transition_target(transition)
+        scaled_target = _scaled_transition_target(transition)
+        rows.transitions.append(
+            {
+                "transition_id": str(lineage["transition_id"]),
+                "run_id": str(lineage["run_id"]),
+                "episode_id": str(lineage["episode_id"]),
+                "task_id": str(lineage["task_id"]),
+                "task_context": float(lineage["task_context"]),
+                "split": split,
+                "step_index": int(lineage["step_index"]),
+                "real_or_imagined": "real",
+                "pre_observation_id": str(lineage["pre_action_observation_id"]),
+                "decision_id": str(lineage["decision_id"]),
+                "executed_action_id": str(lineage["executed_action_id"]),
+                "next_observation_id": str(lineage["next_observation_id"]),
+                "model_version_at_action": str(lineage["model_version_at_action"]),
+                "parameter_sha256_at_action": str(lineage["parameter_digest_at_action"]),
+                "pre_observation": [float(value) for value in cast(Sequence[float], target["before"])],
+                "intended_action": float(lineage["intended_action"]),
+                "applied_action": float(lineage["applied_action"]),
+                "next_observation": [float(value) for value in cast(Sequence[float], target["next"])],
+                "reward": float(lineage["reward"]),
+                "terminated": bool(lineage["terminated"]),
+                "truncated": bool(lineage["truncated"]),
+                "scaled_target": list(scaled_target),
+                "target_sha256": _scaled_target_sha256(scaled_target),
+            }
+        )
+
+
+def _transition_target(transition: EpistemicTransition) -> dict[str, object]:
+    decision = transition.experience.decision
+    if decision is None:
+        raise ValueError("transition target has no decision")
+    before = cast(
+        dict[str, object],
+        decision.belief.distribution.parameters,
+    )["physical_observation"]
+    observation_payload = cast(
+        dict[str, object],
+        transition.experience.observation.evidence.payload,
+    )
+    outcome_payload = cast(
+        dict[str, object],
+        transition.experience.outcome.evidence.payload,
+    )
+    return {
+        "before": before,
+        "context": outcome_payload["task_context"],
+        "intended_action": outcome_payload["intended_torque"],
+        "applied_action": outcome_payload["applied_torque"],
+        "next": observation_payload["physical_observation"],
+        "reward": outcome_payload["reward"],
+    }
+
+
+def _scaled_transition_target(
+    transition: EpistemicTransition,
+) -> tuple[float, float, float, float]:
+    """Return the protocol-fixed scaled target in canonical field order."""
+
+    target = _transition_target(transition)
+    before = np.asarray(target["before"], dtype=np.float64)
+    after = np.asarray(target["next"], dtype=np.float64)
+    return cast(
+        tuple[float, float, float, float],
+        tuple(
+            [
+                (after[0] - before[0]) / 2.0,
+                (after[1] - before[1]) / 2.0,
+                (after[2] - before[2]) / 16.0,
+                float(target["reward"]) / 16.2736044,
+            ]
+        ),
+    )
+
+
+def _scaled_target_sha256(
+    scaled_target: Sequence[float],
+) -> str:
+    """Hash four scaled targets as little-endian IEEE-754 float64 bytes."""
+
+    scaled = np.asarray(scaled_target, dtype="<f8")
+    if scaled.shape != (4,) or not np.isfinite(scaled).all():
+        raise ValueError("scaled WM-001 target must contain four finite values")
+    return hashlib.sha256(scaled.tobytes(order="C")).hexdigest()
+
+
+def append_predictive_metric(
+    rows: ReplicateRows,
+    metrics: PredictiveMetrics,
+    *,
+    runtime: WorldModelRuntime,
+    task_id: str,
+    condition: str,
+    checkpoint_id: str,
+    split: str,
+    evidence_directory: Path,
+) -> None:
+    evidence_path = evidence_directory / (f"{rows.replicate_id}-{task_id}-{condition}-predictions.bin")
+    atomic_write_exclusive(evidence_path, metrics.prediction_payload)
+    if hashlib.sha256(evidence_path.read_bytes()).hexdigest() != metrics.prediction_rows_sha256:
+        raise RuntimeError("persisted predictive evidence digest differs from its metric row")
+    rows.predictive_metrics.append(
+        {
+            "task_id": task_id,
+            "condition": condition,
+            "checkpoint_id": checkpoint_id,
+            "model_version": runtime.version,
+            "parameter_sha256": runtime.digest,
+            "live_state_sha256": runtime.live_state_digest,
+            "split": split,
+            "transition_count": metrics.transition_count,
+            "mixture_nll_nats_per_target_dimension": metrics.mixture_nll_nats_per_target_dimension,
+            "normalized_rmse": metrics.normalized_rmse,
+            "interval_90_coverage": metrics.interval_90_coverage,
+            "prediction_rows_sha256": metrics.prediction_rows_sha256,
+            "prediction_evidence_file": evidence_path.name,
+            "prediction_evidence_bytes": len(metrics.prediction_payload),
+        }
+    )
+
+
+def append_update_row(
+    rows: ReplicateRows,
+    receipt: UpdateReceipt,
+    evidence: LearningEvidence,
+    *,
+    phase: str,
+    eligible_splits: Sequence[str],
+    committed_parameter_sha256: str,
+    committed_live_state_sha256: str,
+    manifest_directory: Path,
+) -> None:
+    manifest_path = manifest_directory / f"{rows.replicate_id}-{phase}-optimizer-batches.bin"
+    atomic_write_exclusive(manifest_path, evidence.sampling_manifest)
+    rows.optimizer_batch_manifests.append(
+        {
+            "phase": phase,
+            "media_type": "application/vnd.prospect.wm001.bootstrap-manifest",
+            "bytes": len(evidence.sampling_manifest),
+            "sha256": evidence.sampling_manifest_sha256,
+            "filename": manifest_path.name,
+        }
+    )
+    target_permutation_file: dict[str, object] | None = None
+    if evidence.target_permutation_payload is not None:
+        permutation_path = manifest_directory / (f"{rows.replicate_id}-{phase}-target-permutation.bin")
+        atomic_write_exclusive(permutation_path, evidence.target_permutation_payload)
+        permutation_sha256 = hashlib.sha256(evidence.target_permutation_payload).hexdigest()
+        if permutation_sha256 != evidence.target_permutation_sha256:
+            raise RuntimeError("persisted target permutation digest differs from learning evidence")
+        target_permutation_file = {
+            "media_type": "application/vnd.prospect.wm001.target-permutation",
+            "bytes": len(evidence.target_permutation_payload),
+            "sha256": permutation_sha256,
+            "filename": permutation_path.name,
+        }
+    rows.updates.append(
+        {
+            "receipt_id": receipt.receipt_id,
+            "phase": phase,
+            "status": "committed",
+            "predecessor_parameter_sha256": evidence.predecessor_parameter_sha256,
+            "candidate_parameter_sha256": evidence.candidate_parameter_sha256,
+            "committed_parameter_sha256": committed_parameter_sha256,
+            "predecessor_model_version": receipt.previous_model_version,
+            "committed_model_version": receipt.new_model_version,
+            "eligible_splits": list(eligible_splits),
+            "eligible_transition_count": len(evidence.consumed_transition_ids),
+            "eligible_transition_ids": list(evidence.consumed_transition_ids),
+            "consumed_sample_count": evidence.optimizer_steps * 5 * 256,
+            "consumed_multiset_sha256": evidence.consumed_multiset_sha256,
+            "sampling_manifest_sha256": evidence.sampling_manifest_sha256,
+            "target_permutation_sha256": evidence.target_permutation_sha256,
+            "target_permutation_file": target_permutation_file,
+            "optimizer_steps": evidence.optimizer_steps,
+            "live_state_before_sha256": evidence.predecessor_live_state_sha256,
+            "live_state_after_sha256": committed_live_state_sha256,
+        }
+    )
+
+
+def append_rejected_probe_row(
+    rows: ReplicateRows,
+    *,
+    receipt_id: str,
+    parameter_sha256: str,
+    model_version: str,
+    live_state_sha256: str,
+    state_before: bytes,
+    state_after: bytes,
+    evidence_directory: Path,
+) -> None:
+    if state_before != state_after:
+        raise RuntimeError("rejected update changed the full live-state snapshot")
+    state_digest = hashlib.sha256(state_before).hexdigest()
+    before_path = evidence_directory / (f"{rows.replicate_id}-rejected-probe-state-before.json")
+    after_path = evidence_directory / (f"{rows.replicate_id}-rejected-probe-state-after.json")
+    atomic_write_exclusive(before_path, state_before)
+    atomic_write_exclusive(after_path, state_after)
+
+    def reference(path: Path, payload: bytes) -> dict[str, object]:
+        return {
+            "media_type": ("application/vnd.prospect.wm001.rejected-probe-state+json"),
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "filename": path.name,
+        }
+
+    rows.updates.append(
+        {
+            "receipt_id": receipt_id,
+            "phase": "rejected_update_probe",
+            "status": "rejected",
+            "predecessor_parameter_sha256": parameter_sha256,
+            "candidate_parameter_sha256": parameter_sha256,
+            "committed_parameter_sha256": parameter_sha256,
+            "predecessor_model_version": model_version,
+            "committed_model_version": model_version,
+            "eligible_splits": ["collect_a"],
+            "eligible_transition_count": 0,
+            "eligible_transition_ids": [],
+            "consumed_sample_count": 0,
+            "consumed_multiset_sha256": hashlib.sha256(b"").hexdigest(),
+            "sampling_manifest_sha256": None,
+            "target_permutation_sha256": None,
+            "target_permutation_file": None,
+            "optimizer_steps": 0,
+            "live_state_before_sha256": live_state_sha256,
+            "live_state_after_sha256": live_state_sha256,
+            "full_state_before_sha256": state_digest,
+            "full_state_after_sha256": state_digest,
+            "full_state_before_file": reference(before_path, state_before),
+            "full_state_after_file": reference(after_path, state_after),
+        }
+    )
+
+
+def capture_rejected_probe_state(
+    *,
+    runtime: WorldModelRuntime,
+    source_custody: RuntimeCustody,
+    probe_custody: RuntimeCustody,
+    probe_snapshot: AgentSnapshot,
+    at: TimePoint,
+    collection_controller: UniformRandomController,
+    retained_learning_evidence: LearningEvidence,
+) -> bytes:
+    """Serialize every live component in scope for the rejected-update probe."""
+
+    graph = encode_domain_graph(
+        {
+            "agent_snapshot": probe_snapshot,
+            "source_events": tuple(source_custody.store.history(AGENT_ID, at)),
+            "source_transitions": tuple(source_custody.ledger.transitions(AGENT_ID, at)),
+            "source_updates": tuple(source_custody.ledger.updates(AGENT_ID, at)),
+            "probe_transitions": tuple(probe_custody.ledger.transitions(AGENT_ID, at)),
+            "probe_updates": tuple(probe_custody.ledger.updates(AGENT_ID, at)),
+        }
+    )
+    model_state = runtime.owner.snapshot_state()
+    evidence = retained_learning_evidence
+    return canonical_json_bytes(
+        {
+            "schema": "prospect.wm001.rejected-probe-full-state.v1",
+            "captured_at": [at.clock_id, at.tick],
+            "model_state": {
+                "version": model_state.version,
+                "digest": model_state.digest,
+                "payload_base64": base64.b64encode(model_state.payload).decode("ascii"),
+            },
+            "domain_graph": graph,
+            "source_replay_rows": source_custody.replay.rows(),
+            "probe_replay_rows": probe_custody.replay.rows(),
+            "source_identity_base64": base64.b64encode(source_custody.identities.checkpoint_bytes()).decode("ascii"),
+            "probe_identity_base64": base64.b64encode(probe_custody.identities.checkpoint_bytes()).decode("ascii"),
+            "collection_rng_state": collection_controller.state(),
+            "process_rng": {
+                "python_base64": base64.b64encode(snapshot_python_rng()).decode("ascii"),
+                "numpy_base64": base64.b64encode(snapshot_numpy_rng()).decode("ascii"),
+                "torch_cpu_base64": base64.b64encode(snapshot_torch_cpu_rng()).decode("ascii"),
+                "torch_accelerator_base64": base64.b64encode(snapshot_torch_accelerator_rng()).decode("ascii"),
+            },
+            "retained_learning_evidence": {
+                "phase": evidence.phase,
+                "consumed_transition_ids": list(evidence.consumed_transition_ids),
+                "consumed_multiset_sha256": (evidence.consumed_multiset_sha256),
+                "predecessor_parameter_sha256": (evidence.predecessor_parameter_sha256),
+                "candidate_parameter_sha256": (evidence.candidate_parameter_sha256),
+                "predecessor_live_state_sha256": (evidence.predecessor_live_state_sha256),
+                "candidate_live_state_sha256": (evidence.candidate_live_state_sha256),
+                "optimizer_steps": evidence.optimizer_steps,
+                "sampling_manifest_base64": base64.b64encode(evidence.sampling_manifest).decode("ascii"),
+                "sampling_manifest_sha256": (evidence.sampling_manifest_sha256),
+                "sampled_id_counts": [[identity, count] for identity, count in evidence.sampled_id_counts],
+                "target_permutation_sha256": (evidence.target_permutation_sha256),
+                "target_permutation_base64": (
+                    None
+                    if evidence.target_permutation_payload is None
+                    else base64.b64encode(evidence.target_permutation_payload).decode("ascii")
+                ),
+                "loss_history": list(evidence.loss_history),
+            },
+        }
+    )
+
+
+def run_behavior_condition(
+    rows: ReplicateRows,
+    *,
+    replicate_id: str,
+    task_id: str,
+    reset_seeds: Sequence[int],
+    condition: str,
+    checkpoint_id: str,
+    backend: PredictiveBackend,
+    controller: UniformRandomController,
+    seed_namespace: str,
+    seed_index: int,
+) -> list[float]:
+    """Execute paired real episodes and immediately preserve their raw rows."""
+
+    run_id = f"{replicate_id}:behavior:{task_id}:{condition}"
+    custody = RuntimeCustody.create(run_id)
+    tick = 0
+    returns: list[float] = []
+    episode_ids: list[str] = []
+    intended_actions: list[float] = []
+    applied_actions: list[float] = []
+    rng_start_sha256 = controller.rng_digest
+    actions_before = controller.actions_emitted
+    for index, reset_seed in enumerate(reset_seeds):
+        started = utc_now()
+        episode, _ = run_episode(
+            run_id=run_id,
+            task_id=task_id,
+            episode_id=f"{replicate_id}:behavior:{task_id}:{condition}:{index}",
+            reset_seed=reset_seed,
+            controller=controller,
+            backend=backend,
+            custody=custody,
+            start_tick=tick,
+        )
+        completed = utc_now()
+        append_episode_rows(
+            rows,
+            episode,
+            split=("behavior_evaluation_a" if task_id == TASK_A else "behavior_evaluation_b"),
+            condition=condition,
+            checkpoint_id=checkpoint_id,
+            learning_allowed=False,
+            replay_writes_allowed=False,
+            started_at=started,
+            completed_at=completed,
+        )
+        returns.append(episode.undiscounted_return)
+        episode_ids.append(episode.episode_id)
+        intended_actions.extend(episode.intended_actions)
+        applied_actions.extend(episode.applied_actions)
+        tick = episode.final_tick + 1
+        del episode
+        gc.collect()
+    append_policy_run(
+        rows,
+        run_id=run_id,
+        task_id=task_id,
+        split=("behavior_evaluation_a" if task_id == TASK_A else "behavior_evaluation_b"),
+        condition=condition,
+        checkpoint_id=checkpoint_id,
+        controller_kind="uniform_random",
+        controller_version=controller.version,
+        seed_namespace=seed_namespace,
+        seed_index=seed_index,
+        seed=controller.seed,
+        reset_seeds=reset_seeds,
+        episode_ids=episode_ids,
+        intended_actions=intended_actions,
+        applied_actions=applied_actions,
+        rng_start_sha256=rng_start_sha256,
+        rng_end_sha256=controller.rng_digest,
+        action_count=controller.actions_emitted - actions_before,
+        planner_budget=None,
+    )
+    return returns
+
+
+def run_batched_cem_condition(
+    rows: ReplicateRows,
+    *,
+    replicate_id: str,
+    task_id: str,
+    reset_seeds: Sequence[int],
+    condition: str,
+    checkpoint_id: str,
+    backend: PredictiveBackend,
+    planner: CEMController,
+) -> list[float]:
+    """Batch only imagined planning while retaining canonical real step custody."""
+
+    expected_controller_version = (
+        "wm001-analytic-pendulum-cem-torchrl-0.13.3-v1" if condition == "oracle" else f"wm001-sha256:{backend.digest}"
+    )
+    if planner.version != expected_controller_version:
+        raise RuntimeError(
+            "CEM controller is not bound to the evaluated backend: "
+            f"expected {expected_controller_version}, found {planner.version}"
+        )
+
+    run_id = f"{replicate_id}:behavior:{task_id}:{condition}"
+    custody = RuntimeCustody.create(run_id)
+    rng_start_sha256 = planner.rng_digest
+    actions_before = int(planner.state_dict()["actions_emitted"])
+    sessions = [
+        PendulumEpisodeSession(
+            run_id=run_id,
+            task_id=task_id,
+            episode_id=f"{replicate_id}:behavior:{task_id}:{condition}:{index}",
+            reset_seed=reset_seed,
+            backend=backend,
+            custody=custody,
+            start_tick=0,
+            controller=PresetActionController(version=planner.version),
+        )
+        for index, reset_seed in enumerate(reset_seeds)
+    ]
+    started = utc_now()
+    tick = 0
+    for _ in range(200):
+        states = np.stack(
+            [
+                np.concatenate(
+                    (
+                        session.current_observation.astype(np.float32),
+                        np.asarray([session.context], dtype=np.float32),
+                    )
+                )
+                for session in sessions
+            ]
+        )
+        actions = planner.act(states).detach().cpu().numpy().reshape(len(sessions))
+        for session, action in zip(sessions, actions, strict=True):
+            result = session.step(float(action), tick)
+            tick = result.transition.created_at.tick + 1
+    completed = utc_now()
+    returns: list[float] = []
+    episodes: list[EpisodeEvidence] = []
+    for session in sessions:
+        episode = session.finish()
+        episodes.append(episode)
+        append_episode_rows(
+            rows,
+            episode,
+            split=("behavior_evaluation_a" if task_id == TASK_A else "behavior_evaluation_b"),
+            condition=condition,
+            checkpoint_id=checkpoint_id,
+            learning_allowed=False,
+            replay_writes_allowed=False,
+            started_at=started,
+            completed_at=completed,
+        )
+        returns.append(episode.undiscounted_return)
+    actions_after = int(planner.state_dict()["actions_emitted"])
+    append_policy_run(
+        rows,
+        run_id=run_id,
+        task_id=task_id,
+        split=("behavior_evaluation_a" if task_id == TASK_A else "behavior_evaluation_b"),
+        condition=condition,
+        checkpoint_id=checkpoint_id,
+        controller_kind=("cem_oracle" if condition == "oracle" else "cem_learned"),
+        controller_version=planner.version,
+        seed_namespace="planner",
+        seed_index=0,
+        seed=planner.seed,
+        reset_seeds=reset_seeds,
+        episode_ids=[episode.episode_id for episode in episodes],
+        intended_actions=[action for episode in episodes for action in episode.intended_actions],
+        applied_actions=[action for episode in episodes for action in episode.applied_actions],
+        rng_start_sha256=rng_start_sha256,
+        rng_end_sha256=planner.rng_digest,
+        action_count=actions_after - actions_before,
+        planner_budget={key: int(value) for key, value in asdict(planner.budget).items()},
+    )
+    return returns
+
+
+def _canonical_transition_dataset(
+    transitions: Sequence[EpistemicTransition],
+) -> dict[str, object]:
+    observations, contexts, actions, targets, transition_ids = transition_arrays(transitions)
+    return {
+        "transition_ids": list(transition_ids),
+        "observations": observations.tolist(),
+        "contexts": contexts.tolist(),
+        "actions": actions.tolist(),
+        "next_observations": (observations + targets[:, :3]).tolist(),
+        "rewards": targets[:, 3].tolist(),
+    }
+
+
+def save_replicate_checkpoint(
+    *,
+    path: Path,
+    rows: ReplicateRows,
+    runtime: WorldModelRuntime,
+    collection: CollectionEvidence,
+    collection_a: Sequence[EpistemicTransition],
+    collection_b: Sequence[EpistemicTransition],
+    collection_rng_states: dict[str, object],
+    planner: CEMController,
+    update_evidence: Sequence[LearningEvidence],
+    created_at: TimePoint,
+) -> tuple[str, list[dict[str, object]], int]:
+    """Create the exact fifteen-component retained-state bundle."""
+
+    if path.exists():
+        raise FileExistsError(f"refusing to replace checkpoint evidence: {path}")
+    snapshot = collection.final_agent.snapshot(TimePoint(max(created_at.tick, collection.next_tick)))
+    identity_bytes = collection.custody.identities.checkpoint_bytes()
+    next_tick = max(created_at.tick, collection.next_tick) + 1
+    agent_runtime = {
+        "schema": "prospect.wm001.agent-runtime.v1",
+        "identity_namespace": collection.custody.identities.namespace,
+        "identity_checkpoint_base64": base64.b64encode(identity_bytes).decode("ascii"),
+        "next_tick": next_tick,
+        "agent_id": snapshot.agent_id,
+        "configuration_version": snapshot.configuration_version,
+        "memory_version": snapshot.memory_version,
+        "knowledge_version": snapshot.knowledge_version,
+        "model_version": runtime.version,
+        "representation_version": snapshot.representation_version,
+        "policy_version": snapshot.policy_version,
+        "belief_id": snapshot.belief.belief_id,
+    }
+    model_ledger = [
+        {
+            "phase": evidence.phase,
+            "predecessor_parameter_sha256": evidence.predecessor_parameter_sha256,
+            "candidate_parameter_sha256": evidence.candidate_parameter_sha256,
+            "predecessor_live_state_sha256": evidence.predecessor_live_state_sha256,
+            "candidate_live_state_sha256": evidence.candidate_live_state_sha256,
+        }
+        for evidence in update_evidence
+    ]
+    replay_sampling = {
+        "schema": "prospect.wm001.replay-sampling-history.v1",
+        "manifests": [
+            {
+                "phase": evidence.phase,
+                "sha256": evidence.sampling_manifest_sha256,
+                "bytes": len(evidence.sampling_manifest),
+                "payload_base64": base64.b64encode(evidence.sampling_manifest).decode("ascii"),
+            }
+            for evidence in update_evidence
+        ],
+    }
+    training_rows = [row for row in rows.transitions if row["split"] in {"collect_a", "collect_b"}]
+    retained_transitions = (*collection_a, *collection_b)
+    retained_events = tuple(transition.experience for transition in retained_transitions)
+    experience_store = {
+        "schema": "prospect.wm001.experience-custody.v1",
+        "transition_rows": training_rows,
+        "domain_graph": encode_domain_graph(
+            {
+                "events": retained_events,
+                "transitions": retained_transitions,
+            }
+        ),
+    }
+    replay_index = {
+        "schema": "prospect.wm001.replay-index.v1",
+        "canonical_experience_rows": collection.custody.replay.rows(),
+        "collect_a": _canonical_transition_dataset(collection_a),
+        "collect_b": _canonical_transition_dataset(collection_b),
+    }
+    retained_update_phases = {evidence.phase for evidence in update_evidence}
+    retained_update_rows = [row for row in rows.updates if row["phase"] in retained_update_phases]
+    retained_receipt_ids = {str(row["receipt_id"]) for row in retained_update_rows}
+    retained_receipts = tuple(
+        receipt
+        for receipt in collection.custody.ledger.updates(
+            snapshot.agent_id,
+            snapshot.captured_at,
+        )
+        if receipt.receipt_id in retained_receipt_ids
+    )
+    if len(retained_receipts) != len(retained_update_phases):
+        raise RuntimeError("checkpoint custody does not contain every retained update receipt")
+    transition_references = {
+        id(transition): transition_external_reference(transition.transition_id) for transition in retained_transitions
+    }
+    update_receipts = {
+        "schema": "prospect.wm001.update-receipts.v1",
+        "updates": retained_update_rows,
+        "domain_graph": encode_domain_graph(
+            {"receipts": retained_receipts},
+            external_references=transition_references,
+        ),
+    }
+    if snapshot.latest_update is None or snapshot.latest_update.resulting_belief is None:
+        raise RuntimeError("checkpoint boundary lacks its canonical learning receipt/belief")
+    if all(snapshot.latest_update is not receipt for receipt in retained_receipts):
+        raise RuntimeError("checkpoint boundary update is absent from retained update custody")
+    agent_runtime["domain_graph"] = encode_domain_graph(
+        {"snapshot": snapshot},
+        external_references={
+            id(snapshot.latest_update): update_external_reference(snapshot.latest_update.receipt_id),
+            id(snapshot.belief): belief_external_reference(snapshot.belief.belief_id),
+        },
+    )
+    scaling = {
+        "schema": "prospect.wm001.fixed-scaling.v1",
+        **asdict(FixedScaling()),
+    }
+    raw_components = {
+        "world_model": ComponentPayload(
+            "world_model",
+            runtime.version,
+            runtime.model_bytes,
+            "application/vnd.prospect.wm001.model",
+        ),
+        "optimizer": ComponentPayload(
+            "optimizer",
+            runtime.version,
+            runtime.optimizer_bytes,
+            "application/vnd.prospect.wm001.adamw",
+        ),
+        "model_version_ledger": ComponentPayload(
+            "model_version_ledger",
+            runtime.version,
+            canonical_json_bytes(model_ledger),
+            "application/json",
+        ),
+        "experience_store": ComponentPayload(
+            "experience_store",
+            "wm001-experience-v1",
+            canonical_json_bytes(experience_store),
+            "application/json",
+        ),
+        "replay_index": ComponentPayload(
+            "replay_index",
+            "wm001-replay-v1",
+            canonical_json_bytes(replay_index),
+            "application/json",
+        ),
+        "replay_sampling_history": ComponentPayload(
+            "replay_sampling_history",
+            "wm001-sampling-v1",
+            canonical_json_bytes(replay_sampling),
+            "application/json",
+        ),
+        "update_receipts": ComponentPayload(
+            "update_receipts",
+            "wm001-updates-v1",
+            canonical_json_bytes(update_receipts),
+            "application/json",
+        ),
+        "agent_runtime": ComponentPayload(
+            "agent_runtime",
+            runtime.version,
+            canonical_json_bytes(agent_runtime),
+            "application/json",
+        ),
+        "scaling_configuration": ComponentPayload(
+            "scaling_configuration",
+            "wm001-fixed-scaling-v1",
+            canonical_json_bytes(scaling),
+            "application/json",
+        ),
+        "python_rng": ComponentPayload(
+            "python_rng",
+            "python-rng-v1",
+            snapshot_python_rng(),
+            "application/vnd.prospect.rng-state+json",
+        ),
+        "numpy_rng": ComponentPayload(
+            "numpy_rng",
+            "numpy-rng-v1",
+            snapshot_numpy_rng(),
+            "application/vnd.prospect.rng-state+json",
+        ),
+        "torch_cpu_rng": ComponentPayload(
+            "torch_cpu_rng",
+            "torch-rng-v1",
+            snapshot_torch_cpu_rng(),
+            "application/vnd.prospect.rng-state+json",
+        ),
+        "torch_accelerator_rng": ComponentPayload(
+            "torch_accelerator_rng",
+            "torch-rng-v1",
+            snapshot_torch_accelerator_rng(),
+            "application/vnd.prospect.rng-state+json",
+        ),
+        "collection_rng": ComponentPayload(
+            "collection_rng",
+            "collection-rng-v1",
+            canonical_json_bytes(
+                {
+                    "schema": "prospect.wm001.collection-rng.v1",
+                    "states": collection_rng_states,
+                }
+            ),
+            "application/json",
+        ),
+        "planner_rng": ComponentPayload(
+            "planner_rng",
+            "planner-rng-v1",
+            snapshot_planner_rng(planner),
+            "application/json",
+        ),
+    }
+    if tuple(raw_components) != CANONICAL_COMPONENT_IDS:
+        raise RuntimeError("checkpoint component assembly order differs from the sealed contract")
+    report = save_checkpoint(
+        path,
+        checkpoint_id=f"{rows.replicate_id}:after_b_replay",
+        agent_id=AGENT_ID,
+        created_at=created_at,
+        components=raw_components,
+        versions={
+            "model": runtime.version,
+            "protocol": PROTOCOL_SHA256,
+        },
+    )
+    archive_bytes = path.read_bytes()
+    rows.checkpoint_archive = {
+        "media_type": "application/vnd.prospect.checkpoint+zip",
+        "bytes": len(archive_bytes),
+        "sha256": hashlib.sha256(archive_bytes).hexdigest(),
+        "filename": path.name,
+    }
+    return report.manifest_sha256, list(report.component_rows()), next_tick
+
+
+def run_restart_parity(
+    *,
+    checkpoint_path: Path,
+    output_directory: Path,
+    rows: ReplicateRows,
+    runtime: WorldModelRuntime,
+    custody: RuntimeCustody,
+    next_tick: int,
+    planner: CEMController,
+    checkpoint_manifest_sha256: str,
+    component_rows: Sequence[dict[str, object]],
+    task_reset_seeds: dict[str, int],
+    device: str,
+    boundary_snapshot: AgentSnapshot,
+) -> dict[str, object]:
+    """Evaluate the bundle here and in a genuinely new interpreter."""
+
+    specification = {
+        "schema": "prospect.wm001.restart-spec.v1",
+        "task_reset_seeds": task_reset_seeds,
+        "device": device,
+    }
+    spec_path = output_directory / f"{rows.replicate_id}-restart-spec.json"
+    restored_path = output_directory / f"{rows.replicate_id}-restored-evaluation.json"
+    atomic_write_exclusive(spec_path, canonical_json_bytes(specification) + b"\n")
+    original = evaluate_live_state(
+        runtime=runtime,
+        custody=custody,
+        next_tick=next_tick,
+        planner=planner,
+        task_reset_seeds=task_reset_seeds,
+        checkpoint_manifest_sha256=checkpoint_manifest_sha256,
+        component_hashes={str(row["component_id"]): str(row["sha256"]) for row in component_rows},
+        boundary_snapshot=boundary_snapshot,
+    )
+    environment = dict(os.environ)
+    environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "bench.world_model_lifecycle.restore_eval",
+            "--checkpoint",
+            str(checkpoint_path),
+            "--spec",
+            str(spec_path),
+            "--output",
+            str(restored_path),
+        ],
+        cwd=Path(__file__).resolve().parents[2],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    atomic_write_exclusive(
+        output_directory / f"{rows.replicate_id}-restore.stdout",
+        completed.stdout.encode("utf-8"),
+    )
+    atomic_write_exclusive(
+        output_directory / f"{rows.replicate_id}-restore.stderr",
+        completed.stderr.encode("utf-8"),
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"fresh-process restore failed with exit {completed.returncode}: {completed.stderr}")
+    restored = load_evaluation(restored_path)
+    return compare_parity(original, restored)
+
+
+def run_replicate(
+    config: ExperimentConfig,
+    *,
+    master_seed: int,
+    output_directory: Path,
+) -> dict[str, object]:
+    """Run one independent master-seed replicate from cold start through K7."""
+
+    replicate_id = f"wm001-{config.lane}-{master_seed}"
+    rows = ReplicateRows.create(replicate_id, master_seed)
+    configure_determinism(rows.seed("torch_runtime"), device=config.device)
+    print(f"[{utc_now()}] {replicate_id}: initialize cold model", flush=True)
+    runtime = WorldModelRuntime.initialize(
+        initialization_seed=rows.seed("model_initialization"),
+        device=config.device,
+    )
+    cold = runtime.fork(device=config.device)
+    frozen = runtime.fork(device=config.device)
+    corrupted = runtime.fork(device=config.device)
+    cold_parameter_sha256 = runtime.digest
+    cold_live_state_sha256 = runtime.live_state_digest
+    preserve_evaluated_checkpoint(
+        rows,
+        condition="cold",
+        runtime=cold,
+        output_directory=output_directory,
+    )
+    preserve_evaluated_checkpoint(
+        rows,
+        condition="frozen",
+        runtime=frozen,
+        output_directory=output_directory,
+    )
+
+    learner_a = TransactionalWorldModelLearner(
+        phase="train_a",
+        bootstrap_seeds=[rows.seed("ensemble_bootstrap_a", index) for index in range(5)],
+        minibatch_order_seed=rows.seed("minibatch_order_a"),
+        optimizer_steps=config.optimizer_steps,
+        device=config.device,
+    )
+    corrupted_learner = TransactionalWorldModelLearner(
+        phase="train_a_corrupted",
+        bootstrap_seeds=[rows.seed("ensemble_bootstrap_a", index) for index in range(5)],
+        minibatch_order_seed=rows.seed("minibatch_order_a"),
+        optimizer_steps=config.optimizer_steps,
+        training_mode="joint_target_permuted",
+        target_permutation_seed=rows.seed("corrupted_target_permutation"),
+        device=config.device,
+    )
+    custody = RuntimeCustody.create(f"{replicate_id}:canonical")
+    collection_action_a_seed = rows.seed("collection_action", 0)
+    collection_controller_a = UniformRandomController(collection_action_a_seed)
+    collection_rng_a_start = collection_controller_a.rng_digest
+    collection_actions_a_before = collection_controller_a.actions_emitted
+    phase_started = utc_now()
+    collection_a = collect_episodes(
+        run_id=f"{replicate_id}:collect-a",
+        task_id=TASK_A,
+        episode_seeds=[rows.seed("collect_a_episode", index) for index in range(config.collection_episodes)],
+        controller_factory=lambda _: collection_controller_a,
+        backend=runtime,
+        custody=custody,
+        model_owner=runtime.owner,
+        learner=learner_a,
+    )
+    phase_completed = utc_now()
+    append_collection_rows(
+        rows,
+        collection_a,
+        split="collect_a",
+        condition="collection_random",
+        checkpoint_id="cold",
+        learning_allowed=True,
+        replay_writes_allowed=True,
+        started_at=phase_started,
+        completed_at=phase_completed,
+    )
+    append_collection_policy_run(
+        rows,
+        collection_a,
+        split="collect_a",
+        condition="collection_random",
+        checkpoint_id="cold",
+        controller=collection_controller_a,
+        seed_namespace="collection_action",
+        seed_index=0,
+        seed=collection_action_a_seed,
+        rng_start_sha256=collection_rng_a_start,
+        actions_before=collection_actions_a_before,
+    )
+    print(
+        f"[{utc_now()}] {replicate_id}: collected A={len(collection_a.transitions)}; train candidates",
+        flush=True,
+    )
+    replay_a = custody.replay.require_transitions(collection_a.transitions)
+    corrupted_custody = RuntimeCustody.branch(
+        custody,
+        f"{replicate_id}:control:corrupted",
+        replay_a,
+    )
+    corrupted_agent = make_branch_learning_agent(
+        source_agent=collection_a.final_agent,
+        at=TimePoint(collection_a.next_tick),
+        model_owner=corrupted.owner,
+        learner=corrupted_learner,
+        custody=corrupted_custody,
+    )
+    receipt_a = collection_a.final_agent.learn(
+        replay_a,
+        at=TimePoint(collection_a.next_tick),
+    )
+    corrupted_receipt = corrupted_agent.learn(
+        corrupted_custody.replay.require_transitions(replay_a),
+        at=TimePoint(collection_a.next_tick),
+    )
+    if learner_a.last_evidence is None or corrupted_learner.last_evidence is None:
+        raise RuntimeError("transactional learners did not retain their preparation evidence")
+    append_update_row(
+        rows,
+        receipt_a,
+        learner_a.last_evidence,
+        phase="train_a",
+        eligible_splits=("collect_a",),
+        committed_parameter_sha256=runtime.digest,
+        committed_live_state_sha256=runtime.live_state_digest,
+        manifest_directory=output_directory,
+    )
+    preserve_evaluated_checkpoint(
+        rows,
+        condition="corrupted",
+        runtime=corrupted,
+        output_directory=output_directory,
+    )
+    preserve_evaluated_checkpoint(
+        rows,
+        condition="after_a",
+        runtime=runtime,
+        output_directory=output_directory,
+    )
+    append_update_row(
+        rows,
+        corrupted_receipt,
+        corrupted_learner.last_evidence,
+        phase="train_a_corrupted",
+        eligible_splits=("collect_a",),
+        committed_parameter_sha256=corrupted.digest,
+        committed_live_state_sha256=corrupted.live_state_digest,
+        manifest_directory=output_directory,
+    )
+
+    probe = RejectedUpdateProbeLearner()
+    probe_at = TimePoint(receipt_a.completed_at.tick + 1)
+    probe_custody = RuntimeCustody.branch(
+        custody,
+        f"{replicate_id}:control:rejected-probe",
+        replay_a,
+    )
+    probe_agent = make_branch_learning_agent(
+        source_agent=collection_a.final_agent,
+        at=probe_at,
+        model_owner=runtime.owner,
+        learner=probe,
+        custody=probe_custody,
+    )
+    probe_before_snapshot = probe_agent.snapshot(probe_at)
+    probe_before = capture_rejected_probe_state(
+        runtime=runtime,
+        source_custody=custody,
+        probe_custody=probe_custody,
+        probe_snapshot=probe_before_snapshot,
+        at=probe_at,
+        collection_controller=collection_controller_a,
+        retained_learning_evidence=learner_a.last_evidence,
+    )
+    try:
+        probe_agent.learn(probe_custody.replay.require_transitions(replay_a), at=probe_at)
+    except Exception as error:
+        if "different model digest" not in str(error):
+            raise
+    else:
+        raise RuntimeError("predeclared rejected update probe unexpectedly committed")
+    probe_after_snapshot = probe_agent.snapshot(probe_at)
+    probe_after = capture_rejected_probe_state(
+        runtime=runtime,
+        source_custody=custody,
+        probe_custody=probe_custody,
+        probe_snapshot=probe_after_snapshot,
+        at=probe_at,
+        collection_controller=collection_controller_a,
+        retained_learning_evidence=learner_a.last_evidence,
+    )
+    if probe_before != probe_after:
+        raise RuntimeError("rejected update probe changed a live component")
+    append_rejected_probe_row(
+        rows,
+        receipt_id=f"wm001:rejected_update_probe:receipt:{runtime.live_state_digest[:24]}",
+        parameter_sha256=runtime.digest,
+        model_version=runtime.version,
+        live_state_sha256=runtime.live_state_digest,
+        state_before=probe_before,
+        state_after=probe_after,
+        evidence_directory=output_directory,
+    )
+
+    validation_action_a_seed = rows.seed("predictive_validation_action", 0)
+    validation_controller_a = UniformRandomController(validation_action_a_seed)
+    validation_rng_a_start = validation_controller_a.rng_digest
+    validation_actions_a_before = validation_controller_a.actions_emitted
+    validation_a_started = utc_now()
+    validation_a = collect_episodes(
+        run_id=f"{replicate_id}:predictive-validation-a",
+        task_id=TASK_A,
+        episode_seeds=[
+            rows.seed("predictive_validation_a_episode", index) for index in range(config.validation_episodes)
+        ],
+        controller_factory=lambda _: validation_controller_a,
+        backend=runtime,
+        custody=RuntimeCustody.create(f"{replicate_id}:validation-a"),
+    )
+    validation_a_completed = utc_now()
+    append_collection_rows(
+        rows,
+        validation_a,
+        split="predictive_validation_a",
+        condition="validation_random",
+        checkpoint_id="after_a",
+        learning_allowed=False,
+        replay_writes_allowed=False,
+        started_at=validation_a_started,
+        completed_at=validation_a_completed,
+    )
+    append_collection_policy_run(
+        rows,
+        validation_a,
+        split="predictive_validation_a",
+        condition="validation_random",
+        checkpoint_id="after_a",
+        controller=validation_controller_a,
+        seed_namespace="predictive_validation_action",
+        seed_index=0,
+        seed=validation_action_a_seed,
+        rng_start_sha256=validation_rng_a_start,
+        actions_before=validation_actions_a_before,
+    )
+    validation_a_batch = to_transition_batch(validation_a.transitions)
+    evaluation_a_backends = {
+        condition: load_evaluated_checkpoint(
+            rows,
+            condition=condition,
+            output_directory=output_directory,
+            device=config.device,
+        )
+        for condition in ("cold", "frozen", "corrupted", "after_a")
+    }
+    for condition, backend in evaluation_a_backends.items():
+        metrics = evaluate_mixture(
+            backend.model,
+            validation_a_batch,
+            device=config.device,
+        )
+        append_predictive_metric(
+            rows,
+            metrics,
+            runtime=backend,
+            task_id=TASK_A,
+            condition=condition,
+            checkpoint_id=condition,
+            split="predictive_validation_a",
+            evidence_directory=output_directory,
+        )
+
+    behavior_a_seeds = [rows.seed("behavior_evaluation_a_episode", index) for index in range(config.behavior_episodes)]
+    planner_seed = rows.seed("planner")
+    print(f"[{utc_now()}] {replicate_id}: evaluate A controls", flush=True)
+    for condition, backend in evaluation_a_backends.items():
+        run_batched_cem_condition(
+            rows,
+            replicate_id=replicate_id,
+            task_id=TASK_A,
+            reset_seeds=behavior_a_seeds,
+            condition=condition,
+            checkpoint_id=condition,
+            backend=backend,
+            planner=CEMController(
+                make_learned_model_env(backend.model, device=config.device),
+                seed=planner_seed,
+            ),
+        )
+    run_behavior_condition(
+        rows,
+        replicate_id=replicate_id,
+        task_id=TASK_A,
+        reset_seeds=behavior_a_seeds,
+        condition="random",
+        checkpoint_id="random",
+        backend=evaluation_a_backends["cold"],
+        controller=UniformRandomController(rows.seed("random_policy_action", 0)),
+        seed_namespace="random_policy_action",
+        seed_index=0,
+    )
+    oracle_backend = OraclePredictiveBackend()
+    run_batched_cem_condition(
+        rows,
+        replicate_id=replicate_id,
+        task_id=TASK_A,
+        reset_seeds=behavior_a_seeds,
+        condition="oracle",
+        checkpoint_id="oracle",
+        backend=oracle_backend,
+        planner=CEMController(
+            make_true_dynamics_env(device=config.device),
+            seed=planner_seed,
+        ),
+    )
+
+    reloaded_after_a = load_evaluated_checkpoint(
+        rows,
+        condition="after_a",
+        output_directory=output_directory,
+        device=config.device,
+    )
+    after_a_payload = reloaded_after_a.owner.snapshot_state().payload
+    validation_action_b_seed = rows.seed("predictive_validation_action", 1)
+    validation_controller_b = UniformRandomController(validation_action_b_seed)
+    validation_rng_b_start = validation_controller_b.rng_digest
+    validation_actions_b_before = validation_controller_b.actions_emitted
+    validation_b_started = utc_now()
+    validation_b = collect_episodes(
+        run_id=f"{replicate_id}:predictive-validation-b",
+        task_id=TASK_B,
+        episode_seeds=[
+            rows.seed("predictive_validation_b_episode", index) for index in range(config.validation_episodes)
+        ],
+        controller_factory=lambda _: validation_controller_b,
+        backend=runtime,
+        custody=RuntimeCustody.create(f"{replicate_id}:validation-b"),
+    )
+    validation_b_completed = utc_now()
+    append_collection_rows(
+        rows,
+        validation_b,
+        split="predictive_validation_b",
+        condition="validation_random",
+        checkpoint_id="after_a",
+        learning_allowed=False,
+        replay_writes_allowed=False,
+        started_at=validation_b_started,
+        completed_at=validation_b_completed,
+    )
+    append_collection_policy_run(
+        rows,
+        validation_b,
+        split="predictive_validation_b",
+        condition="validation_random",
+        checkpoint_id="after_a",
+        controller=validation_controller_b,
+        seed_namespace="predictive_validation_action",
+        seed_index=1,
+        seed=validation_action_b_seed,
+        rng_start_sha256=validation_rng_b_start,
+        actions_before=validation_actions_b_before,
+    )
+    validation_b_batch = to_transition_batch(validation_b.transitions)
+    before_b_metrics = evaluate_mixture(runtime.model, validation_b_batch, device=config.device)
+    append_predictive_metric(
+        rows,
+        before_b_metrics,
+        runtime=runtime,
+        task_id=TASK_B,
+        condition="after_a",
+        checkpoint_id="after_a",
+        split="predictive_validation_b",
+        evidence_directory=output_directory,
+    )
+
+    learner_b_replay = TransactionalWorldModelLearner(
+        phase="train_b_replay",
+        bootstrap_seeds=[rows.seed("ensemble_bootstrap_b", index) for index in range(5)],
+        minibatch_order_seed=rows.seed("minibatch_order_b"),
+        optimizer_steps=config.optimizer_steps,
+        balanced_tasks=True,
+        device=config.device,
+    )
+    collection_action_b_seed = rows.seed("collection_action", 1)
+    collection_controller_b = UniformRandomController(collection_action_b_seed)
+    collection_rng_b_start = collection_controller_b.rng_digest
+    collection_actions_b_before = collection_controller_b.actions_emitted
+    b_started = utc_now()
+    collection_b = collect_episodes(
+        run_id=f"{replicate_id}:collect-b",
+        task_id=TASK_B,
+        episode_seeds=[rows.seed("collect_b_episode", index) for index in range(config.collection_episodes)],
+        controller_factory=lambda _: collection_controller_b,
+        backend=runtime,
+        custody=custody,
+        start_tick=receipt_a.completed_at.tick + 2,
+        model_owner=runtime.owner,
+        learner=learner_b_replay,
+    )
+    b_completed = utc_now()
+    append_collection_rows(
+        rows,
+        collection_b,
+        split="collect_b",
+        condition="collection_random",
+        checkpoint_id="after_a",
+        learning_allowed=True,
+        replay_writes_allowed=True,
+        started_at=b_started,
+        completed_at=b_completed,
+    )
+    append_collection_policy_run(
+        rows,
+        collection_b,
+        split="collect_b",
+        condition="collection_random",
+        checkpoint_id="after_a",
+        controller=collection_controller_b,
+        seed_namespace="collection_action",
+        seed_index=1,
+        seed=collection_action_b_seed,
+        rng_start_sha256=collection_rng_b_start,
+        actions_before=collection_actions_b_before,
+    )
+    print(
+        f"[{utc_now()}] {replicate_id}: collected B={len(collection_b.transitions)}; train replay/naive",
+        flush=True,
+    )
+    naive = WorldModelRuntime.from_payload(after_a_payload, device=config.device)
+    learner_b_naive = TransactionalWorldModelLearner(
+        phase="train_b_naive",
+        bootstrap_seeds=[rows.seed("ensemble_bootstrap_b", index) for index in range(5)],
+        minibatch_order_seed=rows.seed("minibatch_order_b"),
+        optimizer_steps=config.optimizer_steps,
+        device=config.device,
+    )
+    replay_b = custody.replay.require_transitions(collection_b.transitions)
+    naive_custody = RuntimeCustody.branch(
+        custody,
+        f"{replicate_id}:control:naive",
+        (*replay_a, *replay_b),
+    )
+    naive_agent = make_branch_learning_agent(
+        source_agent=collection_b.final_agent,
+        at=TimePoint(collection_b.next_tick),
+        model_owner=naive.owner,
+        learner=learner_b_naive,
+        custody=naive_custody,
+    )
+    replay_receipt = collection_b.final_agent.learn(
+        custody.replay.require_transitions((*replay_a, *replay_b)),
+        at=TimePoint(collection_b.next_tick),
+    )
+    naive_receipt = naive_agent.learn(
+        naive_custody.replay.require_transitions(replay_b),
+        at=TimePoint(collection_b.next_tick + 1),
+    )
+    if learner_b_naive.last_evidence is None or learner_b_replay.last_evidence is None:
+        raise RuntimeError("B learners did not retain preparation evidence")
+    append_update_row(
+        rows,
+        naive_receipt,
+        learner_b_naive.last_evidence,
+        phase="train_b_naive",
+        eligible_splits=("collect_b",),
+        committed_parameter_sha256=naive.digest,
+        committed_live_state_sha256=naive.live_state_digest,
+        manifest_directory=output_directory,
+    )
+    preserve_evaluated_checkpoint(
+        rows,
+        condition="after_b_replay",
+        runtime=runtime,
+        output_directory=output_directory,
+    )
+    preserve_evaluated_checkpoint(
+        rows,
+        condition="after_b_naive",
+        runtime=naive,
+        output_directory=output_directory,
+    )
+    append_update_row(
+        rows,
+        replay_receipt,
+        learner_b_replay.last_evidence,
+        phase="train_b_replay",
+        eligible_splits=("collect_a", "collect_b"),
+        committed_parameter_sha256=runtime.digest,
+        committed_live_state_sha256=runtime.live_state_digest,
+        manifest_directory=output_directory,
+    )
+
+    evaluation_b_backends = {
+        condition: load_evaluated_checkpoint(
+            rows,
+            condition=condition,
+            output_directory=output_directory,
+            device=config.device,
+        )
+        for condition in ("after_b_replay", "after_b_naive")
+    }
+    for condition, backend in evaluation_b_backends.items():
+        metrics = evaluate_mixture(
+            backend.model,
+            validation_b_batch,
+            device=config.device,
+        )
+        append_predictive_metric(
+            rows,
+            metrics,
+            runtime=backend,
+            task_id=TASK_B,
+            condition=condition,
+            checkpoint_id=condition,
+            split="predictive_validation_b",
+            evidence_directory=output_directory,
+        )
+        a_metrics = evaluate_mixture(
+            backend.model,
+            validation_a_batch,
+            device=config.device,
+        )
+        append_predictive_metric(
+            rows,
+            a_metrics,
+            runtime=backend,
+            task_id=TASK_A,
+            condition=condition,
+            checkpoint_id=condition,
+            split="predictive_validation_a",
+            evidence_directory=output_directory,
+        )
+
+    print(f"[{utc_now()}] {replicate_id}: evaluate B plasticity and A retention", flush=True)
+    behavior_b_seeds = [rows.seed("behavior_evaluation_b_episode", index) for index in range(config.behavior_episodes)]
+    for task_id, seeds, conditions in (
+        (
+            TASK_B,
+            behavior_b_seeds,
+            (
+                (
+                    "after_a",
+                    load_evaluated_checkpoint(
+                        rows,
+                        condition="after_a",
+                        output_directory=output_directory,
+                        device=config.device,
+                    ),
+                ),
+                ("after_b_replay", evaluation_b_backends["after_b_replay"]),
+                ("after_b_naive", evaluation_b_backends["after_b_naive"]),
+            ),
+        ),
+        (
+            TASK_A,
+            behavior_a_seeds,
+            (
+                ("after_b_replay", evaluation_b_backends["after_b_replay"]),
+                ("after_b_naive", evaluation_b_backends["after_b_naive"]),
+            ),
+        ),
+    ):
+        for condition, backend in conditions:
+            run_batched_cem_condition(
+                rows,
+                replicate_id=replicate_id,
+                task_id=task_id,
+                reset_seeds=seeds,
+                condition=condition,
+                checkpoint_id=condition,
+                backend=backend,
+                planner=CEMController(
+                    make_learned_model_env(backend.model, device=config.device),
+                    seed=planner_seed,
+                ),
+            )
+
+    run_behavior_condition(
+        rows,
+        replicate_id=replicate_id,
+        task_id=TASK_B,
+        reset_seeds=behavior_b_seeds,
+        condition="random",
+        checkpoint_id="random",
+        backend=load_evaluated_checkpoint(
+            rows,
+            condition="after_a",
+            output_directory=output_directory,
+            device=config.device,
+        ),
+        controller=UniformRandomController(rows.seed("random_policy_action", 1)),
+        seed_namespace="random_policy_action",
+        seed_index=1,
+    )
+    run_batched_cem_condition(
+        rows,
+        replicate_id=replicate_id,
+        task_id=TASK_B,
+        reset_seeds=behavior_b_seeds,
+        condition="oracle",
+        checkpoint_id="oracle",
+        backend=oracle_backend,
+        planner=CEMController(
+            make_true_dynamics_env(device=config.device),
+            seed=planner_seed,
+        ),
+    )
+
+    checkpoint_path = output_directory / f"{replicate_id}-after-b-replay.checkpoint"
+    restart_planner = CEMController(
+        make_learned_model_env(runtime.model, device=config.device),
+        seed=planner_seed,
+    )
+    manifest_sha256, component_rows, restart_tick = save_replicate_checkpoint(
+        path=checkpoint_path,
+        rows=rows,
+        runtime=runtime,
+        collection=collection_b,
+        collection_a=collection_a.transitions,
+        collection_b=collection_b.transitions,
+        collection_rng_states={
+            "task_a": collection_controller_a.state(),
+            "task_b": collection_controller_b.state(),
+        },
+        planner=restart_planner,
+        update_evidence=(
+            learner_a.last_evidence,
+            learner_b_replay.last_evidence,
+        ),
+        created_at=replay_receipt.completed_at,
+    )
+    rows.checkpoint_components.extend(component_rows)
+    print(f"[{utc_now()}] {replicate_id}: fresh-process restore parity", flush=True)
+    rows.restart_parity = run_restart_parity(
+        checkpoint_path=checkpoint_path,
+        output_directory=output_directory,
+        rows=rows,
+        runtime=runtime,
+        custody=collection_b.custody,
+        next_tick=restart_tick,
+        planner=restart_planner,
+        checkpoint_manifest_sha256=manifest_sha256,
+        component_rows=component_rows,
+        task_reset_seeds={
+            TASK_A: rows.seed("behavior_evaluation_a_episode", 0),
+            TASK_B: rows.seed("behavior_evaluation_b_episode", 0),
+        },
+        device=config.device,
+        boundary_snapshot=collection_b.final_agent.snapshot(TimePoint(restart_tick - 1)),
+    )
+    if rows.restart_parity["checkpoint_manifest_sha256"] != manifest_sha256:
+        raise RuntimeError("restart parity reported a different checkpoint manifest")
+
+    if cold.digest != cold_parameter_sha256 or cold.live_state_digest != cold_live_state_sha256:
+        raise RuntimeError("frozen cold checkpoint mutated during the replicate")
+    result = rows.as_dict()
+    partial_path = output_directory / f"{replicate_id}.json"
+    atomic_write_exclusive(partial_path, canonical_json_bytes(result) + b"\n")
+    print(f"[{utc_now()}] {replicate_id}: complete", flush=True)
+    return result
+
+
+def run_experiment(
+    config: ExperimentConfig,
+    *,
+    output_directory: Path,
+    formal_binding_path: Path | None = None,
+    output_prepared: bool = False,
+) -> tuple[dict[str, object], Path]:
+    """Execute all configured replicates and write one schema-valid raw result."""
+
+    from .analysis import analyze_result
+    from .binding import verify_live_binding
+    from .verify import verify_result
+
+    config.validate()
+    if config.lane == "formal" and not output_prepared:
+        raise ValueError("formal execution requires an exclusive ProducerAttempt directory")
+    if config.lane == "formal":
+        if formal_binding_path is None:
+            raise ValueError("formal execution requires its pre-run implementation binding")
+        verify_live_binding(formal_binding_path, device=config.device)
+    elif formal_binding_path is not None:
+        raise ValueError("development execution must not claim a formal binding")
+    if output_prepared:
+        if not output_directory.is_dir():
+            raise ValueError("prepared output directory does not exist")
+        metadata_path = output_directory / "attempt-metadata.json"
+        if not metadata_path.is_file():
+            raise ValueError("prepared output directory has no custody metadata")
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if (
+            not isinstance(metadata, dict)
+            or metadata.get("schema") != "prospect.wm001.producer-attempt.v1"
+            or metadata.get("lane") != config.lane
+        ):
+            raise ValueError("prepared output directory custody metadata differs from the lane")
+        if (output_directory / "producer-manifest.json").exists():
+            raise ValueError("prepared output directory was already finalized")
+    else:
+        output_directory.mkdir(parents=True, exist_ok=False)
+    started_at = utc_now()
+    monotonic_start = time.monotonic()
+    conformance = run_pendulum_conformance(samples_per_task=128, seed=20260717)
+    if not conformance["passed"]:
+        raise RuntimeError("Pendulum semantic conformance preflight failed")
+    replicate_results: list[dict[str, object]] = []
+    for master_seed in config.master_seeds:
+        replicate = run_replicate(
+            config,
+            master_seed=master_seed,
+            output_directory=output_directory,
+        )
+        replicate_results.append(replicate)
+        progress = {
+            "schema": "prospect.wm001.progress.v1",
+            "lane": config.lane,
+            "completed_master_seeds": [int(row["master_seed"]) for row in replicate_results],
+            "updated_at_utc": utc_now(),
+        }
+        progress_path = output_directory / (
+            f"progress-{len(replicate_results):02d}-{int(replicate['master_seed'])}.json"
+        )
+        atomic_write_exclusive(progress_path, canonical_json_bytes(progress) + b"\n")
+
+    git_commit = _git_value("rev-parse", "HEAD")
+    git_tree = _git_value("rev-parse", "HEAD^{tree}")
+    worktree_clean = not _git_value("status", "--short", "--untracked-files=all")
+    lockfile = Path(__file__).resolve().parents[2] / "requirements-wm001.lock"
+    binding_sha256 = (
+        None if formal_binding_path is None else hashlib.sha256(formal_binding_path.read_bytes()).hexdigest()
+    )
+    wall_seconds = time.monotonic() - monotonic_start
+    max_cuda_memory = int(torch.cuda.max_memory_allocated()) if config.device == "cuda" else 0
+    result: dict[str, object] = {
+        "schema": "prospect.world-model-lifecycle.raw-result.v2",
+        "experiment_id": "WM-001",
+        "protocol_version": "1.1.1",
+        "protocol_sha256": PROTOCOL_SHA256,
+        "lane": config.lane,
+        "claim_eligible": config.lane == "formal",
+        "formal_binding_sha256": binding_sha256,
+        "started_at_utc": started_at,
+        "completed_at_utc": utc_now(),
+        "execution": {
+            "git_commit": git_commit,
+            "git_tree": git_tree,
+            "worktree_clean": worktree_clean,
+            "dependency_lock_sha256": hashlib.sha256(lockfile.read_bytes()).hexdigest(),
+            "platform": platform.platform(),
+            "device": config.device,
+            "deterministic_algorithms": bool(torch.are_deterministic_algorithms_enabled()),
+            "launcher_process_id": os.getpid(),
+            "resource_telemetry": {
+                "wall_seconds": wall_seconds,
+                "max_cuda_memory_bytes": max_cuda_memory,
+                "python": platform.python_version(),
+                "torch": torch.__version__,
+                "validation_conformance_cases": conformance["cases"],
+                "validation_conformance_observation_max_abs_error": (conformance["max_observation_absolute_error"]),
+                "validation_conformance_reward_max_abs_error": (conformance["max_reward_absolute_error"]),
+                "validation_conformance_planner_dtype": conformance["planner_dtype"],
+                "validation_conformance_planner_observation_max_abs_error": (
+                    conformance["max_planner_observation_absolute_error"]
+                ),
+                "validation_conformance_planner_reward_max_abs_error": (
+                    conformance["max_planner_reward_absolute_error"]
+                ),
+            },
+        },
+        "replicates": replicate_results,
+        "aggregate_metrics": [],
+        "gate_results": [],
+        "limitations": [
+            (
+                "Development runs are diagnostic and cannot support the sealed capability claim."
+                if config.lane == "development"
+                else "WM-001 is limited to same-machine, same-dependency Pendulum-v1 evidence."
+            ),
+            "Uncertainty is evaluated predictively but is not used as an intrinsic planning reward in WM-001.",
+            "Replay retention is demonstrated on two observed-context actuator regimes, not broad continual learning.",
+        ],
+    }
+    analysis = analyze_result(result)
+    result["aggregate_metrics"] = analysis["aggregate_metrics"]
+    result["gate_results"] = analysis["gate_results"]
+    findings = cast(list[dict[str, object]], analysis["audit_findings"])
+    result["limitations"] = [
+        *cast(list[str], result["limitations"]),
+        *[
+            f"Analysis finding [{finding.get('severity', 'unknown')}]: {finding.get('message', finding)}"
+            for finding in findings
+        ],
+    ]
+    result_path = output_directory / "result.json"
+    atomic_write_exclusive(result_path, canonical_json_bytes(result) + b"\n")
+    verify_result(result_path, formal_binding_path)
+    return result, result_path
+
+
+def _git_value(*arguments: str) -> str:
+    completed = subprocess.run(
+        ["git", *arguments],
+        cwd=Path(__file__).resolve().parents[2],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+__all__ = (
+    "ExperimentConfig",
+    "OraclePredictiveBackend",
+    "ReplicateRows",
+    "append_collection_rows",
+    "append_episode_rows",
+    "append_predictive_metric",
+    "configure_determinism",
+    "run_experiment",
+    "run_replicate",
+    "to_transition_batch",
+)

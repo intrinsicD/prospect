@@ -22,19 +22,28 @@ The repository contains:
 - exact Bayes, information-value, and proper-score reference semantics;
 - transparent action assessment;
 - one linked runtime with canonical experience and epistemic stores;
-- optional TorchRL/TensorDict replay; and
-- integrity-checked component checkpoints.
+- failure-atomic in-process learning across owned model bytes, runtime state, and
+  the update ledger;
+- canonical replay custody plus optional TorchRL/TensorDict sampling;
+- integrity-checked component checkpoints; and
+- an executable probabilistic world-model, CEM control, retention, restart, and
+  independent-evidence program in
+  [WM-001](bench/world_model_lifecycle/README.md).
 
-It does not yet demonstrate one real agent learning a predictive model from its
-own experience, improving executed held-out behavior because of that update, and
-retaining the same gain through shared-state interference and process restart.
-The next experiment must establish that chain before any maturity claim.
+WM-001 is implemented but has no accepted formal result recorded here. Therefore
+the repository does not yet demonstrate that one real agent learned a predictive
+model from its own experience, improved executed held-out behavior because of
+that update, and retained the gain through shared-state interference and process
+restart. Development results are diagnostic; only an independently audited
+formal artifact can establish that chain.
 
 ## Layout
 
 ```text
 src/prospect/             current agent implementation
 bench/epistemic/          exact semantic and lifecycle references
+bench/world_model_lifecycle/
+                          WM-001 protocol, implementation, evidence, and runbook
 tests/                    active unit, adversarial, and integration tests
 docs/architecture.md      canonical system definition
 datasets/                 preserved reusable inputs and checksums
@@ -52,9 +61,15 @@ python -m venv .venv && source .venv/bin/activate
 make install
 make install-runtime
 make check
+make check-runtime
 make epistemic-diagnostics
 make epistemic-gate
+python -m bench.world_model_lifecycle.verify protocol
+make wm001-development
 ```
 
-`make epistemic-gate` remains nonzero until the complete learning and retention
-chain is demonstrated.
+`make check` covers the backend-neutral core. `make check-runtime` adds the
+world-model implementation and adversarial tests. `make wm001-development` runs
+the two declared diagnostic seeds and is never claim-eligible. See the
+[WM-001 executable runbook](bench/world_model_lifecycle/README.md) before
+creating an implementation binding or formal attempt.

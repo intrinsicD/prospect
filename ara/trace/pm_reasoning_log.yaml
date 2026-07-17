@@ -1,0 +1,6 @@
+entries:
+  - turn: "2026-07-17_001#1"
+    notes:
+      - "Initialized a new ARA because this is the first research-significant turn after the requested reset."
+      - "Routed the user's request as open question N01; no experiment choice has been affirmed."
+      - "Staged O01-O04 as ai-suggested and did not crystallize them because no closure signal exists."

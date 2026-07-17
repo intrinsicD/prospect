@@ -1,12 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "schema": "prospect.world-model-lifecycle.protocol.v1",
+  "schema": "prospect.world-model-lifecycle.protocol.v2",
   "experiment": {
     "id": "WM-001",
     "title": "Causal world-model learning, behavioral improvement, retention, and restart",
-    "protocol_version": "1.0.0",
-    "status": "sealed_before_outcomes",
+    "protocol_version": "1.1.1",
+    "status": "sealed_before_formal_outcomes",
     "thresholds_sealed_before_outcomes": true,
+    "revision": {
+      "supersedes": "1.1.0",
+      "superseded_protocol_sha256": "b5e2fb45c462dd8db08c35596e7c42d046444f21bfca12f4c0215b846b993e3e",
+      "reason": "Pre-formal custody review found that v1.1.0 used the phrase formal artifact for both the immutable producer root and the later independent audit, even though placing the audit inside the already-finalized producer root would invalidate its manifest. Version 1.1.1 defines an external, content-addressed adjudication package and strengthens implementation-source and conformance custody. Tasks, model, optimizer, planner, controls, master seeds, budgets, thresholds, metrics, and killing gates are unchanged.",
+      "outcome_use": "No formal outcome was generated under v1.0 or v1.1.0. Development artifacts under v1.1.0 were diagnostic and were not used to change numerical thresholds."
+    },
     "supersession_rule": "Any semantic, seed, budget, metric, threshold, control, or gate change creates a new protocol version and invalidates all formal outcomes collected under an earlier or unbound version."
   },
   "claim": "The same Prospect agent collects identified real experience, changes one shared persistent probabilistic world model because of exactly that experience, improves held-out prediction and executed control, learns a conflicting second task without task-specific model copies, retains the first-task gain through replay, and reproduces the retained state and behavior after a fresh-process restore.",
@@ -45,6 +51,7 @@
     "checkpoint every declared stateful component and restore in a fresh process",
     "reproduce identities, predictions, actions, and executed returns"
   ],
+  "evaluation_scheduling_rule": "A paired evaluation condition may execute after a later causal phase only when it reloads immutable content-addressed bytes for the declared checkpoint, resets the exact paired environment and planner RNG seeds, and has learning and replay writes disabled. Scheduling does not change the condition's causal checkpoint identity.",
   "environment": {
     "family": "Gymnasium classic control",
     "environment_id": "Pendulum-v1",
@@ -315,7 +322,8 @@
     }
   },
   "seed_schedule": {
-    "algorithm": "seed(namespace, replicate_master_seed, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.0.0|' + namespace + '|' + decimal(replicate_master_seed) + '|' + decimal(index))",
+    "derivation_domain_version": "1.0.0",
+    "algorithm": "seed(namespace, replicate_master_seed, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.0.0|' + namespace + '|' + decimal(replicate_master_seed) + '|' + decimal(index)); the 1.0.0 seed-domain tag is intentionally retained by evidence-only protocol revision 1.1 so every pre-existing declared stream is unchanged",
     "formal_replicate_master_seeds": [
       104729,
       130363,
@@ -338,6 +346,14 @@
         "count": 1
       },
       "collection_action": {
+        "count": 2,
+        "index_meaning": "0=task_a, 1=task_b"
+      },
+      "predictive_validation_action": {
+        "count": 2,
+        "index_meaning": "0=task_a, 1=task_b"
+      },
+      "random_policy_action": {
         "count": 2,
         "index_meaning": "0=task_a, 1=task_b"
       },
@@ -407,7 +423,7 @@
     },
     "corrupted_target": {
       "purpose": "tests whether correct transition linkage, rather than optimizer activity or target marginals, explains prediction and behavior",
-      "implementation": "apply one seeded permutation to joint (next_physical_observation, reward) targets across collect_a while leaving inputs, target marginals, transition counts, initialization, minibatch schedule, and update budget matched"
+      "implementation": "apply one seeded permutation to the joint fixed-scaled (delta_cos_theta, delta_sin_theta, delta_angular_velocity, reward) training-target vector across collect_a while leaving inputs, learned-target marginals, transition counts, initialization, minibatch schedule, and update budget matched"
     },
     "naive_sequential": {
       "purpose": "demonstrates actual A/B interference and supplies the no-retention baseline",
@@ -690,21 +706,23 @@
       ]
     },
     "dependencies": {
-      "required_exact_packages": [
+      "required_root_packages": [
         "python",
         "gymnasium",
+        "jsonschema",
         "numpy",
         "torch",
         "torchrl",
         "tensordict",
         "prospect"
       ],
+      "closure_rule": "The formal binding must resolve and record the complete installed transitive dependency closure of every non-Python root under the live marker environment. Each distribution digest covers the bytes of every RECORD-addressed installed file. Launch recomputes every version and digest.",
       "required": [
         "platform and accelerator identity",
         "determinism flags",
         "exact package versions",
         "distribution or wheel SHA-256 values",
-        "complete lockfile SHA-256"
+        "complete transitive lockfile SHA-256"
       ],
       "version_policy": "The protocol does not retrospectively choose package versions. The formal binding selects one exact compatible environment after implementation and freezes it before formal execution."
     },
@@ -785,10 +803,12 @@
       "one gate observation per predeclared threshold"
     ],
     "content_hash_rule": "Unless a binary tensor format is explicitly bound, hash UTF-8 JSON serialized with sorted keys, separators=(',', ':'), ensure_ascii=false, allow_nan=false, and no insignificant whitespace. A JSONL manifest hashes those canonical records in declared order, each followed by one LF byte.",
-    "consumed_multiset_hash_rule": "UpdateReceipt consumed_multiset_sha256 is SHA-256 over the UTF-8 transition IDs in exact optimizer-consumption order, each followed by one LF byte; repetitions are retained.",
+    "consumed_multiset_hash_rule": "Each committed update records the unique phase-eligible canonical transition-ID set separately from consumed_sample_count. consumed_multiset_sha256 is SHA-256 over UTF-8 transition IDs in exact optimizer-consumption order, each followed by one LF byte; repetitions are retained. The phase-labeled content-addressed optimizer manifest must reproduce that order exactly.",
     "target_hash_rule": "A transition target hash covers the fixed-scaled [delta_cos_theta, delta_sin_theta, delta_angular_velocity, reward] vector serialized as four little-endian IEEE-754 float64 values.",
     "aggregation_rule": "The report must be mechanically derivable from raw evidence. A hand-entered aggregate without raw members is a K0 failure.",
-    "formal_artifact_rule": "Preserve raw JSON, protocol and binding copies, stdout/stderr, resource telemetry, checkpoint manifests, hashes, and the independent audit. Do not overwrite a formal artifact."
+    "producer_artifact_rule": "Create a new exclusive producer-attempt directory before the first reset. Preserve raw JSON, protocol and schema copies, binding, test and conformance reports, the exact bound implementation-source bytes, main and child process stdout/stderr, resource telemetry, checkpoint manifests, all content-addressed sidecars, and a complete producer manifest. Finalize this root before independent audit. Never resume, retry in place, repair, or overwrite it; failed attempts remain immutable evidence.",
+    "adjudication_package_rule": "The independent audit must remain outside the immutable producer root. After audit, create a second exclusive package whose canonical manifest binds the finalized producer-manifest digest, raw-result digest, independent-audit digest, auditor-source digest, formal-binding digest, and explicit review disposition. The producer root, external audit report, and adjudication manifest together form the formal evidence package; none may be overwritten in place.",
+    "formal_artifact_rule": "Formal evidence uses two custody levels: an immutable pre-outcome producer root followed by an external independently generated adjudication package. No producer output may claim support, and no accepted disposition is valid unless the external audit is complete, passes, and independently recomputes K0 through K7."
   },
   "independent_audit": {
     "required_before_claim": true,

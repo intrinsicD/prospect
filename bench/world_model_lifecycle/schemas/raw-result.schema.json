@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-raw-result-v1.json",
+  "$id": "https://prospect.local/schemas/wm-001-raw-result-v2.json",
   "title": "WM-001 raw evidence and derived result",
   "type": "object",
   "additionalProperties": false,
@@ -22,13 +22,13 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.raw-result.v1"
+      "const": "prospect.world-model-lifecycle.raw-result.v2"
     },
     "experiment_id": {
       "const": "WM-001"
     },
     "protocol_version": {
-      "const": "1.0.0"
+      "const": "1.1.1"
     },
     "protocol_sha256": {
       "$ref": "#/$defs/sha256"
@@ -187,13 +187,23 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
+    "physicalObservation": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      }
+    },
     "digestRef": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "media_type",
         "bytes",
-        "sha256"
+        "sha256",
+        "filename",
+        "phase"
       ],
       "properties": {
         "media_type": {
@@ -206,6 +216,45 @@
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "filename": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "phase": {
+          "enum": [
+            "train_a",
+            "train_b_replay",
+            "train_b_naive",
+            "train_a_corrupted"
+          ]
+        }
+      }
+    },
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "media_type",
+        "bytes",
+        "sha256",
+        "filename"
+      ],
+      "properties": {
+        "media_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "filename": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
         }
       }
     },
@@ -236,6 +285,7 @@
       "additionalProperties": false,
       "required": [
         "episode_id",
+        "run_id",
         "task_id",
         "split",
         "condition",
@@ -258,6 +308,10 @@
           "type": "string",
           "minLength": 1
         },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
         "task_id": {
           "enum": [
             "pendulum_normal_torque",
@@ -275,12 +329,30 @@
           ]
         },
         "condition": {
-          "type": "string",
-          "minLength": 1
+          "enum": [
+            "collection_random",
+            "validation_random",
+            "cold",
+            "after_a",
+            "frozen",
+            "corrupted",
+            "after_b_replay",
+            "after_b_naive",
+            "random",
+            "oracle"
+          ]
         },
         "checkpoint_id": {
-          "type": "string",
-          "minLength": 1
+          "enum": [
+            "cold",
+            "after_a",
+            "frozen",
+            "corrupted",
+            "after_b_replay",
+            "after_b_naive",
+            "random",
+            "oracle"
+          ]
         },
         "reset_seed": {
           "type": "integer",
@@ -338,8 +410,10 @@
       "additionalProperties": false,
       "required": [
         "transition_id",
+        "run_id",
         "episode_id",
         "task_id",
+        "task_context",
         "split",
         "step_index",
         "real_or_imagined",
@@ -349,15 +423,22 @@
         "next_observation_id",
         "model_version_at_action",
         "parameter_sha256_at_action",
+        "pre_observation",
         "intended_action",
         "applied_action",
+        "next_observation",
         "reward",
         "terminated",
         "truncated",
+        "scaled_target",
         "target_sha256"
       ],
       "properties": {
         "transition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
           "type": "string",
           "minLength": 1
         },
@@ -369,6 +450,12 @@
           "enum": [
             "pendulum_normal_torque",
             "pendulum_reversed_torque"
+          ]
+        },
+        "task_context": {
+          "enum": [
+            0.0,
+            1.0
           ]
         },
         "split": {
@@ -406,6 +493,9 @@
         "parameter_sha256_at_action": {
           "$ref": "#/$defs/sha256"
         },
+        "pre_observation": {
+          "$ref": "#/$defs/physicalObservation"
+        },
         "intended_action": {
           "type": "number",
           "minimum": -2.0,
@@ -416,6 +506,9 @@
           "minimum": -2.0,
           "maximum": 2.0
         },
+        "next_observation": {
+          "$ref": "#/$defs/physicalObservation"
+        },
         "reward": {
           "type": "number"
         },
@@ -424,6 +517,14 @@
         },
         "truncated": {
           "type": "boolean"
+        },
+        "scaled_target": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "number"
+          }
         },
         "target_sha256": {
           "$ref": "#/$defs/sha256"
@@ -443,9 +544,13 @@
         "predecessor_model_version",
         "committed_model_version",
         "eligible_splits",
-        "consumed_transition_count",
-        "consumed_transition_ids",
+        "eligible_transition_count",
+        "eligible_transition_ids",
+        "consumed_sample_count",
         "consumed_multiset_sha256",
+        "sampling_manifest_sha256",
+        "target_permutation_sha256",
+        "target_permutation_file",
         "optimizer_steps",
         "live_state_before_sha256",
         "live_state_after_sha256"
@@ -496,19 +601,54 @@
             ]
           }
         },
-        "consumed_transition_count": {
+        "eligible_transition_count": {
           "type": "integer",
           "minimum": 0
         },
-        "consumed_transition_ids": {
+        "eligible_transition_ids": {
           "type": "array",
+          "uniqueItems": true,
           "items": {
             "type": "string",
             "minLength": 1
           }
         },
+        "consumed_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
         "consumed_multiset_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "sampling_manifest_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_permutation_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_permutation_file": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/fileRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "optimizer_steps": {
           "type": "integer",
@@ -520,8 +660,42 @@
         },
         "live_state_after_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "full_state_before_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "full_state_after_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "full_state_before_file": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "full_state_after_file": {
+          "$ref": "#/$defs/fileRef"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "rejected_update_probe"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "full_state_before_sha256",
+              "full_state_after_sha256",
+              "full_state_before_file",
+              "full_state_after_file"
+            ]
+          }
+        }
+      ]
     },
     "predictiveMetric": {
       "type": "object",
@@ -530,25 +704,54 @@
         "task_id",
         "condition",
         "checkpoint_id",
+        "model_version",
+        "parameter_sha256",
+        "live_state_sha256",
         "split",
         "transition_count",
         "mixture_nll_nats_per_target_dimension",
         "normalized_rmse",
         "interval_90_coverage",
-        "prediction_rows_sha256"
+        "prediction_rows_sha256",
+        "prediction_evidence_file",
+        "prediction_evidence_bytes"
       ],
       "properties": {
         "task_id": {
-          "type": "string",
-          "minLength": 1
+          "enum": [
+            "pendulum_normal_torque",
+            "pendulum_reversed_torque"
+          ]
         },
         "condition": {
+          "enum": [
+            "cold",
+            "after_a",
+            "frozen",
+            "corrupted",
+            "after_b_replay",
+            "after_b_naive"
+          ]
+        },
+        "checkpoint_id": {
+          "enum": [
+            "cold",
+            "after_a",
+            "frozen",
+            "corrupted",
+            "after_b_replay",
+            "after_b_naive"
+          ]
+        },
+        "model_version": {
           "type": "string",
           "minLength": 1
         },
-        "checkpoint_id": {
-          "type": "string",
-          "minLength": 1
+        "parameter_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "live_state_sha256": {
+          "$ref": "#/$defs/sha256"
         },
         "split": {
           "enum": [
@@ -573,6 +776,222 @@
         },
         "prediction_rows_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "prediction_evidence_file": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "prediction_evidence_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "policyRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "task_id",
+        "split",
+        "condition",
+        "checkpoint_id",
+        "controller_kind",
+        "controller_version",
+        "seed_namespace",
+        "seed_index",
+        "seed",
+        "reset_seeds",
+        "episode_ids",
+        "rng_start_sha256",
+        "rng_end_sha256",
+        "action_count",
+        "action_trace_sha256",
+        "planner_budget"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "enum": [
+            "pendulum_normal_torque",
+            "pendulum_reversed_torque"
+          ]
+        },
+        "split": {
+          "enum": [
+            "collect_a",
+            "predictive_validation_a",
+            "behavior_evaluation_a",
+            "collect_b",
+            "predictive_validation_b",
+            "behavior_evaluation_b"
+          ]
+        },
+        "condition": {
+          "enum": [
+            "collection_random",
+            "validation_random",
+            "cold",
+            "after_a",
+            "frozen",
+            "corrupted",
+            "after_b_replay",
+            "after_b_naive",
+            "random",
+            "oracle"
+          ]
+        },
+        "checkpoint_id": {
+          "enum": [
+            "cold",
+            "after_a",
+            "frozen",
+            "corrupted",
+            "after_b_replay",
+            "after_b_naive",
+            "random",
+            "oracle"
+          ]
+        },
+        "controller_kind": {
+          "enum": [
+            "uniform_random",
+            "cem_learned",
+            "cem_oracle"
+          ]
+        },
+        "controller_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed_namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "reset_seeds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        },
+        "episode_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rng_start_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "rng_end_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "action_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "action_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "planner_budget": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "planning_horizon",
+                "optim_steps",
+                "num_candidates",
+                "top_k"
+              ],
+              "properties": {
+                "planning_horizon": {
+                  "const": 10
+                },
+                "optim_steps": {
+                  "const": 3
+                },
+                "num_candidates": {
+                  "const": 64
+                },
+                "top_k": {
+                  "const": 8
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "evaluatedCheckpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition",
+        "model_version",
+        "parameter_sha256",
+        "live_state_sha256",
+        "media_type",
+        "bytes",
+        "sha256",
+        "filename"
+      ],
+      "properties": {
+        "condition": {
+          "enum": [
+            "cold",
+            "frozen",
+            "corrupted",
+            "after_a",
+            "after_b_replay",
+            "after_b_naive"
+          ]
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameter_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "live_state_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "media_type": {
+          "const": "application/vnd.prospect.wm001.owned-model-state"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "filename": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
         }
       }
     },
@@ -690,7 +1109,10 @@
         "updates",
         "optimizer_batch_manifests",
         "predictive_metrics",
+        "policy_runs",
+        "evaluated_checkpoints",
         "checkpoint_components",
+        "checkpoint_archive",
         "restart_parity"
       ],
       "properties": {
@@ -738,11 +1160,28 @@
             "$ref": "#/$defs/predictiveMetric"
           }
         },
+        "policy_runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/policyRun"
+          }
+        },
+        "evaluated_checkpoints": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/evaluatedCheckpoint"
+          }
+        },
         "checkpoint_components": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/checkpointComponent"
           }
+        },
+        "checkpoint_archive": {
+          "$ref": "#/$defs/fileRef"
         },
         "restart_parity": {
           "oneOf": [

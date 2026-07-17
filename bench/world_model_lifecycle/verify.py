@@ -1,0 +1,1177 @@
+#!/usr/bin/env python3
+"""Dependency-free integrity checks for the sealed WM-001 evidence package.
+
+This is deliberately not the experiment runner.  It verifies the immutable
+scientific protocol now, an implementation binding before a formal launch, and
+the causal/evidence envelope of a result after execution.  Metric recomputation
+from tensors and episode traces belongs to the later independent audit.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import re
+import struct
+import sys
+from datetime import datetime
+from hashlib import sha256
+from pathlib import Path
+from typing import Any
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
+PROTOCOL_PATH = HERE / "protocol.json"
+SEAL_PATH = HERE / "SEALED_PROTOCOL.sha256"
+RESULT_SCHEMA_PATH = HERE / "schemas" / "raw-result.schema.json"
+BINDING_SCHEMA_PATH = HERE / "schemas" / "formal-binding.schema.json"
+
+FORMAL_SEEDS = (104729, 130363, 155921, 181081, 206369, 232003, 257371, 283009)
+DEVELOPMENT_SEEDS = (101, 211)
+TASK_A = "pendulum_normal_torque"
+TASK_B = "pendulum_reversed_torque"
+EPISODE_CONTRACTS = frozenset(
+    {
+        ("collect_a", TASK_A, "collection_random", "cold"),
+        ("collect_b", TASK_B, "collection_random", "after_a"),
+        (
+            "predictive_validation_a",
+            TASK_A,
+            "validation_random",
+            "after_a",
+        ),
+        (
+            "predictive_validation_b",
+            TASK_B,
+            "validation_random",
+            "after_a",
+        ),
+        *(
+            ("behavior_evaluation_a", TASK_A, condition, condition)
+            for condition in (
+                "cold",
+                "after_a",
+                "frozen",
+                "corrupted",
+                "after_b_replay",
+                "after_b_naive",
+                "random",
+                "oracle",
+            )
+        ),
+        *(
+            ("behavior_evaluation_b", TASK_B, condition, condition)
+            for condition in (
+                "after_a",
+                "after_b_replay",
+                "after_b_naive",
+                "random",
+                "oracle",
+            )
+        ),
+    }
+)
+PREDICTIVE_CONTRACTS = frozenset(
+    {
+        *(
+            ("predictive_validation_a", TASK_A, condition, condition)
+            for condition in (
+                "cold",
+                "after_a",
+                "frozen",
+                "corrupted",
+                "after_b_replay",
+                "after_b_naive",
+            )
+        ),
+        *(
+            ("predictive_validation_b", TASK_B, condition, condition)
+            for condition in (
+                "after_a",
+                "after_b_replay",
+                "after_b_naive",
+            )
+        ),
+    }
+)
+REQUIRED_PACKAGES = frozenset(
+    {
+        "python",
+        "gymnasium",
+        "jsonschema",
+        "numpy",
+        "torch",
+        "torchrl",
+        "tensordict",
+        "prospect",
+    }
+)
+REQUIRED_COMPONENTS = (
+    "world_model",
+    "optimizer",
+    "model_version_ledger",
+    "experience_store",
+    "replay_index",
+    "replay_sampling_history",
+    "update_receipts",
+    "agent_runtime",
+    "scaling_configuration",
+    "python_rng",
+    "numpy_rng",
+    "torch_cpu_rng",
+    "torch_accelerator_rng",
+    "collection_rng",
+    "planner_rng",
+)
+GATES = tuple(f"K{index}" for index in range(8))
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+GIT_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+FORMAL_CONFORMANCE_KEYS = frozenset(
+    {
+        "schema",
+        "environment_id",
+        "gymnasium_version",
+        "seed",
+        "samples_per_task",
+        "cases",
+        "semantic_parameters",
+        "semantic_parameter_absolute_errors",
+        "spec_horizon",
+        "max_observation_absolute_error",
+        "max_reward_absolute_error",
+        "planner_dtype",
+        "max_planner_observation_absolute_error",
+        "max_planner_reward_absolute_error",
+        "terminated_or_truncated_cases",
+        "observation_atol",
+        "reward_atol",
+        "planner_observation_atol",
+        "planner_reward_atol",
+        "passed",
+        "report_sha256",
+    }
+)
+FORMAL_CONFORMANCE_PARAMETERS = {
+    "g": 10.0,
+    "m": 1.0,
+    "l": 1.0,
+    "dt": 0.05,
+    "max_speed": 8.0,
+    "max_torque": 2.0,
+}
+FORMAL_CONFORMANCE_TOLERANCES = {
+    "observation_atol": 2e-6,
+    "reward_atol": 1e-9,
+    "planner_observation_atol": 2e-6,
+    "planner_reward_atol": 2e-5,
+}
+
+
+class Violation(ValueError):
+    """A protocol, binding, or result integrity violation."""
+
+
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise Violation(message)
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise Violation(f"cannot load JSON {path}: {exc}") from exc
+    _require(isinstance(value, dict), f"{path} must contain one JSON object")
+    return value
+
+
+def _validate_json_schema(
+    value: dict[str, Any],
+    schema: dict[str, Any],
+    *,
+    label: str,
+) -> None:
+    try:
+        from jsonschema import Draft202012Validator
+    except ImportError as exc:
+        raise Violation("jsonschema 4.25.1 is required for binding/result verification") from exc
+    try:
+        Draft202012Validator.check_schema(schema)
+    except Exception as exc:
+        raise Violation(f"{label} schema is invalid: {exc}") from exc
+    errors = sorted(Draft202012Validator(schema).iter_errors(value), key=lambda error: list(error.path))
+    if errors:
+        first = errors[0]
+        location = ".".join(str(part) for part in first.absolute_path) or "<root>"
+        raise Violation(f"{label} violates JSON Schema at {location}: {first.message}")
+
+
+def _file_sha256(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _canonical_sha256(value: object) -> str:
+    payload = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return sha256(payload).hexdigest()
+
+
+def _binding_sibling(path: Path, value: object, field: str) -> Path:
+    _require(isinstance(value, str) and value, f"{field} is missing")
+    relative = Path(value)
+    _require(
+        not relative.is_absolute() and len(relative.parts) == 1 and relative.name == value,
+        f"{field} must be a safe sibling filename",
+    )
+    return path.parent / relative
+
+
+def _require_sha256(value: object, field: str) -> str:
+    _require(isinstance(value, str) and SHA256_PATTERN.fullmatch(value) is not None, f"{field} is not SHA-256")
+    return value
+
+
+def _parse_timestamp(value: object, field: str) -> datetime:
+    _require(isinstance(value, str), f"{field} must be an ISO-8601 string")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise Violation(f"{field} is not an ISO-8601 timestamp") from exc
+    _require(parsed.tzinfo is not None, f"{field} must include a UTC offset")
+    return parsed
+
+
+def _verify_implementation_manifest(value: object) -> None:
+    """Require the exact complete ordered implementation manifest."""
+
+    from .binding import implementation_files
+
+    expected = implementation_files()
+    _require(
+        value == expected,
+        "binding implementation_files differs from the exact complete ordered live implementation manifest",
+    )
+
+
+def _verify_pendulum_conformance_report(report: object) -> None:
+    """Independently enforce the fixed formal Pendulum conformance contract."""
+
+    _require(isinstance(report, dict), "bound Pendulum conformance report is not an object")
+    assert isinstance(report, dict)
+    _require(
+        set(report) == FORMAL_CONFORMANCE_KEYS,
+        "bound Pendulum conformance report fields differ from the formal contract",
+    )
+    _require(
+        report.get("schema") == "prospect.wm001.pendulum-conformance.v1",
+        "bound Pendulum conformance report has the wrong schema",
+    )
+    _require(
+        report.get("environment_id") == "Pendulum-v1",
+        "bound Pendulum conformance report has the wrong environment",
+    )
+    _require(
+        isinstance(report.get("gymnasium_version"), str) and bool(report["gymnasium_version"]),
+        "bound Pendulum conformance report has no Gymnasium version",
+    )
+    _require(
+        report.get("seed") == 20260717 and report.get("samples_per_task") == 512 and report.get("cases") == 1024,
+        "bound Pendulum conformance report does not contain exactly 512 cases per task from seed 20260717",
+    )
+    _require(
+        report.get("semantic_parameters") == FORMAL_CONFORMANCE_PARAMETERS,
+        "bound Pendulum semantic parameters changed",
+    )
+    _require(
+        report.get("semantic_parameter_absolute_errors") == {name: 0.0 for name in FORMAL_CONFORMANCE_PARAMETERS},
+        "bound Pendulum semantic parameters differ from Gymnasium",
+    )
+    _require(
+        report.get("spec_horizon") == 200,
+        "bound Pendulum horizon changed",
+    )
+    _require(
+        report.get("terminated_or_truncated_cases") == 0,
+        "bound Pendulum conformance cases terminated or truncated",
+    )
+    _require(
+        all(report.get(field) == expected for field, expected in FORMAL_CONFORMANCE_TOLERANCES.items()),
+        "bound Pendulum conformance tolerances changed",
+    )
+    _require(
+        report.get("planner_dtype") == "float32",
+        "bound Pendulum planner conformance dtype changed",
+    )
+    error_limits = {
+        "max_observation_absolute_error": FORMAL_CONFORMANCE_TOLERANCES["observation_atol"],
+        "max_reward_absolute_error": FORMAL_CONFORMANCE_TOLERANCES["reward_atol"],
+        "max_planner_observation_absolute_error": FORMAL_CONFORMANCE_TOLERANCES["planner_observation_atol"],
+        "max_planner_reward_absolute_error": FORMAL_CONFORMANCE_TOLERANCES["planner_reward_atol"],
+    }
+    for field, limit in error_limits.items():
+        value = report.get(field)
+        _require(
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(float(value))
+            and 0.0 <= float(value) <= limit,
+            f"bound Pendulum conformance {field} exceeds its fixed tolerance",
+        )
+    _require(
+        report.get("passed") is True,
+        "bound Pendulum conformance report did not pass",
+    )
+    body = dict(report)
+    report_sha256 = body.pop("report_sha256", None)
+    _require_sha256(report_sha256, "Pendulum conformance report_sha256")
+    _require(
+        report_sha256 == _canonical_sha256(body),
+        "bound Pendulum conformance self-hash changed",
+    )
+
+
+def derive_seed(namespace: str, master_seed: int, index: int) -> int:
+    """Derive the exact uint32 seed retained from protocol 1.0.0."""
+
+    payload = f"WM-001|1.0.0|{namespace}|{master_seed}|{index}".encode()
+    return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
+
+
+def verify_protocol() -> dict[str, Any]:
+    """Verify the raw-byte seal and non-negotiable internal invariants."""
+
+    protocol = _load_json(PROTOCOL_PATH)
+    result_schema = _load_json(RESULT_SCHEMA_PATH)
+    binding_schema = _load_json(BINDING_SCHEMA_PATH)
+
+    try:
+        seal_rows = [line.split() for line in SEAL_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except OSError as exc:
+        raise Violation(f"cannot load protocol seal: {exc}") from exc
+    _require(all(len(row) == 2 for row in seal_rows), "invalid protocol seal format")
+    seals = {relative: digest for digest, relative in seal_rows}
+    expected_sealed_files = {
+        "protocol.json": PROTOCOL_PATH,
+        "schemas/formal-binding.schema.json": BINDING_SCHEMA_PATH,
+        "schemas/raw-result.schema.json": RESULT_SCHEMA_PATH,
+    }
+    _require(set(seals) == set(expected_sealed_files), "sealed evidence file set changed")
+    for relative, path in expected_sealed_files.items():
+        _require_sha256(seals[relative], f"{relative} seal")
+        _require(_file_sha256(path) == seals[relative], f"{relative} bytes do not match SEALED_PROTOCOL.sha256")
+
+    experiment = protocol.get("experiment", {})
+    _require(protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v2", "wrong protocol schema")
+    _require(experiment.get("id") == "WM-001", "wrong experiment ID")
+    _require(experiment.get("protocol_version") == "1.1.1", "wrong protocol version")
+    _require(experiment.get("status") == "sealed_before_formal_outcomes", "protocol is not marked sealed")
+    _require(experiment.get("thresholds_sealed_before_outcomes") is True, "experiment thresholds are not sealed")
+    _require(protocol.get("thresholds", {}).get("sealed_before_outcomes") is True, "threshold block is not sealed")
+
+    _require(protocol.get("splits", {}).get("unit") == "whole_episode", "splits are not whole-episode")
+    formal_splits = protocol.get("splits", {}).get("formal", {})
+    for split in ("collect_a", "collect_b"):
+        _require(formal_splits.get(split, {}).get("episodes_per_replicate") == 8, f"{split} episode budget changed")
+        _require(formal_splits.get(split, {}).get("transitions_per_replicate") == 1600, f"{split} step budget changed")
+    for split in ("behavior_evaluation_a", "behavior_evaluation_b"):
+        _require(
+            formal_splits.get(split, {}).get("episodes_per_replicate") == 32,
+            f"{split} must use 32 reset seeds",
+        )
+
+    seed_schedule = protocol.get("seed_schedule", {})
+    _require(
+        seed_schedule.get("derivation_domain_version") == "1.0.0",
+        "evidence-only revision changed the seed derivation domain",
+    )
+    formal_seeds = tuple(seed_schedule.get("formal_replicate_master_seeds", ()))
+    development_seeds = tuple(seed_schedule.get("development_replicate_master_seeds", ()))
+    _require(formal_seeds == FORMAL_SEEDS, "formal master seeds changed")
+    _require(development_seeds == DEVELOPMENT_SEEDS, "development master seeds changed")
+    _require(set(formal_seeds).isdisjoint(development_seeds), "development and formal seeds overlap")
+    _require(protocol.get("budgets", {}).get("formal_replicates") == 8, "formal replicate count changed")
+
+    model = protocol.get("representation_and_model", {}).get("world_model", {})
+    planner = protocol.get("representation_and_model", {}).get("planner", {})
+    _require(model.get("ensemble_members") == 5, "world-model ensemble size changed")
+    _require(planner.get("learning_during_evaluation") is False, "evaluation learning must be disabled")
+    _require(planner.get("replay_writes_during_evaluation") is False, "evaluation replay writes must be disabled")
+    _require(
+        protocol.get("experience_and_learning", {}).get("task_a_update", {}).get("optimizer_steps") == 2000,
+        "task-A update budget changed",
+    )
+    _require(
+        protocol.get("experience_and_learning", {}).get("task_b_replay_update", {}).get("optimizer_steps") == 2000,
+        "task-B update budget changed",
+    )
+
+    _require(
+        set(protocol.get("controls", {}))
+        == {
+            "frozen",
+            "corrupted_target",
+            "naive_sequential",
+            "random_policy",
+            "true_dynamics_mpc",
+        },
+        "control set changed",
+    )
+    _require(tuple(item.get("gate") for item in protocol.get("killing_order", ())) == GATES, "killing order changed")
+    _require(
+        tuple(protocol.get("bindings", {}).get("checkpoint", {}).get("canonical_component_ids", ()))
+        == REQUIRED_COMPONENTS,
+        "checkpoint component contract changed",
+    )
+    _require(
+        result_schema.get("$id") == "https://prospect.local/schemas/wm-001-raw-result-v2.json",
+        "wrong raw-result schema",
+    )
+    _require(
+        binding_schema.get("$id") == "https://prospect.local/schemas/wm-001-formal-binding-v2.json",
+        "wrong formal-binding schema",
+    )
+    return protocol
+
+
+def verify_binding(path: Path) -> dict[str, Any]:
+    """Verify a completed implementation binding before formal execution."""
+
+    protocol = verify_protocol()
+    binding = _load_json(path)
+    _validate_json_schema(binding, _load_json(BINDING_SCHEMA_PATH), label="formal binding")
+    _require(binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v2", "wrong binding schema")
+    _require(binding.get("experiment_id") == "WM-001", "binding has wrong experiment")
+    _parse_timestamp(binding.get("sealed_at_utc"), "sealed_at_utc")
+
+    bound_protocol = binding.get("protocol", {})
+    _require(bound_protocol.get("version") == "1.1.1", "binding has wrong protocol version")
+    _require(bound_protocol.get("sha256") == _file_sha256(PROTOCOL_PATH), "binding has wrong protocol digest")
+    _require(
+        bound_protocol.get("raw_result_schema_sha256") == _file_sha256(RESULT_SCHEMA_PATH),
+        "binding has wrong raw-result schema digest",
+    )
+    _require(
+        bound_protocol.get("binding_schema_sha256") == _file_sha256(BINDING_SCHEMA_PATH),
+        "binding has wrong binding-schema digest",
+    )
+
+    source = binding.get("source", {})
+    _require(
+        isinstance(source.get("git_commit"), str) and GIT_SHA_PATTERN.fullmatch(source["git_commit"]) is not None,
+        "binding source commit is not a full Git SHA",
+    )
+    _require(
+        isinstance(source.get("git_tree"), str) and GIT_SHA_PATTERN.fullmatch(source["git_tree"]) is not None,
+        "binding source tree is not a full Git SHA",
+    )
+    _require(source.get("worktree_clean") is True, "formal binding requires a clean worktree")
+    bound_implementation_files = source.get("implementation_files")
+    _require(
+        isinstance(bound_implementation_files, list) and bound_implementation_files,
+        "binding has no implementation files",
+    )
+    seen_paths: set[str] = set()
+    for index, entry in enumerate(bound_implementation_files):
+        _require(isinstance(entry, dict), f"implementation_files[{index}] is not an object")
+        relative = entry.get("path")
+        _require(isinstance(relative, str) and relative, f"implementation_files[{index}].path is invalid")
+        candidate = Path(relative)
+        _require(not candidate.is_absolute() and ".." not in candidate.parts, f"unsafe implementation path: {relative}")
+        _require(relative not in seen_paths, f"duplicate implementation path: {relative}")
+        seen_paths.add(relative)
+        actual = REPO / candidate
+        _require(actual.is_file(), f"bound implementation file is missing: {relative}")
+        _require(entry.get("bytes") == actual.stat().st_size, f"bound byte size changed: {relative}")
+        _require(entry.get("sha256") == _file_sha256(actual), f"bound file digest changed: {relative}")
+    _verify_implementation_manifest(bound_implementation_files)
+    test_report_path = _binding_sibling(
+        path,
+        source.get("test_report_file"),
+        "source.test_report_file",
+    )
+    _require(test_report_path.is_file(), "bound test report is missing")
+    _require(
+        source.get("test_report_bytes") == test_report_path.stat().st_size,
+        "bound test report byte size changed",
+    )
+    _require(
+        source.get("test_report_sha256") == _file_sha256(test_report_path),
+        "bound test report digest changed",
+    )
+
+    dependencies = binding.get("dependencies", {})
+    lockfile = dependencies.get("lockfile")
+    _require(isinstance(lockfile, str) and lockfile, "binding lockfile path is missing")
+    lock_path = REPO / lockfile
+    _require(lock_path.is_file(), "bound dependency lockfile is missing")
+    _require(dependencies.get("lockfile_sha256") == _file_sha256(lock_path), "dependency lockfile digest changed")
+    packages = dependencies.get("packages")
+    _require(isinstance(packages, list), "binding packages must be an array")
+    package_names = {entry.get("name") for entry in packages if isinstance(entry, dict)}
+    _require(REQUIRED_PACKAGES <= package_names, "binding is missing a required root package identity")
+    _require(len(package_names) == len(packages), "binding package identities are duplicated")
+    for package in packages:
+        _require(isinstance(package.get("version"), str) and package["version"], "package version is missing")
+        _require_sha256(package.get("distribution_sha256"), f"{package.get('name')} distribution_sha256")
+
+    runtime = binding.get("runtime", {})
+    _require(runtime.get("deterministic_algorithms") is True, "formal runtime must enable deterministic algorithms")
+    if runtime.get("device") == "cuda":
+        _require(
+            runtime.get("cublas_workspace_config") == ":4096:8",
+            "formal CUDA runtime must bind CUBLAS_WORKSPACE_CONFIG=:4096:8",
+        )
+    else:
+        _require(
+            runtime.get("cublas_workspace_config") is None,
+            "non-CUDA formal runtime must not bind a cuBLAS workspace",
+        )
+    environment = binding.get("environment", {})
+    _require(environment.get("id") == "Pendulum-v1", "binding has wrong environment")
+    for field in ("wrapper_source_sha256", "installed_distribution_sha256", "conformance_report_sha256"):
+        _require_sha256(environment.get(field), f"environment.{field}")
+    conformance_path = _binding_sibling(
+        path,
+        environment.get("conformance_report_file"),
+        "environment.conformance_report_file",
+    )
+    _require(conformance_path.is_file(), "bound Pendulum conformance report is missing")
+    _require(
+        environment.get("conformance_report_bytes") == conformance_path.stat().st_size,
+        "bound Pendulum conformance report byte size changed",
+    )
+    _require(
+        environment.get("conformance_report_sha256") == _file_sha256(conformance_path),
+        "bound Pendulum conformance report digest changed",
+    )
+    conformance_report = _load_json(conformance_path)
+    _verify_pendulum_conformance_report(conformance_report)
+    expected_conformance_bytes = (
+        json.dumps(
+            conformance_report,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        + b"\n"
+    )
+    _require(
+        conformance_path.read_bytes() == expected_conformance_bytes,
+        "bound Pendulum conformance report is not canonical JSON",
+    )
+
+    checkpoint = binding.get("checkpoint_implementation", {})
+    _require(tuple(checkpoint.get("component_ids", ())) == REQUIRED_COMPONENTS, "checkpoint components are incomplete")
+    _require(
+        tuple(binding.get("formal_replicate_master_seeds", ())) == FORMAL_SEEDS,
+        "binding formal seeds do not match protocol",
+    )
+    _require(
+        tuple(protocol["lanes"]["formal"]["master_seeds"]) == FORMAL_SEEDS,
+        "protocol formal lane seed disagreement",
+    )
+    return binding
+
+
+def verify_result(path: Path, binding_path: Path | None) -> dict[str, Any]:
+    """Verify result-envelope invariants and causal custody."""
+
+    protocol = verify_protocol()
+    result = _load_json(path)
+    _validate_json_schema(result, _load_json(RESULT_SCHEMA_PATH), label="raw result")
+    _require(result.get("schema") == "prospect.world-model-lifecycle.raw-result.v2", "wrong result schema")
+    _require(result.get("experiment_id") == "WM-001", "result has wrong experiment")
+    _require(result.get("protocol_version") == "1.1.1", "result has wrong protocol version")
+    _require(result.get("protocol_sha256") == _file_sha256(PROTOCOL_PATH), "result protocol digest mismatch")
+
+    lane = result.get("lane")
+    _require(lane in {"development", "formal"}, "result lane must be development or formal")
+    if lane == "development":
+        _require(result.get("claim_eligible") is False, "development result cannot be claim eligible")
+    else:
+        _require(result.get("claim_eligible") is True, "formal result must identify its claim-eligible lane")
+        _require(binding_path is not None, "formal result verification requires --binding")
+        binding = verify_binding(binding_path)
+        _require(result.get("formal_binding_sha256") == _file_sha256(binding_path), "formal binding digest mismatch")
+        _require(
+            _parse_timestamp(result.get("started_at_utc"), "started_at_utc")
+            >= _parse_timestamp(binding.get("sealed_at_utc"), "binding.sealed_at_utc"),
+            "formal result started before its implementation binding was sealed",
+        )
+        execution = result.get("execution", {})
+        _require(
+            execution.get("git_commit") == binding["source"]["git_commit"],
+            "result source commit differs from binding",
+        )
+        _require(execution.get("git_tree") == binding["source"]["git_tree"], "result source tree differs from binding")
+        _require(execution.get("worktree_clean") is True, "formal result did not run from a clean worktree")
+        _require(
+            execution.get("dependency_lock_sha256") == binding["dependencies"]["lockfile_sha256"],
+            "result dependency lock differs from binding",
+        )
+        _require(execution.get("deterministic_algorithms") is True, "formal result was nondeterministic")
+
+    started = _parse_timestamp(result.get("started_at_utc"), "started_at_utc")
+    completed = _parse_timestamp(result.get("completed_at_utc"), "completed_at_utc")
+    _require(completed >= started, "result completed before it started")
+
+    replicates = result.get("replicates")
+    _require(isinstance(replicates, list) and replicates, "result has no replicates")
+    expected_masters = FORMAL_SEEDS if lane == "formal" else DEVELOPMENT_SEEDS
+    if lane == "formal":
+        _require(len(replicates) == 8, "formal result must contain exactly 8 replicates")
+        _require(
+            tuple(item.get("master_seed") for item in replicates) == FORMAL_SEEDS,
+            "formal replicate order/seeds changed",
+        )
+    else:
+        _require(all(item.get("master_seed") in expected_masters for item in replicates), "undeclared development seed")
+
+    transition_owner: dict[str, tuple[str, str]] = {}
+    for replicate in replicates:
+        _verify_replicate(replicate, protocol, transition_owner)
+
+    metrics = result.get("aggregate_metrics")
+    _require(isinstance(metrics, list), "aggregate_metrics must be an array")
+    for metric in metrics:
+        values = metric.get("replicate_values")
+        _require(isinstance(values, list), "aggregate metric replicate_values must be an array")
+        if lane == "formal":
+            _require(len(values) == 8, f"formal aggregate {metric.get('name')} must have 8 values")
+
+    gates = result.get("gate_results")
+    _require(isinstance(gates, list) and gates, "result has no gate results")
+    gate_ids = tuple(item.get("gate") for item in gates)
+    _require(gate_ids == GATES[: len(gate_ids)], "gate results are not a K0-K7 prefix")
+    prior_passed = True
+    for index, gate in enumerate(gates):
+        _require(
+            prior_passed,
+            "gate results continue after the first failed killing gate",
+        )
+        checks = gate.get("checks")
+        _require(isinstance(checks, list), f"{gate.get('gate')} checks must be an array")
+        computed_pass = bool(checks) and all(check.get("passed") is True for check in checks)
+        _require(gate.get("passed") is computed_pass, f"{gate.get('gate')} passed value disagrees with checks")
+        _require(
+            gate.get("claim_supported") is False,
+            "producer result claimed support before independent artifact audit",
+        )
+        if not computed_pass:
+            _require(
+                index == len(gates) - 1,
+                "failed killing gate is not the final reported gate",
+            )
+        prior_passed = computed_pass
+    _require(
+        gate_ids[-1] == "K7" or gates[-1].get("passed") is False,
+        "passing gate prefix ends before K7",
+    )
+    if "K7" in gate_ids:
+        for replicate in replicates:
+            _verify_restart_parity(replicate)
+    return result
+
+
+def _verify_replicate(
+    replicate: dict[str, Any],
+    protocol: dict[str, Any],
+    global_transition_owner: dict[str, tuple[str, str]],
+) -> None:
+    replicate_id = replicate.get("replicate_id")
+    master = replicate.get("master_seed")
+    _require(isinstance(replicate_id, str) and replicate_id, "replicate_id is missing")
+    _require(isinstance(master, int), f"{replicate_id}: master_seed is missing")
+
+    seed_rows = replicate.get("derived_seeds")
+    _require(isinstance(seed_rows, list), f"{replicate_id}: derived_seeds must be an array")
+    seeds_by_namespace = {row.get("namespace"): row.get("values") for row in seed_rows if isinstance(row, dict)}
+    for namespace, declaration in protocol["seed_schedule"]["namespaces"].items():
+        values = seeds_by_namespace.get(namespace)
+        _require(isinstance(values, list), f"{replicate_id}: missing seed namespace {namespace}")
+        expected = [derive_seed(namespace, master, index) for index in range(declaration["count"])]
+        _require(values == expected, f"{replicate_id}: derived seeds changed for {namespace}")
+
+    episodes = replicate.get("episodes")
+    transitions = replicate.get("transitions")
+    updates = replicate.get("updates")
+    _require(isinstance(episodes, list), f"{replicate_id}: episodes must be an array")
+    _require(isinstance(transitions, list), f"{replicate_id}: transitions must be an array")
+    _require(isinstance(updates, list), f"{replicate_id}: updates must be an array")
+
+    local_transitions: dict[str, dict[str, Any]] = {}
+    seed_split: dict[tuple[str, int], str] = {}
+    for transition in transitions:
+        transition_id = transition.get("transition_id")
+        _require(isinstance(transition_id, str) and transition_id, f"{replicate_id}: transition ID missing")
+        _require(transition_id not in global_transition_owner, f"duplicate real transition ID: {transition_id}")
+        _require(
+            transition.get("real_or_imagined") == "real",
+            f"imagined transition in real namespace: {transition_id}",
+        )
+        _require(
+            isinstance(transition.get("run_id"), str) and transition["run_id"],
+            f"{transition_id}: run ID missing",
+        )
+        _require(transition.get("task_context") in {0.0, 1.0}, f"{transition_id}: invalid task context")
+        scaled_target = transition.get("scaled_target")
+        _require(
+            isinstance(scaled_target, list)
+            and len(scaled_target) == 4
+            and all(isinstance(value, (int, float)) and math.isfinite(float(value)) for value in scaled_target),
+            f"{transition_id}: scaled target is malformed",
+        )
+        expected_target_sha256 = sha256(struct.pack("<4d", *(float(value) for value in scaled_target))).hexdigest()
+        _require(
+            transition.get("target_sha256") == expected_target_sha256,
+            f"{transition_id}: target digest differs from scaled target",
+        )
+        pre_observation = transition.get("pre_observation")
+        next_observation = transition.get("next_observation")
+        _require(
+            isinstance(pre_observation, list)
+            and len(pre_observation) == 3
+            and all(isinstance(value, (int, float)) and math.isfinite(float(value)) for value in pre_observation),
+            f"{transition_id}: pre-observation is malformed",
+        )
+        _require(
+            isinstance(next_observation, list)
+            and len(next_observation) == 3
+            and all(isinstance(value, (int, float)) and math.isfinite(float(value)) for value in next_observation),
+            f"{transition_id}: next observation is malformed",
+        )
+        reward = transition.get("reward")
+        _require(
+            isinstance(reward, (int, float)) and math.isfinite(float(reward)),
+            f"{transition_id}: reward is malformed",
+        )
+        expected_scaled = (
+            (float(next_observation[0]) - float(pre_observation[0])) / 2.0,
+            (float(next_observation[1]) - float(pre_observation[1])) / 2.0,
+            (float(next_observation[2]) - float(pre_observation[2])) / 16.0,
+            float(reward) / 16.2736044,
+        )
+        _require(
+            all(
+                math.isclose(float(actual), expected, rel_tol=0.0, abs_tol=1e-15)
+                for actual, expected in zip(scaled_target, expected_scaled, strict=True)
+            ),
+            f"{transition_id}: scaled target differs from raw transition values",
+        )
+        intended = float(transition.get("intended_action"))
+        applied = float(transition.get("applied_action"))
+        expected_applied = -intended if transition.get("task_id") == "pendulum_reversed_torque" else intended
+        _require(
+            math.isclose(applied, expected_applied, rel_tol=0.0, abs_tol=1e-12),
+            f"{transition_id}: applied action differs from task semantics",
+        )
+        global_transition_owner[transition_id] = (replicate_id, transition.get("split"))
+        local_transitions[transition_id] = transition
+
+    episode_ids: set[str] = set()
+    for episode in episodes:
+        episode_id = episode.get("episode_id")
+        _require(isinstance(episode_id, str) and episode_id, f"{replicate_id}: episode ID missing")
+        _require(episode_id not in episode_ids, f"{replicate_id}: duplicate episode ID {episode_id}")
+        episode_ids.add(episode_id)
+        _require(episode.get("environment_steps") == 200, f"{episode_id}: incomplete episode")
+        run_id = episode.get("run_id")
+        _require(isinstance(run_id, str) and run_id, f"{episode_id}: run ID missing")
+        split = episode.get("split")
+        task = episode.get("task_id")
+        contract = (
+            split,
+            task,
+            episode.get("condition"),
+            episode.get("checkpoint_id"),
+        )
+        _require(
+            contract in EPISODE_CONTRACTS,
+            f"{episode_id}: split/task/condition/checkpoint is outside the sealed matrix",
+        )
+        reset_seed = episode.get("reset_seed")
+        _require(isinstance(reset_seed, int), f"{episode_id}: reset seed missing")
+        assignment_key = (task, reset_seed)
+        previous_split = seed_split.setdefault(assignment_key, split)
+        _require(previous_split == split, f"{replicate_id}: reset seed crosses episode splits")
+        if str(split).startswith(("predictive_validation_", "behavior_evaluation_")):
+            _require(episode.get("learning_allowed") is False, f"{episode_id}: held-out learning was allowed")
+            _require(episode.get("replay_writes_allowed") is False, f"{episode_id}: held-out replay write was allowed")
+        transition_ids = episode.get("transition_ids")
+        _require(isinstance(transition_ids, list) and len(transition_ids) == 200, f"{episode_id}: bad transition count")
+        intended_actions: list[float] = []
+        applied_actions: list[float] = []
+        rewards: list[float] = []
+        previous_next: list[float] | None = None
+        for expected_step, transition_id in enumerate(transition_ids):
+            _require(transition_id in local_transitions, f"{episode_id}: unresolved transition {transition_id}")
+            transition = local_transitions[transition_id]
+            _require(transition.get("episode_id") == episode_id, f"{transition_id}: episode linkage mismatch")
+            _require(transition.get("run_id") == run_id, f"{transition_id}: run linkage mismatch")
+            _require(transition.get("split") == split, f"{transition_id}: split linkage mismatch")
+            _require(
+                transition.get("step_index") == expected_step,
+                f"{transition_id}: step index differs from episode order",
+            )
+            _require(
+                transition.get("terminated") is False,
+                f"{transition_id}: Pendulum must not terminate",
+            )
+            _require(
+                transition.get("truncated") is (expected_step == 199),
+                f"{transition_id}: TimeLimit truncation flag differs",
+            )
+            current_pre = transition["pre_observation"]
+            if previous_next is not None:
+                _require(
+                    all(
+                        math.isclose(float(left), float(right), rel_tol=0.0, abs_tol=1e-12)
+                        for left, right in zip(previous_next, current_pre, strict=True)
+                    ),
+                    f"{transition_id}: physical observation chain is discontinuous",
+                )
+            previous_next = transition["next_observation"]
+            intended_actions.append(float(transition["intended_action"]))
+            applied_actions.append(float(transition["applied_action"]))
+            rewards.append(float(transition["reward"]))
+        _require(
+            math.isclose(
+                float(episode.get("return")),
+                math.fsum(rewards),
+                rel_tol=0.0,
+                abs_tol=1e-9,
+            ),
+            f"{episode_id}: return differs from raw rewards",
+        )
+        _require(
+            episode.get("action_trace_sha256")
+            == _canonical_sha256(
+                {
+                    "intended": intended_actions,
+                    "applied": applied_actions,
+                }
+            ),
+            f"{episode_id}: action trace digest differs from raw transitions",
+        )
+
+    split_reset_namespaces = {
+        "collect_a": "collect_a_episode",
+        "collect_b": "collect_b_episode",
+        "predictive_validation_a": "predictive_validation_a_episode",
+        "predictive_validation_b": "predictive_validation_b_episode",
+    }
+    for split, namespace in split_reset_namespaces.items():
+        grouped = [episode for episode in episodes if episode.get("split") == split]
+        actual = [episode.get("reset_seed") for episode in grouped]
+        expected = [derive_seed(namespace, master, index) for index in range(len(grouped))]
+        _require(
+            actual == expected,
+            f"{replicate_id}: {split} reset seeds differ from {namespace}",
+        )
+    behavior_reset_namespaces = {
+        "behavior_evaluation_a": "behavior_evaluation_a_episode",
+        "behavior_evaluation_b": "behavior_evaluation_b_episode",
+    }
+    for split, namespace in behavior_reset_namespaces.items():
+        conditions = {str(episode.get("condition")) for episode in episodes if episode.get("split") == split}
+        for condition in sorted(conditions):
+            grouped = [
+                episode
+                for episode in episodes
+                if episode.get("split") == split and episode.get("condition") == condition
+            ]
+            actual = [episode.get("reset_seed") for episode in grouped]
+            expected = [derive_seed(namespace, master, index) for index in range(len(grouped))]
+            _require(
+                actual == expected,
+                f"{replicate_id}: {split}/{condition} reset seeds differ from {namespace}",
+            )
+
+    policy_runs = replicate.get("policy_runs")
+    _require(isinstance(policy_runs, list), f"{replicate_id}: policy_runs must be an array")
+    runs_by_id: dict[str, list[dict[str, Any]]] = {}
+    for run in policy_runs:
+        run_id = run.get("run_id")
+        _require(isinstance(run_id, str) and run_id, f"{replicate_id}: policy run ID missing")
+        runs_by_id.setdefault(run_id, []).append(run)
+    episode_runs = {str(episode.get("run_id")) for episode in episodes}
+    _require(set(runs_by_id) == episode_runs, f"{replicate_id}: policy-run set differs from real executions")
+    for run_id, run_rows in runs_by_id.items():
+        _require(len(run_rows) == 1, f"{replicate_id}: duplicate policy run {run_id}")
+        run = run_rows[0]
+        grouped = [episode for episode in episodes if episode.get("run_id") == run_id]
+        ordered_ids = [str(episode["episode_id"]) for episode in grouped]
+        reset_seeds = [int(episode["reset_seed"]) for episode in grouped]
+        _require(run.get("episode_ids") == ordered_ids, f"{run_id}: episode order differs")
+        _require(run.get("reset_seeds") == reset_seeds, f"{run_id}: reset seeds differ")
+        _require(run.get("action_count") == 200 * len(grouped), f"{run_id}: action count differs")
+        for field in ("task_id", "split", "condition", "checkpoint_id"):
+            values = {episode.get(field) for episode in grouped}
+            _require(len(values) == 1 and run.get(field) in values, f"{run_id}: {field} differs")
+        namespace = run.get("seed_namespace")
+        seed_index = run.get("seed_index")
+        _require(
+            isinstance(namespace, str)
+            and namespace in protocol["seed_schedule"]["namespaces"]
+            and isinstance(seed_index, int)
+            and 0 <= seed_index < int(protocol["seed_schedule"]["namespaces"][namespace]["count"]),
+            f"{run_id}: seed reference is invalid",
+        )
+        _require(
+            run.get("seed") == derive_seed(namespace, master, seed_index),
+            f"{run_id}: seed differs from declared namespace",
+        )
+        task_index = 0 if run.get("task_id") == "pendulum_normal_torque" else 1
+        split = str(run.get("split"))
+        condition = str(run.get("condition"))
+        controller = run.get("controller_kind")
+        expected_controller = (
+            "uniform_random"
+            if condition in {"collection_random", "validation_random", "random"}
+            else "cem_oracle"
+            if condition == "oracle"
+            else "cem_learned"
+        )
+        _require(
+            (
+                run.get("split"),
+                run.get("task_id"),
+                condition,
+                run.get("checkpoint_id"),
+            )
+            in EPISODE_CONTRACTS
+            and controller == expected_controller,
+            f"{run_id}: execution/controller contract is outside the sealed matrix",
+        )
+        expected_seed_ref = (
+            ("collection_action", task_index)
+            if split in {"collect_a", "collect_b"}
+            else ("predictive_validation_action", task_index)
+            if split in {"predictive_validation_a", "predictive_validation_b"}
+            else ("random_policy_action", task_index)
+            if condition == "random"
+            else ("planner", 0)
+        )
+        _require((namespace, seed_index) == expected_seed_ref, f"{run_id}: wrong policy seed namespace")
+        intended_actions = [
+            float(local_transitions[transition_id]["intended_action"])
+            for episode in grouped
+            for transition_id in episode["transition_ids"]
+        ]
+        applied_actions = [
+            float(local_transitions[transition_id]["applied_action"])
+            for episode in grouped
+            for transition_id in episode["transition_ids"]
+        ]
+        _require(
+            run.get("action_trace_sha256")
+            == _canonical_sha256(
+                {
+                    "episode_ids": ordered_ids,
+                    "intended": intended_actions,
+                    "applied": applied_actions,
+                }
+            ),
+            f"{run_id}: run action trace differs",
+        )
+
+    snapshots = replicate.get("evaluated_checkpoints")
+    _require(isinstance(snapshots, list), f"{replicate_id}: evaluated_checkpoints must be an array")
+    snapshots_by_condition = {
+        snapshot.get("condition"): snapshot for snapshot in snapshots if isinstance(snapshot, dict)
+    }
+    _require(
+        len(snapshots) == 6
+        and set(snapshots_by_condition)
+        == {"cold", "frozen", "corrupted", "after_a", "after_b_replay", "after_b_naive"},
+        f"{replicate_id}: evaluated checkpoint set differs",
+    )
+    for condition, snapshot in snapshots_by_condition.items():
+        _require(
+            snapshot.get("sha256") == snapshot.get("live_state_sha256"),
+            f"{replicate_id}: {condition} model artifact does not bind live state",
+        )
+    for run in policy_runs:
+        controller_kind = run.get("controller_kind")
+        condition = str(run.get("condition"))
+        if controller_kind == "cem_learned":
+            snapshot = snapshots_by_condition.get(condition)
+            _require(
+                isinstance(snapshot, dict)
+                and run.get("controller_version") == f"wm001-sha256:{snapshot.get('parameter_sha256')}",
+                f"{replicate_id}: learned CEM {condition} is not bound to its evaluated parameter snapshot",
+            )
+        elif controller_kind == "cem_oracle":
+            _require(
+                run.get("controller_version") == "wm001-analytic-pendulum-cem-torchrl-0.13.3-v1",
+                f"{replicate_id}: oracle CEM controller version differs",
+            )
+    for metric in replicate.get("predictive_metrics", ()):
+        _require(
+            (
+                metric.get("split"),
+                metric.get("task_id"),
+                metric.get("condition"),
+                metric.get("checkpoint_id"),
+            )
+            in PREDICTIVE_CONTRACTS,
+            f"{replicate_id}: predictive row is outside the sealed matrix",
+        )
+        snapshot = snapshots_by_condition.get(metric.get("condition"))
+        _require(isinstance(snapshot, dict), f"{replicate_id}: predictive model snapshot missing")
+        for field in ("model_version", "parameter_sha256", "live_state_sha256"):
+            _require(
+                metric.get(field) == snapshot.get(field),
+                f"{replicate_id}: predictive {metric.get('condition')} {field} differs from artifact",
+            )
+
+    for update in updates:
+        consumed = update.get("eligible_transition_ids")
+        _require(isinstance(consumed, list), f"{replicate_id}: update eligible IDs must be an array")
+        _require(update.get("eligible_transition_count") == len(consumed), f"{replicate_id}: eligible count mismatch")
+        eligible = set(update.get("eligible_splits", ()))
+        _require(eligible <= {"collect_a", "collect_b"}, f"{replicate_id}: update names an ineligible split")
+        for transition_id in consumed:
+            _require(transition_id in local_transitions, f"{replicate_id}: update consumes unknown {transition_id}")
+            _require(
+                local_transitions[transition_id].get("split") in eligible,
+                f"{replicate_id}: update consumes held-out or phase-ineligible {transition_id}",
+            )
+        steps = update.get("optimizer_steps")
+        expected_samples = (
+            0 if update.get("status") == "rejected" else int(steps) * 5 * 256 if isinstance(steps, int) else -1
+        )
+        _require(
+            update.get("consumed_sample_count") == expected_samples,
+            f"{replicate_id}: consumed sample count differs from optimizer budget",
+        )
+
+    updates_by_phase = {update.get("phase"): update for update in updates if isinstance(update, dict)}
+    _require(
+        len(updates_by_phase) == len(updates),
+        f"{replicate_id}: update phases are not unique",
+    )
+    train_a = updates_by_phase.get("train_a")
+    corrupted = updates_by_phase.get("train_a_corrupted")
+    replay = updates_by_phase.get("train_b_replay")
+    naive = updates_by_phase.get("train_b_naive")
+    rejected_probe = updates_by_phase.get("rejected_update_probe")
+    _require(
+        all(isinstance(update, dict) for update in (train_a, corrupted, replay, naive, rejected_probe)),
+        f"{replicate_id}: update and rejected-probe set is incomplete",
+    )
+    assert isinstance(train_a, dict)
+    assert isinstance(corrupted, dict)
+    assert isinstance(replay, dict)
+    assert isinstance(naive, dict)
+    assert isinstance(rejected_probe, dict)
+    _require(
+        rejected_probe.get("status") == "rejected"
+        and rejected_probe.get("full_state_before_sha256") == rejected_probe.get("full_state_after_sha256"),
+        f"{replicate_id}: rejected probe did not preserve full-state bytes",
+    )
+    for label in ("before", "after"):
+        digest = rejected_probe.get(f"full_state_{label}_sha256")
+        reference = rejected_probe.get(f"full_state_{label}_file")
+        _require(
+            isinstance(reference, dict)
+            and reference.get("sha256") == digest
+            and reference.get("media_type") == "application/vnd.prospect.wm001.rejected-probe-state+json",
+            f"{replicate_id}: rejected probe {label} full-state reference differs",
+        )
+    for field in (
+        "predecessor_parameter_sha256",
+        "predecessor_model_version",
+        "live_state_before_sha256",
+    ):
+        _require(
+            corrupted.get(field) == train_a.get(field),
+            f"{replicate_id}: corrupted control cold {field} ancestry differs",
+        )
+    for label, update in (("train_b_replay", replay), ("train_b_naive", naive)):
+        for previous, resulting in (
+            ("predecessor_parameter_sha256", "committed_parameter_sha256"),
+            ("predecessor_model_version", "committed_model_version"),
+            ("live_state_before_sha256", "live_state_after_sha256"),
+        ):
+            _require(
+                update.get(previous) == train_a.get(resulting),
+                f"{replicate_id}: {label} post-A {previous} ancestry differs",
+            )
+    snapshot_ancestry = {
+        "cold": train_a.get("live_state_before_sha256"),
+        "frozen": train_a.get("live_state_before_sha256"),
+        "corrupted": corrupted.get("live_state_after_sha256"),
+        "after_a": train_a.get("live_state_after_sha256"),
+        "after_b_replay": replay.get("live_state_after_sha256"),
+        "after_b_naive": naive.get("live_state_after_sha256"),
+    }
+    for condition, expected_digest in snapshot_ancestry.items():
+        _require(
+            snapshots_by_condition[condition].get("live_state_sha256") == expected_digest,
+            f"{replicate_id}: {condition} compound snapshot ancestry differs",
+        )
+
+
+def _verify_restart_parity(replicate: dict[str, Any]) -> None:
+    replicate_id = replicate.get("replicate_id")
+    parity = replicate.get("restart_parity")
+    _require(isinstance(parity, dict), f"{replicate_id}: restart parity is missing")
+    _require(parity.get("fresh_process") is True, f"{replicate_id}: restore was not fresh-process")
+    _require(
+        parity.get("original_process_id") != parity.get("restored_process_id"),
+        f"{replicate_id}: restore reused the original process",
+    )
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser("protocol", help="verify the sealed scientific protocol")
+    binding = subparsers.add_parser("binding", help="verify a pre-run formal implementation binding")
+    binding.add_argument("path", type=Path)
+    result = subparsers.add_parser("result", help="verify a development or formal raw result")
+    result.add_argument("path", type=Path)
+    result.add_argument("--binding", type=Path, help="required for a formal result")
+    seed = subparsers.add_parser("seed", help="print one declared derived seed")
+    seed.add_argument("namespace")
+    seed.add_argument("master_seed", type=int)
+    seed.add_argument("index", type=int)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the requested verifier."""
+
+    arguments = _parser().parse_args(argv)
+    try:
+        if arguments.command == "protocol":
+            verify_protocol()
+            print(f"WM-001 protocol valid: {_file_sha256(PROTOCOL_PATH)}")
+        elif arguments.command == "binding":
+            verify_binding(arguments.path)
+            print(f"WM-001 formal binding valid: {_file_sha256(arguments.path)}")
+        elif arguments.command == "result":
+            verify_result(arguments.path, arguments.binding)
+            print(f"WM-001 result envelope valid: {_file_sha256(arguments.path)}")
+        else:
+            print(derive_seed(arguments.namespace, arguments.master_seed, arguments.index))
+    except Violation as exc:
+        print(f"WM-001 verification failed: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

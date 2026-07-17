@@ -1,0 +1,270 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+import torch
+
+from bench.world_model_lifecycle import binding as binding_module
+from bench.world_model_lifecycle import experiment as experiment_module
+from bench.world_model_lifecycle import run as run_module
+from bench.world_model_lifecycle.artifact import (
+    MANIFEST_NAME,
+    ProducerAttempt,
+    atomic_write_exclusive,
+    sha256_file,
+    verify_producer_manifest,
+)
+
+
+def _read_json(path: Path) -> dict[str, object]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(value, dict)
+    return value
+
+
+def _implementation_row(relative: str = "Makefile") -> dict[str, object]:
+    path = binding_module.REPO / relative
+    return {
+        "path": relative,
+        "bytes": path.stat().st_size,
+        "sha256": binding_module.sha256_file(path),
+    }
+
+
+def test_atomic_write_exclusive_never_replaces_evidence(tmp_path: Path) -> None:
+    path = tmp_path / "evidence.bin"
+
+    atomic_write_exclusive(path, b"first")
+
+    with pytest.raises(FileExistsError, match="refusing to replace"):
+        atomic_write_exclusive(path, b"second")
+    assert path.read_bytes() == b"first"
+    assert not list(tmp_path.glob(".*.tmp"))
+
+
+def test_completed_attempt_tees_logs_and_manifests_every_file(tmp_path: Path) -> None:
+    output = tmp_path / "attempt"
+
+    with ProducerAttempt(output, lane="development"):
+        print("durable stdout")
+        atomic_write_exclusive(output / "evidence.bin", b"evidence")
+
+    manifest = _read_json(output / MANIFEST_NAME)
+    assert manifest["status"] == "completed"
+    assert manifest["error"] is None
+    rows = {
+        str(row["path"]): row
+        for row in manifest["files"]  # type: ignore[index,union-attr]
+    }
+    assert MANIFEST_NAME not in rows
+    assert "durable stdout" in (output / "main.stdout.log").read_text(encoding="utf-8")
+    assert rows["evidence.bin"]["sha256"] == sha256_file(output / "evidence.bin")
+    assert manifest["file_count"] == len(rows)
+    assert verify_producer_manifest(output) == manifest
+
+    (output / "evidence.bin").write_bytes(b"tampered")
+    with pytest.raises(ValueError, match="digest changed"):
+        verify_producer_manifest(output)
+
+    with pytest.raises(FileExistsError):
+        with ProducerAttempt(output, lane="development"):
+            pass
+
+
+def test_failed_attempt_retains_partial_evidence_and_traceback(tmp_path: Path) -> None:
+    output = tmp_path / "failed"
+
+    with pytest.raises(RuntimeError, match="deliberate failure"):
+        with ProducerAttempt(output, lane="formal"):
+            atomic_write_exclusive(output / "partial.bin", b"partial")
+            raise RuntimeError("deliberate failure")
+
+    manifest = _read_json(output / MANIFEST_NAME)
+    assert manifest["status"] == "failed"
+    assert manifest["error"] == {
+        "message": "deliberate failure",
+        "type": "RuntimeError",
+    }
+    assert (output / "partial.bin").read_bytes() == b"partial"
+    stderr = (output / "main.stderr.log").read_text(encoding="utf-8")
+    assert "RuntimeError: deliberate failure" in stderr
+
+
+def test_formal_attempt_preserves_all_pre_outcome_inputs(tmp_path: Path) -> None:
+    binding_directory = tmp_path / "binding"
+    binding_directory.mkdir()
+    test_report = binding_directory / "tests.txt"
+    conformance = binding_directory / "conformance.json"
+    test_report.write_text("tests passed\n", encoding="utf-8")
+    conformance.write_text('{"passed":true}\n', encoding="utf-8")
+    binding_path = binding_directory / "binding.json"
+    binding_path.write_text(
+        json.dumps(
+            {
+                "source": {
+                    "implementation_files": [_implementation_row()],
+                    "test_report_file": test_report.name,
+                },
+                "environment": {"conformance_report_file": conformance.name},
+            }
+        ),
+        encoding="utf-8",
+    )
+    output = tmp_path / "attempt"
+
+    with ProducerAttempt(output, lane="formal") as attempt:
+        copied_binding = attempt.preserve_formal_inputs(binding_path)
+
+    assert copied_binding == output / "formal-binding.json"
+    expected = {
+        "formal-binding.json",
+        "protocol.json",
+        "SEALED_PROTOCOL.sha256",
+        "schemas/formal-binding.schema.json",
+        "schemas/raw-result.schema.json",
+        "requirements-wm001.lock",
+        test_report.name,
+        conformance.name,
+        "source/Makefile",
+    }
+    assert expected <= {
+        candidate.relative_to(output).as_posix() for candidate in output.rglob("*") if candidate.is_file()
+    }
+
+
+def test_formal_cli_verifies_live_copied_binding_before_outcomes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding_directory = tmp_path / "binding"
+    binding_directory.mkdir()
+    (binding_directory / "tests.txt").write_text("passed\n", encoding="utf-8")
+    (binding_directory / "conformance.json").write_text(
+        '{"passed":true}\n',
+        encoding="utf-8",
+    )
+    binding_path = binding_directory / "binding.json"
+    binding_path.write_text(
+        json.dumps(
+            {
+                "source": {
+                    "implementation_files": [_implementation_row()],
+                    "test_report_file": "tests.txt",
+                },
+                "environment": {"conformance_report_file": "conformance.json"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    output = tmp_path / "formal-attempt"
+    calls: list[tuple[str, Path]] = []
+
+    def verify_live(path: Path, *, device: str) -> dict[str, object]:
+        calls.append((device, path))
+        assert path == output / "formal-binding.json"
+        assert (output / "protocol.json").is_file()
+        return {}
+
+    def run_experiment(
+        config: object,
+        *,
+        output_directory: Path,
+        formal_binding_path: Path | None,
+        output_prepared: bool,
+    ) -> tuple[dict[str, object], Path]:
+        assert calls
+        assert output_prepared is True
+        assert formal_binding_path == output / "formal-binding.json"
+        result_path = output_directory / "result.json"
+        atomic_write_exclusive(result_path, b"{}\n")
+        return {}, result_path
+
+    monkeypatch.setattr(binding_module, "verify_live_binding", verify_live)
+    monkeypatch.setattr(run_module, "_ensure_deterministic_cuda_environment", lambda: None)
+    monkeypatch.setattr(
+        experiment_module.ExperimentConfig,
+        "formal",
+        staticmethod(lambda *, device=None: SimpleNamespace(device=device or "cpu")),
+    )
+    monkeypatch.setattr(experiment_module, "run_experiment", run_experiment)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wm001",
+            "formal",
+            "--binding",
+            str(binding_path),
+            "--device",
+            "cpu",
+            "--output",
+            str(output),
+        ],
+    )
+
+    deterministic_before = torch.are_deterministic_algorithms_enabled()
+    try:
+        assert run_module.main() == 0
+    finally:
+        torch.use_deterministic_algorithms(deterministic_before)
+    assert calls == [("cpu", output / "formal-binding.json")]
+    manifest = _read_json(output / MANIFEST_NAME)
+    assert manifest["status"] == "completed"
+    assert (output / "result.json").is_file()
+
+
+def test_formal_input_source_snapshot_rejects_bound_digest_change(
+    tmp_path: Path,
+) -> None:
+    binding_directory = tmp_path / "binding"
+    binding_directory.mkdir()
+    (binding_directory / "tests.txt").write_text("passed\n", encoding="utf-8")
+    (binding_directory / "conformance.json").write_text(
+        '{"passed":true}\n',
+        encoding="utf-8",
+    )
+    row = _implementation_row()
+    row["sha256"] = "0" * 64
+    binding_path = binding_directory / "binding.json"
+    binding_path.write_text(
+        json.dumps(
+            {
+                "source": {
+                    "implementation_files": [row],
+                    "test_report_file": "tests.txt",
+                },
+                "environment": {
+                    "conformance_report_file": "conformance.json",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with ProducerAttempt(tmp_path / "attempt", lane="formal") as attempt:
+        with pytest.raises(ValueError, match="digest changed"):
+            attempt.preserve_formal_inputs(binding_path)
+
+
+def test_experiment_entrypoint_refuses_unowned_or_existing_output(
+    tmp_path: Path,
+) -> None:
+    formal = experiment_module.ExperimentConfig.formal(device="cpu")
+    with pytest.raises(ValueError, match="ProducerAttempt"):
+        experiment_module.run_experiment(
+            formal,
+            output_directory=tmp_path / "formal",
+            formal_binding_path=tmp_path / "missing-binding.json",
+        )
+
+    development = experiment_module.ExperimentConfig.development(
+        master_seeds=(101,),
+        device="cpu",
+    )
+    with pytest.raises(FileExistsError):
+        experiment_module.run_experiment(
+            development,
+            output_directory=tmp_path,
+        )

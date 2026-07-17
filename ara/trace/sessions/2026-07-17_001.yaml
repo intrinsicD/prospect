@@ -1,0 +1,60 @@
+session:
+  id: "2026-07-17_001"
+  date: "2026-07-17"
+  started: "2026-07-17T19:11+02:00"
+  last_turn: "2026-07-17T19:11+02:00"
+  turn_count: 1
+  summary: "Opened the first post-reset experiment question and staged a Pendulum world-model lifecycle candidate."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: N01
+    routing: direct
+    provenance: user
+    summary: "Identify Prospect's first step toward a mature world-model agent."
+  - turn: 1
+    type: observation
+    id: O01
+    routing: staged
+    provenance: ai-suggested
+    summary: "Use one small same-chain world-model maturity experiment first."
+  - turn: 1
+    type: observation
+    id: O02
+    routing: staged
+    provenance: ai-suggested
+    summary: "Add owned model state and transactional learning before formal attribution."
+  - turn: 1
+    type: observation
+    id: O03
+    routing: staged
+    provenance: ai-suggested
+    summary: "Candidate stack is Pendulum, probabilistic shared model, MPC, replay, and fresh-process restore."
+  - turn: 1
+    type: observation
+    id: O04
+    routing: staged
+    provenance: ai-suggested
+    summary: "Offline retained datasets are not sufficient for the first closed-loop claim."
+
+ai_actions:
+  - turn: 1
+    action: "Audited architecture, protocols, runtime, storage, tests, datasets, and current primary-source building blocks."
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The goal is a mature and well-working agent based on a world model."
+
+open_threads:
+  - "User acceptance, revision, or rejection of the Pendulum first-experiment candidate."
+  - "If accepted, freeze the protocol, controls, splits, budgets, thresholds, and result schema."
+
+ai_suggestions_pending:
+  - "Begin with the Pendulum same-chain maturity experiment rather than multimodality or a full Dreamer implementation."
+  - "Implement model ownership and prepare-validate-commit learning before the formal run."

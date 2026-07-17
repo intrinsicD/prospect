@@ -1,0 +1,68 @@
+observations:
+  - id: O01
+    timestamp: "2026-07-17T19:11+02:00"
+    provenance: ai-suggested
+    content: >-
+      The first milestone should be one small continuous causal chain in which a
+      shared-parameter world model collects experience, learns from exactly those
+      transition identities, improves executed held-out behavior, encounters
+      shared-weight interference, and survives fresh-process restoration.
+    context: >-
+      Repository audit identified lifecycle custody but no real trainable
+      world-model vertical slice.
+    potential_type: architecture
+    bound_to: [N01]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O02
+    timestamp: "2026-07-17T19:11+02:00"
+    provenance: ai-suggested
+    content: >-
+      A versioned, checkpointable world-model owner and a
+      prepare-validate-commit learner boundary are prerequisites for attributing
+      later predictions and behavior to a specific persistent parameter update.
+    context: >-
+      The current runtime can validate an UpdateReceipt but does not own the
+      predictive parameters and permits learner mutation before receipt commit.
+    potential_type: architecture
+    bound_to: [N01]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O03
+    timestamp: "2026-07-17T19:11+02:00"
+    provenance: ai-suggested
+    content: >-
+      The candidate first formal experiment is Pendulum with an identity encoder,
+      a shared probabilistic delta-state and reward model, MPC, a conflicting
+      context-visible task, reservoir replay, matched controls, and an
+      episode-boundary checkpoint restored in a new process.
+    context: >-
+      This uses established Gymnasium, PETS-style, and TorchRL mechanisms while
+      keeping the first causal test small enough to falsify cheaply.
+    potential_type: heuristic
+    bound_to: [N01]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O04
+    timestamp: "2026-07-17T19:11+02:00"
+    provenance: ai-suggested
+    content: >-
+      The retained BridgeControl and Perception Test datasets cannot by
+      themselves establish online closed-loop collection and behavioral
+      improvement; they should be used for adapter, leakage, or later perception
+      tests rather than the first maturity gate.
+    context: >-
+      Both retained datasets are offline while the target claim requires one
+      agent to act, observe, update, and execute a changed policy.
+    potential_type: constraint
+    bound_to: [N01]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

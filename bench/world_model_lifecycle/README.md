@@ -3,155 +3,364 @@
 WM-001 is Prospect's first end-to-end causal learning experiment. It asks one
 deliberately narrow question:
 
-> Can one agent collect identified experience, update one persistent world model
+> Can one agent collect identified experience, change one persistent world model
 > because of that experience, improve held-out prediction and executed behavior,
 > learn a conflicting contextual task, retain the original gain, and reproduce
-> that retained state after a fresh-process restart?
+> the retained state after a fresh-process restart?
 
-The scientific contract is frozen in [`protocol.json`](protocol.json). Its
-raw-byte digest is recorded in [`SEALED_PROTOCOL.sha256`](SEALED_PROTOCOL.sha256).
-The numerical thresholds are hypotheses fixed before outcomes, not statements
-that Prospect already passes.
+The scientific contract is [`protocol.json`](protocol.json), and its raw-byte
+seal is [`SEALED_PROTOCOL.sha256`](SEALED_PROTOCOL.sha256). The schema contracts
+are
+[`schemas/raw-result.schema.json`](schemas/raw-result.schema.json) and
+[`schemas/formal-binding.schema.json`](schemas/formal-binding.schema.json).
+Numerical thresholds are hypotheses fixed before formal outcomes, not evidence
+that Prospect passes them.
 
-## Why this experiment comes first
+## Current status
 
-The current runtime already defines auditable observations, decisions,
-ExperienceEvents, epistemic transitions, update receipts, evaluation records, and
-component checkpoints. It does not yet establish that learned predictive
-parameters caused later behavior to improve and survived interference and
-restart. WM-001 supplies that missing causal chain before adding learned
-encoders, pixels, multimodality, actor learning, or large external benchmarks.
+The WM-001 implementation and evidence pipeline exist, but this document records
+no accepted formal result. A development run is diagnostic. A formal producer
+result is only claim-eligible; it is not self-certifying. The lifecycle claim
+remains unproven until a finalized formal artifact passes the independent
+artifact audit and a separate semantic results review accepts every killing gate
+K0 through K7.
 
-Pendulum-v1 keeps representation learning out of the first test. Task A uses
-normal torque. Task B reverses torque and exposes a context scalar. Both tasks
-must pass through the same five-member probabilistic MLP ensemble; task-specific
+Protocol 1.1.1 supersedes 1.1.0 before any formal outcome was generated. The
+patch separates the immutable producer root from the later independent
+adjudication package, makes the implementation-file manifest complete by
+construction, preserves the exact bound source bytes, and makes the 1,024-case
+environment-conformance budget unbypassable. It does not change tasks, model,
+optimizer, planner, controls, master seeds, budgets, metrics, thresholds, or
+killing gates. Version 1.1.0 diagnostic artifacts remain identified by protocol
+SHA-256 `b5e2fb45c462dd8db08c35596e7c42d046444f21bfca12f4c0215b846b993e3e`;
+the preserved 1.0.0 protocol is identified by Git commit
+`a4e4733ba5f857a0bd88af7105183a143d305976`.
+
+## What the experiment must establish
+
+The claim is a continuous causal chain, not a collection of unrelated scores:
+
+```text
+real interaction
+  -> canonical experience custody
+  -> exact consumed-transition ancestry
+  -> transactional shared-model update
+  -> held-out predictive improvement
+  -> better executed fixed-budget control
+  -> conflicting-task plasticity
+  -> replay-based retention
+  -> component-complete fresh-process parity
+```
+
+The evidence ladder is intentionally strict:
+
+| Stage | Killing gate | What can be said if it passes |
+|---|---|---|
+| Bind | K0 | Protocol, implementation, dependencies, runtime, seeds, and budgets are the predeclared ones. |
+| Collect | K1 | Real experience has unique lineage and training is isolated from validation, behavior, and imagined transitions. |
+| Learn | K2–K3 | A failure-atomic update changed the declared shared model from eligible experience, and correct experience beats frozen and corrupted controls on held-out predictive NLL. |
+| Improve | K4 | The updated model improves executed task-A return under the same frozen MPC and paired evaluation budget. |
+| Interfere | K5 | The same weights learn task B, and the matched naive B-only path demonstrates that A/B interference is real. |
+| Retain | K6 | Balanced replay preserves the prespecified fraction of the A gain without an unacceptable loss of B plasticity. |
+| Persist | K7 | All 15 declared stateful components restore in another process with exact identity, prediction, action, and return parity. |
+
+Passing a later numeric comparison cannot rescue an earlier failed gate. In
+particular, a parameter digest change is not learning, prediction improvement is
+not behavioral improvement, reload parity is not retention, and retention is not
+tested unless task B improves while the naive learner measurably forgets task A.
+
+## Fixed mechanism and controls
+
+Pendulum-v1 keeps representation learning out of this first test. Task A uses
+normal torque. Task B reverses torque and exposes one observed context scalar.
+Both tasks use the same five-member probabilistic MLP ensemble; task-specific
 models, adapters, heads, and checkpoints are forbidden. The ensemble's
-deterministic mean prediction feeds TorchRL 0.13.3's existing `CEMPlanner` through
-a `ModelBasedEnvBase` adapter. Probabilistic uncertainty is evaluated but is not
-an extra planning reward or a custom trajectory-sampling mechanism in WM-001.
-Prospect remains responsible for lifecycle custody, transactions, identities,
-evidence, and persistence.
+deterministic mean prediction feeds TorchRL 0.13.3's `CEMPlanner` through a
+`ModelBasedEnvBase` adapter. Predictive uncertainty is evaluated, but it is not
+an intrinsic planning reward in WM-001.
 
-## Frozen evidence program
+Each formal replicate follows the sealed sequence:
 
-Each of eight formal replicate seeds performs the same sequence:
-
-1. initialize and hash a cold shared model;
-2. collect eight complete task-A episodes (1,600 transitions);
-3. evaluate cold prediction and executed control on disjoint complete episodes;
-4. prepare, validate, and atomically commit a 2,000-step task-A update;
-5. evaluate prediction and behavior with all learning and replay writes disabled;
+1. initialize and preserve the cold shared model;
+2. collect eight complete task-A episodes;
+3. evaluate cold held-out prediction;
+4. prepare, validate, and commit the 2,000-step task-A update;
+5. reload immutable condition checkpoints and evaluate with learning and replay
+   writes disabled;
 6. run matched frozen and joint-target-permutation controls;
 7. collect eight complete task-B episodes through the same agent;
 8. fork the post-A state into balanced A/B replay and naive B-only updates;
-9. require the naive condition to learn B and measurably forget A;
-10. require replay to learn B while retaining the prespecified fraction of A;
-11. checkpoint every declared stateful component at an episode boundary;
-12. restore in a different process and require exact identities, predictions,
-    actions, and paired episode returns.
+9. require the naive path to learn B and measurably forget A;
+10. require replay to learn B while retaining A;
+11. checkpoint the complete declared state at an episode boundary; and
+12. restore in a fresh process and reproduce identities, predictions, actions,
+    and paired returns.
 
 Prediction validation uses eight held-out episodes per task and replicate.
 Executed behavior uses 32 paired reset seeds per task, condition, and replicate.
-The inferential unit is the replicate seed, not an individual transition or
-episode. The protocol declares exact seed derivation, budgets, metrics,
-Student-t intervals, thresholds, controls, and the K0–K7 killing order.
+The inferential unit is the replicate seed, not a transition or episode.
 
 The required controls are:
 
-- a frozen cold model;
-- a learner with jointly permuted next-state/reward targets;
-- a naive sequential B-only learner;
-- an executed random-policy lower bound;
-- a separately namespaced true-dynamics MPC ceiling.
+- **frozen cold model:** rules out collection or repeated evaluation alone;
+- **corrupted joint target:** preserves target marginals and optimizer budget
+  while breaking the input/outcome relationship;
+- **naive sequential learner:** demonstrates interference and provides the
+  no-retention baseline;
+- **executed random policy:** supplies a paired lower bound; and
+- **true-dynamics MPC:** supplies a separately namespaced ceiling under the same
+  planner and evaluation budget.
 
-If any killing gate fails, later numbers are descriptive only. In particular,
-retention is not tested unless B improves and the naive learner reliably forgets
-A.
+The exact seed derivation, task semantics, budgets, metrics, Student-t
+intervals, thresholds, and K0–K7 killing order live in `protocol.json`.
 
-## Two-stage sealing
+## Transactions, checkpoints, and evidence custody
 
-There are two seals with different purposes:
+Learner preparation operates on immutable model bytes outside the short commit
+critical section. Commit revalidates canonical transition ancestry, then advances
+the update ledger, agent learning state, and owned model under a common lock
+order. Any in-process `BaseException` during that composed commit restores all
+three participants. This is failure-atomic in process; abrupt process death still
+requires durable write-ahead recovery and is not claimed.
 
-1. The scientific protocol is sealed now. Outcomes cannot change its null,
-   semantics, seeds, budgets, controls, metrics, or thresholds.
-2. Once implementation is complete, a formal binding conforming to
-   [`schemas/formal-binding.schema.json`](schemas/formal-binding.schema.json)
-   records the clean Git commit and tree, every executed source-file digest,
-   exact dependency lock and distributions, environment conformance report,
-   deterministic runtime, and checkpoint implementation. It must be created
-   before the first formal environment reset.
+Every evaluated condition is reloaded from an immutable content-addressed model
+snapshot. Optimizer consumption is represented by content-addressed bootstrap
+manifests, while the canonical experience store remains the authority. Replay is
+an index over that store, never an alternative evidence namespace.
 
-This avoids inventing a future source commit today while preventing code or
-dependency changes after formal outcomes begin. Changing the scientific contract
-requires a new protocol version. Changing a bound implementation requires a new
-binding and a completely new formal run.
+K7 checkpoints exactly these component IDs:
 
-## Development and formal lanes
+1. `world_model`
+2. `optimizer`
+3. `model_version_ledger`
+4. `experience_store`
+5. `replay_index`
+6. `replay_sampling_history`
+7. `update_receipts`
+8. `agent_runtime`
+9. `scaling_configuration`
+10. `python_rng`
+11. `numpy_rng`
+12. `torch_cpu_rng`
+13. `torch_accelerator_rng`
+14. `collection_rng`
+15. `planner_rng`
 
-Development runs use only master seeds `101` and `211`. They may use reduced
-budgets and exist to debug correctness, feasibility, and failure modes. They are
-never claim-eligible and cannot be relabeled formal.
+A producer attempt gets a new exclusive directory before the first environment
+reset. It writes logs, raw result rows, model and prediction sidecars, optimizer
+manifests, checkpoint archives, restart-process evidence, and progress records.
+On success or failure it finalizes `producer-manifest.json`, which binds the
+complete producer file set by byte length and SHA-256. Attempts are never
+resumed, overwritten, or repaired in place.
 
-The formal lane uses the eight master seeds listed in the protocol and exactly
-the declared budgets. No tuning, exclusions, retries, early stopping, extra
-training, or analysis changes are permitted after launch. A crash or missing
-replicate fails the active gate.
+## Two lanes and two seals
 
-Raw evidence must conform to
-[`schemas/raw-result.schema.json`](schemas/raw-result.schema.json). It retains
-episode rows, transition lineage, update ancestry, optimizer batch manifests,
-checkpoint component hashes, replicate-level values, and every threshold check.
-Aggregate tables without their raw members are invalid.
+Development uses only seeds `101` and `211`, four collection episodes per task,
+eight validation episodes per task, two behavior episodes per condition, and
+300 optimizer steps per update. It is useful for correctness, feasibility, and
+failure diagnosis, but it is never claim-eligible and cannot be relabeled.
 
-## Killing gates
+Formal execution uses the eight sealed master seeds and exact declared budgets.
+No tuning, exclusions, retries, early stopping, extra training, or analysis
+changes are allowed after launch. A crash or incomplete replicate fails the
+active gate.
 
-| Gate | What must be true |
-|---|---|
-| K0 | Protocol, implementation binding, seeds, completeness, and matched budgets are valid. |
-| K1 | Real-transition custody and whole-episode held-out isolation are exact. |
-| K2 | Learning is transactional, changes bytes, binds ancestry, and the committed bytes produce later predictions. |
-| K3 | Correct task-A experience beats frozen and corrupted controls on held-out predictive NLL. |
-| K4 | The learned model improves executed held-out task-A return under fixed MPC. |
-| K5 | The same weights learn B, while the naive B-only update demonstrably forgets A. |
-| K6 | Balanced replay retains A without unacceptable loss of B plasticity. |
-| K7 | A component-complete fresh-process restore has exact state and behavior parity. |
+There are two pre-outcome bindings:
 
-The exact thresholds are in `protocol.json`; this table is only a reading aid.
+1. The scientific seal fixes the protocol and result/binding schemas.
+2. A formal implementation binding fixes a clean Git commit and tree, all
+   executed source and test digests, dependency closure, runtime, deterministic
+   settings, environment conformance, and checkpoint implementation.
 
-## Implementation order
+Changing scientific semantics requires a new protocol version. Changing bound
+source, dependencies, or runtime requires a new implementation binding and a new
+formal attempt; previous failed attempts remain evidence.
 
-Implementation should preserve the gate order:
+## Executable runbook
 
-1. environment/context wrapper and semantic conformance tests;
-2. canonical transition tensor codec and whole-episode split registry;
-3. owned model/optimizer/version state with stable parameter digests;
-4. transactional `prepare → validate → commit` learner;
-5. held-out prediction evaluator;
-6. CEM learned-model, random, and true-dynamics planners;
-7. B replay and naive control;
-8. component-complete checkpoint and fresh-process driver;
-9. development runs on the two development seeds;
-10. immutable implementation binding, then one formal run;
-11. independent recomputation and semantic audit.
+Run these commands from the repository root. CUDA is the intended formal device;
+replace `cuda` with `cpu` only if the binding and subsequent run both use CPU.
 
-Do not start the formal lane merely because the code runs. First pass all
-deterministic conformance, ancestry, leakage, rollback, digest-use, and restore
-tests, then complete and verify the implementation binding.
-
-## Verification
-
-The verifier uses only the Python standard library:
+### 1. Install and verify the pre-outcome contract
 
 ```bash
-python bench/world_model_lifecycle/verify.py protocol
-python bench/world_model_lifecycle/verify.py seed collect_a_episode 104729 0
-python bench/world_model_lifecycle/verify.py binding path/to/formal-binding.json
-python bench/world_model_lifecycle/verify.py result path/to/result.json \
-  --binding path/to/formal-binding.json
+python -m venv .venv
+source .venv/bin/activate
+make install-runtime
+
+python -m bench.world_model_lifecycle.verify protocol
+CUBLAS_WORKSPACE_CONFIG=:4096:8 make check-runtime
 ```
 
-`protocol` is usable immediately. Binding and result verification intentionally
-fail until those future artifacts are complete. JSON Schema files provide the
-full interchange contract; the verifier additionally enforces cross-file hashes,
-seed derivation, causal split custody, gate ordering, and binding consistency
-that JSON Schema alone cannot express.
+Do not continue to formal binding unless both commands pass. `check-runtime`
+runs lint, the scoped static type check, epistemic tests, WM-001 tests, and
+epistemic diagnostics.
+
+### 2. Run and audit the development lane
+
+A one-seed structural run is optional:
+
+```bash
+DEV_SMOKE="bench/world_model_lifecycle/results/development/$(date -u +%Y%m%dT%H%M%SZ)-smoke-$$"
+python -m bench.world_model_lifecycle.run development \
+  --device cuda \
+  --master-seed 101 \
+  --output "$DEV_SMOKE"
+python -m bench.world_model_lifecycle.verify result "$DEV_SMOKE/result.json"
+mkdir -p artifacts/wm001-audits
+python -m bench.world_model_lifecycle.artifact_audit "$DEV_SMOKE" \
+  --output "artifacts/wm001-audits/$(basename "$DEV_SMOKE").json"
+```
+
+The complete two-seed diagnostic uses the same command without
+`--master-seed`:
+
+```bash
+DEV_ARTIFACT="bench/world_model_lifecycle/results/development/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+python -m bench.world_model_lifecycle.run development \
+  --device cuda \
+  --output "$DEV_ARTIFACT"
+python -m bench.world_model_lifecycle.verify result "$DEV_ARTIFACT/result.json"
+python -m bench.world_model_lifecycle.artifact_audit "$DEV_ARTIFACT" \
+  --output "artifacts/wm001-audits/$(basename "$DEV_ARTIFACT").json"
+```
+
+The audit output must be outside the immutable producer directory. A development
+audit can establish evidence integrity and expose failure modes, but its numbers
+cannot support the WM-001 claim.
+
+### 3. Commit the exact candidate and create a formal binding
+
+Resolve every development finding first. Commit the exact candidate source, then
+confirm that the tracked and untracked worktree is clean:
+
+```bash
+git status --short --untracked-files=all
+```
+
+Create a fresh ignored evidence directory, preserve the final check output, and
+bind that clean commit. The binding function also runs 1,024 Pendulum conformance
+cases and refuses a dependency-lock or runtime mismatch.
+
+```bash
+BINDING_DIR="artifacts/wm001-binding-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+mkdir -p "$BINDING_DIR"
+TEST_REPORT="$BINDING_DIR/prebinding-test-report.txt"
+set -o pipefail
+CUBLAS_WORKSPACE_CONFIG=:4096:8 make check-runtime 2>&1 | tee "$TEST_REPORT"
+
+BINDING="$BINDING_DIR/formal-binding.json"
+BINDING="$BINDING" TEST_REPORT="$TEST_REPORT" \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 python - <<'PY'
+import os
+from pathlib import Path
+
+from bench.world_model_lifecycle.binding import create_formal_binding
+
+create_formal_binding(
+    output_path=Path(os.environ["BINDING"]),
+    test_report_path=Path(os.environ["TEST_REPORT"]),
+    conformance_cases=1024,
+    device="cuda",
+)
+PY
+
+python -m bench.world_model_lifecycle.verify binding "$BINDING"
+```
+
+`create_formal_binding` writes content-addressed copies of the test and
+conformance reports beside `formal-binding.json`. It refuses to replace any
+existing binding evidence.
+
+### 4. Launch exactly one formal attempt
+
+```bash
+BINDING_SHA="$(sha256sum "$BINDING" | cut -d' ' -f1)"
+FORMAL_ATTEMPT="bench/world_model_lifecycle/results/formal/$BINDING_SHA/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+python -m bench.world_model_lifecycle.run formal \
+  --device cuda \
+  --binding "$BINDING" \
+  --output "$FORMAL_ATTEMPT"
+```
+
+The launcher rechecks the live source, Git tree, dependency closure, runtime,
+deterministic settings, environment wrapper, and copied binding before the first
+reset. It then copies the protocol, seal, schemas, lock, test report, conformance
+report, binding, and every byte named by the complete bound implementation
+manifest into the attempt.
+
+### 5. Verify custody, recompute, and judge
+
+```bash
+ARTIFACT="$FORMAL_ATTEMPT" python - <<'PY'
+import os
+from pathlib import Path
+
+from bench.world_model_lifecycle.artifact import verify_producer_manifest
+
+manifest = verify_producer_manifest(Path(os.environ["ARTIFACT"]))
+if manifest["status"] != "completed":
+    raise SystemExit(f"producer attempt status: {manifest['status']}")
+print(f"producer custody valid: {manifest['file_count']} files")
+PY
+
+python -m bench.world_model_lifecycle.verify result \
+  "$FORMAL_ATTEMPT/result.json" \
+  --binding "$FORMAL_ATTEMPT/formal-binding.json"
+
+mkdir -p artifacts/wm001-audits
+AUDIT_REPORT="artifacts/wm001-audits/formal-$BINDING_SHA-$(date -u +%Y%m%dT%H%M%SZ).json"
+python -m bench.world_model_lifecycle.artifact_audit "$FORMAL_ATTEMPT" \
+  --output "$AUDIT_REPORT"
+sha256sum "$AUDIT_REPORT"
+
+ADJUDICATION_PACKAGE="artifacts/wm001-adjudications/formal-$BINDING_SHA-$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$(dirname "$ADJUDICATION_PACKAGE")"
+python -m bench.world_model_lifecycle.adjudication \
+  --producer "$FORMAL_ATTEMPT" \
+  --audit "$AUDIT_REPORT" \
+  --output "$ADJUDICATION_PACKAGE" \
+  --disposition pending
+```
+
+The producer root is finalized before independent audit and is never modified
+afterward. The external adjudication package copies the exact audit report and
+binds it to the producer-manifest, result, auditor-source, and formal-binding
+digests. An `accepted` disposition is only created after the separate semantic
+results review; `pending` records the completed independent artifact audit
+without asserting the capability claim.
+
+The envelope verifier checks schemas, hashes, identities, seed derivation, split
+custody, update ancestry, budgets, gate order, and binding consistency. The
+artifact auditor reopens untrusted sidecars and checkpoints, recomputes dynamics,
+model predictions, metrics, controller RNG evidence, aggregate statistics,
+thresholds, checkpoint completeness, and restart parity. It does not trust the
+producer's stored aggregate or gate rows.
+
+Only the external audit report may return `passed: true`. Producer gate rows
+always keep `claim_supported: false`, including in the formal lane. The claim may
+advance only when all of the following are true:
+
+- the producer manifest is complete with status `completed`;
+- protocol, binding, and result verification pass;
+- the artifact audit reports `integrity_passed: true`,
+  `complete_for_claim: true`, `passed: true`, zero failed checks, and zero
+  coverage gaps;
+- independently recomputed K0–K7 all pass in order; and
+- an adversarial semantic review finds no critical lineage, leakage, mechanism,
+  statistical, or scope error.
+
+If any condition fails, report the last valid rung and the failure evidence. Do
+not describe the complete collect → learn → improve → retain claim as
+demonstrated.
+
+## Interpretation boundary
+
+Even a complete WM-001 pass would establish one causal lifecycle on two
+observed-context variants of Pendulum-v1 under one bound software and hardware
+environment. It would not establish general intelligence, multimodal learning,
+long-horizon exploration, cross-hardware bitwise reproducibility, architectural
+novelty, or superiority to published state of the art. Those require later
+experiments and external benchmarks.

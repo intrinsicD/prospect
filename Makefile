@@ -1,5 +1,5 @@
 .RECIPEPREFIX = >
-.PHONY: install install-runtime test test-runtime lint fmt typecheck epistemic-diagnostics epistemic-gate check tree
+.PHONY: install install-runtime test test-runtime lint fmt typecheck typecheck-runtime epistemic-diagnostics epistemic-gate wm001-development check check-runtime tree
 
 install:
 > python -m pip install -e ".[dev]"
@@ -11,16 +11,19 @@ test:
 > pytest -q tests/test_epistemic_*.py
 
 test-runtime:
-> pytest -q tests/test_epistemic_storage.py
+> pytest -q tests/test_world_model_*.py
 
 lint:
-> ruff check src/prospect bench/epistemic tests/test_epistemic_*.py
+> ruff check src/prospect bench tests
 
 fmt:
-> ruff format src/prospect bench/epistemic tests/test_epistemic_*.py
+> ruff format src/prospect bench tests
 
 typecheck:
 > mypy
+
+typecheck-runtime:
+> mypy --follow-imports=skip bench/world_model_lifecycle/artifact_audit.py bench/world_model_lifecycle/adjudication.py
 
 epistemic-diagnostics:
 > PYTHONPATH=src python -m bench.epistemic.run_maturity --diagnostics
@@ -28,7 +31,12 @@ epistemic-diagnostics:
 epistemic-gate:
 > PYTHONPATH=src python -m bench.epistemic.run_maturity
 
+wm001-development:
+> python -m bench.world_model_lifecycle.run development
+
 check: lint typecheck test epistemic-diagnostics
+
+check-runtime: lint typecheck typecheck-runtime test test-runtime epistemic-diagnostics
 
 tree:
 > find . -not -path '*/.*' -not -path '*/__pycache__/*' -type f | sort

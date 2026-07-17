@@ -14,6 +14,16 @@ from .agent import (
     UnknownDecisionError,
 )
 from .journal import LifecycleJournal, LifecycleRecord, LifecycleStage
+from .learning import (
+    ModelState,
+    ModelStateValidator,
+    ModelTransactionError,
+    OwnedModel,
+    PreparedLearningUpdate,
+    PreparedModelSwap,
+    TransactionalLearner,
+    VersionedModelOwner,
+)
 from .state import AgentState, StateTransitionError
 
 __all__ = (
@@ -27,10 +37,18 @@ __all__ = (
     "LifecycleJournal",
     "LifecycleRecord",
     "LifecycleStage",
+    "ModelState",
+    "ModelStateValidator",
+    "ModelTransactionError",
+    "OwnedModel",
+    "PreparedLearningUpdate",
+    "PreparedModelSwap",
     "ReplayIndex",
     "RuntimeEnvironment",
     "RuntimeError",
     "StateTransitionError",
     "StepAlreadyObservedError",
+    "TransactionalLearner",
     "UnknownDecisionError",
+    "VersionedModelOwner",
 )

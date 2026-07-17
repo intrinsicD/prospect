@@ -1,0 +1,11 @@
+tree:
+  - id: N01
+    type: question
+    title: "First maturity-building experiment"
+    provenance: user
+    timestamp: "2026-07-17T19:11+02:00"
+    description: >-
+      What should Prospect do first to progress toward a mature, well-working
+      world-model-based agent?
+    status: open
+    children: []
