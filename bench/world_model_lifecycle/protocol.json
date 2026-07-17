@@ -1,0 +1,833 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema": "prospect.world-model-lifecycle.protocol.v1",
+  "experiment": {
+    "id": "WM-001",
+    "title": "Causal world-model learning, behavioral improvement, retention, and restart",
+    "protocol_version": "1.0.0",
+    "status": "sealed_before_outcomes",
+    "thresholds_sealed_before_outcomes": true,
+    "supersession_rule": "Any semantic, seed, budget, metric, threshold, control, or gate change creates a new protocol version and invalidates all formal outcomes collected under an earlier or unbound version."
+  },
+  "claim": "The same Prospect agent collects identified real experience, changes one shared persistent probabilistic world model because of exactly that experience, improves held-out prediction and executed control, learns a conflicting second task without task-specific model copies, retains the first-task gain through replay, and reproduces the retained state and behavior after a fresh-process restore.",
+  "null_hypothesis": {
+    "id": "H0-WM-001",
+    "statement": "Experience-linked world-model learning does not cause reliable held-out predictive improvement, executed-control improvement, second-task plasticity, first-task retention, and fresh-process persistence beyond matched frozen, corrupted-target, naive-sequential, and random controls.",
+    "rejection_rule": "Reject only if every killing gate K0 through K7 passes in order in the formal lane. Passing a later numerical check cannot rescue an earlier failed gate."
+  },
+  "scope": {
+    "establishes_if_passed": [
+      "one continuous causal lifecycle on two contextual variants of Pendulum-v1",
+      "experience ancestry and train/evaluation separation",
+      "persistent learned world-model state used by later planning",
+      "plasticity and replay-based retention under deliberately demonstrated interference",
+      "component-complete checkpoint and same-machine, same-dependency fresh-process parity"
+    ],
+    "does_not_establish": [
+      "general intelligence or broad task generalization",
+      "novelty over PETS, CEM, replay, or other established model-based control methods",
+      "pixel, language, audio, or multimodal representation learning",
+      "long-horizon autonomous exploration",
+      "cross-hardware or cross-dependency bitwise reproducibility",
+      "superiority to published state of the art"
+    ]
+  },
+  "causal_chain": [
+    "initialize one cold shared model and record its parameter digest",
+    "collect task-A real experience through the authoritative agent lifecycle",
+    "prepare candidate weights from the exact task-A transition IDs without mutating the live model",
+    "validate ancestry and candidate state, then atomically commit the candidate",
+    "evaluate frozen held-out task-A prediction and executed MPC behavior",
+    "collect task-B real experience through the same lifecycle and shared model",
+    "train task B with balanced task-A replay through the same weights and heads",
+    "demonstrate that a matched B-only learner measurably forgets A",
+    "evaluate B plasticity and A retention with learning disabled",
+    "checkpoint every declared stateful component and restore in a fresh process",
+    "reproduce identities, predictions, actions, and executed returns"
+  ],
+  "environment": {
+    "family": "Gymnasium classic control",
+    "environment_id": "Pendulum-v1",
+    "episode_horizon": 200,
+    "termination": "No natural terminal state; the wrapper emits truncation at exactly 200 accepted environment actions.",
+    "physical_observation": {
+      "fields": [
+        "cos(theta)",
+        "sin(theta)",
+        "angular_velocity"
+      ],
+      "bounds": [
+        [
+          -1.0,
+          1.0
+        ],
+        [
+          -1.0,
+          1.0
+        ],
+        [
+          -8.0,
+          8.0
+        ]
+      ]
+    },
+    "agent_action": {
+      "field": "intended_torque",
+      "bounds": [
+        -2.0,
+        2.0
+      ],
+      "dimension": 1
+    },
+    "semantic_parameters": {
+      "gravity": 10.0,
+      "mass": 1.0,
+      "length": 1.0,
+      "time_step": 0.05,
+      "max_speed": 8.0,
+      "max_torque": 2.0,
+      "reset_theta_range": [
+        -3.141592653589793,
+        3.141592653589793
+      ],
+      "reset_angular_velocity_range": [
+        -1.0,
+        1.0
+      ]
+    },
+    "reward": "The unmodified Pendulum-v1 reward computed from physical state and applied torque. The primary behavior metric is the undiscounted sum of 200 rewards.",
+    "source_guard": "The formal binding must record the exact Gymnasium version, installed distribution hash, wrapper source hash, and a conformance-test digest for all semantic parameters above."
+  },
+  "tasks": {
+    "context_is_observed": true,
+    "context_encoding": {
+      "task_a": 0.0,
+      "task_b": 1.0
+    },
+    "task_a": {
+      "id": "pendulum_normal_torque",
+      "context": 0.0,
+      "actuation": "applied_torque = clip(intended_torque, -2, 2)"
+    },
+    "task_b": {
+      "id": "pendulum_reversed_torque",
+      "context": 1.0,
+      "actuation": "applied_torque = -clip(intended_torque, -2, 2)"
+    },
+    "shared_parameter_constraint": "Both tasks must use the identical ensemble members, trunks, output heads, optimizer slots, and model version stream. The context scalar may be an input; task-keyed models, adapters, heads, routing tables, or checkpoint copies are forbidden.",
+    "interference_requirement": "The matched naive B-only update must cause a statistically reliable task-A return loss. If it does not, WM-001 has not tested retention and stops at K5."
+  },
+  "representation_and_model": {
+    "encoder": {
+      "kind": "identity",
+      "input": "physical_observation concatenated with observed task context",
+      "dimension": 4,
+      "learned_parameters": 0
+    },
+    "fixed_scaling": {
+      "physical_observation": [
+        1.0,
+        1.0,
+        8.0
+      ],
+      "context": 1.0,
+      "action": 2.0,
+      "delta_target": [
+        2.0,
+        2.0,
+        16.0
+      ],
+      "reward_target": 16.2736044,
+      "rule": "All divisors are constants in this protocol. No evaluation statistic may fit or update a normalizer."
+    },
+    "world_model": {
+      "kind": "probabilistic neural ensemble",
+      "ensemble_members": 5,
+      "member_architecture": {
+        "input_dimension": 5,
+        "hidden_dimensions": [
+          256,
+          256
+        ],
+        "activation": "SiLU",
+        "output_targets": [
+          "delta_cos_theta",
+          "delta_sin_theta",
+          "delta_angular_velocity",
+          "reward"
+        ],
+        "distribution": "independent diagonal Gaussian per member",
+        "log_variance_bounds": [
+          -10.0,
+          0.5
+        ]
+      },
+      "rollout_projection": "After adding predicted deltas, project the predicted (cos(theta), sin(theta)) pair onto the unit circle using max(L2_norm, 1e-8); clip predicted angular velocity to [-8, 8]; carry context unchanged.",
+      "uncertainty": {
+        "aleatoric": "member predicted variance",
+        "epistemic": "between-member variance of predicted means",
+        "planner_use": "Reported in predictive evaluation but not used as a reward, penalty, acquisition signal, or rollout sample in WM-001. The planner consumes deterministic ensemble-mean next-state and reward predictions."
+      },
+      "forbidden_shortcuts": [
+        "calling the real environment transition from learned-model MPC",
+        "reading hidden theta or environment internals in the learned condition",
+        "training a task-specific model or head",
+        "placing evaluation transitions in replay",
+        "using outcome-time data in action-time predictions"
+      ]
+    },
+    "optimizer": {
+      "name": "AdamW",
+      "learning_rate": 0.0003,
+      "betas": [
+        0.9,
+        0.999
+      ],
+      "epsilon": 1e-08,
+      "weight_decay": 1e-05,
+      "batch_size": 256,
+      "gradient_clip_l2": 10.0,
+      "bootstrap": "Each ensemble member samples training transition IDs with replacement from the phase-eligible replay population using its declared member seed.",
+      "loss": "Mean normalized-target Gaussian negative log likelihood over members and output dimensions."
+    },
+    "planner": {
+      "kind": "torchrl.modules.CEMPlanner 0.13.3 over a torchrl.envs.ModelBasedEnvBase adapter",
+      "planning_horizon": 10,
+      "candidates": 64,
+      "elite_candidates": 8,
+      "iterations": 3,
+      "model_adapter": "At every imagined step, return the arithmetic mean of the five members' predicted physical-state deltas and reward, apply the declared rollout projection, and carry context unchanged.",
+      "initial_action_distribution": "The exact CEMPlanner initialization: independent Gaussian actions with zero mean and unit standard deviation, projected through the bounded action spec to [-2, 2].",
+      "elite_update": "At each iteration, rank candidates by cumulative predicted reward, select the top 8, and replace each horizon position's Gaussian mean and standard deviation with the elites' sample mean and standard deviation. No smoothing or minimum-standard-deviation extension is allowed.",
+      "objective": "cumulative deterministic ensemble-mean predicted environment reward",
+      "action_selection": "Use CEMPlanner's returned final Gaussian mean at horizon position zero and project it through the bounded action spec.",
+      "learning_during_evaluation": false,
+      "replay_writes_during_evaluation": false
+    }
+  },
+  "experience_and_learning": {
+    "collection_policy": "At each training-collection step, the agent assesses and executes a seeded uniform exploratory intended torque in [-2, 2]. Environment interaction must still produce the canonical decision, execution, observation, outcome, experience, and epistemic-transition records.",
+    "canonical_transition_fields": [
+      "run_id",
+      "task_id",
+      "episode_id",
+      "step_index",
+      "pre_action_observation_id",
+      "task_context",
+      "decision_id",
+      "intended_action",
+      "executed_action_id",
+      "applied_action",
+      "next_observation_id",
+      "reward",
+      "terminated",
+      "truncated",
+      "model_version_at_action",
+      "parameter_digest_at_action"
+    ],
+    "episode_reset_rule": "Agent recurrent/belief episode state is reset at each environment reset. Real ExperienceEvent custody, replay lineage, persistent model state, optimizer state, and version ancestry remain continuous.",
+    "imagined_namespace_rule": "Imagined MPC transitions are never ExperienceEvents and cannot enter real-experience or replay namespaces.",
+    "transaction": {
+      "prepare": "Clone live model and optimizer bytes; train the candidate using only the declared transition-ID multiset; do not mutate live state.",
+      "validate": "Validate receipt ancestry, eligible split, target transformation, finite parameters, version predecessor, component digests, and held-out isolation.",
+      "commit": "Atomically replace live model and optimizer state, advance the model/version ledger, attach the receipt and exact consumed-ID multiset, and derive a new compatible belief.",
+      "failure_invariant": "Any rejected or interrupted pre-commit update leaves every live component byte-identical and emits no successful UpdateReceipt."
+    },
+    "task_a_update": {
+      "eligible_replay": [
+        "collect_a"
+      ],
+      "optimizer_steps": 2000
+    },
+    "task_b_replay_update": {
+      "eligible_replay": [
+        "collect_a",
+        "collect_b"
+      ],
+      "optimizer_steps": 2000,
+      "batch_composition": {
+        "task_a": 128,
+        "task_b": 128
+      }
+    },
+    "task_b_naive_update": {
+      "eligible_replay": [
+        "collect_b"
+      ],
+      "optimizer_steps": 2000,
+      "batch_composition": {
+        "task_a": 0,
+        "task_b": 256
+      }
+    }
+  },
+  "splits": {
+    "unit": "whole_episode",
+    "disjointness_key": [
+      "formal_replicate_id",
+      "task_id",
+      "episode_seed"
+    ],
+    "rules": [
+      "No episode or transition may occur in more than one split.",
+      "Only collect_a and collect_b are eligible for gradient updates.",
+      "Prediction-validation and behavior-evaluation episodes are held out from replay, optimizer state, normalization, calibration fitting, and hyperparameter selection.",
+      "All controls within a replicate consume the same eligible real transition IDs and use paired evaluation reset seeds.",
+      "A formal result must enumerate every episode ID and transition ID rather than reporting only counts."
+    ],
+    "formal": {
+      "collect_a": {
+        "task": "task_a",
+        "episodes_per_replicate": 8,
+        "transitions_per_replicate": 1600,
+        "purpose": "task-A training experience"
+      },
+      "predictive_validation_a": {
+        "task": "task_a",
+        "episodes_per_replicate": 8,
+        "transitions_per_replicate": 1600,
+        "purpose": "one-step held-out predictive metrics"
+      },
+      "behavior_evaluation_a": {
+        "task": "task_a",
+        "episodes_per_replicate": 32,
+        "transitions_per_condition_per_replicate": 6400,
+        "purpose": "paired executed return"
+      },
+      "collect_b": {
+        "task": "task_b",
+        "episodes_per_replicate": 8,
+        "transitions_per_replicate": 1600,
+        "purpose": "task-B training experience"
+      },
+      "predictive_validation_b": {
+        "task": "task_b",
+        "episodes_per_replicate": 8,
+        "transitions_per_replicate": 1600,
+        "purpose": "one-step held-out predictive metrics"
+      },
+      "behavior_evaluation_b": {
+        "task": "task_b",
+        "episodes_per_replicate": 32,
+        "transitions_per_condition_per_replicate": 6400,
+        "purpose": "paired executed return"
+      }
+    }
+  },
+  "seed_schedule": {
+    "algorithm": "seed(namespace, replicate_master_seed, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.0.0|' + namespace + '|' + decimal(replicate_master_seed) + '|' + decimal(index))",
+    "formal_replicate_master_seeds": [
+      104729,
+      130363,
+      155921,
+      181081,
+      206369,
+      232003,
+      257371,
+      283009
+    ],
+    "development_replicate_master_seeds": [
+      101,
+      211
+    ],
+    "namespaces": {
+      "model_initialization": {
+        "count": 1
+      },
+      "torch_runtime": {
+        "count": 1
+      },
+      "collection_action": {
+        "count": 2,
+        "index_meaning": "0=task_a, 1=task_b"
+      },
+      "ensemble_bootstrap_a": {
+        "count": 5
+      },
+      "ensemble_bootstrap_b": {
+        "count": 5
+      },
+      "minibatch_order_a": {
+        "count": 1
+      },
+      "minibatch_order_b": {
+        "count": 1
+      },
+      "corrupted_target_permutation": {
+        "count": 1
+      },
+      "collect_a_episode": {
+        "count": 8
+      },
+      "predictive_validation_a_episode": {
+        "count": 8
+      },
+      "behavior_evaluation_a_episode": {
+        "count": 32
+      },
+      "collect_b_episode": {
+        "count": 8
+      },
+      "predictive_validation_b_episode": {
+        "count": 8
+      },
+      "behavior_evaluation_b_episode": {
+        "count": 32
+      },
+      "planner": {
+        "count": 1
+      }
+    },
+    "pairing_rule": "Within a replicate, all learned checkpoints and controls use the exact same task/split episode reset seeds. Planner randomness is reset to the same derived planner state before paired conditions.",
+    "seed_record_rule": "Every derived seed and RNG state digest must appear in the raw result. An undeclared RNG is a K0 failure."
+  },
+  "budgets": {
+    "formal_replicates": 8,
+    "training_collection_per_task_per_replicate": {
+      "episodes": 8,
+      "environment_steps": 1600
+    },
+    "prediction_validation_per_task_per_replicate": {
+      "episodes": 8,
+      "environment_steps": 1600
+    },
+    "behavior_evaluation_per_task_per_condition_per_replicate": {
+      "episodes": 32,
+      "environment_steps": 6400
+    },
+    "gradient_updates_per_phase": 2000,
+    "batch_size": 256,
+    "matched_compute_rule": "Learned, corrupted-target, replay, and naive-sequential conditions use identical architecture, initialization, batch size, optimizer-step count, and planner budget. Frozen performs zero optimizer steps but uses the identical evaluation planner budget.",
+    "budget_overrun_rule": "Any formal overrun, early stop, extra data, extra optimizer step, or extra hyperparameter search fails K0. Resource telemetry may not redefine a budget after outcomes."
+  },
+  "controls": {
+    "frozen": {
+      "purpose": "tests whether data collection or evaluation repetition alone explains improvement",
+      "implementation": "clone the cold checkpoint; consume no gradient update; use identical held-out evaluation and MPC budgets"
+    },
+    "corrupted_target": {
+      "purpose": "tests whether correct transition linkage, rather than optimizer activity or target marginals, explains prediction and behavior",
+      "implementation": "apply one seeded permutation to joint (next_physical_observation, reward) targets across collect_a while leaving inputs, target marginals, transition counts, initialization, minibatch schedule, and update budget matched"
+    },
+    "naive_sequential": {
+      "purpose": "demonstrates actual A/B interference and supplies the no-retention baseline",
+      "implementation": "start from the exact post-A checkpoint and update for 2000 steps on collect_b only"
+    },
+    "random_policy": {
+      "purpose": "executed-control lower bound",
+      "implementation": "seeded uniform intended torque in [-2, 2] on the paired 32 evaluation resets"
+    },
+    "true_dynamics_mpc": {
+      "purpose": "planner and task ceiling under the same action/evaluation budget",
+      "implementation": "the identical CEM planner calls a separately namespaced exact semantic Pendulum transition and reward function; this oracle is never available to learned-model conditions or replay"
+    }
+  },
+  "execution_sequence": [
+    {
+      "index": 0,
+      "name": "bind_and_initialize",
+      "output_checkpoint": "cold"
+    },
+    {
+      "index": 1,
+      "name": "collect_a",
+      "live_checkpoint": "cold"
+    },
+    {
+      "index": 2,
+      "name": "evaluate_cold_a",
+      "learning_allowed": false
+    },
+    {
+      "index": 3,
+      "name": "train_a_transaction",
+      "input_checkpoint": "cold",
+      "output_checkpoint": "after_a"
+    },
+    {
+      "index": 4,
+      "name": "evaluate_after_a",
+      "tasks": [
+        "task_a",
+        "task_b"
+      ],
+      "learning_allowed": false
+    },
+    {
+      "index": 5,
+      "name": "run_frozen_and_corrupted_a_controls"
+    },
+    {
+      "index": 6,
+      "name": "collect_b",
+      "live_checkpoint": "after_a"
+    },
+    {
+      "index": 7,
+      "name": "fork_post_a_checkpoint",
+      "outputs": [
+        "replay_candidate",
+        "naive_candidate"
+      ]
+    },
+    {
+      "index": 8,
+      "name": "train_b_replay_transaction",
+      "output_checkpoint": "after_b_replay"
+    },
+    {
+      "index": 9,
+      "name": "train_b_naive_transaction",
+      "output_checkpoint": "after_b_naive"
+    },
+    {
+      "index": 10,
+      "name": "evaluate_after_b",
+      "tasks": [
+        "task_a",
+        "task_b"
+      ],
+      "learning_allowed": false
+    },
+    {
+      "index": 11,
+      "name": "checkpoint_after_b_replay"
+    },
+    {
+      "index": 12,
+      "name": "restore_fresh_process_and_evaluate",
+      "tasks": [
+        "task_a",
+        "task_b"
+      ],
+      "learning_allowed": false
+    }
+  ],
+  "metrics": {
+    "prediction": {
+      "primary": {
+        "name": "heldout_mixture_nll_nats_per_target_dimension",
+        "formula": "-mean_over_transition_and_target(log(mean_over_5_members Normal(y; member_mean, member_variance))) on the four fixed-scaled targets",
+        "lower_is_better": true
+      },
+      "secondary": [
+        {
+          "name": "heldout_normalized_rmse",
+          "formula": "root mean squared error of ensemble-mean predictions over fixed-scaled targets"
+        },
+        {
+          "name": "heldout_90_percent_interval_coverage",
+          "formula": "fraction of target values whose deterministic ensemble-mixture probability integral transform lies in [0.05, 0.95]"
+        }
+      ]
+    },
+    "behavior": {
+      "primary": {
+        "name": "executed_undiscounted_episode_return",
+        "formula": "sum of the 200 real environment rewards",
+        "higher_is_better": true
+      },
+      "oracle_normalized_score": {
+        "formula": "(learned_mean_return - random_mean_return) / (oracle_mean_return - random_mean_return)",
+        "validity": "oracle_mean_return must exceed random_mean_return by at least 100 return units"
+      }
+    },
+    "retention": {
+      "name": "seed_level_retained_a_gain_fraction",
+      "formula": "For each formal replicate i: (A_after_B_replay_i - A_cold_i) / (A_after_A_i - A_cold_i), using the 32-episode paired mean returns.",
+      "validity": "Every denominator must be positive; otherwise K6 fails."
+    },
+    "inference": {
+      "unit": "formal replicate master seed",
+      "replicates": 8,
+      "within_replicate": "average the 32 paired episode-reset differences before across-replicate inference",
+      "confidence_interval": "two-sided 95% Student t interval across 8 replicate-level values using df=7 and t critical value 2.364624251",
+      "multiple_testing": "No multiplicity adjustment: every predeclared primary check is conjunctive and must pass; secondary metrics are descriptive unless named by a gate.",
+      "missing_data": "No imputation. A missing, non-finite, crashed, or excluded formal replicate fails its current killing gate."
+    }
+  },
+  "thresholds": {
+    "sealed_before_outcomes": true,
+    "k0_protocol_and_budget": [
+      "protocol raw-byte SHA-256 equals SEALED_PROTOCOL.sha256",
+      "formal binding was sealed before the first formal environment reset",
+      "exactly 8 complete formal replicates and every declared episode, transition, optimizer step, control, seed, and resource record are present",
+      "source tree is clean at the bound commit and dependency/runtime hashes match the formal binding"
+    ],
+    "k1_trace_and_isolation": [
+      "100% unique real transition IDs",
+      "100% of learner-consumed transition IDs resolve to eligible collect_a or collect_b real ExperienceEvents",
+      "0 prediction-validation or behavior-evaluation transition IDs occur in any replay sample, optimizer batch, fitted statistic, or candidate update",
+      "0 imagined transitions occur in the real-experience namespace",
+      "100% action-time model and parameter digests match the live committed checkpoint"
+    ],
+    "k2_causal_update": [
+      "post-A and post-B parameter digests differ from their predecessor digests",
+      "every successful UpdateReceipt binds the exact consumed transition-ID multiset, predecessor digest, candidate digest, and committed digest",
+      "a prespecified rejected-update probe leaves all live component bytes and versions identical",
+      "the first post-commit prediction and every later evaluation prediction bind the new committed parameter digest"
+    ],
+    "k3_predictive_learning": {
+      "a_vs_frozen_mean_nll_improvement_min": 0.05,
+      "a_vs_frozen_nll_improvement_ci_lower_strictly_greater_than": 0.0,
+      "a_vs_corrupted_mean_nll_improvement_min": 0.05,
+      "a_vs_corrupted_nll_improvement_ci_lower_strictly_greater_than": 0.0,
+      "after_a_90_percent_interval_coverage_bounds_inclusive": [
+        0.7,
+        0.99
+      ]
+    },
+    "k4_executed_a_improvement": {
+      "after_a_vs_cold_mean_return_improvement_min": 100.0,
+      "after_a_vs_cold_return_improvement_ci_lower_strictly_greater_than": 0.0,
+      "after_a_vs_frozen_mean_return_improvement_min": 100.0,
+      "after_a_vs_frozen_return_improvement_ci_lower_strictly_greater_than": 0.0,
+      "after_a_oracle_normalized_score_min": 0.2,
+      "oracle_vs_random_mean_return_gap_min": 100.0
+    },
+    "k5_b_plasticity_and_interference": {
+      "after_b_replay_vs_before_b_mean_b_nll_improvement_min": 0.05,
+      "after_b_replay_vs_before_b_b_nll_improvement_ci_lower_strictly_greater_than": 0.0,
+      "after_b_replay_vs_before_b_mean_b_return_improvement_min": 100.0,
+      "after_b_replay_vs_before_b_b_return_improvement_ci_lower_strictly_greater_than": 0.0,
+      "after_b_naive_vs_before_b_mean_b_return_improvement_min": 100.0,
+      "after_b_naive_vs_before_b_b_return_improvement_ci_lower_strictly_greater_than": 0.0,
+      "naive_a_forgetting_mean_return_drop_min": 50.0,
+      "naive_a_forgetting_return_drop_ci_lower_strictly_greater_than": 0.0,
+      "shared_parameter_violations_allowed": 0
+    },
+    "k6_retention": {
+      "mean_seed_level_retained_a_gain_fraction_min": 0.8,
+      "retained_a_gain_fraction_ci_lower_min": 0.65,
+      "replay_vs_naive_mean_a_return_advantage_min": 50.0,
+      "replay_vs_naive_a_return_advantage_ci_lower_strictly_greater_than": 0.0,
+      "replay_minus_naive_mean_b_return_min": -25.0,
+      "replay_minus_naive_b_return_ci_lower_min": -75.0
+    },
+    "k7_restart": {
+      "fresh_process_required": true,
+      "required_exact_hash_matches": [
+        "model parameters",
+        "optimizer",
+        "model version ledger",
+        "experience custody store",
+        "replay index and sampled-ID history",
+        "update receipts",
+        "belief/runtime state at declared episode boundary",
+        "normalization configuration",
+        "Python RNG",
+        "NumPy RNG",
+        "Torch CPU RNG",
+        "Torch accelerator RNG when used",
+        "planner RNG"
+      ],
+      "prediction_max_absolute_difference": 0.0,
+      "action_max_absolute_difference": 0.0,
+      "episode_return_max_absolute_difference": 0.0,
+      "identity_or_lineage_mismatches_allowed": 0
+    }
+  },
+  "killing_order": [
+    {
+      "gate": "K0",
+      "name": "protocol, binding, completeness, and matched budgets",
+      "on_failure": "Stop. The run is ineligible for every WM-001 capability claim."
+    },
+    {
+      "gate": "K1",
+      "name": "trace integrity and held-out isolation",
+      "on_failure": "Stop. Later numbers are contaminated or causally ungrounded."
+    },
+    {
+      "gate": "K2",
+      "name": "transactional causal state change and actual downstream use",
+      "on_failure": "Stop. Version movement is not evidence that learned parameters changed safely or were used."
+    },
+    {
+      "gate": "K3",
+      "name": "held-out predictive learning",
+      "on_failure": "Stop. Do not inspect behavior as evidence of world-model learning."
+    },
+    {
+      "gate": "K4",
+      "name": "executed held-out task-A improvement",
+      "on_failure": "Stop. Prediction improvement did not produce useful behavior."
+    },
+    {
+      "gate": "K5",
+      "name": "task-B plasticity and demonstrated interference",
+      "on_failure": "Stop. Retention is untested if B was not learned or the naive learner did not forget A."
+    },
+    {
+      "gate": "K6",
+      "name": "task-A retention without unacceptable task-B loss",
+      "on_failure": "Stop. Replay did not establish continual-learning retention."
+    },
+    {
+      "gate": "K7",
+      "name": "component-complete fresh-process persistence",
+      "on_failure": "Stop. The retained improvement was not shown to persist."
+    }
+  ],
+  "bindings": {
+    "two_stage_seal": "This scientific protocol and its outcome thresholds are sealed now. A separate formal-binding manifest must bind the completed implementation before any formal outcome is generated. Binding implementation later may not alter this protocol.",
+    "protocol": {
+      "required": [
+        "protocol_sha256",
+        "protocol_version",
+        "result_schema_sha256",
+        "binding_schema_sha256"
+      ]
+    },
+    "source": {
+      "required": [
+        "40-character Git commit SHA",
+        "clean worktree assertion",
+        "Git tree SHA",
+        "implementation manifest mapping every executed source file to SHA-256",
+        "environment-wrapper source SHA-256",
+        "conformance-test report SHA-256"
+      ]
+    },
+    "dependencies": {
+      "required_exact_packages": [
+        "python",
+        "gymnasium",
+        "numpy",
+        "torch",
+        "torchrl",
+        "tensordict",
+        "prospect"
+      ],
+      "required": [
+        "platform and accelerator identity",
+        "determinism flags",
+        "exact package versions",
+        "distribution or wheel SHA-256 values",
+        "complete lockfile SHA-256"
+      ],
+      "version_policy": "The protocol does not retrospectively choose package versions. The formal binding selects one exact compatible environment after implementation and freezes it before formal execution."
+    },
+    "checkpoint": {
+      "boundary": "after a completed episode, with no pending action, environment side effect, candidate update, or partially consumed replay batch",
+      "canonical_component_ids": [
+        "world_model",
+        "optimizer",
+        "model_version_ledger",
+        "experience_store",
+        "replay_index",
+        "replay_sampling_history",
+        "update_receipts",
+        "agent_runtime",
+        "scaling_configuration",
+        "python_rng",
+        "numpy_rng",
+        "torch_cpu_rng",
+        "torch_accelerator_rng",
+        "collection_rng",
+        "planner_rng"
+      ],
+      "required_component_states": [
+        "world-model parameters and architecture identity",
+        "optimizer slots and hyperparameters",
+        "model/version ledger",
+        "real ExperienceEvent custody store",
+        "replay index, priorities if any, sampling history, and eligible-ID sets",
+        "update receipts and consumed-ID multisets",
+        "agent belief/runtime state",
+        "fixed scaling configuration",
+        "Python, NumPy, Torch CPU, Torch accelerator, collection, and planner RNG states"
+      ],
+      "manifest_rule": "The checkpoint manifest records media type, byte length, SHA-256, logical version, and ancestry for every component, plus an aggregate manifest SHA-256. Restore rejects a missing, extra, mismatched, or unknown stateful component."
+    }
+  },
+  "lanes": {
+    "development": {
+      "purpose": "implementation debugging, feasibility measurement, and failure diagnosis",
+      "master_seeds": [
+        101,
+        211
+      ],
+      "budgets": "may be smaller than formal and must be labeled in raw results",
+      "tuning_allowed": true,
+      "claim_eligible": false,
+      "result_location": "bench/world_model_lifecycle/results/development/",
+      "rule": "Development outcomes may change implementation choices but cannot change this sealed protocol in place. A desired semantic change requires a new protocol version before another formal attempt."
+    },
+    "formal": {
+      "purpose": "single confirmatory evidence program",
+      "master_seeds": [
+        104729,
+        130363,
+        155921,
+        181081,
+        206369,
+        232003,
+        257371,
+        283009
+      ],
+      "budgets": "exactly those declared in this protocol",
+      "tuning_allowed": false,
+      "claim_eligible": true,
+      "result_location": "bench/world_model_lifecycle/results/formal/<formal-binding-sha256>/",
+      "launch_rule": "Formal execution is disabled until a complete formal binding validates. Once the first formal environment reset occurs, no code, dependency, seed, budget, metric, threshold, exclusion, or analysis change is allowed for that binding."
+    }
+  },
+  "raw_evidence": {
+    "schema_file": "schemas/raw-result.schema.json",
+    "binding_schema_file": "schemas/formal-binding.schema.json",
+    "required_granularity": [
+      "one run record per replicate and condition",
+      "one episode record per executed real episode",
+      "one transition lineage record per training and predictive-validation transition",
+      "one optimizer-step ancestry record or content-addressed batch manifest per step",
+      "one checkpoint component record per stateful component",
+      "one gate observation per predeclared threshold"
+    ],
+    "content_hash_rule": "Unless a binary tensor format is explicitly bound, hash UTF-8 JSON serialized with sorted keys, separators=(',', ':'), ensure_ascii=false, allow_nan=false, and no insignificant whitespace. A JSONL manifest hashes those canonical records in declared order, each followed by one LF byte.",
+    "consumed_multiset_hash_rule": "UpdateReceipt consumed_multiset_sha256 is SHA-256 over the UTF-8 transition IDs in exact optimizer-consumption order, each followed by one LF byte; repetitions are retained.",
+    "target_hash_rule": "A transition target hash covers the fixed-scaled [delta_cos_theta, delta_sin_theta, delta_angular_velocity, reward] vector serialized as four little-endian IEEE-754 float64 values.",
+    "aggregation_rule": "The report must be mechanically derivable from raw evidence. A hand-entered aggregate without raw members is a K0 failure.",
+    "formal_artifact_rule": "Preserve raw JSON, protocol and binding copies, stdout/stderr, resource telemetry, checkpoint manifests, hashes, and the independent audit. Do not overwrite a formal artifact."
+  },
+  "independent_audit": {
+    "required_before_claim": true,
+    "auditor_must_recompute": [
+      "protocol and binding hashes",
+      "episode and transition split disjointness",
+      "receipt ancestry and consumed-ID eligibility",
+      "all primary metrics from raw rows",
+      "all confidence intervals and thresholds",
+      "checkpoint component completeness and hashes",
+      "fresh-process identity and parity"
+    ],
+    "claim_rule": "README, roadmap, publication, or capability claims may cite WM-001 only after an independent semantic audit accepts all K0-K7 gates."
+  },
+  "sources": [
+    {
+      "role": "environment semantics",
+      "name": "Gymnasium Pendulum-v1",
+      "url": "https://gymnasium.farama.org/environments/classic_control/pendulum/",
+      "formal_binding": "exact installed version and distribution hash"
+    },
+    {
+      "role": "probabilistic neural ensemble precedent",
+      "name": "PETS",
+      "url": "https://proceedings.neurips.cc/paper/2018/hash/3de568f8597b94bda53149c7d7f5958c-Abstract.html",
+      "formal_binding": "implementation source files and test digest"
+    },
+    {
+      "role": "fixed-budget CEM planner implementation",
+      "name": "TorchRL 0.13.3 CEMPlanner",
+      "url": "https://github.com/pytorch/rl/blob/662ba6750d67da1007a2010162f09e11631343cd/torchrl/modules/planners/cem.py",
+      "formal_binding": "torchrl==0.13.3 at Git commit 662ba6750d67da1007a2010162f09e11631343cd plus exact installed distribution and source-file hashes"
+    },
+    {
+      "role": "learned and oracle model-environment adapter API",
+      "name": "TorchRL 0.13.3 ModelBasedEnvBase",
+      "url": "https://github.com/pytorch/rl/blob/662ba6750d67da1007a2010162f09e11631343cd/torchrl/envs/model_based/common.py",
+      "api_documentation": "https://docs.pytorch.org/rl/stable/reference/generated/torchrl.envs.ModelBasedEnvBase.html",
+      "formal_binding": "torchrl==0.13.3 at Git commit 662ba6750d67da1007a2010162f09e11631343cd plus exact torch, tensordict, installed distribution, adapter, and conformance-test hashes"
+    }
+  ]
+}
