@@ -4,31 +4,27 @@ Eight requirements, stable IDs. Every requirement maps to a core module, a locke
 decision (ADR), and a benchmark kill-gate. An agent working on R_n should be able to
 find its seam, its rationale, and its acceptance test from this table.
 
-| ID | Requirement | Core module | ADR | Gate |
-|----|-------------|-------------|-----|------|
-| R1 | Predict consequences of actions and plan action sequences | world_model.py, planning.py | 0001 | P1, P2 |
-| R2 | Hierarchical planning | planning.py | 0003 | P5 |
-| R3 | Use violation of expectation to test whether an action is learned | voe.py | 0002 | P3 |
-| R4 | Identify the right patterns in the input | world_model.py (latent), codec.py | 0001 | P1 |
-| R5 | Use the right learned patterns correctly | skills.py, imitation.py | 0002, 0003, 0012 | P4, P14 |
-| R6 | Process any kind of input, produce any kind of output | codec.py | 0001, 0009 | P6, P12 |
-| R7 | Improve over time | memory.py, voe.py, observation.py, imitation.py | 0002, 0005, 0010, 0012 | P7, P13, P14 |
-| R8 | Use different knowledge bases (internal and external) for any use case | memory.py, knowledge.py | 0004 | P8, P10, P11 |
+| ID | Requirement | Active E-series seam | Governing ADR | Evidence |
+|----|-------------|----------------------|---------------|----------|
+| R1 | Predict consequences of actions and plan action sequences | `domain.Prediction`, `PredictiveModel`, `CandidateAssessment`, runtime | 0001, 0014 | E1 semantics; E3 prediction; E4 behavior |
+| R2 | Hierarchical planning | future model/policy adapter | 0003, 0014 | not yet earned in E-series |
+| R3 | Test what was learned against expectation | `Prediction` → `ProperScore`; `BeliefUpdate` → typed `EpistemicEffect` | 0014 | E1, E3 |
+| R4 | Identify outcome-relevant input structure | versioned `Belief`/`Distribution`; future representation adapter | 0001, 0006, 0014 | E3 plus representation sentinels, pending |
+| R5 | Use learned patterns correctly | `CandidateAssessment`, `DecisionRecord`, external held-out evaluator | 0003, 0014 | E4 |
+| R6 | Process required input/output modalities | future backend codec adapter with representation identity | 0001, 0009, 0014 | modality-specific E-series gate pending |
+| R7 | Improve over time | runtime, canonical experience/transition ledger, `UpdateReceipt`, checkpoint manifest | 0005, 0014 | E2 collect, E3 learn, E4 improve, E5 retain |
+| R8 | Use internal/external knowledge safely | retrieval/tool/query as explicit assessed actions with evidence provenance | 0004, 0014 | exact negative controls in E1; live source gate pending |
 
 ## Notes
-- R4 is not a separate module: it is a *property* pressured into the latent by
-  predicting in latent space. Its gate is the same as R1's (calibration/prediction).
-- R7 is mostly a **measurement discipline** (retention, plasticity) layered on the
-  learning loop, plus generative replay introduced early in P3 — not a big new module.
+- R4 is not established merely because a latent predicts a training set. It needs
+  held-out prediction, calibration, intervention/shift controls, and
+  representation-integrity evidence under a named model and representation version.
+- R7 is a causal evidence program, not a training-loss metric. Collect, learn,
+  improve, checkpoint equivalence, retention, and plasticity are separate results.
 - R2 was designed in detail before it became a first-class requirement; the two-level
   jumpy-model planner is part of the spec, not an add-on.
-- Collapse prevention (ADR-0006) is not a separate requirement — it protects the shared
-  latent and the calibrated uncertainty signal that R1, R3, R4 and R7 all read. It is
-  enforced by integrity **sentinels** in `bench/gates.py`, which gate every phase.
-- **P14** (R5, R7) is numpy-gated on `PendulumSwingup` (imitation from observation reproduces a
-  demonstrated swing-up the agent never performed) AND **demonstrated on real MuJoCo** (DeepMind
-  Control Suite swingup) as **non-gated supplementary evidence** — via the `bench.Environment`
-  seam, outside the numpy-only ratchet (`make bench-hard`, `[bench-hard]` extra; ADR-0011).
-  The DMC tier also carries **R1** (the P2 claim re-run on foreign dynamics, BH-001). The DMC
-  numbers are evidence, not gates; the numpy kill-gates (P0–P14) are the ratcheted guarantee.
-  Report: `bench/hard/results/`.
+- Collapse prevention (ADR-0006) remains necessary, but an uncertainty sentinel is
+  not allowed to substitute for a held-out learning or behavior result.
+- P0–P14 and supplementary historical runs remain in Git history and research
+  narratives under their original contracts. Their active code/tests were removed
+  at cutover; none pre-passes E0–E5.

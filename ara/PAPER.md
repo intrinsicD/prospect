@@ -8,6 +8,7 @@
 
 - [Problem](logic/problem.md)
 - [Claims](logic/claims.md)
+- [Concepts](logic/concepts.md)
 - [Architecture](logic/solution/architecture.md)
 - [Heuristics](logic/solution/heuristics.md)
 - [Constraints](logic/solution/constraints.md)

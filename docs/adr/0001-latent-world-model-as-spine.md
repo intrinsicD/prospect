@@ -1,6 +1,6 @@
 # ADR-0001 — Latent predictive world model as the spine
 
-**Status:** Accepted
+**Status:** Accepted — amended by ADR-0014
 
 ## Context
 The system must predict consequences and plan (R1), identify the right patterns
@@ -12,6 +12,19 @@ Make a **latent predictive world model** the core: encode observations into a sh
 latent, and learn dynamics that predict the next latent state and reward. Predict in
 **latent space, not observation/pixel space** (JEPA/Dreamer lineage). Planning,
 uncertainty, skills and knowledge all attach to this latent.
+
+## ADR-0014 amendment — belief and experience boundary
+For the E-series, the reasoning state is a versioned `BeliefState`, not an
+unversioned latent point and not the replay schema. Canonical replay stores raw
+`Experience`; a belief updater derives the posterior state under a named
+representation/model version. A `Prediction`, `Decision`, and
+`EpistemicTransition` link that belief to the action-time expectation and later
+outcome.
+
+This preserves the latent predictive spine while allowing deterministic latent
+models, recurrent stochastic models, and future substrates behind one belief
+contract. The legacy-v1 `LatentState` contract and its P0–P14 evidence remain
+historical. The amended contract is not implemented or evidenced until `E0-001`.
 
 ## Consequences
 - (+) Predicting latents forces the representation to keep controllable,
@@ -27,3 +40,5 @@ uncertainty, skills and knowledge all attach to this latent.
   prediction error — and therefore the whole VoE signal — meaningless); representation
   integrity is enforced per ADR-0006 and monitored by a standing sentinel.
 - Prediction targets are distributions, not point estimates (see ADR-0002).
+- For new E-series work, ADR-0014 supersedes ADR-0002 and governs prediction,
+  uncertainty, and lifecycle linkage.

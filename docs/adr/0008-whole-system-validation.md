@@ -1,6 +1,6 @@
 # ADR-0008 — Whole-system validation: the integration gate + ablation as the fitness
 
-**Status:** Accepted
+**Status:** Accepted — amended by ADR-0014
 
 ## Context
 P0–P8 each prove one capability in its own harness. Passing them individually does
@@ -34,6 +34,19 @@ Add **Phase 9 — whole-system validation** with four standing checks:
 The **integration gate + ablation are the standing whole-system fitness function**:
 per-phase gates prove the parts; P9 proves the whole *and* that the parts matter. P9
 joins the regression ratchet (ADR-0005, P0-007) like any other phase.
+
+## ADR-0014 amendment — independent lifecycle evidence
+P9 remains the legacy-v1 composition and ablation result. It does not establish the
+E-series causal lifecycle merely because components ran in one process. New
+evaluation reports **collect**, **learn**, **improve**, and **retain** independently:
+raw trace completeness; held-out predictive learning against a no-update control;
+matched behavioral improvement against the frozen pre-update policy; and
+post-checkpoint plus post-interference retention.
+
+Each claim names its data split, budget, seeds, model/policy/calibration versions,
+and checkpoint. One passing claim cannot substitute for another. Only all four
+passing their preregistered criteria licenses the full lifecycle statement. The
+gate and evidence do not yet exist; `E0-001` owns their implementation.
 
 ## Consequences
 - (+) "Does it work together?" gets a measured, ratcheted answer — not an assumption.

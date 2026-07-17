@@ -1,74 +1,86 @@
 # Prospect
 
-A small, disciplined research scaffold for a **predictive-world-model agent**: an
-agent that plans by simulating the consequences of its actions, tests what it has
-learned by measuring its own surprise, and adapts across tasks by *attaching*
-knowledge rather than retraining.
+Prospect is a research runtime for making adaptive-agent claims auditable:
+which experience was collected, what persistent state changed because of it,
+whether behavior improved on held-out cases, and whether that gain survived
+restart and interference.
 
-> Working name — rename freely (`Test Engine → IntrinsicEngine` energy).
+## Core contract
 
-## The one load-bearing idea
-A predictive world model is the spine, and **prediction error (violation of
-expectation) is the single signal** that threads through learning, mastery-testing,
-skill selection, re-planning, forgetting-detection and retrieval. Most requirements
-are *consumers* of that core, not separate systems. See `docs/architecture.md`.
+The runtime keeps prediction, uncertainty, realized proper score, belief
+revision, information gain, goal-conditioned information value, learning, and
+retention distinct. Immutable identities link them through:
 
-## Status — P0–P14 shipped; validated on toy benchmarks
-The design is realized, not skeletal. There are working numpy implementations of the
-flat world model (ensemble Gaussian latent dynamics with an epistemic/aleatoric split,
-EMA target encoder, anti-collapse regularization, inverse-dynamics + reward heads),
-iCEM/MPC planning, the jumpy option-model and hierarchical manager, skills, replay,
-semantic memory + uncertainty-gated retrieval, the universal codec, external knowledge +
-compute-as-action tools, a swappable vision seam, latent-action learning from
-action-free observation, and imitation from observation (observe→repeat) — plus five
-standing **collapse sentinels** (representation, uncertainty, replay, option, gate-overfit).
-`bench/SHIPPED` ratchets **P0–P14**; `make gate-all` re-runs every kill-gate in CI.
-
-**Honest scope.** This is a disciplined *research scaffold*, validated on controlled toy
-benchmarks — pendulum, a 2D point-mass, and synthetic visual blobs with deterministic
-stand-in encoders. It is a machine for proving seams and surfacing failure modes, **not**
-evidence of a capable general agent. The next credibility jump needs harder environments,
-real embeddings, and stronger baselines — not more phases. A first step is in the repo: an
-**optional, non-gated** harder-benchmark tier (`make bench-hard`, ADR-0011) that runs the
-*unchanged* core on real DeepMind Control Suite (MuJoCo) tasks through the `Environment`
-seam and reports honestly — including where the toy wins do *not* reproduce. It is fenced
-off from the numpy-only gated CI (the `[bench-hard]` extra), so generality stays *earned by
-a gate*, never assumed; code grows one benchmark-gated phase at a time (`docs/roadmap.md`,
-`tasks/BACKLOG.md`), and a phase ships only when its gate **and** its collapse sentinels pass.
-
-## Quickstart
-```bash
-python -m venv .venv && source .venv/bin/activate   # recommended: work in a venv
-make install     # editable install + dev tools
-make test        # unit + conformance tests (must stay green)
-make lint        # ruff
-make typecheck   # mypy — full type hints are enforced
-make gate PHASE=P1   # inspect a phase kill-gate
-make gate-all    # re-run every shipped gate (the regression ratchet)
-make tree        # see the layout
+```text
+decide -> environment step -> observe -> assimilate -> learn -> evaluate
 ```
 
-## Where to start (as a human or an agent)
-1. Read `CLAUDE.md` — how work is done here.
-2. Read `docs/architecture.md`, `docs/requirements.md`, `docs/roadmap.md`.
-3. Take the top unblocked task in `tasks/BACKLOG.md`. Phases P0–P14 are shipped
-   (`bench/SHIPPED`). For worked examples, `tasks/P1-001-flat-world-model.md` shows an
-   implementation phase and `tasks/P14-001-observe-repeat-imitation.md` a recent one.
-4. For novel research directions, load
-   `.agents/skills/prospect-research-ideation/SKILL.md`; route any selected idea
-   through a task, ADR when needed, and a benchmark gate before implementation.
-5. Before accepting results or promoting a claim, phase, or default, load
-   `.agents/skills/prospect-results-audit/SKILL.md` for an independent scientist pass.
+There is no universal “epistemic” scalar and no hidden “last prediction.” See
+[the architecture](docs/architecture.md) and
+[ADR-0014](docs/adr/0014-linked-epistemic-lifecycle.md).
+
+## Current state
+
+Implemented:
+
+- backend-neutral evidence, observation, belief, prediction, decision,
+  experience, transition, update, snapshot, and evaluation records;
+- exact finite Bayes, information-gain, EVSI, log-score, Brier, and Gaussian-NLL
+  reference semantics;
+- explicit utility/information/cost/risk decision decomposition;
+- one authoritative runtime with canonical experience and epistemic ledgers;
+- append-only partial-lifecycle evidence;
+- an optional pinned TorchRL/TensorDict replay index; and
+- atomic, integrity-checked component checkpoint bundles.
+
+Not demonstrated:
+
+- predictive-model learning from the agent’s own collected experience;
+- executed held-out behavioral improvement caused by that update; or
+- retention of the same gain through shared-state interference and a production
+  process restart.
+
+The exact binary reference diagnostics produce useful numbers, but an
+independent audit found that their E2–E5 rows use different agents and do not
+form one causal chain. The report therefore emits `passed: false`: E2/E3 are
+`reference_only`, while E4/E5 are `blocked`. This is a semantic and plumbing
+fixture, not a mature-agent result.
+
+See the [independent results audit](docs/research/2026-07-17-epistemic-lifecycle-results-audit.md)
+for the reproduced numbers and claim limits, and the
+[research portfolio](docs/research/2026-07-17-linked-experience-research-portfolio.md)
+for prior-art threats, candidate architectures, and the recommended first real
+same-chain experiment.
+
+The superseded P-series implementation, tests, and benchmark ratchet were
+removed from the active tree during the E-series cutover. Their history remains
+available in Git; they no longer constrain or masquerade as validation of the
+new architecture.
+
+## Commands
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+make install                 # editable package + development tools
+make install-runtime         # additionally install pinned TorchRL/TensorDict
+make check                   # lint + typecheck + 85 active tests + diagnostics
+make epistemic-diagnostics  # exact predicates; report still says passed:false
+make epistemic-gate         # capability status; intentionally nonzero today
+```
 
 ## Layout
+
+```text
+src/prospect/domain/       immutable records and backend-neutral protocols
+src/prospect/decision/     transparent candidate assessment and selection
+src/prospect/epistemics/   exact information and proper-score semantics
+src/prospect/runtime/      authoritative linked lifecycle and state custody
+src/prospect/storage/      canonical stores, TorchRL replay, checkpoints
+bench/epistemic/           exact reference diagnostics
+tests/test_epistemic_*.py  active contract, adversarial, and integration tests
+docs/                      architecture, ADRs, roadmap, research audits
+tasks/                     active task and historical planning records
 ```
-CLAUDE.md            agent operating manual (start here)
-.agents/skills/       project-scoped research-ideation and results-audit workflows
-docs/                architecture, requirements, roadmap
-docs/adr/            locked architecture decisions
-tasks/               backlog, task template, specified tasks
-src/prospect/        task-unspecific CORE (interfaces + one file per component)
-bench/               task-specific HARNESS: kill-gates (the fitness function) + the Environment seam
-artifact-pointers/   checksums and retrieval metadata for externally stored artifacts
-tests/               unit + conformance tests
-```
+
+Start with `CLAUDE.md`, `docs/architecture.md`, and
+`tasks/E0-001-epistemic-lifecycle-rewrite.md`.

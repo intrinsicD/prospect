@@ -41,3 +41,24 @@ sessions:
     events_count: 34
     claims_touched: [C15]
     open_threads: 3
+  - id: "2026-07-17_003"
+    date: "2026-07-17"
+    summary: "Implemented and audited the E-series cutover, removed legacy code/tests, and reduced the next research step to one real same-chain learner."
+    turn_count: 7
+    events_count: 42
+    claims_touched: [C16, C17]
+    open_threads: 7
+  - id: "2026-07-17_001"
+    date: "2026-07-17"
+    summary: "Published and verified the external MM-009 artifact, held remote main after exact-host CI failures, and opened Prospect's foundational experience model."
+    turn_count: 4
+    events_count: 13
+    claims_touched: []
+    open_threads: 7
+  - id: "2026-07-17_002"
+    date: "2026-07-17"
+    summary: "Replaced the compact evidence projection with source-only Git and verified the rewritten staging publication."
+    turn_count: 1
+    events_count: 4
+    claims_touched: []
+    open_threads: 2

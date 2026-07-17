@@ -1873,3 +1873,310 @@ tree:
       The preregistered translation coverage cells failed directionality, and the
       unexecuted canonical harness also failed independent lifecycle review.
     status: open
+  - id: N114
+    type: question
+    title: "Close the bottom-up ontology into a complete adaptive-agent system"
+    provenance: user
+    timestamp: "2026-07-17T12:23+02:00"
+    description: >
+      Synthesize the previously discussed function, multimodality, action,
+      uncertainty, and experience primitives into one end-to-end Prospect system,
+      distinguish settled definitions from inherited implementation assumptions, and
+      identify the missing primitives that require further foundational questions.
+    status: open
+  - id: N106
+    type: question
+    title: "Select a professionally maintained external benchmark for Prospect"
+    provenance: user
+    timestamp: "2026-07-17T09:28+02:00"
+    description: >
+      Which currently accepting online arena can provide independently comparable
+      numbers for Prospect once a runnable version is ready, and which candidate is
+      close enough to the present state-based world-model and control stack to justify
+      the adapter and compute cost?
+    status: open
+  - id: N107
+    type: question
+    title: "Separate Git source from sealed benchmark artifacts"
+    provenance: user
+    timestamp: "2026-07-17T09:34+02:00"
+    description: >
+      Which benchmark source and evidence files belong in ordinary Git, which generated
+      runtime/result files caused the current push bloat, and how should complete sealed
+      artifacts be preserved without making the repository carry copied environments and
+      recursively duplicated inputs?
+    status: resolved
+  - id: N108
+    type: decision
+    title: "Externalize the complete MM-009 runtime behind a verified release pointer"
+    provenance: user-revised
+    timestamp: "2026-07-17T11:47+02:00"
+    also_depends_on: [N99, N107]
+    choice: >
+      Keep MM-009's implementation, tests, protocol, concise evidence projection, and
+      content-addressed pointer in Git; preserve the complete mode-sensitive terminal
+      tree as a checksum-bound GitHub Release asset with third-party notices and a
+      verified materializer; rewrite the two unpublished commits so the copied runtime
+      never enters published Git history.
+    alternatives:
+      - "Commit the complete copied NumPy, stdlib, and custody runtime to ordinary Git."
+      - "Delete the runtime without preserving a byte- and mode-exact terminal artifact."
+      - "Use Git LFS without a self-verifying tree manifest and materialization path."
+      - "Externalize every benchmark result bundle in the same cleanup."
+    evidence:
+      - "artifact-pointers/MM-009.json"
+      - "docs/adr/0013-two-tier-research-artifact-storage.md"
+      - "tools/materialize_artifact.py"
+      - "https://github.com/intrinsicD/prospect/releases/tag/mm009-terminal-artifact-v1"
+    status: resolved
+  - id: N109
+    type: experiment
+    title: "MM-009 external artifact and rewritten-history verification"
+    provenance: ai-executed
+    timestamp: "2026-07-17T11:47+02:00"
+    also_depends_on: [N108]
+    evidence:
+      - "artifact-pointers/MM-009.json"
+      - "tests/test_materialize_artifact.py"
+      - "https://github.com/intrinsicD/prospect/actions/runs/29566971669"
+      - "https://github.com/intrinsicD/prospect/releases/tag/mm009-terminal-artifact-v1"
+    result: >
+      The 35,089,588-byte archive re-downloaded byte-identically at SHA-256
+      e189aaf0ff09f91b5aadd6f6d505c023ebb1886ee5e7cba8bf3c33df30ea9ece
+      and materialized 2,261 files, 202 directories, and 106,800,773 payload bytes
+      at tree digest 73174ff267ad9c6c952965b7497f769858f516b153e4d45ecd3f965448eb4e0e.
+      The outgoing Git pack fell from 52.18 MB to 23.35 MB, a 55.24% reduction;
+      the remaining pack is dominated by retained CL-001 and other scientific
+      evidence, with no blob above 8.71 MB. Focused materializer/MM-011 tests,
+      Ruff, and mypy passed. Generic Actions pytest reported 177 failures and 10
+      errors after 1,124 passes and four skips; counterfactual audit found zero
+      net-new failures from runtime deletion, with failures caused by pre-existing
+      exact-host paths, runtimes, modes, and frozen records.
+    status: resolved
+  - id: N110
+    type: decision
+    title: "Publish the verified artifact but withhold remote main after sealed-host CI failure"
+    provenance: ai-executed
+    timestamp: "2026-07-17T11:47+02:00"
+    also_depends_on: [N108, N109]
+    choice: >
+      Publish the checksum-verified release and retain cleaned commit ce5b708 on the
+      staging branch and release tag, but leave remote main at 2a05d34 until the
+      project explicitly separates portable source/unit CI from exact-host sealed
+      replay and preserves MM-001's frozen pyproject binding.
+    alternatives:
+      - "Advance remote main despite a known red 3.11 suite."
+      - "Silently weaken or quarantine exact-path, runtime, and mode custody checks."
+      - "Re-add the copied runtime even though it causes none of the observed failures."
+    evidence:
+      - N109
+      - "https://github.com/intrinsicD/prospect/actions/runs/29566971669"
+      - "https://github.com/intrinsicD/prospect/releases/tag/mm009-terminal-artifact-v1"
+    status: resolved
+  - id: N111
+    type: question
+    title: "Define the unit and representation of agent experience"
+    provenance: user
+    timestamp: "2026-07-17T12:07+02:00"
+    description: >
+      What exactly counts as experience for an adaptive agent, how does it differ from
+      an observation, event, memory, and learned knowledge, and what representation can
+      preserve enough temporal, causal, uncertainty, and provenance structure for
+      Prospect to learn from it and demonstrate retained behavioral improvement?
+    status: open
+  - id: N112
+    type: pivot
+    title: "Replace the compact evidence projection with source-only Git"
+    provenance: user
+    timestamp: "2026-07-17T12:41+02:00"
+    also_depends_on: [N107, N108, N109, N110]
+    from: >
+      Keep concise claim-linked evidence, manifests, and small fixtures in Git while
+      externalizing only complete host-specific runtime closures.
+    to: >
+      Keep authored source and documentation in Git, but exclude every generated
+      benchmark result tree, ARA evidence page, binary, and packaged-data payload;
+      retain only checksum pointers in a source namespace and preserve artifacts
+      outside ordinary Git.
+    trigger: >
+      The rewritten staging push remained above 20 MB because retained NPZ arrays and
+      generated JSON evidence still dominated the pack, and the user explicitly
+      directed that binaries and evidence must not be pushed.
+    status: resolved
+  - id: N113
+    type: experiment
+    title: "Source-only history and remote-tree verification"
+    provenance: ai-executed
+    timestamp: "2026-07-17T12:41+02:00"
+    also_depends_on: [N112]
+    evidence:
+      - ".gitignore"
+      - "artifact-pointers/MM-009.json"
+      - "docs/adr/0013-two-tier-research-artifact-storage.md"
+      - "https://github.com/intrinsicD/prospect/actions/runs/29573132597"
+      - "https://github.com/intrinsicD/prospect/releases/tag/mm009-terminal-artifact-v1"
+    result: >
+      Rebuilt the two unpublished commits as 9048578 and f126703 over remote main,
+      with zero tracked result/evidence paths, zero denied binary extensions, and no
+      binary MIME types in the tip tree. The compressed outgoing pack is 1,255,871
+      bytes; the largest new blob is 160,882 bytes. A clean checkout passed Ruff,
+      mypy over 291 source files, collection of 1,314 tests, five materializer tests,
+      and a 136-test source-only core lane. The staging branch and release tag now
+      resolve to f126703; the release archive remains external and the local complete
+      evidence archive verifies at SHA-256
+      fb5183f33f3eb72c528b1f2165613ce5baadeb30832c71862ef0b02facba7620.
+      The redundant full CI matrix was cancelled after checkout, installation, Ruff,
+      and mypy passed because its unchanged pytest lane requires excluded sealed
+      fixtures and the prior identical lane took about 50 minutes to reach that known
+      host-bound failure.
+    status: resolved
+  - id: N115
+    type: question
+    title: "Audit the proposed world, observation, belief, memory, and latent ontology"
+    provenance: user
+    timestamp: "2026-07-17T13:10+02:00"
+    also_depends_on: [N114]
+    description: >
+      Organize the user's proposed definitions of world state, observation, context,
+      history, belief state, memory, and latent state; identify temporal circularities,
+      overlapping categories, and the exact distinctions that still require a choice.
+    status: resolved
+  - id: N116
+    type: question
+    title: "Define a maximally general, implementation-neutral agent ontology"
+    provenance: user
+    timestamp: "2026-07-17T13:13+02:00"
+    also_depends_on: [N114, N115]
+    description: >
+      Replace or refine the proposed definitions where needed so the vocabulary applies
+      across neural and non-neural, embodied and software, deterministic and stochastic,
+      and reactive and learning agents, with every term assigned a non-circular role.
+    status: resolved
+  - id: N117
+    type: question
+    title: "Identify the primitives still missing after the ontology was accepted"
+    provenance: user
+    timestamp: "2026-07-17T13:29+02:00"
+    also_depends_on: [N114, N116]
+    description: >
+      Determine which temporal, normative, decision, learning, persistence, identity,
+      resource, and evaluation terms are still required to close the accepted
+      descriptive glossary into an operational adaptive agent, while keeping optional
+      implementation choices out of the foundational definitions.
+    status: resolved
+  - id: N118
+    type: question
+    title: "Formalize belief, uncertainty, knowledge, and uncertainty-reducing action value"
+    provenance: user
+    timestamp: "2026-07-17T13:49+02:00"
+    also_depends_on: [N111, N114, N117]
+    description: >
+      Determine whether uncertainty should mean the quantified difference between
+      expectation and reality, whether knowledge is belief with uncertainty minimized,
+      and whether action usefulness, reward, and value can all be defined by uncertainty
+      reduction; then use the repaired definitions to close the remaining agent terms.
+    status: resolved
+  - id: N119
+    type: decision
+    title: "Adopt linked structured epistemic transitions as Prospect's core"
+    provenance: user-revised
+    timestamp: "2026-07-17T14:27+02:00"
+    also_depends_on: [N111, N114, N117, N118]
+    choice: >
+      Replace the one-scalar violation-of-expectation architecture with linked,
+      immutable records for beliefs, predictions, decisions, real experience,
+      epistemic effects, persistent learning updates, and external evaluations.
+      Keep external goal utility distinct from expected decision-relevant information
+      value, cost, risk, and constraints; require independent evidence for collection,
+      learning, behavioral improvement, and retention.
+    alternatives:
+      - "Keep prediction error or ensemble disagreement as the single signal for every job."
+      - "Define all reward and action value as raw uncertainty reduction."
+      - "Add fields to the current Transition while preserving its scalar consumers."
+      - "Adopt an existing agent architecture unchanged rather than testing Prospect's epistemic regulation layer."
+    evidence: [N118, O78, O79, O81, O82, O83]
+    status: resolved
+  - id: N120
+    type: question
+    title: "Migrate the live code to the adopted epistemic architecture"
+    provenance: user
+    timestamp: "2026-07-17T14:27+02:00"
+    also_depends_on: [N119]
+    description: >
+      Which current Prospect mechanisms should be reused, adapted, replaced, removed,
+      or deferred, and in what dependency order can a clean implementation prove
+      collect, learn, improve, and retain without preserving incompatible legacy
+      contracts merely to keep the old gates green?
+    status: resolved
+  - id: N121
+    type: decision
+    title: "Cut the active tree to the E-series contract"
+    provenance: ai-executed
+    timestamp: "2026-07-17T16:04+02:00"
+    also_depends_on: [N119, N120]
+    choice: >
+      Remove the legacy flat source modules, P-series tests, evaluator registry,
+      benchmark ratchet, and obsolete workflow together. Keep authored historical
+      records and Git history as the archive, but let only the linked epistemic
+      architecture define active source, tests, commands, and CI.
+    alternatives:
+      - "Keep all legacy tests as permanent characterization tests."
+      - "Delete old tests while retaining the obsolete production and benchmark code."
+      - "Maintain compatibility adapters so historical gates remain active."
+    evidence:
+      - "README.md"
+      - "tasks/E0-001-epistemic-lifecycle-rewrite.md"
+      - ".github/workflows/ci.yml"
+      - "Makefile"
+    status: resolved
+  - id: N122
+    type: experiment
+    title: "E-series rewrite and active-tree validation"
+    provenance: ai-executed
+    timestamp: "2026-07-17T16:04+02:00"
+    also_depends_on: [N119, N120, N121]
+    evidence:
+      - "src/prospect/domain/"
+      - "src/prospect/epistemics/"
+      - "src/prospect/decision/"
+      - "src/prospect/runtime/"
+      - "src/prospect/storage/"
+      - "bench/epistemic/"
+      - "tests/test_epistemic_*.py"
+      - "docs/research/2026-07-17-epistemic-lifecycle-results-audit.md"
+    result: >
+      The active rewrite implements immutable linked records, exact finite
+      Bayes/EIG/EVSI and proper-score semantics, transparent decision decomposition,
+      one authoritative decide-step-observe-learn runtime, canonical stores,
+      partial-lifecycle journaling, optional TorchRL/TensorDict replay, and
+      integrity-checked checkpoint bundles. The cutover deleted 106 legacy tests,
+      12 flat source modules, and 171 benchmark/workflow files. Ruff, formatting,
+      mypy over 32 files, 85 active tests, 13 optional storage tests, a wheel build,
+      stale-import checks, and the portfolio validator passed. The capability gate
+      correctly exited 1 with `passed: false`.
+    status: resolved
+  - id: N123
+    type: dead_end
+    title: "Disconnected finite diagnostics as full lifecycle evidence"
+    provenance: ai-executed
+    timestamp: "2026-07-17T16:04+02:00"
+    also_depends_on: [N119, N122]
+    hypothesis: >
+      Passing the finite E2-E5 numeric predicates can demonstrate that Prospect
+      collected experience, learned from it, improved behavior, and retained the
+      gain.
+    failure_mode: >
+      E2 and E3 use different agents and E3 never consumes E2 transition identities;
+      E3 changes task-local posterior state rather than model, representation, or
+      policy versions; E4 computes analytic expected utility instead of executed
+      held-out outcomes; and E5 uses independent task slots plus a checkpoint that
+      omits canonical experience, transition, and update custody.
+    lesson: >
+      Keep the fixture as an exact semantic oracle, report E2/E3 as reference-only
+      and E4/E5 as blocked, and require one real shared-parameter agent and one
+      identity-linked collect-to-retain lane before any capability claim.
+    evidence:
+      - "docs/research/2026-07-17-epistemic-lifecycle-results-audit.md"
+      - "bench/epistemic/maturity.py"
+      - "tasks/E0-001-epistemic-lifecycle-rewrite.md"
+    status: resolved

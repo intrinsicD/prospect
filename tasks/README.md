@@ -8,7 +8,9 @@ handoff between the roadmap and the code.
 Use `blocked` with a reason when a dependency isn't met.
 
 ## Conventions
-- ID: `P<phase>-NNN` (e.g. `P1-001`). Filename `P1-001-short-slug.md`.
+- ID: `P<phase>-NNN` for frozen legacy-v1 phase work (e.g. `P1-001`) and
+  `E<stage>-NNN` for the ADR-0014 epistemic lifecycle track (e.g. `E0-001`).
+  Filenames use `<ID>-short-slug.md`.
 - Every task links its **Requirements (R#)**, **ADRs**, **Depends on**, and its
   **Phase gate**. If work reveals the ADR is wrong, amend the ADR first.
 - A task's scope is *exactly* its interface + acceptance criteria. No scope creep.
@@ -18,5 +20,8 @@ Use `blocked` with a reason when a dependency isn't met.
 - Handoff/publishing work must reuse a still-valid receipt instead of retesting.
   Rerun only if the receipt is absent/incomplete, relevant source or environment
   inputs changed, the recorded run failed, or the user explicitly requests it.
+- P-series and U-series task files are historical research records. Their commands
+  refer to the removed v1 runner and are not active instructions on the E-series
+  source tree.
 
 Copy `TEMPLATE.md` to start a new task. `P1-001` is the fully worked example.

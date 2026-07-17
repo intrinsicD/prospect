@@ -167,3 +167,21 @@
   `docs/research/2026-07-16-mm011-lcv-backed-causal-deformation-appearance-prediction-protocol.md`,
   `ara/evidence/mm011-offgrid-sensitivity-2026-07-16.md`]
 - **From staging**: O60
+
+## H13: Prove one small same-chain learner before scaling or external benchmarking
+- **Rationale**: Use one shared-parameter learner and opaque task identities to
+  evaluate task A before learning, collect A through the authoritative runtime,
+  update from those exact transition identities, execute disjoint A behavior, learn
+  overlapping task B, re-evaluate both tasks, restore complete state in a fresh
+  process, and mutate lineage claims. This is the cheapest experiment that can
+  distinguish causal learning and retention from correct bookkeeping, analytic
+  utility, isolated task state, or serialization parity before model scale and
+  benchmark variance obscure the result.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**: [`docs/roadmap.md`,
+  `docs/research/2026-07-17-epistemic-lifecycle-results-audit.md`,
+  `docs/research/2026-07-17-linked-experience-research-portfolio.md`,
+  `tasks/E0-001-epistemic-lifecycle-rewrite.md`]
+- **From staging**: O89

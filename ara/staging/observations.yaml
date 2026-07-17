@@ -1078,3 +1078,584 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O70
+    timestamp: "2026-07-17T12:23+02:00"
+    provenance: ai-suggested
+    content: >
+      A complete adaptive agent can be represented as two coupled loops over four
+      distinct state classes: transient belief, learned parameters, persistent
+      memory, and regulatory/calibration state. The fast loop maps typed observations
+      through alignment and belief inference into action-conditioned predictions,
+      goal- and constraint-conditioned decisions, and intended then executed actions.
+      The slow loop turns prediction/outcome records into experience, selects learning
+      and consolidation updates, and tests resulting behavior and persistence.
+      Uncertainty, provenance, time, and version identity cross-cut both loops.
+    context: >
+      Synthesis of the user's foundational question sequence, the live Prospect
+      composition, and independent completeness audits.
+    potential_type: architecture
+    bound_to: [N114]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O71
+    timestamp: "2026-07-17T12:23+02:00"
+    provenance: ai-suggested
+    content: >
+      Function, multimodality, uncertainty, action, and experience do not by themselves
+      form a closed agent ontology. Multimodality is a property of typed observation
+      channels and their alignment; uncertainty is a calibrated distribution over a
+      named object conditional on a named information set and horizon; experience is a
+      provenance-bearing segment of ordered interaction history. A closed system still
+      needs explicit agent/environment/time boundaries, belief state, goals and value,
+      a decision rule, learning/update semantics, memory and identity, and an external
+      behavioral evaluator.
+    context: >
+      Adversarial category and circularity audit of the primitives defined in the
+      bottom-up dialogue.
+    potential_type: concept
+    bound_to: [N114]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O72
+    timestamp: "2026-07-17T12:23+02:00"
+    provenance: ai-suggested
+    content: >
+      Prospect's one-signal-many-jobs premise should mean one structured predictive
+      belief with distinct, validated projections, not one scalar reused as uncertainty,
+      surprise, competence, forgetting, risk, and decision value. The live repository
+      already supplies a cautionary example: mastery reads epistemic uncertainty while
+      forgetting had to read rising prediction error because ensembles can be
+      confidently wrong.
+    context: >
+      Reconciliation of the structured uncertainty definition with the accepted
+      predictive-regulation architecture and its recorded confidently-wrong failure.
+    potential_type: constraint
+    bound_to: [N114]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O63
+    timestamp: "2026-07-17T09:28+02:00"
+    provenance: ai-suggested
+    content: >
+      As of 2026-07-17, no professionally maintained online arena accepts the current
+      NumPy, state-observation, continuous-action Prospect agent unchanged. Waymo's
+      still-active Interaction Prediction and Sim Agents leaderboards are the nearest
+      hidden-label tests of the stochastic predictive core, but score generated
+      multi-agent trajectories rather than executing the full agent and require a
+      substantial map/data/protobuf adapter. ARC-AGI-3 is the nearest organizer-run
+      hidden test of Prospect's intended whole-agent thesis, but requires grid
+      perception, discrete and coordinate actions, test-time learning, and autonomous
+      goal acquisition. Current visual-video and robotics arenas require still more
+      infrastructure.
+    context: >
+      Primary-source survey of current and recently closed world-model, motion,
+      interactive-agent, embodied-control, game, and robotics arenas, cross-checked
+      against Prospect's current interfaces and harder-benchmark report.
+    potential_type: constraint
+    bound_to: [N106]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O64
+    timestamp: "2026-07-17T09:28+02:00"
+    provenance: ai-suggested
+    content: >
+      Treat external benchmarking as two evidence lanes rather than forcing one score
+      to answer every question: use Waymo Interaction Prediction and then Sim Agents
+      to test predictive distribution quality, and use ARC-AGI-3 to test exploration,
+      world-model construction, goal acquisition, planning, and action efficiency as
+      a whole agent. Keep public tasks for development, spend hidden submissions only
+      on frozen milestones, and report per-case metrics and replays alongside the
+      aggregate. Planet Wars can provide an intermediate public containerized planning
+      arena; BEHAVIOR remains a later embodied-agent milestone.
+    context: >
+      Synthesis of evaluation integrity, diagnostic value, technical fit, and
+      benchmark-gaming risk across the surveyed venues. The user has not yet adopted
+      this ladder or selected a first adapter.
+    potential_type: architecture
+    bound_to: [N106]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O65
+    timestamp: "2026-07-17T09:34+02:00"
+    provenance: ai-suggested
+    content: >
+      Ordinary Git should retain benchmark implementations, tests, protocols, concise
+      claim-linked reports, manifests, and small required fixtures, while complete
+      host-specific runtime closures and bulky recursive result packages should live in
+      mode-preserving content-addressed artifact storage with a tracked pointer and
+      checksum. The current MM-009 tree is not fidelity-preserving in Git: ignore rules
+      omit manifest-bound bytecode and stdlib-venv members, and Git cannot reproduce its
+      required 0444 file and 0555 directory modes.
+    context: >
+      Read-only audit of the two unpushed commits found a 49.83 MiB pack, 2,351 changed
+      paths, an 87.33 MiB tracked MM-009 runtime closure, 407 ignored manifest-bound
+      bytecode files, and no single blob above 24.23 MiB.
+    potential_type: constraint
+    bound_to: [N99, N107]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K17"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O66
+    timestamp: "2026-07-17T11:47+02:00"
+    provenance: ai-suggested
+    content: >
+      Generic clean-checkout CI cannot honestly stand in for exact replay of sealed
+      benchmark packages that bind absolute host paths, terminal interpreter and
+      library identities, read-only file/directory modes, and local system services.
+      Keep a named portable source/unit lane distinct from an exact-host,
+      mode-restored sealed-validation lane; do not make the portable lane green by
+      weakening custody predicates or representing skipped sealed replay as full
+      validation.
+    context: >
+      The cleaned staging branch passed checkout, Ruff, mypy, and cleanup-focused
+      tests, but generic Python 3.11 pytest produced 177 failures and 10 errors
+      concentrated in host-bound sealed suites. Counterfactual comparison with the
+      original unpublished commit found zero net-new failing tests from removing the
+      MM-009 runtime.
+    potential_type: constraint
+    bound_to: [N109]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O67
+    timestamp: "2026-07-17T12:07+02:00"
+    provenance: ai-suggested
+    content: >
+      Experience is agent-relative evidence produced by temporally situated observation
+      or interaction: it relates the agent's prior information and internal context, an
+      intended and actually executed intervention or exogenous event, subsequent
+      observations and feedback, and their provenance. It is neither latent
+      environment ground truth nor learned knowledge; memory is a retained encoding of
+      experience, while knowledge is a generalization derived from one or more
+      experiences.
+    context: >
+      Foundational dialogue defining the primitives needed to specify Prospect's
+      collect-learn-improve-retain claim.
+    potential_type: concept
+    bound_to: [N111]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O68
+    timestamp: "2026-07-17T12:07+02:00"
+    provenance: ai-suggested
+    content: >
+      Preserve experience canonically as an append-only typed temporal event stream,
+      optionally with hypothesized causal edges, retaining raw multimodal references,
+      pre-outcome predictions and uncertainty, intended and executed actions, observed
+      consequences, feedback, source class, and model/version identity. Construct
+      transitions, trajectories, retrieval cases, summaries, and training examples as
+      reproducible derived views rather than making a lossy state-action-reward tuple
+      or current embedding the sole authoritative record.
+    context: >
+      Architecture implication of separating the experienced evidence from the
+      learner-specific views and representations derived from it.
+    potential_type: architecture
+    bound_to: [N111]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O69
+    timestamp: "2026-07-17T12:41+02:00"
+    provenance: user-revised
+    content: >
+      Ordinary Git should contain authored source and documentation but no generated
+      benchmark result trees, ARA evidence pages, binaries, or packaged data. Required
+      runtime and result artifacts may remain ignored locally or in checksum-verified
+      external artifact storage, with only source-namespace pointers tracked.
+    context: >
+      The user explicitly replaced the earlier compact-evidence projection after the
+      cleaned staging push still measured about 23.33 MB. Audit attributed 48.12 MiB
+      of logical paths to 38 NPZ files and 45.35 MiB to 154 generated JSON files; the
+      source-only rewrite reduced the compressed outgoing pack to 1,255,871 bytes.
+    potential_type: constraint
+    bound_to: [N112, N113]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K18"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O73
+    timestamp: "2026-07-17T13:10+02:00"
+    provenance: user
+    content: >
+      Proposed ontology: world state comprises environment plus agent state;
+      observations are the raw world-state measurements supplied to encoders; context
+      combines an observation with the agent's latent state; history is the actual
+      world-state trajectory; belief is the inferred unobserved portion of an
+      incomplete observation; memory is the sequence of actual observations; and
+      latent state is the agent state after observation.
+    context: >
+      The user supplied first-person definitions for the concepts they consider
+      grounded and requested a consistency audit before defining further primitives.
+    potential_type: concept
+    bound_to: [N115]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O74
+    timestamp: "2026-07-17T13:10+02:00"
+    provenance: ai-suggested
+    content: >
+      The ontology requires explicit pre-observation and post-observation phases.
+      Sample the observation from a pre-observation world state containing prior agent
+      state and memory; then update latent and memory to form the post-observation agent
+      and world state. An assimilation context must use the prior latent with the new
+      observation, while observation plus post-update latent may only be a descriptive
+      or decision context; otherwise observation, context, latent, memory, and world
+      state form same-time causal cycles.
+    context: >
+      Independent temporal and causality audits of the user's proposed definitions.
+    potential_type: constraint
+    bound_to: [N115]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K19"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O75
+    timestamp: "2026-07-17T13:10+02:00"
+    provenance: ai-suggested
+    content: >
+      Keep full agent state distinct from its fast latent component: agent state may
+      contain latent, stored memory, learned parameters, goals, calibration, and pending
+      commitments. Treat belief as a distribution or structured estimate over hidden
+      world variables that may be parameterized by the latent. Distinguish the
+      inaccessible actual world trajectory, the received observation or interaction
+      history, and the agent's possibly selective stored memory; perfect observation
+      memory is the special case in which storage is the identity map.
+    context: >
+      Type and category audit preserving the intent of the proposed objective-world
+      versus subjective-agent split.
+    potential_type: concept
+    bound_to: [N115]
+    promoted: true
+    promoted_to: "logic/concepts.md:G01"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O76
+    timestamp: "2026-07-17T13:13+02:00"
+    provenance: user
+    content: >
+      The foundational vocabulary should be as general and implementation-neutral as
+      possible so every later component and claim uses explicit, shared meanings rather
+      than definitions that silently assume a neural architecture, encoder topology,
+      memory capacity, probability formalism, or benchmark.
+    context: >
+      The user requested replacement definitions, not only repairs to the initial
+      proposal, and prioritized a complete common vocabulary.
+    potential_type: constraint
+    bound_to: [N116]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K20"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O77
+    timestamp: "2026-07-17T13:13+02:00"
+    provenance: ai-suggested
+    content: >
+      Organize the ontology into ontic/dynamical terms, epistemic terms,
+      representational terms, and persistence/adaptation terms. Define observation as
+      an information event crossing the agent boundary rather than an encoder input;
+      context as an operation-relative view of the agent's available information;
+      latent as an internal representational component of agent state; belief as a
+      structured stance over possible world values or propositions; memory as a
+      persistent storage transform of accessible history; and qualify every state,
+      history, context, belief, and prediction by owner, phase, target, or consumer.
+    context: >
+      Generalization of the user's definitions after the temporal and category audit.
+    potential_type: concept
+    bound_to: [N116]
+    promoted: true
+    promoted_to: "logic/concepts.md:G02"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O78
+    timestamp: "2026-07-17T13:29+02:00"
+    provenance: ai-suggested
+    content: >
+      The accepted descriptive ontology is not yet an operationally closed adaptive
+      agent. Closure additionally requires world-transition and time semantics; a
+      normative task specification; a decision rule; a persistent learned
+      configuration distinct from transient latent state and explicit memory; an
+      experience-dependent update and credit rule; lifecycle, reset, identity, and
+      resource semantics; and an external behavioral evaluator.
+    context: >
+      Dependency-ordered completeness audit after the user affirmed the
+      implementation-neutral glossary.
+    potential_type: concept
+    bound_to: [N117]
+    promoted: true
+    promoted_to: "logic/concepts.md:G03"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O79
+    timestamp: "2026-07-17T13:29+02:00"
+    provenance: ai-suggested
+    content: >
+      Prospect's collect-learn-improve-retain claim must be non-circular. Internal
+      uncertainty, surprise, prediction loss, or self-score cannot simultaneously
+      define collection quality, learning, improvement, and retention. At minimum the
+      evaluated objective, causal controls, resource budget, held-out probe, and
+      retention conditions must be specified independently of the mechanism whose
+      improvement is being tested.
+    context: >
+      Adversarial audit of what evidence would distinguish genuine persistent
+      behavioral improvement from memory growth, retrieval, metric gaming, leakage,
+      or extra computation.
+    potential_type: constraint
+    bound_to: [N117]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K21"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O80
+    timestamp: "2026-07-17T13:49+02:00"
+    provenance: user
+    content: >
+      Candidate information-centric architecture: uncertainty is the quantified
+      difference between expectation and reality; knowledge is the corresponding
+      belief with uncertainty minimized; an action is useful when it reduces
+      uncertainty; the value of an action is its own uncertainty reduction; and the
+      reward of an action sequence is its total uncertainty reduction.
+    context: >
+      The user proposed these relations as a hypothesis and explicitly asked whether
+      they make sense, rather than adopting them as final definitions.
+    potential_type: architecture
+    bound_to: [N118]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O81
+    timestamp: "2026-07-17T13:49+02:00"
+    provenance: ai-suggested
+    content: >
+      Separate the epistemic cycle into belief, prediction, uncertainty, realized
+      error or surprise, belief update, information gain, and knowledge. Belief is an
+      information-conditioned stance over named alternatives; uncertainty is an
+      ex-ante measure of unresolved predictive or decision risk; expectation is only a
+      summary of belief; expectation-versus-reality discrepancy is ex-post prediction
+      error; surprise scores the full predictive distribution; information gain
+      measures evidence-caused belief change or reducible-risk reduction; and knowledge
+      is retained, scoped, evidence-grounded, externally calibrated epistemic
+      competence rather than low confidence width alone.
+    context: >
+      Formal reconciliation of the user's intuition with proper scoring, Bayes risk,
+      epistemic versus aleatoric uncertainty, calibration, and the confidently-wrong
+      failure already recorded in Prospect.
+    potential_type: concept
+    bound_to: [N118]
+    promoted: true
+    promoted_to: "logic/concepts.md:G04"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O82
+    timestamp: "2026-07-17T13:49+02:00"
+    provenance: ai-suggested
+    content: >
+      Represent each epistemic interaction as a structured pre-belief, action,
+      action-conditional prediction, observation, post-belief record. Derive different
+      projections from it: surprise triggers model repair; expected decision-relevant
+      epistemic gain values information-seeking actions; signed durable knowledge
+      potential change credits learning; external goal utility values desired
+      outcomes; and costs, risk, safety, observability, and evidence-integrity constrain
+      the action. A pure uncertainty-reducing agent is the special case with no
+      external goal term, not the definition of a general agent.
+    context: >
+      Substrate-independent architecture synthesis preserving Prospect's predictive
+      spine while avoiding a single self-certifying scalar.
+    potential_type: architecture
+    bound_to: [N118]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A02"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O83
+    timestamp: "2026-07-17T13:49+02:00"
+    provenance: ai-suggested
+    content: >
+      Credit only expected, causal, cost-aware reduction of externally calibrated
+      epistemic uncertainty about named decision-relevant variables under admissible
+      evidence. Raw surprise, total outcome entropy, internal confidence, or latent
+      collapse cannot define knowledge or improvement. Independent preferences remain
+      necessary because equally certain success and failure have identical uncertainty;
+      controls must also reject irreducible-noise attraction, sensor manipulation,
+      evidence deletion, destructive certainty, misspecification, and forget-relearn
+      reward loops.
+    context: >
+      Adversarial counterexample audit of uncertainty reduction as a sufficient theory
+      of agency.
+    potential_type: constraint
+    bound_to: [N118]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K22"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O84
+    timestamp: "2026-07-17T14:27+02:00"
+    provenance: ai-suggested
+    content: >
+      The current core cannot demonstrate Prospect's target lifecycle end to end. Its
+      shared episode loop calls act and environment step but never Agent.observe or a
+      learner; LatentState alternately carries encoded state and raw observations;
+      Transition conflates training, monitoring, replay, options, and imagination; and
+      no core snapshot or versioned persistent-update contract exists. More training
+      alone cannot repair these missing causal and persistence semantics.
+    context: >
+      Read-only audit of the live types, protocols, composition root, shared episode
+      loop, world model, planner, VoE monitor, memory, retrieval, and gate lineage
+      after adoption of the structured epistemic architecture.
+    potential_type: claim
+    bound_to: [N120]
+    promoted: true
+    promoted_to: "logic/claims.md:C17"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O85
+    timestamp: "2026-07-17T14:27+02:00"
+    provenance: ai-suggested
+    content: >
+      Migrate through a parallel clean contract lineage rather than compatibility
+      wrappers: first linked records, explicit belief assimilation, an always-observing
+      runtime, experience store, update receipts, and snapshots; then exact analytic
+      epistemic gates; then predictive-model and planner adapters; finally delete the
+      scalar VoE, hidden retrieval, and legacy gate semantics. Preserve the old P0-P14
+      results as historical component evidence, not as proof of the new architecture.
+    context: >
+      Dependency and hidden-coupling audit designed to avoid a nominal rewrite that
+      leaves every consumer reading one backward-compatible epistemic scalar.
+    potential_type: architecture
+    bound_to: [N119, N120]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O86
+    timestamp: "2026-07-17T14:27+02:00"
+    provenance: ai-suggested
+    content: >
+      Reuse a mature tensor-based RL data plane instead of rebuilding collection,
+      batching, replay, and checkpointing. Evaluate TorchRL and TensorDict for this
+      substrate, adapt the official TD-MPC2 implementation as the first latent
+      model-predictive-control reference, retain the NumPy model only as a small
+      reference adapter, and use DreamerV3 as an independent baseline. Prospect-owned
+      code should concentrate on epistemic records, information value, regulation,
+      calibration, and causal evaluation.
+    context: >
+      Current official documentation and repositories were checked while separating
+      reusable operational infrastructure from Prospect's novel research layer.
+    potential_type: architecture
+    bound_to: [N120]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O87
+    timestamp: "2026-07-17T16:04+02:00"
+    provenance: ai-suggested
+    content: >
+      The active finite E2-E5 report reproduces every numeric diagnostic predicate
+      but does not support the full collect-learn-improve-retain claim. E2 and E3
+      are reference-only; E4 and E5 are blocked; the machine report therefore
+      correctly emits `passed: false`.
+    context: >
+      Independent semantic audit reproduced the arithmetic, traced agent and record
+      identities, inspected version changes and evaluation execution, and checked
+      checkpoint contents before the task and public documentation were updated.
+    potential_type: claim
+    bound_to: [N122, N123]
+    promoted: true
+    promoted_to: "logic/claims.md:C16"
+    crystallized_via: empirical-resolution
+    stale: false
+  - id: O88
+    timestamp: "2026-07-17T16:04+02:00"
+    provenance: ai-suggested
+    content: >
+      After a semantic architecture cutover, obsolete tests should leave the active
+      tree with the obsolete code and runner they specify. Preserve their history,
+      but retain an old test only when it asserts an invariant, external baseline,
+      or compatibility contract that the new architecture intentionally still owns.
+    context: >
+      The user questioned whether the legacy tests were needed; the cutover removed
+      106 tests together with their 12 source modules and old benchmark lane while
+      the new 85-test surface, commands, and CI passed.
+    potential_type: constraint
+    bound_to: [N121, N122]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K23"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O89
+    timestamp: "2026-07-17T16:04+02:00"
+    provenance: ai-suggested
+    content: >
+      Before scaling training or entering an external arena, run the smallest real
+      shared-parameter same-chain experiment: evaluate task A before learning,
+      collect A through the authoritative runtime, train from those exact transition
+      identities, execute disjoint A behavior, learn overlapping task B, re-evaluate
+      A and B, restore complete state in a fresh process, and run lineage mutations.
+    context: >
+      The results audit and prior-art portfolio converged on a CPU-scale causal lane
+      as the cheapest experiment that can distinguish a working learning architecture
+      from better bookkeeping.
+    potential_type: heuristic
+    bound_to: [N122, N123]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H13"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O90
+    timestamp: "2026-07-17T16:04+02:00"
+    provenance: ai-suggested
+    content: >
+      A provisional research direction is to replace privileged learner mutation by
+      a quarantined candidate state plus a causal update certificate binding consumed
+      experience identities, before/after state, disjoint outcomes, counterfactual
+      controls, interference, and restored behavior; an independent verifier alone
+      may promote the candidate.
+    context: >
+      Transformational research ideation and adversarial prior-art search found that
+      experience memory, learned harnesses, event-sourced agents, proof-carrying
+      actions, safe policy improvement, and checkpoint retention are occupied
+      territory. The possible delta is causal improvement-and-retention admission,
+      and its novelty remains unconfirmed.
+    potential_type: architecture
+    bound_to: [N123]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O91
+    timestamp: "2026-07-17T16:04+02:00"
+    provenance: ai-suggested
+    content: >
+      A production lifecycle claim requires a durable idempotent journal, serialized
+      or transactional multi-operation runtime, a learner prepare-validate-commit
+      boundary, complete state-category checkpoint coverage, environment side-effect
+      reconciliation, and fresh-process continuation. In-memory partial evidence and
+      component hash parity alone are insufficient.
+    context: >
+      Adversarial runtime and storage audits found an in-memory journal, no global
+      lifecycle lock, learner mutation before receipt validation, caller-declared
+      checkpoint completeness, and no environment-side-effect recovery.
+    potential_type: constraint
+    bound_to: [N122, N123]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K24"
+    crystallized_via: artifact-commitment
+    stale: false

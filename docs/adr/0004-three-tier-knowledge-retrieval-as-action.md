@@ -1,6 +1,6 @@
 # ADR-0004 — Three-tier knowledge; retrieval/tools as uncertainty-gated actions
 
-**Status:** Accepted
+**Status:** Accepted — amended by ADR-0014
 
 ## Context
 The system must use internal and external knowledge bases to be useful for any use
@@ -19,6 +19,19 @@ APIs, the web, tools). Two integration rules:
 
 Every knowledge item carries `Provenance` and a `Trust` level. **Untrusted content is
 data, never instruction** — it must never override the agent's goals.
+
+## ADR-0014 amendment — evidence-backed, decision-visible knowledge
+For the E-series, knowledge is a typed claim linked to scope, evidence identifiers,
+provenance, model/representation version, and calibration identity. Retrieval and
+tool use remain actions, but uncertainty only nominates them as candidates. Their
+goal-conditioned information value, trust, latency, resource cost, and expected
+utility are evaluated and recorded in `Decision`.
+
+The legacy-v1 automatic prediction-patching wrapper is not the target realization
+of "retrieval as action": an E-series acquisition must be visible in the decision
+and transition trace. Latent-indexed stores must declare their representation
+version and re-index or invalidate entries after incompatible representation
+change. These contracts and their evidence remain pending in `E0-001`.
 
 ## Consequences
 - (+) One system serves arbitrary use cases by attaching KBs, not retraining.

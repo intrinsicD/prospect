@@ -336,3 +336,48 @@
 - **Tags**: synthetic target, off-grid motion, coarse affine grid, directionality,
   reversal control, causal prediction, pre-real negative result
 - **From staging**: O59
+
+## C16: The finite E2-E5 diagnostics do not establish Prospect's target lifecycle
+- **Statement**: On the active 2026-07-17 E-series source state, every frozen
+  arithmetic predicate in the finite E2-E5 fixture reproduces, but the rows do not
+  form one causal agent history. E2 and E3 use different agents; E3 performs
+  same-task posterior assimilation without changing model, representation, or policy
+  versions; E4 computes analytic expected utility rather than executed held-out
+  outcomes; and E5 uses independent task slots plus a checkpoint that omits canonical
+  experience, transition, and update custody. The audited report is therefore
+  `passed: false`, with E2/E3 `reference_only` and E4/E5 `blocked`.
+- **Status**: supported
+- **Provenance**: ai-suggested
+- **Crystallized via**: empirical-resolution
+- **Falsification criteria**: A reproduction shows that E3 consumes the exact E2
+  transition identities in the same agent, changes persistent predictive state,
+  executes disjoint held-out behavior, applies genuine shared-state interference,
+  restores complete state in a fresh process, and meets every preregistered row.
+- **Proof**: [`docs/research/2026-07-17-epistemic-lifecycle-results-audit.md`,
+  `bench/epistemic/maturity.py`, `tests/test_epistemic_maturity.py`,
+  `tasks/E0-001-epistemic-lifecycle-rewrite.md`, N122, N123]
+- **Dependencies**: []
+- **Tags**: epistemic lifecycle, causal custody, model learning, behavior,
+  retention, negative result
+- **From staging**: O87
+
+## C17: The legacy-v1 core lacked a complete causal learning lifecycle
+- **Statement**: At source revision `f126703`, the superseded flat Prospect core
+  could not demonstrate one collect-to-retain chain: its shared episode loop did
+  not run the complete observe-and-learn path, its transition and latent records
+  carried incompatible roles, and it had no authoritative versioned update receipt
+  or complete agent snapshot contract. Additional training alone could not supply
+  those missing causal and persistence identities.
+- **Status**: supported
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The historical `f126703` source is shown to contain
+  one authoritative runtime that links exact collected experiences to a
+  version-changing learner update, disjoint executed improvement, complete restore,
+  and post-interference retention without relying on the E-series rewrite.
+- **Proof**: [`docs/adr/0014-linked-epistemic-lifecycle.md`,
+  `docs/architecture.md`, `tasks/E0-001-epistemic-lifecycle-rewrite.md`,
+  `f126703:bench/loop.py`, `f126703:src/prospect/agent.py`, N120, N121]
+- **Dependencies**: []
+- **Tags**: legacy-v1, causal lifecycle, migration, negative architecture audit
+- **From staging**: O84

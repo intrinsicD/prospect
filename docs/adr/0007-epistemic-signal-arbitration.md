@@ -1,7 +1,11 @@
 # ADR-0007 — Arbitration of the epistemic signal (seek vs avoid)
 
-**Status:** Accepted — implemented by P3-002 (`voe.LearningProgressCurriculum`
-owns the mode; consumers read `uncertainty_coefficient()`)
+**Status:** Superseded by ADR-0014 — legacy-v1 record
+
+> The P3-002 implementation and its measurements remain historical evidence.
+> ADR-0014 supersedes binary sign arbitration for E-series work: uncertainty,
+> expected information gain, goal-conditioned information value, risk, and cost
+> are distinct, and their contribution is recorded in each `Decision`.
 
 ## Context
 Two consumers pull the one epistemic signal (ADR-0002) in opposite directions.

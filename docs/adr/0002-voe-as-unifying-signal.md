@@ -1,6 +1,11 @@
 # ADR-0002 — Prediction error (VoE) as the single unifying signal
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0014 — legacy-v1 record
+
+> ADR-0014 retains probabilistic prediction, uncertainty decomposition, and proper
+> scoring, but supersedes the "single unifying signal" semantics and the
+> variance-share attribution of surprise. The text below records the design and
+> evidence boundary used by P0–P14; it does not govern E-series implementation.
 
 ## Context
 We need to test whether an action has been *learned* (R3). Raw error cannot: a large

@@ -3,6 +3,33 @@
 Take the top **unblocked** item. Each line: ID · status · requirement · blocked-by.
 Expand a one-liner into a full task file (from `TEMPLATE.md`) when you pick it up.
 
+## Active track — Epistemic lifecycle v2 (ADR-0014)
+> This is the active architecture track. Prospect owns the linked epistemic
+> transition, explicit information-value regulation, calibration, and independent
+> lifecycle evidence while mature tensor/replay and future model/planner backends
+> remain adapter dependencies. The contracts, runtime, storage, and exact reference
+> diagnostics are implemented; the causal collect → learn → improve → retain
+> capability remains blocked.
+
+- **E0-001** · `in-progress` · R1,R3,R7 (R8 boundary) · none · Rewrite the flat
+  runtime around version-linked `Experience` → `BeliefState` → `Prediction` →
+  `Decision` → `EpistemicTransition`; adopt an existing tensor/replay and reference
+  model/planner substrate; then independently demonstrate **collect**, **learn**,
+  **improve**, and **retain**. Full scope, controls, deletion plan, and honest
+  pending evidence are in `tasks/E0-001-epistemic-lifecycle-rewrite.md`.
+
+---
+
+## Legacy-v1 evidence boundary — P0–P14 frozen
+> All P0–P14 sections and PASS/done statements below are historical evidence under
+> ADR-0002/ADR-0007-era contracts. Their authored records and result artifacts
+> remain in this checkout and their implementation remains in Git history, but the
+> old runner is no longer active or promised reproducible on this source state.
+> They do not pre-pass, partially satisfy, or supply formal evidence for E0. Do not
+> reopen a P-series task to implement ADR-0014; migrate through the E-series.
+> Upgrade and out-of-band tasks below are likewise outside the E0 critical path
+> unless promoted into a new E-series task with explicit lifecycle criteria.
+
 > Every phase gate also enforces its applicable **collapse sentinels** (ADR-0006):
 > `representation-integrity` & `uncertainty-reliability` (from P1), `replay-fidelity`
 > (from P3), `option-diversity` (from P5). A task is not *done* if its phase's

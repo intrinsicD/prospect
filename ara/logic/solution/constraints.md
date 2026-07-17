@@ -263,3 +263,144 @@
   `tasks/MM-011-lcv-backed-causal-deformation-appearance-prediction.md`,
   `bench/multimodal_causal_assay/supervisor.py`, N102]
 - **From staging**: O61
+
+## K17: Preserve complete sealed runtimes outside ordinary Git
+- **Status**: superseded by K18 after the user adopted a source-only Git boundary.
+- **Constraint**: Keep benchmark implementations, tests, protocols, concise
+  claim-linked evidence, manifests, and small required fixtures in Git. Store complete
+  host-specific runtime closures and bulky recursive packages in mode-preserving,
+  content-addressed artifact storage behind a tracked checksum pointer and verified
+  materializer; never discard the authoritative tree merely to reduce Git history.
+- **Rationale**: MM-009's copied NumPy, stdlib, and custody closure made the outgoing
+  pack 52.18 MB and could not be faithfully checked out because Git does not preserve
+  its required 0444 file and 0555 directory modes. A verified release archive preserves
+  all 2,261 files and modes at a canonical tree digest while the non-authoritative
+  20-file Git projection reduces the pack to 23.35 MB.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Evidence**: [`artifact-pointers/MM-009.json`,
+  `docs/adr/0013-two-tier-research-artifact-storage.md`,
+  `tools/materialize_artifact.py`,
+  `https://github.com/intrinsicD/prospect/releases/tag/mm009-terminal-artifact-v1`,
+  N108, N109]
+- **From staging**: O65
+
+## K18: Keep ordinary Git source-only
+- **Constraint**: Track authored source, tests, protocols, ADRs, narrative research
+  documentation, license notices, and checksum pointers in Git. Exclude every generated
+  `bench/**/results/` tree, `ara/evidence/`, and binary or packaged-data payload,
+  regardless of individual file size; preserve required artifacts in ignored local
+  storage or checksum-verified external artifact storage.
+- **Rationale**: After the copied MM-009 runtime was externalized, the staging push
+  still contained 248 new generated result paths totaling 98,727,104 logical bytes:
+  38 NPZ paths contributed 48.12 MiB and 154 generated JSON paths contributed
+  45.35 MiB. Rewriting the two unpublished commits to omit the complete generated
+  layer reduced the compressed outgoing pack from about 23.33 MB to 1,255,871 bytes.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Evidence**: [`.gitignore`,
+  `docs/adr/0013-two-tier-research-artifact-storage.md`,
+  `artifact-pointers/MM-009.json`,
+  `https://github.com/intrinsicD/prospect/tree/artifact-staging/mm009-externalization`,
+  N112, N113]
+- **From staging**: O69
+
+## K19: Separate pre-observation and post-observation phases
+- **Constraint**: Define each interaction step with an explicit pre-observation world
+  and agent state, an observation event, and a post-assimilation agent state. An
+  assimilation context may combine the new observation with prior agent information;
+  a decision context may include the resulting posterior state. Do not use one
+  unqualified same-time state for both roles.
+- **Rationale**: Sampling an observation from a world state that already contains the
+  agent state produced by that observation creates a causal cycle and makes context,
+  latent state, memory, and world state temporally ambiguous.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Evidence**: [N115, N116]
+- **From staging**: O74
+
+## K20: Keep foundational definitions implementation-neutral
+- **Constraint**: Define the shared ontology without requiring neural parameters,
+  encoder topology, a fixed memory capacity, probability distributions, a particular
+  benchmark, or any other optional implementation substrate. Any architecture-specific
+  realization must declare how it instantiates the general terms.
+- **Rationale**: Prospect is intended to test a potentially new adaptive-agent
+  architecture; baking one existing mechanism into the definitions would make later
+  comparisons circular and hide incompatible uses of the same term.
+- **Provenance**: user
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Evidence**: [N116]
+- **From staging**: O76
+
+## K21: Evaluate collection, learning, improvement, and retention independently
+- **Constraint**: Do not let internal uncertainty, surprise, training loss, memory
+  growth, retrieval success, or a self-score simultaneously define whether Prospect
+  collected useful experience, learned from it, improved behavior, and retained the
+  improvement. Bind every claim to an externally specified target, frozen held-out
+  probe, causal negative controls, equal resource ledger, effect threshold, agent
+  snapshot, and zero-mutation evaluation path.
+- **Rationale**: Otherwise extra computation, test leakage, storing evaluation
+  examples, retrieving an answer without learning, or changing the internal metric can
+  manufacture apparent improvement without a persistent causal change in behavior.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Evidence**: [N117, N119, pending]
+- **From staging**: O79
+
+## K22: Credit only causal, decision-relevant epistemic gain
+- **Constraint**: Value information seeking by the expected causal, cost-aware
+  reduction of externally calibrated epistemic risk about named decision-relevant
+  variables under admissible evidence. Keep external preferences independent. Do not
+  substitute raw surprise, total entropy, internal confidence, representation
+  contraction, a percentile trigger rate, or physical destruction of uncertainty.
+- **Rationale**: Irreducible noise, irrelevant but learnable bits, sensor manipulation,
+  evidence deletion, destructive certainty, misspecification, and forget-relearn loops
+  can all reduce or repeatedly create an internal uncertainty score without improving
+  the agent's decisions. Equally certain success and failure also have the same
+  uncertainty but different external utility.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Evidence**: [N118, N119, pending]
+- **From staging**: O83
+
+## K23: Retire obsolete tests with the semantics they specify
+- **Constraint**: When an architecture cutover intentionally removes a behavior or
+  contract, remove its production path, runner, and tests from the active tree
+  together. Preserve source history and authored research records, but retain an old
+  test only when it asserts an invariant, external baseline, or compatibility
+  obligation that the new architecture still owns.
+- **Rationale**: Leaving the 106 P-series tests active would make deleted scalar-VoE,
+  flat-model, hidden-retrieval, and legacy gate behavior normative by accident.
+  Deleting tests alone would instead hide live obsolete code. The coherent cutover
+  removed both sides while 85 E-series tests, commands, and CI passed.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Evidence**: [`Makefile`, `.github/workflows/ci.yml`, `README.md`,
+  `tasks/E0-001-epistemic-lifecycle-rewrite.md`, N121, N122]
+- **From staging**: O88
+
+## K24: Recovery and learner commits must be lifecycle-transactional
+- **Constraint**: Do not claim production retention or exact continuation until the
+  lifecycle journal is durable and idempotently replayable, concurrent
+  multi-operation sequences are serialized or transactional, learner mutation has a
+  prepare-validate-commit boundary, every stateful category is checkpointed, and
+  environment side effects plus pending intentions are reconciled in a fresh process.
+- **Rationale**: The active journal records partial stages only in memory; the runtime
+  has no global lifecycle lock; `Learner.update` may mutate backend state before its
+  receipt is validated; the generic checkpoint coordinator cannot infer omitted
+  caller state; and no environment-side-effect recovery contract exists. Hash parity
+  over declared components cannot close those gaps.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Evidence**: [`docs/architecture.md`, `docs/runtime-substrate.md`,
+  `src/prospect/runtime/`, `src/prospect/storage/`,
+  `tests/test_epistemic_runtime.py`, `tests/test_epistemic_storage.py`, N122]
+- **From staging**: O91

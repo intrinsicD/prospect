@@ -1,6 +1,6 @@
 # ADR-0006 — Representation & uncertainty integrity (collapse prevention)
 
-**Status:** Accepted
+**Status:** Accepted — amended by ADR-0014
 
 ## Context
 ADR-0001 chose to predict in *latent* space; ADR-0002 made a single calibrated
@@ -55,6 +55,24 @@ horizon probe. *(Amended by U-001.)*
 **Integrity is gated, not hoped for.** Because collapse hides in a good loss, integrity
 is enforced by standing **sentinels** in `bench/gates.py`. Every phase gate passes only
 if its capability criterion passes **and** all applicable sentinels are healthy.
+
+## ADR-0014 amendment — lifecycle and trace integrity
+E-series integrity extends beyond representation rank and ensemble disagreement.
+It also checks:
+
+- one raw `Experience` per environment step, with complete episode, step, and
+  decision links;
+- an immutable action-time prediction rather than a forecast recomputed after an
+  update;
+- compatible model, representation, and calibration versions;
+- separation of real and imagined transition lineage;
+- checkpoint manifests that restore the declared learning state and random state;
+  and
+- disjoint training, calibration, improvement-evaluation, and retention evidence.
+
+The existing sentinels remain valid legacy-v1 evidence for P0–P14. They do not
+automatically satisfy these lifecycle checks. The E-series sentinel implementation
+and results are pending in `E0-001`.
 
 ## Consequences
 - (+) The two single-points-of-failure — the representation and the calibrated
