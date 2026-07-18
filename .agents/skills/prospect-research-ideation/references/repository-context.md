@@ -1,8 +1,8 @@
 # Repository Context: Prospect
 
-This is a navigation aid, not authority. Verify it against
-`docs/architecture.md`, `src/prospect/`, `bench/epistemic/`, `tests/`, and
-`datasets/` before relying on it.
+This is a navigation aid, not authority. Verify it against `README.md`,
+`docs/architecture.md`, `src/prospect/`, `bench/epistemic/`,
+`bench/world_model_lifecycle/`, `tests/`, and `datasets/` before relying on it.
 
 ## Mission
 
@@ -21,14 +21,16 @@ identities and versions.
 
 - **Toolchain:** Python 3.11+, Hatchling, pytest, Ruff, and strict mypy. Core and
   exact references are standard-library-only.
-- **Optional runtime:** pinned PyTorch, TorchRL, and TensorDict support an
-  experience-replay index. Imports are lazy.
+- **Optional runtime:** pinned PyTorch, TorchRL, TensorDict, Gymnasium, and
+  JSON Schema support replay and the WM-001 world-model experiment. The
+  backend-neutral core still declares no required runtime dependency.
 - **Core boundary:** `src/prospect/` is task-neutral. It contains immutable domain
   records, decision decomposition, exact epistemic calculations, the linked
   runtime, canonical stores, and checkpoint coordination.
 - **Experiment boundary:** `bench/` owns environments, reference problems,
-  baselines, scorers, and experiments. `bench/epistemic/` is the current exact
-  semantic reference and active test dependency.
+  baselines, scorers, and experiments. `bench/epistemic/` is the exact semantic
+  reference; `bench/world_model_lifecycle/` contains the current WM-001
+  protocol, implementation, verification, audit, and runbook.
 - **Data boundary:** curated reusable inputs live under `datasets/` with
   provenance and checksums. Generated outputs live under
   `bench/**/results/` and are not tracked.
@@ -39,26 +41,34 @@ identities and versions.
 
 ## Highest-value research surface
 
-The nearest missing result is a small real shared-parameter learner that:
+WM-001 protocol 1.3.0 now supplies the first bounded end-to-end implementation:
+a probabilistic ensemble learns two observed-context Pendulum regimes, drives a
+fixed-budget CEM controller, undergoes shared-state interference, uses balanced
+replay for retention, and restores its retained state in a fresh process. Its
+eight-seed immutable producer passed K0-K7, but the mandatory pre-bound
+independent auditor returned two reproduced false negatives. The attempt is
+formally rejected and the complete lifecycle claim remains unestablished; this
+is not evidence that the agent failed to learn.
 
-1. collects canonical experience through the authoritative runtime;
-2. consumes those exact transition identities in a persistent update;
-3. improves predictive score and executed utility on disjoint cases;
-4. beats frozen, irrelevant-evidence, and marginal-preserving corruption
-   controls;
-5. experiences genuine cross-task interference through shared state; and
-6. retains measurable improvement after complete fresh-process restoration.
+The next confirmatory step is to bind the formal seed schedule to the sealed
+protocol, define coverage in integer target-count space with exact endpoint
+semantics, adversarially test both repairs before outcomes, and then issue a new
+protocol version, fresh seed domain, clean implementation binding, and immutable
+attempt. Same-seed or corrected-auditor replay of v1.3 remains diagnostic only.
 
-Other open mechanisms include:
+Other high-value open boundaries include:
 
-- transactional prepare/validate/commit semantics for learning;
-- durable idempotent recovery across partial lifecycle steps;
-- calibrated value-of-information forecasts under model and sensor
-  misspecification;
-- continual-learning response surfaces for plasticity, interference, and
-  retention;
-- causal attribution and revocation of individual experience groups; and
-- external benchmark adapters with strong published baselines.
+- calibrated value-of-information estimates with adversarial controls;
+- durable idempotent recovery across partial lifecycle steps and abrupt process
+  death;
+- serialization beyond the learning commit so concurrent callers cannot race
+  across interaction-stage boundaries;
+- exact mid-episode resume across environment, recurrent belief, pending action,
+  external side effects, and RNG state;
+- broader continual-learning plasticity and retention beyond two
+  observed-context actuator regimes; and
+- external benchmarks and strong published baselines before capability or
+  novelty claims.
 
 ## Constraints
 
@@ -87,7 +97,8 @@ For a selected direction:
 4. Keep reusable task-neutral behavior behind typed protocols in
    `src/prospect/`.
 5. Add the narrowest adversarial tests needed to protect the new contract.
-6. Run `make check`, then audit quantitative evidence with
-   `prospect-results-audit`.
+6. Run the scope-appropriate gate (`make check` for the backend-neutral core,
+   `make check-runtime` for world-model/runtime changes), then audit quantitative
+   evidence with `prospect-results-audit`.
 7. Update `docs/architecture.md` only if the accepted result changes stable
    system semantics.

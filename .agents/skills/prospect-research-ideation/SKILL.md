@@ -1,6 +1,10 @@
 ---
 name: prospect-research-ideation
 description: Generates and rigorously audits diverse, falsifiable research directions for Prospect's adaptive agent, including assumption surgery, new primitives and evidence programs, cross-domain mechanism transfer, and adversarial prior-art review. Use for novel research ideas, unexplored agent or world-model algorithms, high-risk/high-reward experiments, or publishable extensions that may enter Prospect's experiment and benchmark workflow. Do not use for ordinary feature brainstorming or implementation of an already selected method.
+license: MIT
+metadata:
+  author: Alexander Dieckmann
+  version: "1.0.0"
 ---
 
 # Research Ideation (Transformational)
