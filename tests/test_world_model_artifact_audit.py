@@ -24,6 +24,7 @@ from bench.world_model_lifecycle.artifact_audit import (
     _audit_bound_source_snapshot,
     _audit_formal_schedule,
     _audit_irrelevant_prediction_manipulation,
+    _audit_prediction_coverage,
     _audit_predictions,
     _audit_recomputed_analysis,
     _audit_rejected_probe_full_state,
@@ -121,6 +122,8 @@ def test_independent_prediction_decoder_recomputes_simple_gaussian_metrics() -> 
     assert recomputed.mixture_nll_nats_per_target_dimension == pytest.approx(0.5 * math.log(2.0 * math.pi))
     assert recomputed.normalized_rmse == 0.0
     assert recomputed.interval_90_coverage == 1.0
+    assert recomputed.covered_target_count == 12
+    assert recomputed.coverage_target_count == 12
 
     corrupted = bytearray(payload)
     corrupted[-1] ^= 1
@@ -206,6 +209,8 @@ def test_v130_oscillator_manipulation_crossbinds_pair_targets_and_isolation() ->
             mixture_nll_nats_per_target_dimension=1.0,
             normalized_rmse=1.0,
             interval_90_coverage=0.9,
+            covered_target_count=4,
+            coverage_target_count=4,
         )
 
     split = "predictive_validation_irrelevant"
@@ -689,18 +694,25 @@ def test_checkpoint_replay_audit_rejects_irrelevant_ids_and_manifests(
     }
 
 
+def test_auditor_formal_seed_constant_matches_sealed_protocol() -> None:
+    protocol = json.loads(
+        (artifact_audit_module.HERE / "protocol.json").read_text(encoding="utf-8")
+    )
+    protocol_seeds = tuple(
+        protocol["seed_schedule"]["formal_replicate_master_seeds"]
+    )
+
+    assert artifact_audit_module._FORMAL_SEEDS == protocol_seeds
+
+
 def test_formal_schedule_binds_exact_v130_seed_order_and_replicate_sidecars(
     tmp_path: Path,
 ) -> None:
-    seeds = (
-        17_123_296,
-        3_280_611_227,
-        2_725_263_418,
-        3_124_246_399,
-        4_093_604_926,
-        3_908_390_087,
-        3_332_986_400,
-        724_244_869,
+    protocol = json.loads(
+        (artifact_audit_module.HERE / "protocol.json").read_text(encoding="utf-8")
+    )
+    seeds = tuple(
+        protocol["seed_schedule"]["formal_replicate_master_seeds"]
     )
     replicates = [
         {
@@ -761,6 +773,102 @@ def test_formal_schedule_binds_exact_v130_seed_order_and_replicate_sidecars(
     _audit_formal_schedule(update_order_audit, tmp_path, wrong_update_order)
     assert "formal_update_budget_mismatch" in {
         finding["code"] for finding in update_order_audit.findings
+    }
+
+
+def test_prediction_coverage_allows_exactly_one_target_count_difference() -> None:
+    target_count = 6_400
+    recomputed_count = 5_837
+    recomputed = PredictionRecomputation(
+        transition_ids=tuple(f"transition:{index}" for index in range(target_count // 4)),
+        normalized_targets=np.empty((target_count // 4, 4), dtype=np.float32),
+        member_means=np.empty((5, target_count // 4, 4), dtype=np.float32),
+        member_log_variances=np.empty((5, target_count // 4, 4), dtype=np.float32),
+        mixture_nll_nats_per_target_dimension=0.0,
+        normalized_rmse=0.0,
+        interval_90_coverage=recomputed_count / target_count,
+        covered_target_count=recomputed_count,
+        coverage_target_count=target_count,
+    )
+
+    exact = _Audit()
+    _audit_prediction_coverage(
+        exact,
+        recomputed,
+        recomputed_count / target_count,
+        label="exact",
+        replicate_id="replicate",
+    )
+    assert exact.failed_checks == 0
+
+    one_target = _Audit()
+    _audit_prediction_coverage(
+        one_target,
+        recomputed,
+        (recomputed_count + 1) / target_count,
+        label="one-target",
+        replicate_id="replicate",
+    )
+    assert one_target.failed_checks == 0
+
+    two_targets = _Audit()
+    _audit_prediction_coverage(
+        two_targets,
+        recomputed,
+        (recomputed_count + 2) / target_count,
+        label="two-targets",
+        replicate_id="replicate",
+    )
+    assert {finding["code"] for finding in two_targets.findings} == {
+        "prediction_coverage_mismatch"
+    }
+    evidence = two_targets.findings[0]["evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["recomputed_covered_target_count"] == recomputed_count
+    assert evidence["stored_covered_target_count"] == recomputed_count + 2
+    assert evidence["covered_target_count_difference"] == 2
+
+
+@pytest.mark.parametrize(
+    "stored",
+    [
+        True,
+        "0.9",
+        math.nan,
+        math.inf,
+        -0.1,
+        1.1,
+        (5_837.25 / 6_400),
+    ],
+)
+def test_prediction_coverage_rejects_malformed_or_non_grid_values(
+    stored: object,
+) -> None:
+    target_count = 6_400
+    recomputed_count = 5_837
+    recomputed = PredictionRecomputation(
+        transition_ids=("unused",),
+        normalized_targets=np.empty((1, 4), dtype=np.float32),
+        member_means=np.empty((5, 1, 4), dtype=np.float32),
+        member_log_variances=np.empty((5, 1, 4), dtype=np.float32),
+        mixture_nll_nats_per_target_dimension=0.0,
+        normalized_rmse=0.0,
+        interval_90_coverage=recomputed_count / target_count,
+        covered_target_count=recomputed_count,
+        coverage_target_count=target_count,
+    )
+
+    audit = _Audit()
+    _audit_prediction_coverage(
+        audit,
+        recomputed,
+        stored,
+        label="adversarial",
+        replicate_id="replicate",
+    )
+
+    assert {finding["code"] for finding in audit.findings} == {
+        "prediction_coverage_grid_mismatch"
     }
 
 

@@ -30,12 +30,15 @@ The repository contains:
   independent-evidence program in
   [WM-001](bench/world_model_lifecycle/README.md).
 
-WM-001 is implemented but has no accepted formal result recorded here. Therefore
-the repository does not yet demonstrate that one real agent learned a predictive
-model from its own experience, improved executed held-out behavior because of
-that update, and retained the gain through shared-state interference and process
-restart. Development results are diagnostic; only an independently audited
-formal artifact can establish that chain.
+WM-001 protocol 1.3.0 has completed one eight-seed formal attempt. Its immutable
+producer evidence passed K0–K7 with strong fixture-specific effects and exact
+fresh-process parity, but the attempt is formally rejected because its mandatory
+pre-bound independent auditor contained two false-negative defects and returned
+`passed: false`. The [formal results review](docs/wm001-v130-formal-results.md)
+preserves both the mechanism evidence and the failed-acceptance boundary.
+Therefore the repository still has no accepted demonstration of the complete
+claim. A corrected auditor, fresh protocol and seeds, and a new binding are
+required.
 
 ## Layout
 

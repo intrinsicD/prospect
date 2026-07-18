@@ -481,7 +481,7 @@ _TASK_CONTEXT = {
 }
 _FORMAL_SEEDS = (
     17_123_296,
-    3_280_611_227,
+    3_280_610_186,
     2_725_263_418,
     3_124_246_399,
     4_093_604_926,
@@ -554,6 +554,8 @@ class PredictionRecomputation:
     mixture_nll_nats_per_target_dimension: float
     normalized_rmse: float
     interval_90_coverage: float
+    covered_target_count: int
+    coverage_target_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -848,7 +850,10 @@ def recompute_prediction_evidence(payload: bytes) -> PredictionRecomputation:
         count=z_score.size,
     ).reshape(z_score.shape)
     mixture_pit = np.mean(0.5 * (1.0 + erf_values), axis=0)
-    coverage = float(np.mean((mixture_pit >= 0.05) & (mixture_pit <= 0.95)))
+    covered_targets = (mixture_pit >= 0.05) & (mixture_pit <= 0.95)
+    covered_target_count = int(np.count_nonzero(covered_targets))
+    coverage_target_count = int(covered_targets.size)
+    coverage = covered_target_count / coverage_target_count
     if not all(math.isfinite(value) for value in (mixture_nll, normalized_rmse, coverage)):
         raise ArtifactAuditError("recomputed prediction metrics are non-finite")
     return PredictionRecomputation(
@@ -859,6 +864,8 @@ def recompute_prediction_evidence(payload: bytes) -> PredictionRecomputation:
         mixture_nll_nats_per_target_dimension=mixture_nll,
         normalized_rmse=normalized_rmse,
         interval_90_coverage=coverage,
+        covered_target_count=covered_target_count,
+        coverage_target_count=coverage_target_count,
     )
 
 
@@ -1200,6 +1207,80 @@ def _ordered_validation_ids(
     return tuple(result)
 
 
+def _stored_coverage_count(value: object, *, target_count: int) -> int | None:
+    """Recover a discrete covered-target count from a stored coverage fraction."""
+
+    if (
+        target_count <= 0
+        or isinstance(value, bool)
+        or not isinstance(value, (int, float))
+    ):
+        return None
+    fraction = float(value)
+    if not math.isfinite(fraction) or fraction < 0.0 or fraction > 1.0:
+        return None
+    scaled = fraction * target_count
+    nearest = round(scaled)
+    # JSON round-tripping an exact k / target_count fraction can introduce a
+    # few binary ulps.  Express that allowance in count space; it remains many
+    # orders of magnitude smaller than one target and cannot admit an off-grid
+    # fraction as a second tolerance on the scientific comparison.
+    grid_tolerance = max(
+        1e-9,
+        8.0 * math.ulp(fraction) * target_count,
+    )
+    if (
+        nearest < 0
+        or nearest > target_count
+        or not math.isclose(scaled, nearest, rel_tol=0.0, abs_tol=grid_tolerance)
+    ):
+        return None
+    return int(nearest)
+
+
+def _audit_prediction_coverage(
+    audit: _Audit,
+    recomputed: PredictionRecomputation,
+    stored: object,
+    *,
+    label: str,
+    replicate_id: str,
+) -> None:
+    """Compare coverage as integer counts with the sealed one-target allowance."""
+
+    stored_count = _stored_coverage_count(
+        stored,
+        target_count=recomputed.coverage_target_count,
+    )
+    audit.require(
+        stored_count is not None,
+        code="prediction_coverage_grid_mismatch",
+        message=f"{label} stored coverage is malformed or not on the target-count grid",
+        replicate_id=replicate_id,
+        evidence={
+            "stored": stored,
+            "target_count": recomputed.coverage_target_count,
+        },
+    )
+    if stored_count is None:
+        return
+    count_difference = abs(recomputed.covered_target_count - stored_count)
+    audit.require(
+        count_difference <= 1,
+        code="prediction_coverage_mismatch",
+        message=f"{label} stored coverage differs from independent recomputation by more than one target",
+        replicate_id=replicate_id,
+        evidence={
+            "recomputed": recomputed.interval_90_coverage,
+            "stored": stored,
+            "recomputed_covered_target_count": recomputed.covered_target_count,
+            "stored_covered_target_count": stored_count,
+            "coverage_target_count": recomputed.coverage_target_count,
+            "covered_target_count_difference": count_difference,
+        },
+    )
+
+
 def _audit_predictions(
     audit: _Audit,
     root: Path,
@@ -1356,20 +1437,12 @@ def _audit_predictions(
                     "stored": row.get("normalized_rmse"),
                 },
             )
-            coverage_tolerance = 1.0 / max(1, 4 * len(recomputed.transition_ids))
-            audit.require(
-                _close_enough(
-                    recomputed.interval_90_coverage,
-                    row.get("interval_90_coverage"),
-                    absolute=coverage_tolerance,
-                ),
-                code="prediction_coverage_mismatch",
-                message=f"{label} stored coverage differs from independent recomputation",
+            _audit_prediction_coverage(
+                audit,
+                recomputed,
+                row.get("interval_90_coverage"),
+                label=label,
                 replicate_id=replicate_id,
-                evidence={
-                    "recomputed": recomputed.interval_90_coverage,
-                    "stored": row.get("interval_90_coverage"),
-                },
             )
         except (ArtifactAuditError, OSError, ValueError) as error:
             audit.error("prediction_evidence_invalid", f"{label}: {error}", replicate_id=replicate_id)

@@ -233,7 +233,9 @@ def _verify_audit_identity(
     producer_root: Path,
     producer_manifest_sha256: str,
     result_sha256: str,
-) -> None:
+) -> bool:
+    """Verify upstream audit identity/custody and return claim cleanliness."""
+
     if audit.get("schema") != "prospect.world-model-lifecycle.artifact-audit.v1":
         raise AdjudicationError("independent audit report has the wrong semantic identity")
     raw_artifact_root = audit.get("artifact_root")
@@ -255,20 +257,35 @@ def _verify_audit_identity(
     findings = audit.get("findings")
     gaps = audit.get("coverage_gaps")
     if (
-        audit.get("integrity_passed") is not True
-        or audit.get("complete_for_claim") is not True
-        or audit.get("passed") is not True
+        type(audit.get("integrity_passed")) is not bool
+        or type(audit.get("complete_for_claim")) is not bool
+        or type(audit.get("passed")) is not bool
         or not isinstance(counts, Mapping)
         or type(counts.get("passed")) is not int
         or cast(int, counts.get("passed")) < 1
         or type(counts.get("failed")) is not int
-        or counts.get("failed") != 0
+        or cast(int, counts.get("failed")) < 0
         or type(counts.get("coverage_gaps")) is not int
-        or counts.get("coverage_gaps") != 0
-        or findings != []
-        or gaps != []
+        or cast(int, counts.get("coverage_gaps")) < 0
+        or not isinstance(findings, list)
+        or not isinstance(gaps, list)
+        or any(not isinstance(row, Mapping) for row in findings)
+        or any(not isinstance(row, Mapping) for row in gaps)
     ):
-        raise AdjudicationError("independent audit must pass with no failures or claim-completeness gaps")
+        raise AdjudicationError("independent audit status block is invalid")
+    failed_count = cast(int, counts["failed"])
+    gap_count = cast(int, counts["coverage_gaps"])
+    integrity_passed = cast(bool, audit["integrity_passed"])
+    complete_for_claim = cast(bool, audit["complete_for_claim"])
+    passed = cast(bool, audit["passed"])
+    if (
+        failed_count != len(findings)
+        or gap_count != len(gaps)
+        or integrity_passed != (failed_count == 0)
+        or complete_for_claim != (gap_count == 0)
+        or passed != (integrity_passed and complete_for_claim)
+    ):
+        raise AdjudicationError("independent audit status block is internally inconsistent")
 
     custody = audit.get("custody")
     if (
@@ -278,6 +295,8 @@ def _verify_audit_identity(
         or custody.get("producer_manifest_sha256") != producer_manifest_sha256
     ):
         raise AdjudicationError("independent audit custody does not bind the completed producer manifest")
+
+    return passed
 
 
 def _verify_formal_auditor_snapshot(
@@ -308,6 +327,7 @@ def _verify_semantic_review(
     result_sha256: str,
     audit_sha256: str,
     disposition: Disposition,
+    audit_clean_for_claim: bool,
 ) -> None:
     if review.get("schema") != "prospect.wm001.semantic-review.v1":
         raise AdjudicationError("semantic review has the wrong schema")
@@ -332,6 +352,10 @@ def _verify_semantic_review(
         raise AdjudicationError("semantic review fatal_findings must be an array")
     if disposition == "accepted" and fatal_findings:
         raise AdjudicationError("accepted semantic review contains unresolved fatal findings")
+    if disposition == "rejected" and not audit_clean_for_claim and not fatal_findings:
+        raise AdjudicationError(
+            "rejected adjudication of a non-clean audit requires at least one fatal semantic finding"
+        )
 
 
 def create_adjudication_package(
@@ -395,12 +419,17 @@ def create_adjudication_package(
         label="independent audit report",
     )
     audit_sha256 = _sha256(audit_payload)
-    _verify_audit_identity(
+    audit_clean_for_claim = _verify_audit_identity(
         audit,
         producer_root=root,
         producer_manifest_sha256=producer_manifest_sha256,
         result_sha256=result_sha256,
     )
+    if disposition in {"pending", "accepted"} and not audit_clean_for_claim:
+        raise AdjudicationError(
+            f"{disposition} adjudication requires an independent audit that passes "
+            "with no failures or claim-completeness gaps"
+        )
 
     auditor_source_payload = _read_regular_file(
         AUDITOR_SOURCE_PATH,
@@ -435,6 +464,7 @@ def create_adjudication_package(
             result_sha256=result_sha256,
             audit_sha256=audit_sha256,
             disposition=disposition,
+            audit_clean_for_claim=audit_clean_for_claim,
         )
     elif disposition in {"accepted", "rejected"}:
         raise AdjudicationError(f"{disposition} adjudication requires a separate semantic review")
@@ -455,7 +485,7 @@ def create_adjudication_package(
             }
         )
     manifest: dict[str, object] = {
-        "schema": "prospect.wm001.adjudication-package.v2",
+        "schema": "prospect.wm001.adjudication-package.v3",
         "experiment_id": "WM-001",
         "lane": lane,
         "disposition": disposition,
@@ -466,6 +496,7 @@ def create_adjudication_package(
         "result_sha256": result_sha256,
         "audit_file": COPIED_AUDIT_NAME,
         "audit_sha256": audit_sha256,
+        "audit_clean_for_claim": audit_clean_for_claim,
         "auditor_source_file": AUDITOR_SOURCE_NAME,
         "auditor_source_sha256": auditor_source_sha256,
         "semantic_review_file": (COPIED_SEMANTIC_REVIEW_NAME if review_sha256 is not None else None),

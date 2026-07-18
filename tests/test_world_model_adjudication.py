@@ -187,9 +187,10 @@ def test_formal_acceptance_creates_canonical_external_package(tmp_path: Path) ->
     stored_manifest = (output / ADJUDICATION_MANIFEST_NAME).read_bytes()
     assert stored_manifest == _canonical(manifest)
     assert (output / COPIED_AUDIT_NAME).read_bytes() == audit_payload
-    assert manifest["schema"] == "prospect.wm001.adjudication-package.v2"
+    assert manifest["schema"] == "prospect.wm001.adjudication-package.v3"
     assert manifest["lane"] == "formal"
     assert manifest["disposition"] == "accepted"
+    assert manifest["audit_clean_for_claim"] is True
     assert manifest["producer_manifest_sha256"] == _digest((producer / "producer-manifest.json").read_bytes())
     assert manifest["result_sha256"] == _digest((producer / "result.json").read_bytes())
     assert manifest["audit_sha256"] == _digest(audit_payload)
@@ -250,9 +251,11 @@ def test_development_can_be_pending_but_cannot_be_accepted(tmp_path: Path) -> No
 
 
 @pytest.mark.parametrize("failure", ["integrity", "completeness"])
-def test_audit_failure_or_incompleteness_is_never_packaged(
+@pytest.mark.parametrize("disposition", ["pending", "accepted"])
+def test_non_rejected_dispositions_require_a_clean_audit(
     tmp_path: Path,
     failure: str,
+    disposition: str,
 ) -> None:
     producer, audit_path, audit = _make_evidence(tmp_path)
     if failure == "integrity":
@@ -267,12 +270,134 @@ def test_audit_failure_or_incompleteness_is_never_packaged(
         audit["coverage_gaps"] = [{"severity": "blocker", "code": "missing"}]
     _write_json(audit_path, audit)
 
-    with pytest.raises(AdjudicationError, match="must pass"):
+    review_path = _make_semantic_review(
+        tmp_path,
+        producer=producer,
+        audit_path=audit_path,
+        verdict=disposition,
+    )
+    with pytest.raises(AdjudicationError, match="requires an independent audit"):
+        create_adjudication_package(
+            producer_root=producer,
+            audit_report=audit_path,
+            output_directory=tmp_path / "package",
+            disposition=disposition,
+            semantic_review=review_path if disposition == "accepted" else None,
+        )
+    assert not (tmp_path / "package").exists()
+
+
+@pytest.mark.parametrize("failure", ["integrity", "completeness"])
+def test_rejected_package_can_preserve_non_clean_audit_with_fatal_review(
+    tmp_path: Path,
+    failure: str,
+) -> None:
+    producer, audit_path, audit = _make_evidence(tmp_path)
+    if failure == "integrity":
+        audit["integrity_passed"] = False
+        audit["passed"] = False
+        audit["check_counts"]["failed"] = 1
+        audit["findings"] = [{"severity": "error", "code": "tampered"}]
+    else:
+        audit["complete_for_claim"] = False
+        audit["passed"] = False
+        audit["check_counts"]["coverage_gaps"] = 1
+        audit["coverage_gaps"] = [{"severity": "blocker", "code": "missing"}]
+    audit_payload = _write_json(audit_path, audit)
+    review_path = _make_semantic_review(
+        tmp_path,
+        producer=producer,
+        audit_path=audit_path,
+        verdict="rejected",
+        fatal_findings=[{"severity": "fatal", "code": f"audit_{failure}"}],
+    )
+    output = tmp_path / "package"
+
+    manifest = create_adjudication_package(
+        producer_root=producer,
+        audit_report=audit_path,
+        output_directory=output,
+        disposition="rejected",
+        semantic_review=review_path,
+    )
+
+    assert manifest["schema"] == "prospect.wm001.adjudication-package.v3"
+    assert manifest["disposition"] == "rejected"
+    assert manifest["audit_clean_for_claim"] is False
+    assert (output / COPIED_AUDIT_NAME).read_bytes() == audit_payload
+    assert (output / COPIED_SEMANTIC_REVIEW_NAME).read_bytes() == review_path.read_bytes()
+
+
+def test_rejected_non_clean_audit_requires_fatal_semantic_finding(tmp_path: Path) -> None:
+    producer, audit_path, audit = _make_evidence(tmp_path)
+    audit["integrity_passed"] = False
+    audit["passed"] = False
+    audit["check_counts"]["failed"] = 1
+    audit["findings"] = [{"severity": "error", "code": "failed_check"}]
+    _write_json(audit_path, audit)
+    review_path = _make_semantic_review(
+        tmp_path,
+        producer=producer,
+        audit_path=audit_path,
+        verdict="rejected",
+    )
+
+    with pytest.raises(AdjudicationError, match="at least one fatal semantic finding"):
         create_adjudication_package(
             producer_root=producer,
             audit_report=audit_path,
             output_directory=tmp_path / "package",
             disposition="rejected",
+            semantic_review=review_path,
+        )
+    assert not (tmp_path / "package").exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("failed_count", 2),
+        ("gap_count", 2),
+        ("integrity_passed", True),
+        ("complete_for_claim", True),
+        ("passed", True),
+    ],
+)
+def test_rejected_package_refuses_internally_inconsistent_audit_status(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    producer, audit_path, audit = _make_evidence(tmp_path)
+    audit["integrity_passed"] = False
+    audit["complete_for_claim"] = False
+    audit["passed"] = False
+    audit["check_counts"]["failed"] = 1
+    audit["check_counts"]["coverage_gaps"] = 1
+    audit["findings"] = [{"severity": "error", "code": "failed_check"}]
+    audit["coverage_gaps"] = [{"severity": "blocker", "code": "missing_check"}]
+    if field == "failed_count":
+        audit["check_counts"]["failed"] = value
+    elif field == "gap_count":
+        audit["check_counts"]["coverage_gaps"] = value
+    else:
+        audit[field] = value
+    _write_json(audit_path, audit)
+    review_path = _make_semantic_review(
+        tmp_path,
+        producer=producer,
+        audit_path=audit_path,
+        verdict="rejected",
+        fatal_findings=[{"severity": "fatal", "code": "audit_invalid"}],
+    )
+
+    with pytest.raises(AdjudicationError, match="internally inconsistent"):
+        create_adjudication_package(
+            producer_root=producer,
+            audit_report=audit_path,
+            output_directory=tmp_path / "package",
+            disposition="rejected",
+            semantic_review=review_path,
         )
     assert not (tmp_path / "package").exists()
 
@@ -285,36 +410,63 @@ def test_audit_failure_or_incompleteness_is_never_packaged(
         ("result_sha256", "0" * 64, "different producer root or result"),
     ],
 )
+@pytest.mark.parametrize("disposition", ["pending", "rejected"])
 def test_audit_semantic_identity_mismatch_is_rejected(
     tmp_path: Path,
     field: str,
     value: object,
     message: str,
+    disposition: str,
 ) -> None:
     producer, audit_path, audit = _make_evidence(tmp_path)
     audit[field] = value
     _write_json(audit_path, audit)
+    review_path = (
+        _make_semantic_review(
+            tmp_path,
+            producer=producer,
+            audit_path=audit_path,
+            verdict="rejected",
+            fatal_findings=[{"severity": "fatal", "code": "audit_identity"}],
+        )
+        if disposition == "rejected"
+        else None
+    )
 
     with pytest.raises(AdjudicationError, match=message):
         create_adjudication_package(
             producer_root=producer,
             audit_report=audit_path,
             output_directory=tmp_path / "package",
-            disposition="pending",
+            disposition=disposition,
+            semantic_review=review_path,
         )
 
 
-def test_custody_identity_mismatch_is_rejected(tmp_path: Path) -> None:
+@pytest.mark.parametrize("disposition", ["pending", "rejected"])
+def test_custody_identity_mismatch_is_rejected(tmp_path: Path, disposition: str) -> None:
     producer, audit_path, audit = _make_evidence(tmp_path)
     audit["custody"]["producer_manifest_sha256"] = "0" * 64
     _write_json(audit_path, audit)
+    review_path = (
+        _make_semantic_review(
+            tmp_path,
+            producer=producer,
+            audit_path=audit_path,
+            verdict="rejected",
+            fatal_findings=[{"severity": "fatal", "code": "audit_custody"}],
+        )
+        if disposition == "rejected"
+        else None
+    )
 
     with pytest.raises(AdjudicationError, match="custody"):
         create_adjudication_package(
             producer_root=producer,
             audit_report=audit_path,
             output_directory=tmp_path / "package",
-            disposition="pending",
+            disposition=disposition,
+            semantic_review=review_path,
         )
 
 

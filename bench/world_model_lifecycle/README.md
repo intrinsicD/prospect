@@ -18,12 +18,20 @@ that Prospect passes them.
 
 ## Current status
 
-The WM-001 implementation and evidence pipeline exist, but this document records
-no accepted formal result. A development run is diagnostic. A formal producer
-result is only claim-eligible; it is not self-certifying. The lifecycle claim
-remains unproven until a finalized formal artifact passes the independent
-artifact audit and a separate semantic results review accepts every killing gate
-K0 through K7.
+The WM-001 implementation and evidence pipeline exist, and protocol 1.3.0 has
+completed one eight-seed formal attempt. Its immutable producer evidence passed
+K0–K7, but the mandatory pre-bound independent auditor returned two failures.
+Both were reproduced as auditor defects rather than producer-data corruption:
+one duplicated seed constant disagreed with the sealed protocol, and one
+corrupted-control coverage coordinate fell on numerically underspecified PIT
+endpoint semantics. The attempt has an explicit rejected adjudication and is not
+an accepted demonstration. See the
+[formal results review](../../docs/wm001-v130-formal-results.md).
+
+A development run remains diagnostic. A formal producer result is only
+claim-eligible; it is not self-certifying. The lifecycle claim remains unproven
+until a finalized formal artifact passes the independent artifact audit and a
+separate semantic results review accepts every killing gate K0 through K7.
 
 Protocol 1.3.0 supersedes two non-accepted predecessors. The first v1.1.1
 formal artifact supports bounded K0–K6 pilot evidence, but adversarial review
@@ -43,6 +51,12 @@ control learned its source process. The protocol uses a fresh derivation domain
 and transparently derived master seeds. The manipulation threshold reuses the
 existing predictive minimum-effect floor and was fixed before any v1.3.0
 development or formal outcome.
+
+The active auditor now sources the corrected formal schedule and compares
+coverage in discrete target-count space with adversarial tests. These are
+postmortem fixes for a future binding only. They cannot repair or upgrade the
+immutable v1.3.0 attempt, whose audit and auditor-source bytes remain preserved
+in its rejected package.
 
 ## What the experiment must establish
 
@@ -348,8 +362,11 @@ The producer root is finalized before independent audit and is never modified
 afterward. The external adjudication package copies the exact audit report and
 binds it to the producer-manifest, result, auditor-source, and formal-binding
 digests. An `accepted` or `rejected` disposition additionally requires a
-canonical content-addressed semantic review; `pending` records the completed
-independent artifact audit without asserting the capability claim.
+canonical content-addressed semantic review. `pending` and `accepted` packages
+require a complete, clean, passing audit. An explicit `rejected` package may
+instead preserve an identity- and custody-valid failed or incomplete audit, but
+its semantic review must record at least one fatal finding explaining why the
+claim is rejected.
 
 The envelope verifier checks schemas, hashes, identities, seed derivation, split
 custody, update ancestry, budgets, gate order, and binding consistency. The

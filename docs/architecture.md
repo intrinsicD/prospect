@@ -217,6 +217,17 @@ the conclusion to this specified learned nuisance process, uses a new seed
 domain and transparently derived masters, and does not repair or relabel prior
 artifacts.
 
+The eight-seed v1.3.0 formal producer result passed K0–K7, with large held-out
+predictive and executed-return effects, demonstrated naive interference,
+replay-based retention, and exact fresh-process parity. It did not receive
+formal acceptance. The pre-bound independent auditor returned two false
+negatives: a duplicated wrong seed constant and a single coverage classification
+at an underspecified floating-point endpoint. Because the protocol requires a
+clean pass from the auditor bound before outcomes, the attempt is explicitly
+rejected even though neither finding changes a gate. The
+[formal results review](wm001-v130-formal-results.md) records the exact effects,
+claim dispositions, and next confirmation requirements.
+
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget
