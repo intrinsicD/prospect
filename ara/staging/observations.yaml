@@ -12,9 +12,9 @@ observations:
       world-model vertical slice.
     potential_type: architecture
     bound_to: [N01]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A01"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O02
     timestamp: "2026-07-17T19:11+02:00"
@@ -28,9 +28,9 @@ observations:
       predictive parameters and permits learner mutation before receipt commit.
     potential_type: architecture
     bound_to: [N01]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A02"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O03
     timestamp: "2026-07-17T19:11+02:00"
@@ -62,7 +62,96 @@ observations:
       agent to act, observe, update, and execute a changed policy.
     potential_type: constraint
     bound_to: [N01]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R01"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O05
+    timestamp: "2026-07-18T07:31+02:00"
+    provenance: ai-suggested
+    content: >-
+      WM-001 coverage is numerically underspecified at its inclusive 0.05 and
+      0.95 endpoints: the bound CUDA float32 implementation and an
+      implementation-independent high-precision interpretation can classify
+      the same stored target differently without data corruption.
+    context: >-
+      Independent reproduction isolated the formal audit failure to one
+      endpoint-sensitive target value in corrupted-condition predictive
+      coverage; no K0-K7 numeric gate changes.
+    potential_type: constraint
+    bound_to: [N02]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R02"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O06
+    timestamp: "2026-07-18T07:31+02:00"
+    provenance: ai-suggested
+    content: >-
+      Coverage audits should compare integer covered-target counts rather than
+      aggregate floating fractions, require any permitted disagreement to be
+      predeclared, and bind each differing coordinate to an explicit numerical
+      endpoint guard; the next protocol should specify exact arithmetic
+      semantics.
+    context: >-
+      The current auditor intended to tolerate one target but rejected a
+      one-target difference because its fraction exceeded the floating
+      tolerance by approximately 8e-17.
+    potential_type: heuristic
+    bound_to: [N02]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H01"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O07
+    timestamp: "2026-07-18T07:49+02:00"
+    provenance: ai-suggested
+    content: >-
+      Within the exact WM-001 v1.3 fixture, immutable producer evidence supports
+      the continuous experience-to-update-to-behavior-to-retention-to-restart
+      chain, while formal acceptance remains unestablished because the
+      mandatory pre-bound independent audit did not pass.
+    context: >-
+      Eight formal replicates passed producer K0-K7; direct raw recomputation
+      reproduced the effects; the semantic review and rejected adjudication
+      preserve the distinction between mechanism evidence and claim acceptance.
+    potential_type: claim
+    bound_to: [N03, N04]
+    promoted: true
+    promoted_to: "logic/claims.md:C01"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O08
+    timestamp: "2026-07-18T07:49+02:00"
+    provenance: ai-suggested
+    content: >-
+      A corrected post-hoc auditor cannot upgrade a bound formal attempt; the
+      next confirmation must fix and adversarially test the auditor before
+      outcomes, then use a fresh protocol version, seed domain, clean binding,
+      and immutable attempt.
+    context: >-
+      The rejected semantic review and results report commit this governance
+      boundary after the v1.3 auditor failed.
+    potential_type: constraint
+    bound_to: [N04, N05]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R03"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O09
+    timestamp: "2026-07-18T07:49+02:00"
+    provenance: ai-suggested
+    content: >-
+      Pending and accepted adjudications require a coherent, clean, complete,
+      passing audit; a coherent failed or incomplete audit may be preserved only
+      in an explicit rejected package whose separate semantic review contains a
+      fatal finding.
+    context: >-
+      Adjudication v3 was implemented so negative evidence can be retained
+      without weakening acceptance requirements or losing custody.
+    potential_type: constraint
+    bound_to: [N04, N05]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R04"
+    crystallized_via: artifact-commitment
     stale: false

@@ -7,5 +7,89 @@ tree:
     description: >-
       What should Prospect do first to progress toward a mature, well-working
       world-model-based agent?
-    status: open
+    status: resolved
+    children:
+      - id: N03
+        type: experiment
+        title: "Run WM-001 v1.3 end-to-end formal lifecycle"
+        provenance: ai-executed
+        timestamp: "2026-07-18T07:49+02:00"
+        result: >-
+          Eight prospectively fixed formal replicates completed. Each retained
+          496 episodes, 99,200 transitions, 20 policy runs, 12 predictive rows,
+          five committed training phases, one rejected probe, and 15 checkpoint
+          components. Producer K0-K7 all passed: task-A NLL gain versus frozen
+          was 3.5556 [3.4764, 3.6349], executed return gain was 863.12
+          [643.14, 1083.11], retained A-gain fraction was 1.3468
+          [0.8979, 1.7958], and every restart difference was zero. The
+          independent audit completed 6,392,734 checks with two failures and no
+          coverage gaps, so the attempt did not receive formal acceptance.
+        evidence:
+          - "docs/wm001-v130-formal-results.md"
+          - "bench/world_model_lifecycle/results/formal/fcb544699d62797999aa40aadcb94ff19af0acac39212f438302aad337a8709b/20260718-v130-8cc5a8b-attempt1"
+          - "artifacts/wm001-audits/formal-fcb54469-20260718-v130.json"
+          - "artifacts/wm001-adjudications/formal-fcb54469-20260718-v130-rejected"
+        status: resolved
+        children:
+          - id: N04
+            type: decision
+            title: "Reject attempt acceptance without refuting the hypothesis"
+            provenance: ai-executed
+            timestamp: "2026-07-18T07:49+02:00"
+            choice: >-
+              Preserve the immutable producer artifact and bounded mechanism
+              evidence, but reject this attempt's claim eligibility because
+              the mandatory pre-bound independent audit did not pass.
+            alternatives:
+              - "Accept from producer gates or a corrected post-hoc audit."
+              - "Discard the entire artifact as evidence that the agent failed."
+              - "Reject acceptance while retaining bounded producer evidence."
+            evidence:
+              - N02
+              - N03
+              - "docs/wm001-v130-formal-results.md"
+              - "artifacts/wm001-adjudications/formal-fcb54469-20260718-v130-rejected"
+            also_depends_on: [N02]
+            status: resolved
+            children: []
+          - id: N05
+            type: experiment
+            title: "Harden future audit and rejection custody"
+            provenance: ai-executed
+            timestamp: "2026-07-18T07:49+02:00"
+            result: >-
+              Corrected auditor seed parity against protocol.json, replaced
+              floating-fraction coverage tolerance with discrete target-count
+              checks, and introduced adjudication v3 so a coherent failed audit
+              can be immutably packaged only as rejected with a fatal semantic
+              finding. Ruff, both mypy scopes, 85 epistemic tests, and 176
+              world-model tests passed. Commit 77d6db6 records the changes;
+              they apply only to future bindings and cannot upgrade N03.
+            evidence:
+              - "bench/world_model_lifecycle/artifact_audit.py"
+              - "bench/world_model_lifecycle/adjudication.py"
+              - "tests/test_world_model_artifact_audit.py"
+              - "tests/test_world_model_adjudication.py"
+              - "git:77d6db6"
+            status: resolved
+            children: []
+  - id: N02
+    type: experiment
+    title: "Reproduce formal coverage-audit mismatch"
+    provenance: ai-executed
+    timestamp: "2026-07-18T07:31+02:00"
+    result: >-
+      Independent decoding of predictive metric 4 found exactly one differing
+      target among 6400: sidecar row 207, target dimension 0. The bound CUDA
+      Torch float32 producer computed PIT 0.05000000074505806 and counted it
+      covered; the NumPy float64 auditor computed 0.049999998325471175 and
+      counted it uncovered. An 80-digit recomputation from the exact stored
+      float32 tensors gave 0.0499999983254711630649, below 0.05. The aggregate
+      coverage difference was 0.00015625000000007994; the auditor's intended
+      one-target tolerance was 0.00015625 and failed only through binary
+      rounding in math.isclose.
+    evidence:
+      - "bench/world_model_lifecycle/results/formal/fcb544699d62797999aa40aadcb94ff19af0acac39212f438302aad337a8709b/20260718-v130-8cc5a8b-attempt1"
+      - "artifacts/wm001-audits/formal-fcb54469-20260718-v130.json"
+    status: resolved
     children: []

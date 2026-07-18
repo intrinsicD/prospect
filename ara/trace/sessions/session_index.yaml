@@ -6,3 +6,10 @@ sessions:
     events_count: 5
     claims_touched: []
     open_threads: 2
+  - id: "2026-07-18_001"
+    date: "2026-07-18"
+    summary: "Completed and rejected WM-001 v1.3 formal acceptance while retaining bounded mechanism evidence and hardening the next audit path."
+    turn_count: 2
+    events_count: 14
+    claims_touched: [C01]
+    open_threads: 2

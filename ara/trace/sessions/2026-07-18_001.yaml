@@ -1,0 +1,137 @@
+session:
+  id: "2026-07-18_001"
+  date: "2026-07-18"
+  started: "2026-07-18T07:31+02:00"
+  last_turn: "2026-07-18T07:49+02:00"
+  turn_count: 2
+  summary: "Completed and rejected WM-001 v1.3 formal acceptance while retaining bounded mechanism evidence and hardening the next audit path."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: N02
+    routing: direct
+    provenance: ai-executed
+    summary: "Reproduced one-coordinate coverage disagreement between CUDA float32 and high-precision arithmetic."
+  - turn: 1
+    type: observation
+    id: O05
+    routing: staged
+    provenance: ai-suggested
+    summary: "Coverage endpoint arithmetic is not fully specified by WM-001."
+  - turn: 1
+    type: observation
+    id: O06
+    routing: staged
+    provenance: ai-suggested
+    summary: "Audit covered counts and guarded boundary coordinates instead of aggregate fractions."
+  - turn: 2
+    type: experiment
+    id: N03
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed eight formal lifecycle replicates; producer K0-K7 passed and the pre-bound audit returned two failures."
+  - turn: 2
+    type: decision
+    id: N04
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected attempt acceptance without treating the bounded evidence or hypothesis as refuted."
+  - turn: 2
+    type: experiment
+    id: N05
+    routing: direct
+    provenance: ai-executed
+    summary: "Hardened future auditor parity, coverage comparison, and rejected-evidence custody."
+  - turn: 2
+    type: architecture
+    id: O01
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the one-chain maturity architecture as A01."
+  - turn: 2
+    type: architecture
+    id: O02
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized transactional model ownership as A02."
+  - turn: 2
+    type: constraint
+    id: O04
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the offline-data boundary as R01."
+  - turn: 2
+    type: constraint
+    id: O05
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized bound coverage arithmetic as R02."
+  - turn: 2
+    type: heuristic
+    id: O06
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized target-count coverage auditing as H01."
+  - turn: 2
+    type: claim
+    id: O07
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized bounded WM-001 lifecycle mechanism evidence as C01."
+  - turn: 2
+    type: constraint
+    id: O08
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized prospective-only confirmatory audit correction as R03."
+  - turn: 2
+    type: constraint
+    id: O09
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized rejected-evidence custody without weaker acceptance as R04."
+
+ai_actions:
+  - turn: 1
+    action: "Decoded the formal prediction sidecar and independently replayed producer, auditor, and high-precision PIT coverage arithmetic."
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
+  - turn: 2
+    action: >-
+      Recomputed formal effects from raw replicate evidence, completed an
+      adversarial semantic review, created an immutable rejected adjudication,
+      repaired future audit/adjudication harnesses, ran all checks, and committed
+      the tracked result record as 77d6db6.
+    provenance: ai-executed
+    files_changed:
+      - "README.md"
+      - "bench/world_model_lifecycle/"
+      - "docs/architecture.md"
+      - "docs/wm001-v130-formal-results.md"
+      - "tests/"
+      - "artifacts/wm001-audits/"
+      - "artifacts/wm001-adjudications/"
+      - "ara/"
+
+claims_touched:
+  - id: C01
+    action: crystallized
+    turn: 2
+
+key_context:
+  - turn: 1
+    excerpt: "The formal coverage audit mismatch is one endpoint-sensitive target, not sidecar corruption."
+  - turn: 2
+    excerpt: >-
+      The user requested the first maturity program be written down, executed
+      end to end, and returned with results for the next decision.
+
+open_threads:
+  - "Design and seal WM-001 v1.4 with exact coverage semantics, fresh seeds, and the corrected auditor before a new formal attempt."
+  - "After a clean lifecycle confirmation, choose broader environments, published baselines, and external benchmark arenas."
+
+ai_suggestions_pending:
+  - "Treat any corrected-auditor replay of v1.3 as diagnostic only."
+  - "Use a new protocol and seed domain for the next confirmatory attempt."

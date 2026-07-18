@@ -4,3 +4,15 @@ entries:
       - "Initialized a new ARA because this is the first research-significant turn after the requested reset."
       - "Routed the user's request as open question N01; no experiment choice has been affirmed."
       - "Staged O01-O04 as ai-suggested and did not crystallize them because no closure signal exists."
+  - turn: "2026-07-18_001#1"
+    notes:
+      - "Routed the independent numerical reproduction as experiment N02 with exact sidecar and audit bindings."
+      - "Staged O05 as a numerical-semantics constraint and O06 as an audit heuristic."
+      - "Did not crystallize O05 or O06: the user has not yet adjudicated the reproduced result or recommendation."
+  - turn: "2026-07-18_001#2"
+    notes:
+      - "Routed the full formal result, explicit rejected disposition, and postmortem harness verification as N03-N05."
+      - "Crystallized O01, O02, O04-O06 through artifact commitment because implemented code, the formal report, and commit 77d6db6 now depend on them."
+      - "Staged and immediately crystallized O07-O09 through artifact commitment into C01 and R03-R04."
+      - "Left O03 staged: its early candidate mentions reservoir replay, while the sealed experiment used balanced replay; no exact closure signal applies to that wording."
+      - "Kept C01 explicitly bounded and separate from formal acceptance because the pre-bound audit did not pass."
