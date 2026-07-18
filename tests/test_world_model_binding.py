@@ -12,46 +12,51 @@ from bench.world_model_lifecycle import verify as verify_module
 from bench.world_model_lifecycle.planning import run_pendulum_conformance
 
 
-def test_protocol_130_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (3625750835, 2671781227)
+def test_protocol_140_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (2439054559, 3246851043)
     assert verify_module.FORMAL_SEEDS == (
-        17123296,
-        3280610186,
-        2725263418,
-        3124246399,
-        4093604926,
-        3908390087,
-        3332986400,
-        724244869,
+        339970590,
+        474769515,
+        550273937,
+        438984650,
+        2732731971,
+        2253809848,
+        2206960337,
+        3506881479,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            3625750835,
+            2439054559,
             index,
         )
         for index in range(8)
     ] == [
-        2942674611,
-        2293535130,
-        4012898876,
-        2683320388,
-        907306470,
-        412736665,
-        2342122439,
-        3346769572,
+        1501666155,
+        608622105,
+        3038957295,
+        2485648490,
+        3416187949,
+        228997209,
+        2858985894,
+        450599828,
     ]
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            2671781227,
+            3246851043,
             0,
         )
-        == 1797070682
+        == 11246224
     )
+    assert (
+        tuple(verify_module.derive_master_seed("development", index) for index in range(2))
+        == verify_module.DEVELOPMENT_SEEDS
+    )
+    assert tuple(verify_module.derive_master_seed("formal", index) for index in range(8)) == verify_module.FORMAL_SEEDS
 
 
-def test_protocol_130_irrelevant_control_contract_is_bound() -> None:
+def test_protocol_140_irrelevant_control_contract_is_bound() -> None:
     assert (
         "collect_irrelevant",
         verify_module.TASK_IRRELEVANT,
@@ -90,32 +95,94 @@ def test_protocol_130_irrelevant_control_contract_is_bound() -> None:
     ) in verify_module.EPISODE_CONTRACTS
 
 
-def test_formal_binding_schema_binds_protocol_130_and_fresh_seeds() -> None:
+def test_result_runtime_must_equal_formal_binding_runtime() -> None:
+    runtime = {
+        "platform": "bound-platform",
+        "device": "cuda",
+        "deterministic_algorithms": True,
+    }
+    verify_module._verify_result_runtime_binding(
+        {
+            "platform": "bound-platform",
+            "device": "cuda",
+            "deterministic_algorithms": True,
+        },
+        runtime,
+    )
+    with pytest.raises(
+        verify_module.Violation,
+        match="result runtime differs from binding",
+    ):
+        verify_module._verify_result_runtime_binding(
+            {
+                "platform": "bound-platform",
+                "device": "cpu",
+                "deterministic_algorithms": True,
+            },
+            runtime,
+        )
+
+
+def test_formal_binding_schema_binds_protocol_140_and_fresh_seeds() -> None:
     schema = json.loads(
         verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
 
-    assert schema["$id"].endswith("wm-001-formal-binding-v3.json")
-    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v3"
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.3.0"
+    assert schema["$id"].endswith("wm-001-formal-binding-v4.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v4"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.4.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
         )
         == verify_module.FORMAL_SEEDS
     )
+    assert "coverage_arithmetic" in schema["required"]
+    coverage = schema["properties"]["coverage_arithmetic"]
+    assert coverage["properties"]["semantics_id"]["const"] == ("wm001-mixture-pit-binary64-count-v1")
+    assert {
+        "producer_source_sha256",
+        "auditor_source_sha256",
+        "formal_test_report_sha256",
+        "conformance_report_sha256",
+    } <= set(coverage["required"])
 
 
-def test_raw_result_schema_binds_v130_heldout_split_and_formal_counts() -> None:
+def test_raw_result_schema_binds_v140_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
     replicate_limits = schema["allOf"][0]["then"]["properties"]["replicates"]["items"]["allOf"][1]["properties"]
+    predictive_schema = schema["$defs"]["predictiveMetric"]
+    predictive_properties = predictive_schema["properties"]
 
-    assert schema["properties"]["protocol_version"]["const"] == "1.3.0"
+    assert schema["$id"].endswith("wm-001-raw-result-v4.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v4"
+    assert schema["properties"]["protocol_version"]["const"] == "1.4.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
-    assert "predictive_validation_irrelevant" in schema["$defs"]["predictiveMetric"]["properties"]["split"]["enum"]
+    assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
+    assert {
+        "coverage_semantics",
+        "interval_90_covered_target_count",
+        "coverage_target_count",
+    } <= set(predictive_schema["required"])
+    assert predictive_properties["coverage_semantics"] == {
+        "const": "wm001-mixture-pit-binary64-count-v1",
+    }
+    assert predictive_properties["interval_90_covered_target_count"] == {
+        "type": "integer",
+        "minimum": 0,
+    }
+    assert predictive_properties["coverage_target_count"] == {
+        "type": "integer",
+        "minimum": 1,
+    }
+    assert predictive_properties["interval_90_coverage"] == {
+        "type": "number",
+        "minimum": 0.0,
+        "maximum": 1.0,
+    }
     assert replicate_limits["derived_seeds"] == {"minItems": 21, "maxItems": 21}
     assert replicate_limits["episodes"] == {"minItems": 496, "maxItems": 496}
     assert replicate_limits["transitions"] == {"minItems": 99200, "maxItems": 99200}
@@ -123,7 +190,7 @@ def test_raw_result_schema_binds_v130_heldout_split_and_formal_counts() -> None:
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v130_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v140_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -147,6 +214,7 @@ def test_formal_matrix_verifier_requires_every_exact_v130_row() -> None:
             "condition": condition,
             "checkpoint_id": checkpoint_id,
             "transition_count": 1_600,
+            "coverage_target_count": 6_400,
         }
         for split, task_id, condition, checkpoint_id in verify_module.PREDICTIVE_CONTRACTS
     ]
@@ -180,10 +248,7 @@ def test_formal_matrix_verifier_requires_every_exact_v130_row() -> None:
         "predictive_metrics": predictive,
         "policy_runs": policy_runs,
         "updates": updates,
-        "optimizer_batch_manifests": [
-            {"phase": phase}
-            for phase in verify_module.COMMITTED_PHASE_SPLITS
-        ],
+        "optimizer_batch_manifests": [{"phase": phase} for phase in verify_module.COMMITTED_PHASE_SPLITS],
     }
 
     verify_module._verify_formal_matrix(replicate, replicate_id="formal-fixture")
@@ -333,6 +398,32 @@ def test_fixed_formal_conformance_rejects_invalid_self_hash() -> None:
 
     with pytest.raises(verify_module.Violation, match="self-hash"):
         verify_module._verify_pendulum_conformance_report(report)
+
+
+def test_coverage_conformance_reproduces_endpoints_and_v130_regression() -> None:
+    report = binding_module.run_coverage_conformance()
+
+    verify_module._verify_coverage_conformance_report(report)
+    assert report["passed"] is True
+    assert report["cases"][-1]["case_id"] == "v130-disclosed-boundary-coordinate"
+    assert report["cases"][-1]["observed_pit_hex"] == "0x1.999998b3745adp-5"
+    assert report["cases"][-1]["observed_covered"] is False
+
+
+def test_coverage_conformance_rejects_rehashed_boundary_change() -> None:
+    report = binding_module.run_coverage_conformance()
+    report["cases"][-1]["target_little_endian_f32_hex"] = "00000000"
+    corpus = {
+        "semantics_id": report["semantics_id"],
+        "cases": report["cases"],
+    }
+    report["corpus_sha256"] = hashlib.sha256(binding_module.canonical_json_bytes(corpus)).hexdigest()
+    body = dict(report)
+    body.pop("report_sha256")
+    report["report_sha256"] = hashlib.sha256(binding_module.canonical_json_bytes(body)).hexdigest()
+
+    with pytest.raises(verify_module.Violation, match="boundary regression inputs"):
+        verify_module._verify_coverage_conformance_report(report)
 
 
 def test_create_binding_refuses_nonformal_conformance_budget(

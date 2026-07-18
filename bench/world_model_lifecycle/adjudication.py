@@ -2,9 +2,10 @@
 
 The producer artifact is the first custody level.  This module creates a
 separate second level after an independent audit and semantic review have
-completed.  The package copies both reports verbatim and binds their bytes to
-the finalized producer manifest, raw result, auditor source, and pre-run
-binding.
+completed.  Before accepting an audit report, adjudication reruns the current
+pre-bound auditor and requires byte-identical canonical output.  The package
+then copies both reports verbatim and binds their bytes to the finalized
+producer manifest, raw result, auditor source, and pre-run binding.
 """
 
 from __future__ import annotations
@@ -13,7 +14,9 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import sys
+import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -60,6 +63,89 @@ def _canonical_json_bytes(value: object) -> bytes:
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
+
+
+def _rerun_independent_audit(
+    producer_root: Path,
+    *,
+    auditor_source_payload: bytes,
+    protocol_payload: bytes,
+    result_schema_payload: bytes,
+) -> bytes:
+    """Execute the already-verified auditor bytes from an exclusive copy."""
+
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix="prospect-wm001-auditor-",
+        ) as temporary:
+            private_root = Path(temporary)
+            private_source = private_root / "artifact_audit.py"
+            private_schema = private_root / "schemas" / "raw-result.schema.json"
+            atomic_write_exclusive(private_source, auditor_source_payload)
+            private_schema.parent.mkdir(mode=0o700)
+            atomic_write_exclusive(
+                private_schema,
+                result_schema_payload,
+            )
+            atomic_write_exclusive(
+                private_root / "protocol.json",
+                protocol_payload,
+            )
+            os.chmod(private_source, 0o400)
+            source_descriptor = os.open(
+                private_source,
+                os.O_RDONLY | os.O_NOFOLLOW,
+            )
+            try:
+                descriptor_paths = (
+                    Path(f"/proc/self/fd/{source_descriptor}"),
+                    Path(f"/dev/fd/{source_descriptor}"),
+                )
+                inherited_source = next(
+                    (candidate for candidate in descriptor_paths if candidate.exists()),
+                    None,
+                )
+                if inherited_source is None:
+                    raise AdjudicationError("platform cannot execute a descriptor-bound auditor copy")
+                command = [
+                    sys.executable,
+                    "-I",
+                    "-B",
+                    str(inherited_source),
+                    str(producer_root),
+                ]
+                completed = subprocess.run(
+                    command,
+                    check=False,
+                    capture_output=True,
+                    env=dict(os.environ),
+                    pass_fds=(source_descriptor,),
+                )
+            finally:
+                os.close(source_descriptor)
+            if (
+                _read_regular_file(
+                    private_source,
+                    limit=_MAX_AUDITOR_SOURCE_BYTES,
+                    label="private independent auditor source",
+                )
+                != auditor_source_payload
+            ):
+                raise AdjudicationError("private independent auditor source changed during execution")
+    except OSError as error:
+        raise AdjudicationError(f"fresh independent-audit recomputation failed: {error}") from error
+    if completed.returncode not in {0, 1}:
+        diagnostic = completed.stderr[:4096].decode("utf-8", errors="replace")
+        raise AdjudicationError(
+            f"fresh independent-audit recomputation failed with exit {completed.returncode}: {diagnostic}"
+        )
+    if len(completed.stdout) > _MAX_AUDIT_BYTES:
+        raise AdjudicationError(f"fresh independent-audit report exceeds its {_MAX_AUDIT_BYTES}-byte limit")
+    _parse_canonical_json_object(
+        completed.stdout,
+        label="fresh independent audit report",
+    )
+    return completed.stdout
 
 
 def _read_regular_file(path: Path, *, limit: int, label: str) -> bytes:
@@ -168,10 +254,11 @@ def _verify_result_identity(
     result_payload: bytes,
 ) -> tuple[str, str | None]:
     if (
-        result.get("schema") != "prospect.world-model-lifecycle.raw-result.v3"
+        result.get("schema") != "prospect.world-model-lifecycle.raw-result.v4"
         or result.get("experiment_id") != "WM-001"
+        or result.get("protocol_version") != "1.4.0"
     ):
-        raise AdjudicationError("raw result is not a WM-001 raw-result v3 document")
+        raise AdjudicationError("raw result is not a WM-001 protocol-1.4 raw-result v4 document")
     lane = result.get("lane")
     if lane not in {"development", "formal"}:
         raise AdjudicationError("raw result lane is invalid")
@@ -213,6 +300,57 @@ def _verify_result_identity(
         filename="formal-binding.json",
         expected_payload=binding_payload,
     )
+    binding = _parse_canonical_json_object(binding_payload, label="copied formal binding")
+    binding_protocol = binding.get("protocol")
+    if (
+        binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v4"
+        or binding.get("experiment_id") != "WM-001"
+        or not isinstance(binding_protocol, Mapping)
+        or binding_protocol.get("version") != "1.4.0"
+        or binding_protocol.get("sha256") != result.get("protocol_sha256")
+    ):
+        raise AdjudicationError("formal binding identity and protocol do not agree with the raw result")
+    execution = result.get("execution")
+    binding_runtime = binding.get("runtime")
+    if (
+        not isinstance(execution, Mapping)
+        or not isinstance(binding_runtime, Mapping)
+        or execution.get("platform") != binding_runtime.get("platform")
+        or execution.get("device") != binding_runtime.get("device")
+        or execution.get("deterministic_algorithms") != binding_runtime.get("deterministic_algorithms")
+        or execution.get("deterministic_algorithms") is not True
+    ):
+        raise AdjudicationError("formal result runtime differs from its pre-run binding")
+    launch_payload = _read_regular_file(
+        producer_root / "formal-launch.json",
+        limit=_MAX_PRODUCER_MANIFEST_BYTES,
+        label="copied formal launch record",
+    )
+    launch = _parse_canonical_json_object(
+        launch_payload,
+        label="copied formal launch record",
+    )
+    launch_body = dict(launch)
+    launch_record_sha256 = launch_body.pop("record_sha256", None)
+    if (
+        launch.get("schema") != "prospect.wm001.formal-launch.v1"
+        or launch.get("experiment_id") != "WM-001"
+        or launch.get("protocol_version") != "1.4.0"
+        or launch.get("formal_binding_sha256") != binding_digest
+        or launch.get("attempt_directory") != producer_root.name
+        or not isinstance(execution, Mapping)
+        or execution.get("formal_launch_file") != "formal-launch.json"
+        or execution.get("formal_launch_sha256") != _sha256(launch_payload)
+        or launch.get("git_commit") != execution.get("git_commit")
+        or launch.get("git_tree") != execution.get("git_tree")
+        or launch_record_sha256 != _sha256(_canonical_json_bytes(launch_body))
+    ):
+        raise AdjudicationError("formal result does not bind its unique v1.4 launch record")
+    _manifested_digest(
+        producer_manifest,
+        filename="formal-launch.json",
+        expected_payload=launch_payload,
+    )
     return lane, binding_digest
 
 
@@ -230,13 +368,14 @@ def _verify_acceptance_gates(result: Mapping[str, object]) -> None:
 def _verify_audit_identity(
     audit: Mapping[str, object],
     *,
+    lane: str,
     producer_root: Path,
     producer_manifest_sha256: str,
     result_sha256: str,
 ) -> bool:
     """Verify upstream audit identity/custody and return claim cleanliness."""
 
-    if audit.get("schema") != "prospect.world-model-lifecycle.artifact-audit.v1":
+    if audit.get("schema") != "prospect.world-model-lifecycle.artifact-audit.v2" or audit.get("lane") != lane:
         raise AdjudicationError("independent audit report has the wrong semantic identity")
     raw_artifact_root = audit.get("artifact_root")
     if not isinstance(raw_artifact_root, str) or not raw_artifact_root:
@@ -258,6 +397,7 @@ def _verify_audit_identity(
     gaps = audit.get("coverage_gaps")
     if (
         type(audit.get("integrity_passed")) is not bool
+        or type(audit.get("engineering_complete")) is not bool
         or type(audit.get("complete_for_claim")) is not bool
         or type(audit.get("passed")) is not bool
         or not isinstance(counts, Mapping)
@@ -276,14 +416,16 @@ def _verify_audit_identity(
     failed_count = cast(int, counts["failed"])
     gap_count = cast(int, counts["coverage_gaps"])
     integrity_passed = cast(bool, audit["integrity_passed"])
+    engineering_complete = cast(bool, audit["engineering_complete"])
     complete_for_claim = cast(bool, audit["complete_for_claim"])
     passed = cast(bool, audit["passed"])
     if (
         failed_count != len(findings)
         or gap_count != len(gaps)
         or integrity_passed != (failed_count == 0)
-        or complete_for_claim != (gap_count == 0)
-        or passed != (integrity_passed and complete_for_claim)
+        or engineering_complete != (gap_count == 0)
+        or complete_for_claim != (lane == "formal" and engineering_complete)
+        or passed != (integrity_passed and engineering_complete)
     ):
         raise AdjudicationError("independent audit status block is internally inconsistent")
 
@@ -296,7 +438,45 @@ def _verify_audit_identity(
     ):
         raise AdjudicationError("independent audit custody does not bind the completed producer manifest")
 
-    return passed
+    audit_implementation = audit.get("audit_implementation")
+    if not isinstance(audit_implementation, Mapping):
+        raise AdjudicationError("independent audit implementation identity is missing")
+    auditor_digest = audit_implementation.get("auditor_source_sha256")
+    if not isinstance(auditor_digest, str) or len(auditor_digest) != _SHA256_LENGTH:
+        raise AdjudicationError("independent audit source digest is invalid")
+    binding_path = producer_root / "formal-binding.json"
+    if binding_path.is_file():
+        binding_payload = _read_regular_file(
+            binding_path,
+            limit=_MAX_PRODUCER_MANIFEST_BYTES,
+            label="copied formal binding",
+        )
+        binding = _parse_canonical_json_object(binding_payload, label="copied formal binding")
+        coverage_arithmetic = binding.get("coverage_arithmetic")
+        if not isinstance(coverage_arithmetic, Mapping):
+            raise AdjudicationError("formal binding has no coverage arithmetic identity")
+        snapshot_payload = _read_regular_file(
+            producer_root / "source" / AUDITOR_SOURCE_NAME,
+            limit=_MAX_AUDITOR_SOURCE_BYTES,
+            label="formal auditor source snapshot",
+        )
+        expected_auditor_digest = _sha256(snapshot_payload)
+        if (
+            audit_implementation.get("bound_auditor_source_sha256") != expected_auditor_digest
+            or auditor_digest != expected_auditor_digest
+            or coverage_arithmetic.get("auditor_source_sha256") != expected_auditor_digest
+            or audit_implementation.get("formal_test_report_sha256")
+            != coverage_arithmetic.get("formal_test_report_sha256")
+            or audit_implementation.get("coverage_conformance_report_sha256")
+            != coverage_arithmetic.get("conformance_report_sha256")
+            or audit_implementation.get("auditor_source_matches_binding") is not True
+            or audit_implementation.get("coverage_conformance_verified") is not True
+        ):
+            raise AdjudicationError(
+                "independent audit source, tests, or coverage conformance do not match the pre-outcome binding"
+            )
+
+    return passed and (lane != "formal" or complete_for_claim)
 
 
 def _verify_formal_auditor_snapshot(
@@ -316,8 +496,22 @@ def _verify_formal_auditor_snapshot(
         limit=_MAX_AUDITOR_SOURCE_BYTES,
         label="formal auditor source snapshot",
     )
-    if _sha256(payload) != auditor_source_sha256:
-        raise AdjudicationError("formal source snapshot and adjudication auditor source do not agree")
+    binding_payload = _read_regular_file(
+        producer_root / "formal-binding.json",
+        limit=_MAX_PRODUCER_MANIFEST_BYTES,
+        label="copied formal binding",
+    )
+    binding = _parse_canonical_json_object(
+        binding_payload,
+        label="copied formal binding",
+    )
+    coverage_arithmetic = binding.get("coverage_arithmetic")
+    if (
+        _sha256(payload) != auditor_source_sha256
+        or not isinstance(coverage_arithmetic, Mapping)
+        or coverage_arithmetic.get("auditor_source_sha256") != auditor_source_sha256
+    ):
+        raise AdjudicationError("formal binding, source snapshot, and adjudication auditor source do not agree")
 
 
 def _verify_semantic_review(
@@ -409,28 +603,6 @@ def create_adjudication_package(
             raise AdjudicationError("development evidence cannot receive an accepted disposition")
         _verify_acceptance_gates(result)
 
-    audit_payload = _read_regular_file(
-        report_path,
-        limit=_MAX_AUDIT_BYTES,
-        label="independent audit report",
-    )
-    audit = _parse_canonical_json_object(
-        audit_payload,
-        label="independent audit report",
-    )
-    audit_sha256 = _sha256(audit_payload)
-    audit_clean_for_claim = _verify_audit_identity(
-        audit,
-        producer_root=root,
-        producer_manifest_sha256=producer_manifest_sha256,
-        result_sha256=result_sha256,
-    )
-    if disposition in {"pending", "accepted"} and not audit_clean_for_claim:
-        raise AdjudicationError(
-            f"{disposition} adjudication requires an independent audit that passes "
-            "with no failures or claim-completeness gaps"
-        )
-
     auditor_source_payload = _read_regular_file(
         AUDITOR_SOURCE_PATH,
         limit=_MAX_AUDITOR_SOURCE_BYTES,
@@ -441,6 +613,67 @@ def create_adjudication_package(
         _verify_formal_auditor_snapshot(
             root,
             auditor_source_sha256=auditor_source_sha256,
+        )
+        protocol_support_path = root / "protocol.json"
+        result_schema_support_path = root / "schemas" / "raw-result.schema.json"
+    else:
+        protocol_support_path = HERE / "protocol.json"
+        result_schema_support_path = HERE / "schemas" / "raw-result.schema.json"
+    protocol_support_payload = _read_regular_file(
+        protocol_support_path,
+        limit=_MAX_AUDITOR_SOURCE_BYTES,
+        label="auditor protocol",
+    )
+    result_schema_support_payload = _read_regular_file(
+        result_schema_support_path,
+        limit=_MAX_AUDITOR_SOURCE_BYTES,
+        label="auditor raw-result schema",
+    )
+    if lane == "formal":
+        _manifested_digest(
+            producer_manifest,
+            filename="protocol.json",
+            expected_payload=protocol_support_payload,
+        )
+        _manifested_digest(
+            producer_manifest,
+            filename="schemas/raw-result.schema.json",
+            expected_payload=result_schema_support_payload,
+        )
+        if _sha256(protocol_support_payload) != result.get("protocol_sha256"):
+            raise AdjudicationError("formal auditor support protocol differs from the raw result")
+
+    audit_payload = _read_regular_file(
+        report_path,
+        limit=_MAX_AUDIT_BYTES,
+        label="independent audit report",
+    )
+    audit = _parse_canonical_json_object(
+        audit_payload,
+        label="independent audit report",
+    )
+    recomputed_audit_payload = _rerun_independent_audit(
+        root,
+        auditor_source_payload=auditor_source_payload,
+        protocol_payload=protocol_support_payload,
+        result_schema_payload=result_schema_support_payload,
+    )
+    if audit_payload != recomputed_audit_payload:
+        raise AdjudicationError(
+            "supplied independent audit report does not exactly match a fresh canonical run of the pre-bound auditor"
+        )
+    audit_sha256 = _sha256(audit_payload)
+    audit_clean_for_claim = _verify_audit_identity(
+        audit,
+        lane=lane,
+        producer_root=root,
+        producer_manifest_sha256=producer_manifest_sha256,
+        result_sha256=result_sha256,
+    )
+    if disposition in {"pending", "accepted"} and not audit_clean_for_claim:
+        raise AdjudicationError(
+            f"{disposition} adjudication requires an independent audit that passes "
+            "with no failures or claim-completeness gaps"
         )
 
     review_payload: bytes | None = None

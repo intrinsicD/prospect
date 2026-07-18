@@ -22,8 +22,11 @@ from .verify import (
 )
 
 REPO = Path(__file__).resolve().parents[2]
+HERE = Path(__file__).resolve().parent
 LOCKFILE_PATH = REPO / "requirements-wm001.lock"
 MANIFEST_NAME = "producer-manifest.json"
+FORMAL_LAUNCH_NAME = "formal-launch.json"
+FORMAL_RESULTS_ROOT = HERE / "results" / "formal"
 
 
 def utc_now() -> str:
@@ -66,6 +69,86 @@ def copy_file_exclusive(source: Path, destination: Path) -> None:
     if not source.is_file():
         raise FileNotFoundError(f"required evidence file is missing: {source}")
     atomic_write_exclusive(destination, source.read_bytes())
+
+
+def formal_launch_marker_path(
+    binding_path: Path,
+    output_directory: Path,
+    *,
+    formal_results_root: Path = FORMAL_RESULTS_ROOT,
+) -> tuple[Path, str]:
+    """Validate the canonical per-binding output namespace and locate the protocol-wide claim."""
+
+    if binding_path.is_symlink() or not binding_path.is_file():
+        raise ValueError("formal binding must be a regular non-symbolic-link file")
+    binding_payload = binding_path.read_bytes()
+    try:
+        binding = json.loads(binding_payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("formal binding is not valid JSON") from error
+    if (
+        not isinstance(binding, dict)
+        or binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v4"
+        or binding.get("experiment_id") != "WM-001"
+        or not isinstance(binding.get("protocol"), dict)
+        or binding["protocol"].get("version") != "1.4.0"
+    ):
+        raise ValueError("formal binding is not a WM-001 protocol-1.4 binding")
+    binding_sha256 = hashlib.sha256(binding_payload).hexdigest()
+    if formal_results_root.is_symlink():
+        raise ValueError("formal results root must not be a symbolic link")
+    results_root = formal_results_root.resolve()
+    binding_root = results_root / binding_sha256
+    binding_root.mkdir(parents=True, exist_ok=True)
+    if binding_root.is_symlink() or binding_root.resolve() != binding_root:
+        raise ValueError("formal binding-results root is aliased")
+    output = output_directory.resolve()
+    if output.parent != binding_root or not output.name or output.name in {".", ".."}:
+        raise ValueError(
+            "formal output must be one new direct child of results/formal/<binding-sha256>"
+        )
+    return results_root / FORMAL_LAUNCH_NAME, binding_sha256
+
+
+def claim_formal_launch(
+    binding_path: Path,
+    output_directory: Path,
+    *,
+    formal_results_root: Path = FORMAL_RESULTS_ROOT,
+) -> Path:
+    """Atomically consume protocol 1.4's sole formal launch across all bindings."""
+
+    marker_path, binding_sha256 = formal_launch_marker_path(
+        binding_path,
+        output_directory,
+        formal_results_root=formal_results_root,
+    )
+    binding = _load_json(binding_path)
+    source = binding.get("source", {})
+    if not isinstance(source, dict):
+        raise ValueError("formal binding source block is invalid")
+    record: dict[str, object] = {
+        "schema": "prospect.wm001.formal-launch.v1",
+        "experiment_id": "WM-001",
+        "protocol_version": "1.4.0",
+        "formal_binding_sha256": binding_sha256,
+        "attempt_directory": output_directory.resolve().name,
+        "claimed_at_utc": utc_now(),
+        "git_commit": source.get("git_commit"),
+        "git_tree": source.get("git_tree"),
+    }
+    record["record_sha256"] = hashlib.sha256(_canonical_json_bytes(record)).hexdigest()
+    try:
+        atomic_write_exclusive(
+            marker_path,
+            _canonical_json_bytes(record) + b"\n",
+        )
+    except FileExistsError:
+        raise RuntimeError(
+            "protocol 1.4 already has a formal launch claim; "
+            "same-version resume or retry is forbidden"
+        ) from None
+    return marker_path
 
 
 def verify_producer_manifest(output_directory: Path) -> dict[str, Any]:
@@ -249,12 +332,14 @@ class ProducerAttempt(AbstractContextManager["ProducerAttempt"]):
         source = binding.get("source", {})
         environment = binding.get("environment", {})
         irrelevant_control = binding.get("irrelevant_control", {})
+        coverage_arithmetic = binding.get("coverage_arithmetic", {})
         if (
             not isinstance(source, dict)
             or not isinstance(environment, dict)
             or not isinstance(irrelevant_control, dict)
+            or not isinstance(coverage_arithmetic, dict)
         ):
-            raise ValueError("formal binding source/environment/control blocks are invalid")
+            raise ValueError("formal binding source/environment/control/coverage blocks are invalid")
         test_report = _safe_sibling(
             binding_path,
             source.get("test_report_file"),
@@ -269,6 +354,11 @@ class ProducerAttempt(AbstractContextManager["ProducerAttempt"]):
             binding_path,
             irrelevant_control.get("conformance_report_file"),
             field="irrelevant_control.conformance_report_file",
+        )
+        coverage_conformance_report = _safe_sibling(
+            binding_path,
+            coverage_arithmetic.get("conformance_report_file"),
+            field="coverage_arithmetic.conformance_report_file",
         )
         copies = (
             (binding_path, Path("formal-binding.json")),
@@ -288,6 +378,10 @@ class ProducerAttempt(AbstractContextManager["ProducerAttempt"]):
             (
                 oscillator_conformance_report,
                 Path(oscillator_conformance_report.name),
+            ),
+            (
+                coverage_conformance_report,
+                Path(coverage_conformance_report.name),
             ),
             *_bound_implementation_copies(source),
         )

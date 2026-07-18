@@ -12,10 +12,12 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import platform
 import re
 import struct
 import sys
 from collections import Counter
+from collections.abc import Mapping
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
@@ -29,6 +31,18 @@ RESULT_SCHEMA_PATH = HERE / "schemas" / "raw-result.schema.json"
 BINDING_SCHEMA_PATH = HERE / "schemas" / "formal-binding.schema.json"
 
 FORMAL_SEEDS = (
+    339970590,
+    474769515,
+    550273937,
+    438984650,
+    2732731971,
+    2253809848,
+    2206960337,
+    3506881479,
+)
+DEVELOPMENT_SEEDS = (2439054559, 3246851043)
+COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
+_V130_MASTER_SEEDS = (
     17123296,
     3280610186,
     2725263418,
@@ -37,8 +51,24 @@ FORMAL_SEEDS = (
     3908390087,
     3332986400,
     724244869,
+    3625750835,
+    2671781227,
 )
-DEVELOPMENT_SEEDS = (3625750835, 2671781227)
+_V130_BOUNDARY_TARGET_F32_HEX = "ac3cdebd"
+_V130_BOUNDARY_MEANS_F32_HEX = (
+    "8cd85cbb",
+    "f032d7bb",
+    "d0d5aebc",
+    "fcaa09bc",
+    "0086a53a",
+)
+_V130_BOUNDARY_LOG_VARIANCES_F32_HEX = (
+    "66b8b3c0",
+    "cb11b5c0",
+    "d611b2c0",
+    "86dcb2c0",
+    "9390b2c0",
+)
 TASK_A = "pendulum_normal_torque"
 TASK_B = "pendulum_reversed_torque"
 TASK_IRRELEVANT = "independent_phase_oscillator"
@@ -131,12 +161,9 @@ PREDICTIVE_CONTRACTS = frozenset(
     }
 )
 FORMAL_EPISODE_CONTRACT_COUNTS = {
-    contract: 32 if str(contract[0]).startswith("behavior_evaluation_") else 8
-    for contract in EPISODE_CONTRACTS
+    contract: 32 if str(contract[0]).startswith("behavior_evaluation_") else 8 for contract in EPISODE_CONTRACTS
 }
-FORMAL_PREDICTIVE_CONTRACT_COUNTS = {
-    contract: 1 for contract in PREDICTIVE_CONTRACTS
-}
+FORMAL_PREDICTIVE_CONTRACT_COUNTS = {contract: 1 for contract in PREDICTIVE_CONTRACTS}
 COMMITTED_PHASE_SPLITS = {
     "train_a": ("collect_a",),
     "train_a_corrupted": ("collect_a",),
@@ -412,10 +439,108 @@ def _verify_pendulum_conformance_report(report: object) -> None:
     )
 
 
-def derive_seed(namespace: str, master_seed: int, index: int) -> int:
-    """Derive the exact protocol-1.3.0 uint32 seed."""
+def _binary64_pit_covered(pit: float) -> bool:
+    _require(math.isfinite(pit), "coverage conformance PIT is non-finite")
+    numerator, denominator = pit.as_integer_ratio()
+    return 20 * numerator >= denominator and 20 * numerator <= 19 * denominator
 
-    payload = f"WM-001|1.3.0|{namespace}|{master_seed}|{index}".encode()
+
+def _verify_coverage_conformance_report(report: object) -> None:
+    _require(isinstance(report, dict), "bound coverage conformance report is not an object")
+    _require(
+        report.get("schema") == "prospect.wm001.coverage-conformance.v1"
+        and report.get("semantics_id") == COVERAGE_SEMANTICS
+        and report.get("python_executable") == sys.executable
+        and report.get("python_implementation") == platform.python_implementation() == "CPython"
+        and report.get("python_version") == platform.python_version()
+        and report.get("platform") == platform.platform()
+        and report.get("machine") == platform.machine(),
+        "bound coverage conformance runtime identity changed",
+    )
+    rows = report.get("cases")
+    _require(isinstance(rows, list), "bound coverage conformance cases are missing")
+    direct_expected = (
+        ("lower-binary64", 0.05, True),
+        ("lower-predecessor", math.nextafter(0.05, -math.inf), False),
+        ("lower-successor", math.nextafter(0.05, math.inf), True),
+        ("upper-binary64", 0.95, True),
+        ("upper-predecessor", math.nextafter(0.95, -math.inf), True),
+        ("upper-successor", math.nextafter(0.95, math.inf), False),
+        ("central", 0.5, True),
+        ("zero-tail", 0.0, False),
+        ("one-tail", 1.0, False),
+    )
+    _require(len(rows) == len(direct_expected) + 1, "coverage conformance case count changed")
+    for row, (case_id, pit, expected) in zip(rows[: len(direct_expected)], direct_expected, strict=True):
+        _require(
+            isinstance(row, dict)
+            and row.get("case_id") == case_id
+            and row.get("kind") == "binary64_pit"
+            and row.get("pit_hex") == pit.hex()
+            and row.get("expected_covered") is expected
+            and row.get("observed_covered") is expected
+            and row.get("passed") is True
+            and _binary64_pit_covered(float.fromhex(str(row.get("pit_hex")))) is expected,
+            f"coverage conformance direct case {case_id} changed or failed",
+        )
+    regression = rows[-1]
+    _require(isinstance(regression, dict), "coverage regression case is malformed")
+    _require(
+        regression.get("case_id") == "v130-disclosed-boundary-coordinate"
+        and regression.get("kind") == "float32_mixture_inputs"
+        and regression.get("target_little_endian_f32_hex") == _V130_BOUNDARY_TARGET_F32_HEX
+        and tuple(regression.get("member_means_little_endian_f32_hex", ())) == _V130_BOUNDARY_MEANS_F32_HEX
+        and tuple(regression.get("member_log_variances_little_endian_f32_hex", ()))
+        == _V130_BOUNDARY_LOG_VARIANCES_F32_HEX,
+        "coverage v1.3 boundary regression inputs changed",
+    )
+    target = float(struct.unpack("<f", bytes.fromhex(_V130_BOUNDARY_TARGET_F32_HEX))[0])
+    means = tuple(float(struct.unpack("<f", bytes.fromhex(value))[0]) for value in _V130_BOUNDARY_MEANS_F32_HEX)
+    log_variances = tuple(
+        float(struct.unpack("<f", bytes.fromhex(value))[0]) for value in _V130_BOUNDARY_LOG_VARIANCES_F32_HEX
+    )
+    member_cdfs = []
+    for mean, log_variance in zip(means, log_variances, strict=True):
+        z_score = (target - mean) * math.exp(-0.5 * log_variance)
+        member_cdfs.append(0.5 * (1.0 + math.erf(z_score / math.sqrt(2.0))))
+    pit = math.fsum(member_cdfs) / 5
+    _require(
+        pit.hex() == "0x1.999998b3745adp-5"
+        and regression.get("expected_pit_hex") == pit.hex()
+        and regression.get("observed_pit_hex") == pit.hex()
+        and regression.get("expected_covered") is False
+        and regression.get("observed_covered") is False
+        and regression.get("passed") is True
+        and not _binary64_pit_covered(pit),
+        "coverage v1.3 boundary regression did not reproduce exactly",
+    )
+    corpus = {"semantics_id": COVERAGE_SEMANTICS, "cases": rows}
+    _require(
+        report.get("corpus_sha256") == _canonical_sha256(corpus),
+        "coverage conformance corpus digest changed",
+    )
+    body = dict(report)
+    report_sha256 = body.pop("report_sha256", None)
+    _require_sha256(report_sha256, "coverage conformance report_sha256")
+    _require(
+        report_sha256 == _canonical_sha256(body) and report.get("passed") is True,
+        "coverage conformance report self-hash or pass status changed",
+    )
+
+
+def derive_seed(namespace: str, master_seed: int, index: int) -> int:
+    """Derive the exact protocol-1.4.0 uint32 seed."""
+
+    payload = f"WM-001|1.4.0|{namespace}|{master_seed}|{index}".encode()
+    return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
+
+
+def derive_master_seed(lane: str, index: int) -> int:
+    """Derive one protocol-1.4.0 lane master from its prospective index."""
+
+    if lane not in {"development", "formal"} or index < 0:
+        raise ValueError("invalid WM-001 master-seed lane or index")
+    payload = f"WM-001|1.4.0|{lane}-master|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
@@ -493,9 +618,9 @@ def verify_protocol() -> dict[str, Any]:
         _require(_file_sha256(path) == seals[relative], f"{relative} bytes do not match SEALED_PROTOCOL.sha256")
 
     experiment = protocol.get("experiment", {})
-    _require(protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v3", "wrong protocol schema")
+    _require(protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v4", "wrong protocol schema")
     _require(experiment.get("id") == "WM-001", "wrong experiment ID")
-    _require(experiment.get("protocol_version") == "1.3.0", "wrong protocol version")
+    _require(experiment.get("protocol_version") == "1.4.0", "wrong protocol version")
     _require(experiment.get("status") == "sealed_before_formal_outcomes", "protocol is not marked sealed")
     _require(experiment.get("thresholds_sealed_before_outcomes") is True, "experiment thresholds are not sealed")
     _require(protocol.get("thresholds", {}).get("sealed_before_outcomes") is True, "threshold block is not sealed")
@@ -528,8 +653,8 @@ def verify_protocol() -> dict[str, Any]:
 
     seed_schedule = protocol.get("seed_schedule", {})
     _require(
-        seed_schedule.get("derivation_domain_version") == "1.3.0",
-        "seed derivation domain differs from protocol 1.3.0",
+        seed_schedule.get("derivation_domain_version") == "1.4.0",
+        "seed derivation domain differs from protocol 1.4.0",
     )
     formal_seeds = tuple(seed_schedule.get("formal_replicate_master_seeds", ()))
     development_seeds = tuple(seed_schedule.get("development_replicate_master_seeds", ()))
@@ -545,7 +670,51 @@ def verify_protocol() -> dict[str, Any]:
     }
     _require(
         actual_seed_counts == EXPECTED_SEED_COUNTS,
-        "seed namespace/count schedule differs from protocol 1.3.0",
+        "seed namespace/count schedule differs from protocol 1.4.0",
+    )
+    master_derivation = seed_schedule.get("master_seed_derivation", {})
+    _require(
+        isinstance(master_derivation, dict)
+        and master_derivation.get("lane_index_domains")
+        == {
+            "development": [0, 1],
+            "formal": [0, 7],
+        },
+        "master-seed derivation index domains changed",
+    )
+    _require(
+        DEVELOPMENT_SEEDS == tuple(derive_master_seed("development", index) for index in range(2))
+        and FORMAL_SEEDS == tuple(derive_master_seed("formal", index) for index in range(8)),
+        "master seeds do not match their prospective SHA-256 derivation",
+    )
+    current_streams = {
+        derive_seed(namespace, master_seed, index)
+        for master_seed in (*DEVELOPMENT_SEEDS, *FORMAL_SEEDS)
+        for namespace, count in EXPECTED_SEED_COUNTS.items()
+        for index in range(count)
+    }
+    old_streams = {
+        int.from_bytes(
+            sha256(f"WM-001|1.3.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            "big",
+            signed=False,
+        )
+        for master_seed in _V130_MASTER_SEEDS
+        for namespace, count in EXPECTED_SEED_COUNTS.items()
+        for index in range(count)
+    }
+    collision_audit = master_derivation.get("collision_audit", {})
+    _require(
+        isinstance(collision_audit, dict)
+        and collision_audit.get("current_master_seed_count") == 10
+        and collision_audit.get("current_derived_stream_count") == 1360
+        and collision_audit.get("unique_current_derived_stream_count") == len(current_streams) == 1360
+        and collision_audit.get("current_internal_collision_count") == 0
+        and collision_audit.get("master_overlap_with_v1_3_count") == 0
+        and collision_audit.get("derived_stream_overlap_with_v1_3_count") == 0
+        and set((*DEVELOPMENT_SEEDS, *FORMAL_SEEDS)).isdisjoint(_V130_MASTER_SEEDS)
+        and current_streams.isdisjoint(old_streams),
+        "master or derived seed collision audit failed",
     )
 
     tasks = protocol.get("tasks", {})
@@ -564,6 +733,34 @@ def verify_protocol() -> dict[str, Any]:
     _require(model.get("ensemble_members") == 5, "world-model ensemble size changed")
     _require(planner.get("learning_during_evaluation") is False, "evaluation learning must be disabled")
     _require(planner.get("replay_writes_during_evaluation") is False, "evaluation replay writes must be disabled")
+    predictive_secondary = protocol.get("metrics", {}).get("prediction", {}).get("secondary", ())
+    coverage_metric = next(
+        (
+            row
+            for row in predictive_secondary
+            if isinstance(row, dict) and row.get("name") == "heldout_90_percent_interval_coverage"
+        ),
+        None,
+    )
+    _require(
+        isinstance(coverage_metric, dict)
+        and coverage_metric.get("semantics_id") == COVERAGE_SEMANTICS
+        and coverage_metric.get("raw_fields")
+        == [
+            "interval_90_covered_target_count",
+            "coverage_target_count",
+            "interval_90_coverage",
+            "coverage_semantics",
+        ],
+        "coverage metric semantics or raw fields changed",
+    )
+    k3_thresholds = protocol.get("thresholds", {}).get("k3_predictive_learning", {})
+    _require(
+        k3_thresholds.get("after_a_90_percent_interval_coverage_bounds_inclusive") == [0.7, 0.99]
+        and "10*C >= 7*T" in str(k3_thresholds.get("after_a_coverage_decision_arithmetic"))
+        and "100*C <= 99*T" in str(k3_thresholds.get("after_a_coverage_decision_arithmetic")),
+        "coverage thresholds or count-space decision arithmetic changed",
+    )
     _require(
         protocol.get("experience_and_learning", {}).get("task_a_update", {}).get("optimizer_steps") == 2000,
         "task-A update budget changed",
@@ -602,12 +799,36 @@ def verify_protocol() -> dict[str, Any]:
         == REQUIRED_COMPONENTS,
         "checkpoint component contract changed",
     )
+    development_lane = protocol.get("lanes", {}).get("development", {})
+    formal_lane = protocol.get("lanes", {}).get("formal", {})
     _require(
-        result_schema.get("$id") == "https://prospect.local/schemas/wm-001-raw-result-v3.json",
+        development_lane.get("tuning_allowed") is False
+        and "K3-K6 development performance values are descriptive" in str(development_lane.get("rule"))
+        and tuple(development_lane.get("master_seeds", ())) == DEVELOPMENT_SEEDS,
+        "development rehearsal governance changed",
+    )
+    _require(
+        tuple(formal_lane.get("master_seeds", ())) == FORMAL_SEEDS
+        and "sole permitted producer attempt" in str(formal_lane.get("launch_rule"))
+        and "no same-version formal rerun" in str(formal_lane.get("launch_rule")),
+        "single-attempt formal governance changed",
+    )
+    _require(
+        set(protocol.get("bindings", {}).get("coverage_arithmetic", {}).get("required", ()))
+        >= {
+            "semantics identifier",
+            "exact CPython executable and platform identity",
+            "content-addressed conformance corpus and report",
+            "producer-reference and independent-auditor agreement",
+        },
+        "coverage arithmetic binding contract is incomplete",
+    )
+    _require(
+        result_schema.get("$id") == "https://prospect.local/schemas/wm-001-raw-result-v4.json",
         "wrong raw-result schema",
     )
     _require(
-        binding_schema.get("$id") == "https://prospect.local/schemas/wm-001-formal-binding-v3.json",
+        binding_schema.get("$id") == "https://prospect.local/schemas/wm-001-formal-binding-v4.json",
         "wrong formal-binding schema",
     )
     return protocol
@@ -619,12 +840,12 @@ def verify_binding(path: Path) -> dict[str, Any]:
     protocol = verify_protocol()
     binding = _load_json(path)
     _validate_json_schema(binding, _load_json(BINDING_SCHEMA_PATH), label="formal binding")
-    _require(binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v3", "wrong binding schema")
+    _require(binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v4", "wrong binding schema")
     _require(binding.get("experiment_id") == "WM-001", "binding has wrong experiment")
     _parse_timestamp(binding.get("sealed_at_utc"), "sealed_at_utc")
 
     bound_protocol = binding.get("protocol", {})
-    _require(bound_protocol.get("version") == "1.3.0", "binding has wrong protocol version")
+    _require(bound_protocol.get("version") == "1.4.0", "binding has wrong protocol version")
     _require(bound_protocol.get("sha256") == _file_sha256(PROTOCOL_PATH), "binding has wrong protocol digest")
     _require(
         bound_protocol.get("raw_result_schema_sha256") == _file_sha256(RESULT_SCHEMA_PATH),
@@ -789,6 +1010,50 @@ def verify_binding(path: Path) -> dict[str, Any]:
         "bound oscillator conformance report is not canonical JSON",
     )
 
+    coverage_arithmetic = binding.get("coverage_arithmetic", {})
+    _require(
+        coverage_arithmetic.get("semantics_id") == COVERAGE_SEMANTICS
+        and coverage_arithmetic.get("python_executable") == sys.executable
+        and coverage_arithmetic.get("python_implementation") == platform.python_implementation() == "CPython"
+        and coverage_arithmetic.get("python_version") == platform.python_version()
+        and coverage_arithmetic.get("platform") == platform.platform()
+        and coverage_arithmetic.get("machine") == platform.machine(),
+        "bound coverage arithmetic runtime identity changed",
+    )
+    _require(
+        coverage_arithmetic.get("producer_source_sha256") == _file_sha256(HERE / "model.py")
+        and coverage_arithmetic.get("auditor_source_sha256") == _file_sha256(HERE / "artifact_audit.py")
+        and coverage_arithmetic.get("formal_test_report_sha256") == source.get("test_report_sha256"),
+        "bound coverage source or test-report digest changed",
+    )
+    coverage_conformance_path = _binding_sibling(
+        path,
+        coverage_arithmetic.get("conformance_report_file"),
+        "coverage_arithmetic.conformance_report_file",
+    )
+    _require(coverage_conformance_path.is_file(), "bound coverage conformance report is missing")
+    _require(
+        coverage_arithmetic.get("conformance_report_bytes") == coverage_conformance_path.stat().st_size
+        and coverage_arithmetic.get("conformance_report_sha256") == _file_sha256(coverage_conformance_path),
+        "bound coverage conformance report size or digest changed",
+    )
+    coverage_conformance = _load_json(coverage_conformance_path)
+    _verify_coverage_conformance_report(coverage_conformance)
+    expected_coverage_bytes = (
+        json.dumps(
+            coverage_conformance,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        + b"\n"
+    )
+    _require(
+        coverage_conformance_path.read_bytes() == expected_coverage_bytes,
+        "bound coverage conformance report is not canonical JSON",
+    )
+
     checkpoint = binding.get("checkpoint_implementation", {})
     _require(tuple(checkpoint.get("component_ids", ())) == REQUIRED_COMPONENTS, "checkpoint components are incomplete")
     _require(
@@ -802,15 +1067,64 @@ def verify_binding(path: Path) -> dict[str, Any]:
     return binding
 
 
+def _verify_formal_launch_record(
+    path: Path,
+    *,
+    binding_sha256: str,
+    execution: Mapping[str, Any],
+) -> None:
+    _require(path.name == "formal-launch.json", "formal launch record has the wrong filename")
+    _require(path.is_file() and not path.is_symlink(), "formal launch record is missing or aliased")
+    payload = path.read_bytes()
+    record = _load_json(path)
+    body = dict(record)
+    record_sha256 = body.pop("record_sha256", None)
+    _require_sha256(record_sha256, "formal launch record_sha256")
+    _require(
+        record.get("schema") == "prospect.wm001.formal-launch.v1"
+        and record.get("experiment_id") == "WM-001"
+        and record.get("protocol_version") == "1.4.0"
+        and record.get("formal_binding_sha256") == binding_sha256
+        and record.get("attempt_directory") == path.parent.name
+        and record.get("git_commit") == execution.get("git_commit")
+        and record.get("git_tree") == execution.get("git_tree")
+        and record_sha256 == _canonical_sha256(body),
+        "formal launch record identity or self-hash changed",
+    )
+    expected_payload = (
+        json.dumps(
+            record,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        + b"\n"
+    )
+    _require(payload == expected_payload, "formal launch record is not canonical JSON")
+
+
+def _verify_result_runtime_binding(
+    execution: Mapping[str, Any],
+    runtime: Mapping[str, Any],
+) -> None:
+    _require(
+        execution.get("platform") == runtime.get("platform")
+        and execution.get("device") == runtime.get("device")
+        and execution.get("deterministic_algorithms") == runtime.get("deterministic_algorithms") is True,
+        "result runtime differs from binding",
+    )
+
+
 def verify_result(path: Path, binding_path: Path | None) -> dict[str, Any]:
     """Verify result-envelope invariants and causal custody."""
 
     protocol = verify_protocol()
     result = _load_json(path)
     _validate_json_schema(result, _load_json(RESULT_SCHEMA_PATH), label="raw result")
-    _require(result.get("schema") == "prospect.world-model-lifecycle.raw-result.v3", "wrong result schema")
+    _require(result.get("schema") == "prospect.world-model-lifecycle.raw-result.v4", "wrong result schema")
     _require(result.get("experiment_id") == "WM-001", "result has wrong experiment")
-    _require(result.get("protocol_version") == "1.3.0", "result has wrong protocol version")
+    _require(result.get("protocol_version") == "1.4.0", "result has wrong protocol version")
     _require(result.get("protocol_sha256") == _file_sha256(PROTOCOL_PATH), "result protocol digest mismatch")
 
     lane = result.get("lane")
@@ -838,7 +1152,32 @@ def verify_result(path: Path, binding_path: Path | None) -> dict[str, Any]:
             execution.get("dependency_lock_sha256") == binding["dependencies"]["lockfile_sha256"],
             "result dependency lock differs from binding",
         )
+        runtime = binding.get("runtime", {})
+        _require(
+            isinstance(runtime, dict),
+            "formal binding runtime block is malformed",
+        )
+        _verify_result_runtime_binding(execution, runtime)
         _require(execution.get("deterministic_algorithms") is True, "formal result was nondeterministic")
+        launch_path = path.parent / "formal-launch.json"
+        _require(
+            execution.get("formal_launch_file") == "formal-launch.json"
+            and execution.get("formal_launch_sha256") == _file_sha256(launch_path),
+            "formal result does not bind its sole-launch record",
+        )
+        _verify_formal_launch_record(
+            launch_path,
+            binding_sha256=_file_sha256(binding_path),
+            execution=execution,
+        )
+    if lane == "development":
+        execution = result.get("execution", {})
+        _require(
+            isinstance(execution, dict)
+            and execution.get("formal_launch_file") is None
+            and execution.get("formal_launch_sha256") is None,
+            "development result unexpectedly binds a formal launch",
+        )
 
     started = _parse_timestamp(result.get("started_at_utc"), "started_at_utc")
     completed = _parse_timestamp(result.get("completed_at_utc"), "completed_at_utc")
@@ -916,13 +1255,12 @@ def _verify_formal_matrix(
     *,
     replicate_id: str,
 ) -> None:
-    """Require the exact sealed v1.3 formal evidence matrix."""
+    """Require the exact sealed v1.4 formal evidence matrix."""
 
     episodes = replicate["episodes"]
     actual_episode_counts = Counter(_row_contract(row) for row in episodes)
     _require(
-        len(episodes) == 496
-        and actual_episode_counts == Counter(FORMAL_EPISODE_CONTRACT_COUNTS),
+        len(episodes) == 496 and actual_episode_counts == Counter(FORMAL_EPISODE_CONTRACT_COUNTS),
         f"{replicate_id}: formal episode matrix differs from the exact 496-episode contract",
     )
 
@@ -932,8 +1270,7 @@ def _verify_formal_matrix(
     transitions = replicate["transitions"]
     actual_transition_counts = Counter(row.get("split") for row in transitions)
     _require(
-        len(transitions) == 99_200
-        and actual_transition_counts == expected_transition_counts,
+        len(transitions) == 99_200 and actual_transition_counts == expected_transition_counts,
         f"{replicate_id}: formal transition matrix differs from the exact 99,200-transition contract",
     )
 
@@ -941,9 +1278,9 @@ def _verify_formal_matrix(
     _require(
         isinstance(predictive, list)
         and len(predictive) == 12
-        and Counter(_row_contract(row) for row in predictive)
-        == Counter(FORMAL_PREDICTIVE_CONTRACT_COUNTS)
-        and all(row.get("transition_count") == 1_600 for row in predictive),
+        and Counter(_row_contract(row) for row in predictive) == Counter(FORMAL_PREDICTIVE_CONTRACT_COUNTS)
+        and all(row.get("transition_count") == 1_600 for row in predictive)
+        and all(row.get("coverage_target_count") == 6_400 for row in predictive),
         f"{replicate_id}: formal predictive matrix differs from the exact twelve-row contract",
     )
 
@@ -958,10 +1295,7 @@ def _verify_formal_matrix(
 
     updates = replicate["updates"]
     expected_updates = Counter(
-        {
-            (phase, "committed", 2_000): 1
-            for phase in COMMITTED_PHASE_SPLITS
-        }
+        {(phase, "committed", 2_000): 1 for phase in COMMITTED_PHASE_SPLITS}
         | {("rejected_update_probe", "rejected", 0): 1}
     )
     actual_updates = Counter(
@@ -981,8 +1315,7 @@ def _verify_formal_matrix(
     _require(
         isinstance(manifests, list)
         and len(manifests) == 5
-        and Counter(row.get("phase") for row in manifests)
-        == Counter({phase: 1 for phase in COMMITTED_PHASE_SPLITS}),
+        and Counter(row.get("phase") for row in manifests) == Counter({phase: 1 for phase in COMMITTED_PHASE_SPLITS}),
         f"{replicate_id}: formal optimizer-manifest matrix differs",
     )
 
@@ -1009,8 +1342,7 @@ def _verify_update_eligibility(
     )
     expected_splits = expected_phase_splits.get(phase)
     _require(
-        expected_splits is not None
-        and tuple(update.get("eligible_splits", ())) == expected_splits,
+        expected_splits is not None and tuple(update.get("eligible_splits", ())) == expected_splits,
         f"{replicate_id}: {phase} eligible split declaration differs",
     )
     eligible = set(expected_splits or ())
@@ -1021,9 +1353,7 @@ def _verify_update_eligibility(
             f"{replicate_id}: update consumes held-out or phase-ineligible {transition_id}",
         )
     expected_ids = {
-        transition_id
-        for transition_id, transition in local_transitions.items()
-        if transition.get("split") in eligible
+        transition_id for transition_id, transition in local_transitions.items() if transition.get("split") in eligible
     }
     if phase == "rejected_update_probe":
         _require(not consumed, f"{replicate_id}: rejected probe consumed real experience")
@@ -1431,6 +1761,32 @@ def _verify_replicate(
         )
         snapshot = snapshots_by_condition.get(metric.get("condition"))
         _require(isinstance(snapshot, dict), f"{replicate_id}: predictive model snapshot missing")
+        transition_count = metric.get("transition_count")
+        covered_target_count = metric.get("interval_90_covered_target_count")
+        coverage_target_count = metric.get("coverage_target_count")
+        coverage = metric.get("interval_90_coverage")
+        _require(
+            metric.get("coverage_semantics") == COVERAGE_SEMANTICS,
+            f"{replicate_id}: predictive coverage semantics differ from v1.4",
+        )
+        _require(
+            isinstance(transition_count, int)
+            and not isinstance(transition_count, bool)
+            and isinstance(covered_target_count, int)
+            and not isinstance(covered_target_count, bool)
+            and isinstance(coverage_target_count, int)
+            and not isinstance(coverage_target_count, bool)
+            and coverage_target_count == 4 * transition_count
+            and 0 <= covered_target_count <= coverage_target_count,
+            f"{replicate_id}: predictive coverage counts are invalid",
+        )
+        _require(
+            isinstance(coverage, (int, float))
+            and not isinstance(coverage, bool)
+            and math.isfinite(float(coverage))
+            and float(coverage) == covered_target_count / coverage_target_count,
+            f"{replicate_id}: predictive coverage fraction differs from exact counts",
+        )
         for field in ("model_version", "parameter_sha256", "live_state_sha256"):
             _require(
                 metric.get(field) == snapshot.get(field),
@@ -1455,8 +1811,7 @@ def _verify_replicate(
     updates_by_phase = {update.get("phase"): update for update in updates if isinstance(update, dict)}
     _require(
         len(updates_by_phase) == len(updates)
-        and set(updates_by_phase)
-        == {*COMMITTED_PHASE_SPLITS, "rejected_update_probe"},
+        and set(updates_by_phase) == {*COMMITTED_PHASE_SPLITS, "rejected_update_probe"},
         f"{replicate_id}: update phase matrix is incomplete, duplicated, or extended",
     )
     train_a = updates_by_phase.get("train_a")
@@ -1545,11 +1900,7 @@ def _verify_replicate(
 
     manifests = replicate.get("optimizer_batch_manifests")
     _require(isinstance(manifests, list), f"{replicate_id}: optimizer manifests must be an array")
-    manifests_by_phase = {
-        manifest.get("phase"): manifest
-        for manifest in manifests
-        if isinstance(manifest, dict)
-    }
+    manifests_by_phase = {manifest.get("phase"): manifest for manifest in manifests if isinstance(manifest, dict)}
     _require(
         len(manifests) == len(COMMITTED_PHASE_SPLITS)
         and len(manifests_by_phase) == len(manifests)

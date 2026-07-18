@@ -207,6 +207,13 @@ clean commit. The producer cannot accept its own claim; an external artifact
 audit and a separate adversarial semantic review must both pass before an
 accepted adjudication package can exist.
 
+For protocol 1.4.0, the auditor selects formal arithmetic only from the bound
+runtime, verifies the result and its live accelerator/CUDA and dependency bytes
+against that runtime, and requires exact prediction-target bytes and coverage
+counts. Adjudication reruns an exclusive descriptor-bound copy of the captured
+pre-bound auditor bytes, closing the source-path swap window before it compares
+the canonical report byte for byte.
+
 The first protocol-1.1.1 formal attempt is preserved as a rejected attempt. It
 provided bounded K0–K6 pilot evidence, but its original live K7 evaluation was
 not retained and an independent learned-source control did not yet exist.
@@ -227,6 +234,18 @@ clean pass from the auditor bound before outcomes, the attempt is explicitly
 rejected even though neither finding changes a gate. The
 [formal results review](wm001-v130-formal-results.md) records the exact effects,
 claim dispositions, and next confirmation requirements.
+
+Protocol 1.4.0 performs that fresh confirmation without changing the formal
+agent, data budgets, controls, thresholds, or gate order. Coverage is now
+defined by a fixed scalar-binary64 operation sequence over the exact persisted
+float32 prediction tensors. Each row stores an authoritative covered count and
+target count; K3 applies `[0.70, 0.99]` using integer cross-products, and the
+independent auditor must reproduce every count exactly. The binding preserves
+endpoint-neighbor conformance, the disclosed v1.3 boundary coordinate, the
+auditor source digest, and the test-report digest. Fresh master seeds are
+formula-derived and collision-checked. Development is evidence/custody-only,
+and the first formal reset begins the sole permitted v1.4.0 attempt. See the
+[v1.4 confirmation plan](wm001-v140-confirmation-plan.md).
 
 ## Open engineering boundaries
 

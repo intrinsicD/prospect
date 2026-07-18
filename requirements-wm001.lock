@@ -1,4 +1,4 @@
-# WM-001 protocol 1.1.1 live execution closure.
+# WM-001 protocol 1.4.0 live execution closure.
 # Each digest covers the installed Python executable or every stable declared
 # distribution file selected by bench.world_model_lifecycle.binding.
 python==3.12.9 --distribution-sha256=d9b73f600a860cefe799d7b4d21bad64719231227c2cf326ca17ed94624841af

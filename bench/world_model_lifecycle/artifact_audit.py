@@ -5,18 +5,22 @@ checkpoint decoders.  It treats ``result.json`` and every referenced sidecar as
 untrusted input, applies explicit byte limits, decodes the safe formats again,
 and recomputes the claims that the current artifact actually makes auditable.
 
-The audit distinguishes two outcomes:
+The audit distinguishes three outcomes:
 
 ``integrity_passed``
     Every check possible from the current artifact passed.
 
-``complete_for_claim``
+``engineering_complete``
     The producer supplied enough evidence to independently bind predictions,
-    targets, controller actions, and formal execution to their claimed causes.
+    targets, and controller actions to their claimed causes.
 
-``passed`` is true only when both are true.  This prevents a byte-consistent but
-causally incomplete artifact from being mistaken for independent evidence of
-learning and retention.
+``complete_for_claim``
+    The evidence is engineering-complete and came from the formal lane.
+
+For a normal audit, ``passed`` requires integrity and engineering completeness.
+Development can therefore pass its rehearsal audit without ever becoming
+claim-eligible.  This prevents a clean rehearsal from being mistaken for
+confirmatory evidence of learning and retention.
 """
 
 from __future__ import annotations
@@ -25,12 +29,15 @@ import argparse
 import base64
 import binascii
 import hashlib
+import importlib.metadata
 import json
 import math
 import os
+import platform
 import stat
 import statistics
 import struct
+import subprocess
 import sys
 import zipfile
 from collections.abc import Mapping, Sequence
@@ -48,6 +55,7 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 HERE = Path(__file__).resolve().parent
 RESULT_SCHEMA_PATH = HERE / "schemas" / "raw-result.schema.json"
+_AUDITOR_SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 _MAGIC = b"PROSPECT-WM001\0"
 _PREDICTION_FORMAT = "prospect.wm001.predictive-evidence.v1"
@@ -75,7 +83,7 @@ _CEM_PLANNING_HORIZON = 10
 _CEM_OPTIM_STEPS = 3
 _CEM_NUM_CANDIDATES = 64
 _CEM_TOP_K = 8
-_SEED_HASH_DOMAIN_VERSION = "1.3.0"
+_SEED_HASH_DOMAIN_VERSION = "1.4.0"
 _EPISODE_HORIZON = 200
 _GRAPH_SCHEMA = "prospect.wm001.domain-graph.v1"
 _MAX_GRAPH_NODES = 250_000
@@ -411,6 +419,7 @@ _MAX_CHECKPOINT_COMPONENT_BYTES = 1 << 30
 _MAX_CHECKPOINT_TOTAL_BYTES = 4 << 30
 _MAX_SOURCE_FILE_BYTES = 64 << 20
 _MAX_SOURCE_SNAPSHOT_BYTES = 512 << 20
+_MAX_BOUND_PACKAGES = 512
 _MAX_PRODUCER_MANIFEST_BYTES = 64 << 20
 _MAX_PRODUCER_FILE_BYTES = 4 << 30
 _MAX_PRODUCER_TOTAL_BYTES = 16 << 30
@@ -480,6 +489,18 @@ _TASK_CONTEXT = {
     _TASK_IRRELEVANT: 2.0,
 }
 _FORMAL_SEEDS = (
+    339_970_590,
+    474_769_515,
+    550_273_937,
+    438_984_650,
+    2_732_731_971,
+    2_253_809_848,
+    2_206_960_337,
+    3_506_881_479,
+)
+_DEVELOPMENT_SEEDS = (2_439_054_559, 3_246_851_043)
+_COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
+_V130_MASTER_SEEDS = (
     17_123_296,
     3_280_610_186,
     2_725_263_418,
@@ -488,8 +509,24 @@ _FORMAL_SEEDS = (
     3_908_390_087,
     3_332_986_400,
     724_244_869,
+    3_625_750_835,
+    2_671_781_227,
 )
-_DEVELOPMENT_SEEDS = (3_625_750_835, 2_671_781_227)
+_V130_BOUNDARY_TARGET_F32_HEX = "ac3cdebd"
+_V130_BOUNDARY_MEANS_F32_HEX = (
+    "8cd85cbb",
+    "f032d7bb",
+    "d0d5aebc",
+    "fcaa09bc",
+    "0086a53a",
+)
+_V130_BOUNDARY_LOG_VARIANCES_F32_HEX = (
+    "66b8b3c0",
+    "cb11b5c0",
+    "d611b2c0",
+    "86dcb2c0",
+    "9390b2c0",
+)
 _EXPECTED_PHASE_SPLITS = {
     "train_a": ("collect_a",),
     "train_a_irrelevant": ("collect_irrelevant",),
@@ -583,6 +620,7 @@ class _Audit:
         self.findings: list[dict[str, object]] = []
         self.coverage_gaps: list[dict[str, object]] = []
         self.independence_limitations: list[str] = []
+        self.coverage_conformance_verified = False
         self.custody: dict[str, object] = {
             "producer_manifest_checked": False,
             "producer_manifest_status": None,
@@ -843,16 +881,20 @@ def recompute_prediction_evidence(payload: bytes) -> PredictionRecomputation:
     squared_error = np.square(targets - ensemble_mean)
     normalized_rmse = float(math.sqrt(float(np.mean(squared_error, dtype=np.float64))))
 
-    z_score = (target64[None, :, :] - means64) * np.exp(-0.5 * log_variances64)
-    erf_values = np.fromiter(
-        (math.erf(float(value) / math.sqrt(2.0)) for value in z_score.flat),
-        dtype=np.float64,
-        count=z_score.size,
-    ).reshape(z_score.shape)
-    mixture_pit = np.mean(0.5 * (1.0 + erf_values), axis=0)
-    covered_targets = (mixture_pit >= 0.05) & (mixture_pit <= 0.95)
-    covered_target_count = int(np.count_nonzero(covered_targets))
-    coverage_target_count = int(covered_targets.size)
+    covered_target_count = 0
+    coverage_target_count = int(targets.size)
+    for row_index in range(row_count):
+        for target_index in range(4):
+            member_cdfs: list[float] = []
+            target = float(targets[row_index, target_index])
+            for member_index in range(5):
+                mean = float(means[member_index, row_index, target_index])
+                log_variance = float(log_variances[member_index, row_index, target_index])
+                z_score = (target - mean) * math.exp(-0.5 * log_variance)
+                member_cdfs.append(0.5 * (1.0 + math.erf(z_score / math.sqrt(2.0))))
+            mixture_pit = math.fsum(member_cdfs) / 5
+            if _binary64_mixture_pit_is_covered(mixture_pit):
+                covered_target_count += 1
     coverage = covered_target_count / coverage_target_count
     if not all(math.isfinite(value) for value in (mixture_nll, normalized_rmse, coverage)):
         raise ArtifactAuditError("recomputed prediction metrics are non-finite")
@@ -1207,76 +1249,186 @@ def _ordered_validation_ids(
     return tuple(result)
 
 
-def _stored_coverage_count(value: object, *, target_count: int) -> int | None:
-    """Recover a discrete covered-target count from a stored coverage fraction."""
+def _expected_prediction_targets_f32(
+    transitions: Sequence[Mapping[str, object]],
+    *,
+    device: str,
+) -> npt.NDArray[np.float32]:
+    """Reproduce the producer's exact bound-device target operation path."""
 
-    if (
-        target_count <= 0
-        or isinstance(value, bool)
-        or not isinstance(value, (int, float))
-    ):
-        return None
-    fraction = float(value)
-    if not math.isfinite(fraction) or fraction < 0.0 or fraction > 1.0:
-        return None
-    scaled = fraction * target_count
-    nearest = round(scaled)
-    # JSON round-tripping an exact k / target_count fraction can introduce a
-    # few binary ulps.  Express that allowance in count space; it remains many
-    # orders of magnitude smaller than one target and cannot admit an off-grid
-    # fraction as a second tolerance on the scientific comparison.
-    grid_tolerance = max(
-        1e-9,
-        8.0 * math.ulp(fraction) * target_count,
+    before_rows: list[list[float]] = []
+    after_rows: list[list[float]] = []
+    rewards: list[float] = []
+    for transition in transitions:
+        before_raw = transition.get("pre_observation")
+        after_raw = transition.get("next_observation")
+        reward = _finite_float(transition.get("reward"))
+        if (
+            not isinstance(before_raw, list)
+            or len(before_raw) != 3
+            or any(_finite_float(value) is None for value in before_raw)
+            or not isinstance(after_raw, list)
+            or len(after_raw) != 3
+            or any(_finite_float(value) is None for value in after_raw)
+            or reward is None
+        ):
+            raise ArtifactAuditError("raw transition cannot reconstruct the prediction target")
+        before_rows.append([float(value) for value in before_raw])
+        after_rows.append([float(value) for value in after_raw])
+        rewards.append(reward)
+    if not before_rows:
+        raise ArtifactAuditError("prediction target reconstruction is empty")
+
+    before_f64 = np.asarray(before_rows, dtype=np.float64)
+    after_f64 = np.asarray(after_rows, dtype=np.float64)
+    delta_f64 = np.subtract(after_f64, before_f64, dtype=np.float64)
+    reconstructed_after_f64 = np.add(
+        before_f64,
+        delta_f64,
+        dtype=np.float64,
     )
-    if (
-        nearest < 0
-        or nearest > target_count
-        or not math.isclose(scaled, nearest, rel_tol=0.0, abs_tol=grid_tolerance)
-    ):
-        return None
-    return int(nearest)
+    try:
+        import torch
+
+        destination = torch.device(device)
+        if destination.type == "cuda" and not torch.cuda.is_available():
+            raise ArtifactAuditError("bound CUDA target arithmetic is unavailable to the auditor")
+        before_f32 = torch.as_tensor(
+            before_f64,
+            dtype=torch.float32,
+        ).contiguous()
+        after_f32 = torch.as_tensor(
+            reconstructed_after_f64,
+            dtype=torch.float32,
+        ).contiguous()
+        reward_f32 = (
+            torch.as_tensor(
+                rewards,
+                dtype=torch.float32,
+            )
+            .reshape(-1, 1)
+            .contiguous()
+        )
+        before_device = before_f32.to(destination)
+        after_device = after_f32.to(destination)
+        reward_device = reward_f32.to(destination)
+        delta_scale = before_device.new_tensor((2.0, 2.0, 16.0))
+        expected = torch.cat(
+            (
+                (after_device - before_device) / delta_scale,
+                reward_device / _TARGET_REWARD_SCALE,
+            ),
+            dim=-1,
+        )
+        result = expected.detach().cpu().contiguous().numpy().astype("<f4", copy=False)
+    except ImportError as error:
+        raise ArtifactAuditError("PyTorch is required for bound-device target reconstruction") from error
+    except (RuntimeError, ValueError) as error:
+        raise ArtifactAuditError(f"bound-device target reconstruction failed: {error}") from error
+    if result.shape != (len(transitions), 4) or not np.isfinite(result).all():
+        raise ArtifactAuditError("reconstructed prediction targets have invalid shape or values")
+    return result
+
+
+def _expected_prediction_target_f32(
+    transition: Mapping[str, object],
+    *,
+    device: str = "cpu",
+) -> npt.NDArray[np.float32]:
+    return _expected_prediction_targets_f32(
+        (transition,),
+        device=device,
+    )[0]
+
+
+def _binary64_mixture_pit_is_covered(mixture_pit: float) -> bool:
+    """Apply the sealed inclusive interval to an exact binary64 ratio."""
+
+    if not math.isfinite(mixture_pit):
+        raise ArtifactAuditError("mixture PIT is non-finite")
+    numerator, denominator = mixture_pit.as_integer_ratio()
+    return 20 * numerator >= denominator and 20 * numerator <= 19 * denominator
 
 
 def _audit_prediction_coverage(
     audit: _Audit,
     recomputed: PredictionRecomputation,
-    stored: object,
+    row: Mapping[str, object],
     *,
     label: str,
     replicate_id: str,
 ) -> None:
-    """Compare coverage as integer counts with the sealed one-target allowance."""
+    """Require the complete v1.4 count contract and exact recomputation."""
 
-    stored_count = _stored_coverage_count(
-        stored,
-        target_count=recomputed.coverage_target_count,
-    )
     audit.require(
-        stored_count is not None,
-        code="prediction_coverage_grid_mismatch",
-        message=f"{label} stored coverage is malformed or not on the target-count grid",
+        row.get("coverage_semantics") == _COVERAGE_SEMANTICS,
+        code="prediction_coverage_semantics_mismatch",
+        message=f"{label} does not declare the exact sealed coverage semantics",
         replicate_id=replicate_id,
         evidence={
-            "stored": stored,
-            "target_count": recomputed.coverage_target_count,
+            "expected": _COVERAGE_SEMANTICS,
+            "stored": row.get("coverage_semantics"),
         },
     )
-    if stored_count is None:
-        return
-    count_difference = abs(recomputed.covered_target_count - stored_count)
+    transition_count = row.get("transition_count")
+    stored_count = row.get("interval_90_covered_target_count")
+    stored_target_count = row.get("coverage_target_count")
+    expected_target_count = 4 * transition_count if type(transition_count) is int and transition_count > 0 else None
+    count_contract_valid = (
+        type(stored_count) is int
+        and type(stored_target_count) is int
+        and expected_target_count is not None
+        and stored_target_count == expected_target_count
+        and recomputed.coverage_target_count == expected_target_count
+        and 0 <= stored_count <= stored_target_count
+    )
     audit.require(
-        count_difference <= 1,
+        count_contract_valid,
+        code="prediction_coverage_count_contract_mismatch",
+        message=f"{label} coverage counts do not match four targets per transition",
+        replicate_id=replicate_id,
+        evidence={
+            "transition_count": transition_count,
+            "stored_covered_target_count": stored_count,
+            "stored_coverage_target_count": stored_target_count,
+            "recomputed_coverage_target_count": recomputed.coverage_target_count,
+        },
+    )
+    if not count_contract_valid:
+        return
+    assert type(stored_count) is int
+    assert type(stored_target_count) is int
+    stored_fraction = row.get("interval_90_coverage")
+    expected_fraction = stored_count / stored_target_count
+    audit.require(
+        (
+            not isinstance(stored_fraction, bool)
+            and isinstance(stored_fraction, (int, float))
+            and math.isfinite(float(stored_fraction))
+            and float(stored_fraction) == expected_fraction
+        ),
+        code="prediction_coverage_fraction_mismatch",
+        message=f"{label} stored coverage is not the exact covered/total fraction",
+        replicate_id=replicate_id,
+        evidence={
+            "stored": stored_fraction,
+            "expected": expected_fraction,
+            "stored_covered_target_count": stored_count,
+            "stored_coverage_target_count": stored_target_count,
+        },
+    )
+    audit.require(
+        stored_count == recomputed.covered_target_count,
         code="prediction_coverage_mismatch",
-        message=f"{label} stored coverage differs from independent recomputation by more than one target",
+        message=f"{label} stored covered-target count differs from independent recomputation",
         replicate_id=replicate_id,
         evidence={
             "recomputed": recomputed.interval_90_coverage,
-            "stored": stored,
+            "stored": stored_fraction,
             "recomputed_covered_target_count": recomputed.covered_target_count,
             "stored_covered_target_count": stored_count,
             "coverage_target_count": recomputed.coverage_target_count,
-            "covered_target_count_difference": count_difference,
+            "covered_target_count_difference": abs(recomputed.covered_target_count - stored_count),
         },
     )
 
@@ -1287,6 +1439,7 @@ def _audit_predictions(
     replicate: Mapping[str, object],
     *,
     replicate_id: str,
+    device: str,
     transitions_by_id: Mapping[str, Mapping[str, object]],
     evaluated_checkpoints: Mapping[str, _EvaluatedCheckpoint],
 ) -> None:
@@ -1294,6 +1447,7 @@ def _audit_predictions(
         tuple[str, str, str],
         PredictionRecomputation,
     ] = {}
+    target_cache: dict[tuple[str, ...], bytes] = {}
     for index, row in enumerate(_mapping_rows(replicate.get("predictive_metrics"))):
         label = f"{replicate_id} predictive metric {index}"
         try:
@@ -1322,9 +1476,7 @@ def _audit_predictions(
             if isinstance(condition, str):
                 key = (task_id, split, condition)
                 if key in verified:
-                    raise ArtifactAuditError(
-                        f"{label} duplicates predictive condition {key!r}"
-                    )
+                    raise ArtifactAuditError(f"{label} duplicates predictive condition {key!r}")
                 verified[key] = recomputed
             expected_ids = _ordered_validation_ids(replicate, task_id=task_id, split=split)
             audit.require(
@@ -1339,34 +1491,37 @@ def _audit_predictions(
                 message=f"{label} transition count disagrees with its sidecar",
                 replicate_id=replicate_id,
             )
-            expected_targets: list[list[float]] = []
-            target_rows_complete = True
-            for transition_id in recomputed.transition_ids:
-                transition = transitions_by_id.get(transition_id)
-                raw_target = None if transition is None else transition.get("scaled_target")
-                if (
-                    not isinstance(raw_target, list)
-                    or len(raw_target) != 4
-                    or any(
-                        isinstance(value, bool)
-                        or not isinstance(value, (int, float))
-                        or not math.isfinite(float(value))
-                        for value in raw_target
+            source_target_rows = [
+                transitions_by_id[transition_id]
+                for transition_id in recomputed.transition_ids
+                if transition_id in transitions_by_id
+            ]
+            target_rows_complete = len(source_target_rows) == len(recomputed.transition_ids)
+            expected_target_bytes = b""
+            if target_rows_complete:
+                expected_target_bytes = target_cache.get(
+                    recomputed.transition_ids,
+                    b"",
+                )
+                if not expected_target_bytes:
+                    expected_target_bytes = (
+                        _expected_prediction_targets_f32(
+                            source_target_rows,
+                            device=device,
+                        )
+                        .astype("<f4", copy=False)
+                        .tobytes(order="C")
                     )
-                ):
-                    target_rows_complete = False
-                    break
-                expected_targets.append([float(value) for value in raw_target])
-            targets_match = target_rows_complete and np.allclose(
-                recomputed.normalized_targets,
-                np.asarray(expected_targets, dtype=np.float32),
-                rtol=2e-6,
-                atol=2e-7,
-            )
+                    target_cache[recomputed.transition_ids] = expected_target_bytes
+            actual_target_bytes = recomputed.normalized_targets.astype("<f4", copy=False).tobytes(order="C")
+            targets_match = target_rows_complete and actual_target_bytes == expected_target_bytes
             audit.require(
                 targets_match,
                 code="prediction_target_binding_mismatch",
-                message=f"{label} normalized targets do not match raw transition targets",
+                message=(
+                    f"{label} normalized target bytes do not exactly match the "
+                    "binary32 targets reconstructed from raw transitions"
+                ),
                 replicate_id=replicate_id,
             )
             evaluated = evaluated_checkpoints.get(condition) if isinstance(condition, str) else None
@@ -1440,7 +1595,7 @@ def _audit_predictions(
             _audit_prediction_coverage(
                 audit,
                 recomputed,
-                row.get("interval_90_coverage"),
+                row,
                 label=label,
                 replicate_id=replicate_id,
             )
@@ -1464,7 +1619,7 @@ def _audit_irrelevant_prediction_manipulation(
     transitions_by_id: Mapping[str, Mapping[str, object]],
     verified: Mapping[tuple[str, str, str], PredictionRecomputation],
 ) -> None:
-    """Cross-bind both v1.3 oscillator sidecars to one analytic held-out set."""
+    """Cross-bind both v1.4 oscillator sidecars to one analytic held-out set."""
 
     split = "predictive_validation_irrelevant"
     expected_ids = _ordered_validation_ids(
@@ -1475,16 +1630,12 @@ def _audit_irrelevant_prediction_manipulation(
     predictive_rows = [
         row
         for row in _mapping_rows(replicate.get("predictive_metrics"))
-        if row.get("task_id") == _TASK_IRRELEVANT
-        or row.get("split") == split
+        if row.get("task_id") == _TASK_IRRELEVANT or row.get("split") == split
     ]
     if not expected_ids and not predictive_rows:
         audit.gap(
             "irrelevant_prediction_manipulation_absent",
-            (
-                f"{replicate_id} has no held-out oscillator prediction pair "
-                "for the protocol-v1.3 manipulation check."
-            ),
+            (f"{replicate_id} has no held-out oscillator prediction pair for the protocol-v1.4 manipulation check."),
             evidence_needed=(
                 "Cold and after-irrelevant prediction sidecars over the same "
                 "disjoint predictive_validation_irrelevant transitions."
@@ -1511,9 +1662,7 @@ def _audit_irrelevant_prediction_manipulation(
     }
     pair = {key: verified[key] for key in expected_keys if key in verified}
     audit.require(
-        actual_contracts == expected_contracts
-        and len(predictive_rows) == 2
-        and set(pair) == expected_keys,
+        actual_contracts == expected_contracts and len(predictive_rows) == 2 and set(pair) == expected_keys,
         code="irrelevant_prediction_pair_incomplete",
         message=(
             f"{replicate_id} does not contain exactly the independently "
@@ -1558,9 +1707,7 @@ def _audit_irrelevant_prediction_manipulation(
             analytic_valid = False
             break
         try:
-            expected_next, expected_reward, expected_applied = (
-                _independent_oscillator_step(before)
-            )
+            expected_next, expected_reward, expected_applied = _independent_oscillator_step(before)
         except ArtifactAuditError:
             analytic_valid = False
             break
@@ -1607,9 +1754,7 @@ def _audit_irrelevant_prediction_manipulation(
     for update in _mapping_rows(replicate.get("updates")):
         eligible = update.get("eligible_transition_ids")
         if isinstance(eligible, list):
-            update_ids.update(
-                identity for identity in eligible if isinstance(identity, str)
-            )
+            update_ids.update(identity for identity in eligible if isinstance(identity, str))
     audit.require(
         bool(heldout_ids) and heldout_ids.isdisjoint(update_ids),
         code="irrelevant_validation_training_contamination",
@@ -2380,6 +2525,81 @@ def _derive_seed(namespace: str, master_seed: int, index: int = 0) -> int:
     )
 
 
+def _derive_master_seed(lane: str, index: int) -> int:
+    if lane not in {"development", "formal"} or index < 0:
+        raise ArtifactAuditError("invalid master-seed lane or index")
+    return int.from_bytes(
+        hashlib.sha256(f"WM-001|1.4.0|{lane}-master|{index}".encode()).digest()[:4],
+        "big",
+        signed=False,
+    )
+
+
+def _audit_protocol_seed_contract(
+    audit: _Audit,
+    protocol: Mapping[str, object],
+) -> None:
+    schedule = protocol.get("seed_schedule")
+    if not isinstance(schedule, Mapping):
+        audit.error("protocol_seed_contract_mismatch", "protocol seed schedule is missing")
+        return
+    master_derivation = schedule.get("master_seed_derivation")
+    collision_audit = master_derivation.get("collision_audit") if isinstance(master_derivation, Mapping) else None
+    namespace_rows = schedule.get("namespaces")
+    declared_counts = (
+        {
+            str(namespace): declaration.get("count")
+            for namespace, declaration in namespace_rows.items()
+            if isinstance(namespace, str) and isinstance(declaration, Mapping)
+        }
+        if isinstance(namespace_rows, Mapping)
+        else {}
+    )
+    current_streams = {
+        _derive_seed(namespace, master_seed, index)
+        for master_seed in (*_DEVELOPMENT_SEEDS, *_FORMAL_SEEDS)
+        for namespace, count in _EXPECTED_SEED_COUNTS.items()
+        for index in range(count)
+    }
+    old_streams = {
+        int.from_bytes(
+            hashlib.sha256(f"WM-001|1.3.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            "big",
+            signed=False,
+        )
+        for master_seed in _V130_MASTER_SEEDS
+        for namespace, count in _EXPECTED_SEED_COUNTS.items()
+        for index in range(count)
+    }
+    valid = (
+        protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v4"
+        and schedule.get("derivation_domain_version") == "1.4.0"
+        and tuple(schedule.get("development_replicate_master_seeds", ()))
+        == tuple(_derive_master_seed("development", index) for index in range(2))
+        == _DEVELOPMENT_SEEDS
+        and tuple(schedule.get("formal_replicate_master_seeds", ()))
+        == tuple(_derive_master_seed("formal", index) for index in range(8))
+        == _FORMAL_SEEDS
+        and isinstance(master_derivation, Mapping)
+        and master_derivation.get("lane_index_domains") == {"development": [0, 1], "formal": [0, 7]}
+        and declared_counts == _EXPECTED_SEED_COUNTS
+        and isinstance(collision_audit, Mapping)
+        and collision_audit.get("current_master_seed_count") == 10
+        and collision_audit.get("current_derived_stream_count") == 1360
+        and collision_audit.get("unique_current_derived_stream_count") == len(current_streams) == 1360
+        and collision_audit.get("current_internal_collision_count") == 0
+        and collision_audit.get("master_overlap_with_v1_3_count") == 0
+        and collision_audit.get("derived_stream_overlap_with_v1_3_count") == 0
+        and set((*_DEVELOPMENT_SEEDS, *_FORMAL_SEEDS)).isdisjoint(_V130_MASTER_SEEDS)
+        and current_streams.isdisjoint(old_streams)
+    )
+    audit.require(
+        valid,
+        code="protocol_seed_contract_mismatch",
+        message="protocol master derivation, schedule parity, or collision audit differs from v1.4",
+    )
+
+
 def _independent_pendulum_reset(seed: int) -> npt.NDArray[np.float32]:
     """Reconstruct Gymnasium Pendulum-v1's default seeded reset observation.
 
@@ -2839,11 +3059,8 @@ def _audit_transition_and_episode_rows(
             target_array = np.asarray(raw_target, dtype="<f8")
             target_digest = hashlib.sha256(target_array.tobytes(order="C")).hexdigest()
             reward = _finite_float(row.get("reward"))
-            reward_target_valid = reward is not None and math.isclose(
-                float(raw_target[3]),
-                reward / _TARGET_REWARD_SCALE,
-                rel_tol=1e-12,
-                abs_tol=1e-12,
+            reward_target_valid = reward is not None and struct.pack("<d", float(raw_target[3])) == struct.pack(
+                "<d", reward / _TARGET_REWARD_SCALE
             )
             before = row.get("pre_observation")
             after = row.get("next_observation")
@@ -2865,14 +3082,10 @@ def _audit_transition_and_episode_rows(
                     ],
                     dtype=np.float64,
                 )
-                source_target_valid = bool(
-                    np.allclose(
-                        target_array,
-                        independently_scaled,
-                        rtol=1e-12,
-                        atol=1e-12,
-                    )
-                )
+                source_target_valid = target_array.tobytes(order="C") == independently_scaled.astype(
+                    "<f8",
+                    copy=False,
+                ).tobytes(order="C")
             else:
                 source_target_valid = False
         else:
@@ -2925,11 +3138,7 @@ def _expected_policy_contract(
 ) -> tuple[tuple[str, int], str, Mapping[str, int] | None] | None:
     if task_id == _TASK_IRRELEVANT and split == "collect_irrelevant" and condition == "collection_random":
         return ("irrelevant_collection_action", 0), "uniform_random", None
-    if (
-        task_id == _TASK_IRRELEVANT
-        and split == "predictive_validation_irrelevant"
-        and condition == "validation_random"
-    ):
+    if task_id == _TASK_IRRELEVANT and split == "predictive_validation_irrelevant" and condition == "validation_random":
         return (
             ("predictive_validation_irrelevant_action", 0),
             "uniform_random",
@@ -2980,10 +3189,7 @@ def _expected_policy_contract(
 def _expected_reset_namespace(*, task_id: object, split: object) -> str | None:
     if task_id == _TASK_IRRELEVANT and split == "collect_irrelevant":
         return "collect_irrelevant_episode"
-    if (
-        task_id == _TASK_IRRELEVANT
-        and split == "predictive_validation_irrelevant"
-    ):
+    if task_id == _TASK_IRRELEVANT and split == "predictive_validation_irrelevant":
         return "predictive_validation_irrelevant_episode"
     suffix = {_TASK_A: "a", _TASK_B: "b"}.get(str(task_id))
     if suffix is None:
@@ -3373,7 +3579,7 @@ def _audit_policy_runs(
             f"{replicate_id} does not retain the exact full seed namespace/count schedule.",
             evidence_needed=(
                 "Every sealed namespace row, in full declared counts, with each value "
-                "regenerated from the v1.3 experimental seed hash domain."
+                "regenerated from the v1.4 experimental seed hash domain."
             ),
         )
 
@@ -3604,7 +3810,13 @@ def _audit_policy_runs(
                     replicate_id=replicate_id,
                 )
                 cem_replay_count += 1
-            except (ArtifactAuditError, KeyError, TypeError, ValueError) as error:
+            except (
+                ArtifactAuditError,
+                KeyError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+            ) as error:
                 rng_valid = False
                 audit.error(
                     "cem_policy_action_replay_unavailable",
@@ -4554,9 +4766,7 @@ def _decode_checkpoint_replay_component(
         or raw.get("schema") != expected_schema
         or payload != _canonical_json_bytes(raw)
     ):
-        raise ArtifactAuditError(
-            f"checkpoint {component_id} violates its canonical format"
-        )
+        raise ArtifactAuditError(f"checkpoint {component_id} violates its canonical format")
     return raw
 
 
@@ -4588,18 +4798,11 @@ def _audit_retained_replay_components(
     heldout_ids = {
         str(row["transition_id"])
         for row in transitions
-        if str(row.get("split", "")).startswith(
-            ("predictive_validation_", "behavior_evaluation_")
-        )
+        if str(row.get("split", "")).startswith(("predictive_validation_", "behavior_evaluation_"))
         and isinstance(row.get("transition_id"), str)
     }
     expected_by_split = {
-        split: [
-            row
-            for row in transitions
-            if row.get("split") == split
-        ]
-        for split in ("collect_a", "collect_b")
+        split: [row for row in transitions if row.get("split") == split] for split in ("collect_a", "collect_b")
     }
     expected_rows = [
         *expected_by_split["collect_a"],
@@ -4621,18 +4824,14 @@ def _audit_retained_replay_components(
         experience_ids: list[object] = []
         experience_rows_valid = True
         for row in canonical_experiences:
-            if (
-                not isinstance(row, Mapping)
-                or set(row)
-                != {
-                    "experience_id",
-                    "run_id",
-                    "task_id",
-                    "episode_id",
-                    "step_index",
-                    "closed_at",
-                }
-            ):
+            if not isinstance(row, Mapping) or set(row) != {
+                "experience_id",
+                "run_id",
+                "task_id",
+                "episode_id",
+                "step_index",
+                "closed_at",
+            }:
                 experience_rows_valid = False
                 continue
             closed_at = row.get("closed_at")
@@ -4658,22 +4857,13 @@ def _audit_retained_replay_components(
                 )
             )
         experience_linkage_valid = (
-            experience_rows_valid
-            and len(experience_ids) == len(set(experience_ids))
-            and actual_links == expected_links
+            experience_rows_valid and len(experience_ids) == len(set(experience_ids)) and actual_links == expected_links
         )
     replay_dataset_valid = (
-        replay_index.get("collect_a")
-        == _expected_checkpoint_transition_dataset(
-            expected_by_split["collect_a"]
-        )
-        and replay_index.get("collect_b")
-        == _expected_checkpoint_transition_dataset(
-            expected_by_split["collect_b"]
-        )
+        replay_index.get("collect_a") == _expected_checkpoint_transition_dataset(expected_by_split["collect_a"])
+        and replay_index.get("collect_b") == _expected_checkpoint_transition_dataset(expected_by_split["collect_b"])
         and all(
-            row.get("task_id") in {_TASK_A, _TASK_B}
-            and row.get("split") in {"collect_a", "collect_b"}
+            row.get("task_id") in {_TASK_A, _TASK_B} and row.get("split") in {"collect_a", "collect_b"}
             for row in expected_rows
         )
     )
@@ -4693,11 +4883,7 @@ def _audit_retained_replay_components(
             continue
         identities = dataset.get("transition_ids")
         if isinstance(identities, list):
-            retained_transition_ids.update(
-                identity
-                for identity in identities
-                if isinstance(identity, str)
-            )
+            retained_transition_ids.update(identity for identity in identities if isinstance(identity, str))
     audit.require(
         retained_transition_ids.isdisjoint(heldout_ids),
         code="checkpoint_replay_heldout_contamination",
@@ -4711,34 +4897,23 @@ def _audit_retained_replay_components(
     expected_updates = [
         row
         for row in _mapping_rows(replicate.get("updates"))
-        if row.get("phase") in {"train_a", "train_b_replay"}
-        and row.get("status") == "committed"
+        if row.get("phase") in {"train_a", "train_b_replay"} and row.get("status") == "committed"
     ]
     expected_phases = ("train_a", "train_b_replay")
     result_manifests = {
         str(row.get("phase")): row
-        for row in _mapping_rows(
-            replicate.get("optimizer_batch_manifests")
-        )
+        for row in _mapping_rows(replicate.get("optimizer_batch_manifests"))
         if row.get("phase") in expected_phases
     }
     retained_manifests = replay_sampling_history.get("manifests")
     sampling_valid = (
         isinstance(retained_manifests, list)
-        and tuple(
-            row.get("phase")
-            for row in retained_manifests
-            if isinstance(row, Mapping)
-        )
-        == expected_phases
-        and tuple(row.get("phase") for row in expected_updates)
-        == expected_phases
+        and tuple(row.get("phase") for row in retained_manifests if isinstance(row, Mapping)) == expected_phases
+        and tuple(row.get("phase") for row in expected_updates) == expected_phases
         and set(result_manifests) == set(expected_phases)
     )
     if isinstance(retained_manifests, list):
-        updates_by_phase = {
-            str(row.get("phase")): row for row in expected_updates
-        }
+        updates_by_phase = {str(row.get("phase")): row for row in expected_updates}
         for row in retained_manifests:
             if not isinstance(row, Mapping) or set(row) != {
                 "phase",
@@ -4767,11 +4942,9 @@ def _audit_retained_replay_components(
                 update = updates_by_phase[str(phase)]
                 sampling_valid = sampling_valid and (
                     row.get("bytes") == len(payload)
-                    and row.get("sha256")
-                    == hashlib.sha256(payload).hexdigest()
+                    and row.get("sha256") == hashlib.sha256(payload).hexdigest()
                     and payload == external_payload
-                    and update.get("sampling_manifest_sha256")
-                    == row.get("sha256")
+                    and update.get("sampling_manifest_sha256") == row.get("sha256")
                 )
             except (
                 ArtifactAuditError,
@@ -4921,15 +5094,10 @@ def _audit_checkpoint(
                     "replay_index",
                     "replay_sampling_history",
                 }:
-                    if (
-                        entry.get("media_type") == "application/json"
-                        and size <= 512 << 20
-                    ):
-                        verified_replay_components[component_id] = (
-                            _decode_checkpoint_replay_component(
-                                archive.read(info),
-                                component_id=component_id,
-                            )
+                    if entry.get("media_type") == "application/json" and size <= 512 << 20:
+                        verified_replay_components[component_id] = _decode_checkpoint_replay_component(
+                            archive.read(info),
+                            component_id=component_id,
                         )
                 expected_paths.add(str(member_path))
                 archive_components[component_id] = entry
@@ -4990,15 +5158,11 @@ def _audit_checkpoint(
                 )
                 checkpoint_transition_ids = {
                     str(row["transition_id"])
-                    for row in _mapping_rows(
-                        experience_component.get("transition_rows")
-                    )
+                    for row in _mapping_rows(experience_component.get("transition_rows"))
                     if isinstance(row.get("transition_id"), str)
                 }
                 audit.require(
-                    checkpoint_transition_ids.isdisjoint(
-                        heldout_transition_ids
-                    ),
+                    checkpoint_transition_ids.isdisjoint(heldout_transition_ids),
                     code="checkpoint_heldout_experience_contamination",
                     message=(
                         f"{replicate_id} retained checkpoint experience contains "
@@ -5038,9 +5202,7 @@ def _audit_checkpoint(
                     replicate,
                     replicate_id=replicate_id,
                     replay_index=verified_replay_components["replay_index"],
-                    replay_sampling_history=verified_replay_components[
-                        "replay_sampling_history"
-                    ],
+                    replay_sampling_history=verified_replay_components["replay_sampling_history"],
                 )
 
             result_rows = _mapping_rows(replicate.get("checkpoint_components"))
@@ -5490,9 +5652,7 @@ def _expected_formal_oscillator_conformance() -> dict[str, object]:
     trajectory = hashlib.sha256()
     for case_index in range(_FORMAL_OSCILLATOR_CONFORMANCE_CASES):
         reset_seed = _FORMAL_OSCILLATOR_CONFORMANCE_SEED + case_index
-        digest = hashlib.sha256(
-            f"{_OSCILLATOR_SOURCE}:{reset_seed}".encode("ascii")
-        ).digest()
+        digest = hashlib.sha256(f"{_OSCILLATOR_SOURCE}:{reset_seed}".encode("ascii")).digest()
         phase_unit = int.from_bytes(digest[:8], "big") / float(1 << 64)
         velocity_unit = int.from_bytes(digest[8:16], "big") / float(1 << 64)
         phase = (2.0 * phase_unit - 1.0) * math.pi
@@ -5529,9 +5689,7 @@ def _expected_formal_oscillator_conformance() -> dict[str, object]:
                 )
             )
     report: dict[str, object] = {
-        "schema": (
-            "prospect.wm001.independent-phase-oscillator-conformance.v1"
-        ),
+        "schema": ("prospect.wm001.independent-phase-oscillator-conformance.v1"),
         "source_id": _OSCILLATOR_SOURCE,
         "cases": _FORMAL_OSCILLATOR_CONFORMANCE_CASES,
         "steps_per_case": _EPISODE_HORIZON,
@@ -5544,9 +5702,7 @@ def _expected_formal_oscillator_conformance() -> dict[str, object]:
         "trajectory_sha256": trajectory.hexdigest(),
         "passed": True,
     }
-    report["report_sha256"] = hashlib.sha256(
-        _canonical_json_bytes(report)
-    ).hexdigest()
+    report["report_sha256"] = hashlib.sha256(_canonical_json_bytes(report)).hexdigest()
     return report
 
 
@@ -5557,9 +5713,90 @@ def _validate_formal_oscillator_conformance_report(
 
     if report != _expected_formal_oscillator_conformance():
         raise ArtifactAuditError(
-            "independent oscillator conformance differs from the independently "
-            "recomputed sealed trajectories"
+            "independent oscillator conformance differs from the independently recomputed sealed trajectories"
         )
+
+
+def _validate_formal_coverage_conformance_report(report: object) -> None:
+    """Recompute the bound endpoint corpus without producer coverage code."""
+
+    if not isinstance(report, dict):
+        raise ArtifactAuditError("coverage conformance report is not an object")
+    if (
+        report.get("schema") != "prospect.wm001.coverage-conformance.v1"
+        or report.get("semantics_id") != _COVERAGE_SEMANTICS
+        or report.get("python_executable") != sys.executable
+        or report.get("python_implementation") != platform.python_implementation()
+        or report.get("python_implementation") != "CPython"
+        or report.get("python_version") != platform.python_version()
+        or report.get("platform") != platform.platform()
+        or report.get("machine") != platform.machine()
+    ):
+        raise ArtifactAuditError("coverage conformance runtime identity differs")
+    rows = report.get("cases")
+    direct_expected = (
+        ("lower-binary64", 0.05, True),
+        ("lower-predecessor", math.nextafter(0.05, -math.inf), False),
+        ("lower-successor", math.nextafter(0.05, math.inf), True),
+        ("upper-binary64", 0.95, True),
+        ("upper-predecessor", math.nextafter(0.95, -math.inf), True),
+        ("upper-successor", math.nextafter(0.95, math.inf), False),
+        ("central", 0.5, True),
+        ("zero-tail", 0.0, False),
+        ("one-tail", 1.0, False),
+    )
+    if not isinstance(rows, list) or len(rows) != len(direct_expected) + 1:
+        raise ArtifactAuditError("coverage conformance case matrix changed")
+    for row, (case_id, pit, expected) in zip(rows[: len(direct_expected)], direct_expected, strict=True):
+        if (
+            not isinstance(row, Mapping)
+            or row.get("case_id") != case_id
+            or row.get("kind") != "binary64_pit"
+            or row.get("pit_hex") != pit.hex()
+            or row.get("expected_covered") is not expected
+            or row.get("observed_covered") is not expected
+            or row.get("passed") is not True
+            or _binary64_mixture_pit_is_covered(float.fromhex(str(row.get("pit_hex")))) is not expected
+        ):
+            raise ArtifactAuditError(f"coverage conformance direct case {case_id} changed or failed")
+    regression = rows[-1]
+    if (
+        not isinstance(regression, Mapping)
+        or regression.get("case_id") != "v130-disclosed-boundary-coordinate"
+        or regression.get("kind") != "float32_mixture_inputs"
+        or regression.get("target_little_endian_f32_hex") != _V130_BOUNDARY_TARGET_F32_HEX
+        or tuple(regression.get("member_means_little_endian_f32_hex", ())) != _V130_BOUNDARY_MEANS_F32_HEX
+        or tuple(regression.get("member_log_variances_little_endian_f32_hex", ()))
+        != _V130_BOUNDARY_LOG_VARIANCES_F32_HEX
+    ):
+        raise ArtifactAuditError("coverage v1.3 boundary regression inputs changed")
+    target = float(struct.unpack("<f", bytes.fromhex(_V130_BOUNDARY_TARGET_F32_HEX))[0])
+    means = tuple(float(struct.unpack("<f", bytes.fromhex(value))[0]) for value in _V130_BOUNDARY_MEANS_F32_HEX)
+    log_variances = tuple(
+        float(struct.unpack("<f", bytes.fromhex(value))[0]) for value in _V130_BOUNDARY_LOG_VARIANCES_F32_HEX
+    )
+    member_cdfs = []
+    for mean, log_variance in zip(means, log_variances, strict=True):
+        z_score = (target - mean) * math.exp(-0.5 * log_variance)
+        member_cdfs.append(0.5 * (1.0 + math.erf(z_score / math.sqrt(2.0))))
+    pit = math.fsum(member_cdfs) / 5
+    if (
+        pit.hex() != "0x1.999998b3745adp-5"
+        or regression.get("expected_pit_hex") != pit.hex()
+        or regression.get("observed_pit_hex") != pit.hex()
+        or regression.get("expected_covered") is not False
+        or regression.get("observed_covered") is not False
+        or regression.get("passed") is not True
+        or _binary64_mixture_pit_is_covered(pit)
+    ):
+        raise ArtifactAuditError("coverage v1.3 boundary regression did not reproduce exactly")
+    corpus = {"semantics_id": _COVERAGE_SEMANTICS, "cases": rows}
+    if report.get("corpus_sha256") != hashlib.sha256(_canonical_json_bytes(corpus)).hexdigest():
+        raise ArtifactAuditError("coverage conformance corpus digest changed")
+    body = dict(report)
+    report_sha256 = body.pop("report_sha256", None)
+    if report.get("passed") is not True or report_sha256 != hashlib.sha256(_canonical_json_bytes(body)).hexdigest():
+        raise ArtifactAuditError("coverage conformance self-hash or status changed")
 
 
 def _audit_bound_irrelevant_control(
@@ -5570,13 +5807,7 @@ def _audit_bound_irrelevant_control(
     """Bind the distractor implementation and conformance independently."""
 
     try:
-        source_path = (
-            root
-            / "source"
-            / "bench"
-            / "world_model_lifecycle"
-            / "runtime_lane.py"
-        )
+        source_path = root / "source" / "bench" / "world_model_lifecycle" / "runtime_lane.py"
         source_payload = _read_bounded(
             source_path,
             _MAX_SOURCE_FILE_BYTES,
@@ -5585,13 +5816,9 @@ def _audit_bound_irrelevant_control(
         audit.require(
             block.get("id") == _TASK_IRRELEVANT
             and block.get("source_id") == _OSCILLATOR_SOURCE
-            and block.get("source_sha256")
-            == hashlib.sha256(source_payload).hexdigest(),
+            and block.get("source_sha256") == hashlib.sha256(source_payload).hexdigest(),
             code="formal_irrelevant_control_source_mismatch",
-            message=(
-                "formal irrelevant-control identity/source digest differs from "
-                "the bound runtime source snapshot"
-            ),
+            message=("formal irrelevant-control identity/source digest differs from the bound runtime source snapshot"),
         )
         report_path = _resolve_artifact_file(
             root,
@@ -5605,25 +5832,16 @@ def _audit_bound_irrelevant_control(
         )
         audit.require(
             block.get("conformance_report_bytes") == len(report_payload)
-            and block.get("conformance_report_sha256")
-            == hashlib.sha256(report_payload).hexdigest(),
+            and block.get("conformance_report_sha256") == hashlib.sha256(report_payload).hexdigest(),
             code="formal_irrelevant_conformance_file_mismatch",
-            message=(
-                "copied independent oscillator conformance report differs "
-                "from its formal binding"
-            ),
+            message=("copied independent oscillator conformance report differs from its formal binding"),
         )
         report = _json_without_duplicate_keys(
             report_payload,
             label="independent oscillator conformance report",
         )
-        if (
-            not isinstance(report, dict)
-            or report_payload != _canonical_json_bytes(report) + b"\n"
-        ):
-            raise ArtifactAuditError(
-                "independent oscillator conformance report is not canonical JSON"
-            )
+        if not isinstance(report, dict) or report_payload != _canonical_json_bytes(report) + b"\n":
+            raise ArtifactAuditError("independent oscillator conformance report is not canonical JSON")
         _validate_formal_oscillator_conformance_report(report)
     except (ArtifactAuditError, OSError, TypeError, ValueError) as error:
         audit.error(
@@ -5725,22 +5943,171 @@ def _audit_bound_source_snapshot(
     audit.passed_checks += 1
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _installed_distribution_sha256(name: str) -> str:
+    """Independently reproduce the binding's installed-distribution digest."""
+
+    distribution = importlib.metadata.distribution(name)
+    digest = hashlib.sha256()
+    canonical_name = str(distribution.metadata["Name"]).lower().replace("_", "-")
+    digest.update(canonical_name.encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(distribution.version.encode("utf-8"))
+    declared_files = list(distribution.files or ())
+    addressed_files = [entry for entry in declared_files if entry.hash is not None]
+    selected_files = addressed_files or [
+        entry for entry in declared_files if "__pycache__" not in entry.parts and entry.suffix != ".pyc"
+    ]
+    if not selected_files:
+        raise ArtifactAuditError(f"installed distribution {name!r} has no stable declared files")
+    digest.update(b"\0record-addressed\0" if addressed_files else b"\0all-stable-declared\0")
+    for entry in sorted(selected_files, key=str):
+        path = Path(str(distribution.locate_file(entry)))
+        if not path.is_file():
+            raise ArtifactAuditError(f"installed distribution file is missing: {entry}")
+        digest.update(b"\0")
+        digest.update(str(entry).encode("utf-8"))
+        digest.update(b"\0")
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1 << 20), b""):
+                digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _live_bound_package_rows(rows: object) -> list[dict[str, object]]:
+    if not isinstance(rows, list) or not rows or len(rows) > _MAX_BOUND_PACKAGES:
+        raise ArtifactAuditError("formal dependency package rows are malformed")
+    result: list[dict[str, object]] = []
+    for index, raw_row in enumerate(rows):
+        if not isinstance(raw_row, Mapping) or set(raw_row) != {"name", "version", "distribution_sha256"}:
+            raise ArtifactAuditError(f"formal dependency package row {index} is malformed")
+        name = raw_row.get("name")
+        if not isinstance(name, str) or not name or len(name) > 256:
+            raise ArtifactAuditError(f"formal dependency package row {index} has an invalid name")
+        if name == "python":
+            version = platform.python_version()
+            digest = _sha256_file(Path(sys.executable))
+        else:
+            try:
+                distribution = importlib.metadata.distribution(name)
+            except importlib.metadata.PackageNotFoundError as error:
+                raise ArtifactAuditError(f"bound distribution is not installed: {name}") from error
+            version = distribution.version
+            digest = _installed_distribution_sha256(name)
+        result.append(
+            {
+                "name": name,
+                "version": version,
+                "distribution_sha256": digest,
+            }
+        )
+    return result
+
+
+def _cuda_driver_version() -> str | None:
+    try:
+        completed = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=driver_version",
+                "--format=csv,noheader",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if completed.returncode != 0:
+        return None
+    versions = sorted({row.strip() for row in completed.stdout.splitlines() if row.strip()})
+    return ",".join(versions) if versions else None
+
+
+def _live_runtime_identity(device: str) -> dict[str, object]:
+    try:
+        import torch
+    except ImportError as error:
+        raise ArtifactAuditError("PyTorch is required to verify the bound formal runtime") from error
+    if device not in {"cpu", "cuda", "mps"}:
+        raise ArtifactAuditError("formal binding has an invalid runtime device")
+    if device == "cuda" and not torch.cuda.is_available():
+        raise ArtifactAuditError("bound CUDA runtime is unavailable to the independent auditor")
+    if device == "mps" and (not hasattr(torch.backends, "mps") or not torch.backends.mps.is_available()):
+        raise ArtifactAuditError("bound MPS runtime is unavailable to the independent auditor")
+    torch.use_deterministic_algorithms(True)
+    return {
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "device": device,
+        "accelerator": (torch.cuda.get_device_name(0) if device == "cuda" else None),
+        "deterministic_algorithms": (torch.are_deterministic_algorithms_enabled()),
+        "thread_count": torch.get_num_threads(),
+        "interop_thread_count": torch.get_num_interop_threads(),
+        "cuda_runtime": torch.version.cuda,
+        "cuda_driver": (_cuda_driver_version() if device == "cuda" else None),
+        "cublas_workspace_config": (os.environ.get("CUBLAS_WORKSPACE_CONFIG") if device == "cuda" else None),
+    }
+
+
+def _audit_formal_runtime_binding(
+    audit: _Audit,
+    *,
+    runtime: Mapping[str, object],
+    dependencies: Mapping[str, object],
+    execution: Mapping[str, object],
+) -> str:
+    """Bind result arithmetic and the live auditor to the pre-run runtime."""
+
+    device = runtime.get("device")
+    if not isinstance(device, str) or device not in {"cpu", "cuda", "mps"}:
+        raise ArtifactAuditError("formal binding runtime device is invalid")
+    audit.require(
+        execution.get("platform") == runtime.get("platform")
+        and execution.get("device") == device
+        and execution.get("deterministic_algorithms") == runtime.get("deterministic_algorithms") is True,
+        code="formal_result_runtime_binding_mismatch",
+        message=("formal result platform, device, or determinism differs from its pre-run runtime binding"),
+    )
+    audit.require(
+        _live_runtime_identity(device) == dict(runtime),
+        code="formal_auditor_runtime_binding_mismatch",
+        message=("independent auditor platform, accelerator, CUDA, or Torch runtime differs from the pre-run binding"),
+    )
+    package_rows = dependencies.get("packages")
+    audit.require(
+        _live_bound_package_rows(package_rows) == package_rows,
+        code="formal_auditor_dependency_binding_mismatch",
+        message=("independent auditor dependency bytes differ from the pre-run binding"),
+    )
+    return device
+
+
 def _audit_formal_input_package(
     audit: _Audit,
     root: Path,
     result: Mapping[str, object],
-) -> None:
+) -> str | None:
     if result.get("lane") != "formal":
-        return
+        return None
+    bound_device: str | None = None
     fixed_files = {
         "protocol.json": root / "protocol.json",
         "schemas/formal-binding.schema.json": root / "schemas" / "formal-binding.schema.json",
         "schemas/raw-result.schema.json": root / "schemas" / "raw-result.schema.json",
     }
     binding_path = root / "formal-binding.json"
+    launch_path = root / "formal-launch.json"
     lock_path = root / "requirements-wm001.lock"
     seal_path = root / "SEALED_PROTOCOL.sha256"
-    required = [binding_path, lock_path, seal_path, *fixed_files.values()]
+    required = [binding_path, launch_path, lock_path, seal_path, *fixed_files.values()]
     try:
         root_resolved = root.resolve()
         if any(
@@ -5766,6 +6133,47 @@ def _audit_formal_input_package(
             result.get("formal_binding_sha256") == binding_digest,
             code="formal_binding_result_digest_mismatch",
             message="result does not bind the copied pre-outcome formal binding",
+        )
+        launch_payload = _read_bounded(
+            launch_path,
+            1 << 20,
+            label="formal launch record",
+        )
+        launch_raw = _json_without_duplicate_keys(
+            launch_payload,
+            label="formal launch record",
+        )
+        if not isinstance(launch_raw, dict):
+            raise ArtifactAuditError("formal launch record is not an object")
+        launch_body = dict(launch_raw)
+        launch_record_sha256 = launch_body.pop("record_sha256", None)
+        execution_for_launch = result.get("execution")
+        protocol_wide_marker = root.parent.parent / "formal-launch.json"
+        audit.require(
+            root.parent.name == binding_digest
+            and root.parent.parent.name == "formal"
+            and not protocol_wide_marker.is_symlink()
+            and protocol_wide_marker.is_file()
+            and _read_bounded(
+                protocol_wide_marker,
+                1 << 20,
+                label="protocol-wide formal launch marker",
+            )
+            == launch_payload
+            and launch_raw.get("schema") == "prospect.wm001.formal-launch.v1"
+            and launch_raw.get("experiment_id") == "WM-001"
+            and launch_raw.get("protocol_version") == "1.4.0"
+            and launch_raw.get("formal_binding_sha256") == binding_digest
+            and launch_raw.get("attempt_directory") == root.name
+            and isinstance(execution_for_launch, Mapping)
+            and launch_raw.get("git_commit") == execution_for_launch.get("git_commit")
+            and launch_raw.get("git_tree") == execution_for_launch.get("git_tree")
+            and launch_record_sha256 == hashlib.sha256(_canonical_json_bytes(launch_body)).hexdigest()
+            and launch_payload == _canonical_json_bytes(launch_raw) + b"\n"
+            and execution_for_launch.get("formal_launch_file") == "formal-launch.json"
+            and execution_for_launch.get("formal_launch_sha256") == hashlib.sha256(launch_payload).hexdigest(),
+            code="formal_single_launch_binding_mismatch",
+            message="formal result does not bind the unique protocol-wide v1.4 launch claim",
         )
         seal_payload = _read_bounded(
             seal_path,
@@ -5793,8 +6201,10 @@ def _audit_formal_input_package(
         protocol_block = binding.get("protocol")
         dependencies = binding.get("dependencies")
         source = binding.get("source")
+        runtime = binding.get("runtime")
         environment = binding.get("environment")
         irrelevant_control = binding.get("irrelevant_control")
+        coverage_arithmetic = binding.get("coverage_arithmetic")
         execution = result.get("execution")
         if not all(
             isinstance(value, Mapping)
@@ -5802,8 +6212,10 @@ def _audit_formal_input_package(
                 protocol_block,
                 dependencies,
                 source,
+                runtime,
                 environment,
                 irrelevant_control,
+                coverage_arithmetic,
                 execution,
             )
         ):
@@ -5811,8 +6223,10 @@ def _audit_formal_input_package(
         assert isinstance(protocol_block, Mapping)
         assert isinstance(dependencies, Mapping)
         assert isinstance(source, Mapping)
+        assert isinstance(runtime, Mapping)
         assert isinstance(environment, Mapping)
         assert isinstance(irrelevant_control, Mapping)
+        assert isinstance(coverage_arithmetic, Mapping)
         assert isinstance(execution, Mapping)
         lock_payload = _read_bounded(
             lock_path,
@@ -5846,11 +6260,43 @@ def _audit_formal_input_package(
             code="formal_source_binding_mismatch",
             message="formal result source identity differs from its pre-run binding",
         )
+        bound_device = _audit_formal_runtime_binding(
+            audit,
+            runtime=runtime,
+            dependencies=dependencies,
+            execution=execution,
+        )
         _audit_bound_source_snapshot(audit, root, source)
         _audit_bound_irrelevant_control(
             audit,
             root,
             irrelevant_control,
+        )
+        auditor_snapshot = root / "source" / "bench" / "world_model_lifecycle" / "artifact_audit.py"
+        model_snapshot = root / "source" / "bench" / "world_model_lifecycle" / "model.py"
+        audit.require(
+            coverage_arithmetic.get("semantics_id") == _COVERAGE_SEMANTICS
+            and coverage_arithmetic.get("python_executable") == sys.executable
+            and coverage_arithmetic.get("python_implementation") == platform.python_implementation() == "CPython"
+            and coverage_arithmetic.get("python_version") == platform.python_version()
+            and coverage_arithmetic.get("platform") == platform.platform()
+            and coverage_arithmetic.get("machine") == platform.machine()
+            and coverage_arithmetic.get("producer_source_sha256")
+            == hashlib.sha256(
+                _read_bounded(
+                    model_snapshot,
+                    _MAX_SOURCE_FILE_BYTES,
+                    label="bound model source",
+                )
+            ).hexdigest()
+            and coverage_arithmetic.get("auditor_source_sha256")
+            == hashlib.sha256(
+                _read_bounded(auditor_snapshot, _MAX_SOURCE_FILE_BYTES, label="bound auditor source")
+            ).hexdigest()
+            == _AUDITOR_SOURCE_SHA256
+            and coverage_arithmetic.get("formal_test_report_sha256") == source.get("test_report_sha256"),
+            code="formal_coverage_binding_mismatch",
+            message="coverage arithmetic runtime, source, or test-report binding changed",
         )
         audit.require(
             result.get("claim_eligible") is True,
@@ -5871,6 +6317,13 @@ def _audit_formal_input_package(
                 "conformance_report_bytes",
                 "conformance_report_sha256",
                 "Pendulum conformance report",
+            ),
+            (
+                coverage_arithmetic,
+                "conformance_report_file",
+                "conformance_report_bytes",
+                "conformance_report_sha256",
+                "coverage conformance report",
             ),
         ):
             filename = block.get(filename_field)
@@ -5907,6 +6360,34 @@ def _audit_formal_input_package(
             audit.error("formal_conformance_report_failed", str(error))
         else:
             audit.passed_checks += 1
+        coverage_conformance_path = _resolve_artifact_file(
+            root,
+            coverage_arithmetic.get("conformance_report_file"),
+            label="coverage conformance report",
+        )
+        coverage_conformance_payload = _read_bounded(
+            coverage_conformance_path,
+            64 << 20,
+            label="coverage conformance report",
+        )
+        coverage_conformance_raw = _json_without_duplicate_keys(
+            coverage_conformance_payload,
+            label="coverage conformance report",
+        )
+        try:
+            _validate_formal_coverage_conformance_report(coverage_conformance_raw)
+            canonical_coverage_conformance = (
+                _canonical_json_bytes(coverage_conformance_raw) + b"\n"
+                if isinstance(coverage_conformance_raw, dict)
+                else b""
+            )
+            if coverage_conformance_payload != canonical_coverage_conformance:
+                raise ArtifactAuditError("coverage conformance report is not canonical JSON")
+        except (ArtifactAuditError, OSError, TypeError, ValueError) as error:
+            audit.error("formal_coverage_conformance_failed", str(error))
+        else:
+            audit.coverage_conformance_verified = True
+            audit.passed_checks += 1
         audit.limitation(
             "The preserved formal test report is content-addressed but has no "
             "machine-verifiable result schema; its pass/fail semantics still "
@@ -5930,6 +6411,7 @@ def _audit_formal_input_package(
         )
     except (ArtifactAuditError, OSError, StopIteration, ValueError) as error:
         audit.error("formal_input_package_invalid", str(error))
+    return bound_device
 
 
 def _audit_formal_schedule(
@@ -5937,7 +6419,7 @@ def _audit_formal_schedule(
     root: Path,
     result: Mapping[str, object],
 ) -> None:
-    """Independently enforce the complete v1.3 formal replicate schedule."""
+    """Independently enforce the complete v1.4 formal replicate schedule."""
 
     if result.get("lane") != "formal":
         return
@@ -5949,7 +6431,7 @@ def _audit_formal_schedule(
         seeds == _FORMAL_SEEDS and replicate_ids == expected_ids,
         code="formal_replicate_schedule_mismatch",
         message=(
-            "formal result does not contain the exact ordered eight v1.3 master seeds and seed-bound replicate IDs"
+            "formal result does not contain the exact ordered eight v1.4 master seeds and seed-bound replicate IDs"
         ),
     )
 
@@ -6304,20 +6786,6 @@ _ANALYSIS_NUMERIC_GATE_DECLARATIONS: Mapping[
             0.0,
             "a_vs_irrelevant_nll_improvement_ci_lower",
         ),
-        (
-            "a_after_a_interval_90_coverage",
-            "mean",
-            "ge",
-            0.7,
-            "after_a_interval_coverage_lower_bound",
-        ),
-        (
-            "a_after_a_interval_90_coverage",
-            "mean",
-            "le",
-            0.99,
-            "after_a_interval_coverage_upper_bound",
-        ),
     ),
     "K4": (
         (
@@ -6578,6 +7046,19 @@ def _analysis_replicate_values(
             return None
         return float(value)
 
+    def coverage_value(
+        task_id: str,
+        condition: str,
+    ) -> float | None:
+        row = predictive[(task_id, condition)]
+        if row is None or row.get("coverage_semantics") != _COVERAGE_SEMANTICS:
+            return None
+        covered = row.get("interval_90_covered_target_count")
+        total = row.get("coverage_target_count")
+        if type(covered) is not int or type(total) is not int or total <= 0 or covered < 0 or covered > total:
+            return None
+        return covered / total
+
     nll = lambda task_id, condition: predictive_value(  # noqa: E731
         task_id,
         condition,
@@ -6654,13 +7135,20 @@ def _analysis_replicate_values(
         for name, (left, right) in operands.items()
         if left is not None and right is not None and math.isfinite(left) and math.isfinite(right)
     }
-    coverage = predictive_value(
+    coverage = coverage_value(
         _ANALYSIS_TASK_A,
         "after_a",
-        "interval_90_coverage",
     )
     if coverage is not None and math.isfinite(coverage):
         values["a_after_a_interval_90_coverage"] = coverage
+        after_a_prediction = predictive[(_ANALYSIS_TASK_A, "after_a")]
+        assert after_a_prediction is not None
+        covered_target_count = after_a_prediction.get("interval_90_covered_target_count")
+        coverage_target_count = after_a_prediction.get("coverage_target_count")
+        assert type(covered_target_count) is int
+        assert type(coverage_target_count) is int
+        values["_a_after_a_interval_90_covered_target_count"] = float(covered_target_count)
+        values["_a_after_a_coverage_target_count"] = float(coverage_target_count)
 
     oracle = returns[(_ANALYSIS_TASK_A, "oracle")]
     random_return = returns[(_ANALYSIS_TASK_A, "random")]
@@ -6824,9 +7312,68 @@ def _analysis_metric_check(
     )
 
 
+def _independent_coverage_count_gate_checks(
+    replicate_values: Sequence[Mapping[str, float]],
+) -> tuple[dict[str, object], dict[str, object]]:
+    count_pairs: list[tuple[int, int]] = []
+    for row in replicate_values:
+        covered_value = row.get("_a_after_a_interval_90_covered_target_count")
+        total_value = row.get("_a_after_a_coverage_target_count")
+        if (
+            not isinstance(covered_value, (int, float))
+            or isinstance(covered_value, bool)
+            or not math.isfinite(float(covered_value))
+            or not float(covered_value).is_integer()
+            or not isinstance(total_value, (int, float))
+            or isinstance(total_value, bool)
+            or not math.isfinite(float(total_value))
+            or not float(total_value).is_integer()
+        ):
+            count_pairs = []
+            break
+        covered = int(covered_value)
+        total = int(total_value)
+        if total <= 0 or covered < 0 or covered > total:
+            count_pairs = []
+            break
+        count_pairs.append((covered, total))
+
+    complete = bool(replicate_values) and len(count_pairs) == len(replicate_values)
+    covered_sum = sum(covered for covered, _ in count_pairs)
+    target_sum = sum(total for _, total in count_pairs)
+    evidence = {
+        "replicate_counts": [
+            {"covered_target_count": covered, "coverage_target_count": total} for covered, total in count_pairs
+        ],
+        "covered_target_count_sum": covered_sum,
+        "coverage_target_count_sum": target_sum,
+    }
+    observed: int | float | bool | str = f"{covered_sum}/{target_sum}" if complete and target_sum > 0 else "missing"
+    return (
+        _analysis_check(
+            "after_a_interval_coverage_lower_bound",
+            observed,
+            "10*C >= 7*T",
+            "0.70 inclusive",
+            complete and target_sum > 0 and 10 * covered_sum >= 7 * target_sum,
+            {**evidence, "left": 10 * covered_sum, "right": 7 * target_sum},
+        ),
+        _analysis_check(
+            "after_a_interval_coverage_upper_bound",
+            observed,
+            "100*C <= 99*T",
+            "0.99 inclusive",
+            complete and target_sum > 0 and 100 * covered_sum <= 99 * target_sum,
+            {**evidence, "left": 100 * covered_sum, "right": 99 * target_sum},
+        ),
+    )
+
+
 def _independent_recompute_gate_results(
     aggregates: Sequence[Mapping[str, object]],
     replicate_values: Sequence[Mapping[str, float]],
+    *,
+    protocol: Mapping[str, object] | None = None,
 ) -> list[dict[str, object]]:
     """Apply the sealed K0--K7 order and thresholds without producer code.
 
@@ -6854,6 +7401,8 @@ def _independent_recompute_gate_results(
             )
             for metric_name, field, comparator, threshold, check_name in declarations
         ]
+        if gate == "K3":
+            gate_checks.extend(_independent_coverage_count_gate_checks(replicate_values))
         if gate == "K6":
             denominator_passed = bool(replicate_values) and all(
                 "retained_a_gain_fraction" in row for row in replicate_values
@@ -6871,12 +7420,18 @@ def _independent_recompute_gate_results(
             )
         numeric[gate] = gate_checks
 
-    protocol = _json_without_duplicate_keys(
-        _read_bounded(HERE / "protocol.json", 16 << 20, label="WM-001 protocol"),
-        label="WM-001 protocol",
-    )
-    if not isinstance(protocol, Mapping):
-        raise ArtifactAuditError("WM-001 protocol root is not an object")
+    if protocol is None:
+        protocol_raw = _json_without_duplicate_keys(
+            _read_bounded(
+                HERE / "protocol.json",
+                16 << 20,
+                label="WM-001 protocol",
+            ),
+            label="WM-001 protocol",
+        )
+        if not isinstance(protocol_raw, Mapping):
+            raise ArtifactAuditError("WM-001 protocol root is not an object")
+        protocol = protocol_raw
     killing_order = _mapping_rows(protocol.get("killing_order"))
     gates: list[dict[str, object]] = []
     for declaration in killing_order:
@@ -6904,6 +7459,8 @@ def _independent_recompute_gate_results(
 def _audit_recomputed_analysis(
     audit: _Audit,
     result: Mapping[str, object],
+    *,
+    protocol: Mapping[str, object] | None = None,
 ) -> None:
     if not isinstance(result.get("aggregate_metrics"), list) or not isinstance(
         result.get("gate_results"),
@@ -6915,6 +7472,7 @@ def _audit_recomputed_analysis(
         recomputed_gates = _independent_recompute_gate_results(
             recomputed_metrics,
             replicate_values,
+            protocol=protocol,
         )
         audit.require(
             _canonical_json_bytes(result.get("aggregate_metrics")) == _canonical_json_bytes(recomputed_metrics),
@@ -6941,16 +7499,11 @@ def _declare_current_coverage_gaps(
     verify_custody: bool,
 ) -> None:
     if result.get("lane") != "formal":
-        audit.gap(
-            "formal_execution_not_present",
+        audit.limitation(
             (
-                "This is a development artifact. Its measurements may be "
-                "structurally valid, but the sealed protocol explicitly makes "
-                "development runs ineligible for capability-claim adjudication."
-            ),
-            evidence_needed=(
-                "A completed formal-lane artifact with all eight predeclared "
-                "replicates, the sealed budgets, and a valid pre-run binding."
+                "This is development evidence, not formal claim evidence. "
+                "Protocol 1.4 makes K3-K6 development outcomes "
+                "descriptive and permanently ineligible for capability adjudication."
             ),
         )
     if not verify_custody:
@@ -7082,6 +7635,11 @@ def audit_artifact(
     result_path = supplied / "result.json" if supplied.is_dir() else supplied
     root = supplied if supplied.is_dir() else supplied.parent
     audit = _Audit()
+    audit.require(
+        hashlib.sha256(Path(__file__).read_bytes()).hexdigest() == _AUDITOR_SOURCE_SHA256,
+        code="auditor_source_changed_during_execution",
+        message="independent auditor source changed after module import",
+    )
     if verify_custody:
         _verify_finalized_custody(audit, root)
     try:
@@ -7097,6 +7655,7 @@ def audit_artifact(
             root=root,
             result_path=result_path,
             result_sha256=None,
+            lane=None,
             require_claim_completeness=require_claim_completeness,
         )
 
@@ -7108,26 +7667,34 @@ def audit_artifact(
         )
         _validate_result_schema(audit, result, schema_path=schema_path)
     audit.require(
-        result.get("schema") == "prospect.world-model-lifecycle.raw-result.v3"
+        result.get("schema") == "prospect.world-model-lifecycle.raw-result.v4"
         and result.get("experiment_id") == "WM-001",
         code="result_identity_mismatch",
-        message="artifact is not a WM-001 raw-result v3 document",
+        message="artifact is not a WM-001 raw-result v4 document",
     )
     protocol_source = root / "protocol.json" if (root / "protocol.json").is_file() else HERE / "protocol.json"
+    protocol_value: Mapping[str, object] | None = None
     try:
-        protocol_digest = hashlib.sha256(
-            _read_bounded(
-                protocol_source,
-                16 << 20,
-                label="WM-001 protocol",
-            )
-        ).hexdigest()
+        protocol_payload = _read_bounded(
+            protocol_source,
+            16 << 20,
+            label="WM-001 protocol",
+        )
+        protocol_digest = hashlib.sha256(protocol_payload).hexdigest()
+        protocol_raw = _json_without_duplicate_keys(
+            protocol_payload,
+            label="WM-001 protocol",
+        )
+        if not isinstance(protocol_raw, Mapping):
+            raise ArtifactAuditError("WM-001 protocol root is not an object")
+        protocol_value = protocol_raw
+        _audit_protocol_seed_contract(audit, protocol_value)
     except ArtifactAuditError:
         protocol_digest = ""
     audit.require(
-        result.get("protocol_version") == "1.3.0" and result.get("protocol_sha256") == protocol_digest,
+        result.get("protocol_version") == "1.4.0" and result.get("protocol_sha256") == protocol_digest,
         code="result_protocol_binding_mismatch",
-        message="result does not bind the exact WM-001 protocol 1.3.0 bytes",
+        message="result does not bind the exact WM-001 protocol 1.4.0 bytes",
     )
     replicates = _mapping_rows(result.get("replicates"))
     audit.require(
@@ -7135,15 +7702,21 @@ def audit_artifact(
         code="replicates_missing",
         message="result has no auditable replicate rows",
     )
-    _audit_formal_input_package(audit, root, result)
+    bound_formal_device = _audit_formal_input_package(audit, root, result)
     _audit_formal_schedule(audit, root, result)
     seen_replicates: set[str] = set()
     execution = result.get("execution")
-    device = (
-        str(execution.get("device"))
-        if isinstance(execution, Mapping) and execution.get("device") in {"cpu", "cuda", "mps"}
-        else "cpu"
-    )
+    if result.get("lane") == "formal":
+        # Formal arithmetic is selected only by the pre-outcome binding.  A
+        # missing or malformed binding cannot silently fall back to a mutable
+        # result field or to CPU.
+        device = bound_formal_device if bound_formal_device is not None else "invalid-formal-binding-device"
+    else:
+        device = (
+            str(execution.get("device"))
+            if isinstance(execution, Mapping) and execution.get("device") in {"cpu", "cuda", "mps"}
+            else "cpu"
+        )
     for index, replicate in enumerate(replicates):
         raw_replicate_id = replicate.get("replicate_id")
         replicate_id = (
@@ -7172,6 +7745,7 @@ def audit_artifact(
             root,
             replicate,
             replicate_id=replicate_id,
+            device=device,
             transitions_by_id=transitions_by_id,
             evaluated_checkpoints=evaluated_checkpoints,
         )
@@ -7203,7 +7777,11 @@ def audit_artifact(
             replicate_id=replicate_id,
             launcher_process_id=(execution.get("launcher_process_id") if isinstance(execution, Mapping) else None),
         )
-    _audit_recomputed_analysis(audit, result)
+    _audit_recomputed_analysis(
+        audit,
+        result,
+        protocol=protocol_value,
+    )
     _declare_current_coverage_gaps(
         audit,
         result,
@@ -7215,6 +7793,7 @@ def audit_artifact(
         root=root,
         result_path=result_path,
         result_sha256=result_digest,
+        lane=(str(result["lane"]) if result.get("lane") in {"development", "formal"} else None),
         require_claim_completeness=require_claim_completeness,
     )
 
@@ -7225,23 +7804,57 @@ def _audit_report(
     root: Path,
     result_path: Path,
     result_sha256: str | None,
+    lane: str | None,
     require_claim_completeness: bool,
 ) -> dict[str, object]:
     integrity_passed = audit.failed_checks == 0
-    complete_for_claim = not audit.coverage_gaps
+    engineering_complete = not audit.coverage_gaps
+    complete_for_claim = lane == "formal" and engineering_complete
+    live_auditor_sha256 = _AUDITOR_SOURCE_SHA256
+    audit_implementation: dict[str, object] = {
+        "auditor_source_sha256": live_auditor_sha256,
+        "bound_auditor_source_sha256": None,
+        "formal_test_report_sha256": None,
+        "coverage_conformance_report_sha256": None,
+        "auditor_source_matches_binding": False,
+        "coverage_conformance_verified": audit.coverage_conformance_verified,
+    }
+    binding_path = root / "formal-binding.json"
+    if binding_path.is_file() and not binding_path.is_symlink():
+        try:
+            binding_value = _json_without_duplicate_keys(
+                _read_bounded(binding_path, 64 << 20, label="formal binding"),
+                label="formal binding",
+            )
+            coverage_block = binding_value.get("coverage_arithmetic") if isinstance(binding_value, Mapping) else None
+            if isinstance(coverage_block, Mapping):
+                bound_auditor_sha256 = coverage_block.get("auditor_source_sha256")
+                audit_implementation.update(
+                    {
+                        "bound_auditor_source_sha256": bound_auditor_sha256,
+                        "formal_test_report_sha256": coverage_block.get("formal_test_report_sha256"),
+                        "coverage_conformance_report_sha256": coverage_block.get("conformance_report_sha256"),
+                        "auditor_source_matches_binding": (bound_auditor_sha256 == live_auditor_sha256),
+                    }
+                )
+        except (ArtifactAuditError, OSError):
+            pass
     return {
-        "schema": "prospect.world-model-lifecycle.artifact-audit.v1",
+        "schema": "prospect.world-model-lifecycle.artifact-audit.v2",
         "artifact_root": str(root.resolve()),
         "result_file": result_path.name,
         "result_sha256": result_sha256,
+        "lane": lane,
         "integrity_passed": integrity_passed,
+        "engineering_complete": engineering_complete,
         "complete_for_claim": complete_for_claim,
-        "passed": integrity_passed and (complete_for_claim or not require_claim_completeness),
+        "passed": integrity_passed and (engineering_complete or not require_claim_completeness),
         "check_counts": {
             "passed": audit.passed_checks,
             "failed": audit.failed_checks,
             "coverage_gaps": len(audit.coverage_gaps),
         },
+        "audit_implementation": audit_implementation,
         "resource_limits_bytes": {
             "result": _MAX_RESULT_BYTES,
             "prediction_sidecar": _MAX_PREDICTION_BYTES,

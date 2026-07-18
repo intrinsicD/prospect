@@ -37,8 +37,11 @@ pre-bound independent auditor contained two false-negative defects and returned
 `passed: false`. The [formal results review](docs/wm001-v130-formal-results.md)
 preserves both the mechanism evidence and the failed-acceptance boundary.
 Therefore the repository still has no accepted demonstration of the complete
-claim. A corrected auditor, fresh protocol and seeds, and a new binding are
-required.
+claim. Protocol 1.4.0 is the active fresh-seed confirmation: it keeps the
+scientific system and thresholds unchanged, makes predictive coverage an exact
+integer-count contract over persisted float32 evidence, binds endpoint
+conformance and corrected auditor identity, and permits one formal attempt
+after a claim-ineligible full-budget rehearsal.
 
 ## Layout
 

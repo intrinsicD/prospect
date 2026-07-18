@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+import bench.world_model_lifecycle.adjudication as adjudication_module
 from bench.world_model_lifecycle.adjudication import (
     ADJUDICATION_MANIFEST_NAME,
     AUDITOR_SOURCE_PATH,
@@ -16,6 +19,8 @@ from bench.world_model_lifecycle.adjudication import (
     create_adjudication_package,
     main,
 )
+
+_REAL_SUBPROCESS_RUN = adjudication_module.subprocess.run
 
 
 def _canonical(value: object) -> bytes:
@@ -40,6 +45,41 @@ def _write_json(path: Path, value: object) -> bytes:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(payload)
     return payload
+
+
+@pytest.fixture(autouse=True)
+def _stub_expensive_auditor_rerun(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep adjudication unit fixtures focused while preserving byte identity."""
+
+    def supplied_fixture_report(
+        command: list[str],
+        *,
+        check: bool,
+        capture_output: bool,
+        env: dict[str, str],
+        pass_fds: tuple[int, ...],
+    ) -> subprocess.CompletedProcess[bytes]:
+        assert check is False
+        assert capture_output is True
+        assert env
+        assert len(pass_fds) == 1
+        assert Path(command[-2]).read_bytes() == AUDITOR_SOURCE_PATH.read_bytes()
+        producer_root = Path(command[-1])
+        payload = (producer_root.parent / "audit.json").read_bytes()
+        value = json.loads(payload.decode("utf-8"))
+        assert isinstance(value, dict)
+        return subprocess.CompletedProcess(
+            command,
+            0 if value.get("passed") is True else 1,
+            stdout=payload,
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(
+        adjudication_module.subprocess,
+        "run",
+        supplied_fixture_report,
+    )
 
 
 def _write_producer_manifest(root: Path, *, lane: str) -> bytes:
@@ -79,27 +119,89 @@ def _make_evidence(
 ) -> tuple[Path, Path, dict[str, Any]]:
     producer = tmp_path / "producer"
     producer.mkdir()
+    protocol_sha256 = "a" * 64
+    auditor_source_sha256 = _digest(AUDITOR_SOURCE_PATH.read_bytes())
+    formal_test_report_sha256 = "b" * 64
+    coverage_conformance_report_sha256 = "c" * 64
+    git_commit = "d" * 40
+    git_tree = "e" * 40
 
     formal_binding_sha256: str | None = None
     if lane == "formal":
+        protocol_payload = _write_json(
+            producer / "protocol.json",
+            {"fixture": "wm001-v140-protocol"},
+        )
+        protocol_sha256 = _digest(protocol_payload)
+        _write_json(
+            producer / "schemas" / "raw-result.schema.json",
+            {"fixture": "wm001-v140-result-schema"},
+        )
         binding_payload = _write_json(
             producer / "formal-binding.json",
             {
-                "schema": "prospect.world-model-lifecycle.formal-binding.v3",
+                "schema": "prospect.world-model-lifecycle.formal-binding.v4",
                 "experiment_id": "WM-001",
+                "protocol": {
+                    "version": "1.4.0",
+                    "sha256": protocol_sha256,
+                },
+                "coverage_arithmetic": {
+                    "auditor_source_sha256": auditor_source_sha256,
+                    "formal_test_report_sha256": formal_test_report_sha256,
+                    "conformance_report_sha256": coverage_conformance_report_sha256,
+                },
+                "runtime": {
+                    "platform": "fixture-platform",
+                    "device": "cuda",
+                    "deterministic_algorithms": True,
+                },
             },
         )
         formal_binding_sha256 = _digest(binding_payload)
         snapshot = producer / "source" / "bench" / "world_model_lifecycle" / "artifact_audit.py"
         snapshot.parent.mkdir(parents=True)
         snapshot.write_bytes(b"different auditor\n" if auditor_snapshot_mismatch else AUDITOR_SOURCE_PATH.read_bytes())
+        launch = {
+            "schema": "prospect.wm001.formal-launch.v1",
+            "experiment_id": "WM-001",
+            "protocol_version": "1.4.0",
+            "formal_binding_sha256": formal_binding_sha256,
+            "attempt_directory": producer.name,
+            "claimed_at_utc": "2026-07-17T00:00:00Z",
+            "git_commit": git_commit,
+            "git_tree": git_tree,
+        }
+        launch["record_sha256"] = _digest(
+            json.dumps(
+                launch,
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+        launch_payload = _write_json(producer / "formal-launch.json", launch)
+    else:
+        launch_payload = None
 
     result = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v3",
+        "schema": "prospect.world-model-lifecycle.raw-result.v4",
         "experiment_id": "WM-001",
+        "protocol_version": "1.4.0",
+        "protocol_sha256": protocol_sha256,
         "lane": lane,
         "claim_eligible": lane == "formal",
         "formal_binding_sha256": ("0" * 64 if binding_mismatch else formal_binding_sha256),
+        "execution": {
+            "git_commit": git_commit,
+            "git_tree": git_tree,
+            "platform": "fixture-platform",
+            "device": "cuda",
+            "deterministic_algorithms": True,
+            "formal_launch_file": ("formal-launch.json" if lane == "formal" else None),
+            "formal_launch_sha256": (_digest(launch_payload) if launch_payload is not None else None),
+        },
         "gate_results": [
             {
                 "gate": f"K{index}",
@@ -112,12 +214,14 @@ def _make_evidence(
     producer_manifest_payload = _write_producer_manifest(producer, lane=lane)
 
     audit = {
-        "schema": "prospect.world-model-lifecycle.artifact-audit.v1",
+        "schema": "prospect.world-model-lifecycle.artifact-audit.v2",
         "artifact_root": str(producer.resolve()),
         "result_file": "result.json",
         "result_sha256": _digest(result_payload),
+        "lane": lane,
         "integrity_passed": True,
-        "complete_for_claim": True,
+        "engineering_complete": True,
+        "complete_for_claim": lane == "formal",
         "passed": True,
         "check_counts": {
             "passed": 100,
@@ -128,6 +232,14 @@ def _make_evidence(
             "producer_manifest_checked": True,
             "producer_manifest_status": "completed",
             "producer_manifest_sha256": _digest(producer_manifest_payload),
+        },
+        "audit_implementation": {
+            "auditor_source_sha256": auditor_source_sha256,
+            "bound_auditor_source_sha256": (auditor_source_sha256 if lane == "formal" else None),
+            "formal_test_report_sha256": (formal_test_report_sha256 if lane == "formal" else None),
+            "coverage_conformance_report_sha256": (coverage_conformance_report_sha256 if lane == "formal" else None),
+            "auditor_source_matches_binding": lane == "formal",
+            "coverage_conformance_verified": True,
         },
         "findings": [],
         "coverage_gaps": [],
@@ -250,6 +362,231 @@ def test_development_can_be_pending_but_cannot_be_accepted(tmp_path: Path) -> No
     assert not (tmp_path / "accepted").exists()
 
 
+def test_adjudication_rejects_audit_report_not_reproduced_by_bound_auditor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer, audit_path, _ = _make_evidence(tmp_path)
+    monkeypatch.setattr(
+        adjudication_module.subprocess,
+        "run",
+        _REAL_SUBPROCESS_RUN,
+    )
+
+    with pytest.raises(
+        AdjudicationError,
+        match="does not exactly match a fresh canonical run",
+    ):
+        create_adjudication_package(
+            producer_root=producer,
+            audit_report=audit_path,
+            output_directory=tmp_path / "package",
+            disposition="pending",
+        )
+    assert not (tmp_path / "package").exists()
+
+
+@pytest.mark.parametrize("disposition", ["pending", "accepted", "rejected"])
+def test_all_dispositions_reject_byte_distinct_self_consistent_audit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    disposition: str,
+) -> None:
+    producer, audit_path, honest = _make_evidence(tmp_path)
+    supplied = json.loads(json.dumps(honest))
+    supplied["check_counts"]["passed"] = 101
+    _write_json(audit_path, supplied)
+    honest_payload = _canonical(honest)
+
+    def frozen_honest_audit(
+        command: list[str],
+        **_options: object,
+    ) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=honest_payload,
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(
+        adjudication_module.subprocess,
+        "run",
+        frozen_honest_audit,
+    )
+    with pytest.raises(
+        AdjudicationError,
+        match="does not exactly match a fresh canonical run",
+    ):
+        create_adjudication_package(
+            producer_root=producer,
+            audit_report=audit_path,
+            output_directory=tmp_path / "package",
+            disposition=disposition,
+        )
+    assert not (tmp_path / "package").exists()
+
+
+def test_adjudication_runs_strict_auditor_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer, audit_path, audit = _make_evidence(tmp_path, lane="development")
+    calls: list[
+        tuple[
+            list[str],
+            bool,
+            bool,
+            dict[str, str],
+            tuple[int, ...],
+            bytes,
+        ]
+    ] = []
+    audit_payload = _canonical(audit)
+
+    def audited(
+        command: list[str],
+        *,
+        check: bool,
+        capture_output: bool,
+        env: dict[str, str],
+        pass_fds: tuple[int, ...],
+    ) -> subprocess.CompletedProcess[bytes]:
+        calls.append(
+            (
+                command,
+                check,
+                capture_output,
+                env,
+                pass_fds,
+                Path(command[-2]).read_bytes(),
+            )
+        )
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=audit_payload,
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(adjudication_module.subprocess, "run", audited)
+    create_adjudication_package(
+        producer_root=producer,
+        audit_report=audit_path,
+        output_directory=tmp_path / "package",
+        disposition="pending",
+    )
+    assert len(calls) == 1
+    command, check, capture_output, environment, pass_fds, executed_bytes = calls[0]
+    assert command[:3] == [sys.executable, "-I", "-B"]
+    assert command[-1] == str(producer.resolve())
+    assert command[-2] != str(AUDITOR_SOURCE_PATH)
+    assert command[-2] in {
+        f"/proc/self/fd/{pass_fds[0]}",
+        f"/dev/fd/{pass_fds[0]}",
+    }
+    assert len(pass_fds) == 1
+    assert executed_bytes == AUDITOR_SOURCE_PATH.read_bytes()
+    assert check is False
+    assert capture_output is True
+    assert environment == dict(adjudication_module.os.environ)
+
+
+def test_adjudication_executes_captured_bytes_across_live_source_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live_source = tmp_path / "live-artifact-audit.py"
+    original = AUDITOR_SOURCE_PATH.read_bytes()
+    live_source.write_bytes(original)
+    monkeypatch.setattr(
+        adjudication_module,
+        "AUDITOR_SOURCE_PATH",
+        live_source,
+    )
+    evidence_root = tmp_path / "evidence"
+    evidence_root.mkdir()
+    producer, audit_path, audit = _make_evidence(
+        evidence_root,
+        lane="development",
+    )
+    audit_payload = _canonical(audit)
+
+    def transient_swap(
+        command: list[str],
+        **_options: object,
+    ) -> subprocess.CompletedProcess[bytes]:
+        live_source.write_bytes(b"print('forged audit')\n")
+        try:
+            assert Path(command[-2]).read_bytes() == original
+        finally:
+            live_source.write_bytes(original)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=audit_payload,
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(
+        adjudication_module.subprocess,
+        "run",
+        transient_swap,
+    )
+    manifest = create_adjudication_package(
+        producer_root=producer,
+        audit_report=audit_path,
+        output_directory=tmp_path / "package",
+        disposition="pending",
+    )
+    assert manifest["auditor_source_sha256"] == _digest(original)
+
+
+def test_formal_adjudication_rejects_result_binding_device_mismatch(
+    tmp_path: Path,
+) -> None:
+    producer, audit_path, _ = _make_evidence(tmp_path)
+    result = json.loads((producer / "result.json").read_text(encoding="utf-8"))
+    result["execution"]["device"] = "cpu"
+    _write_json(producer / "result.json", result)
+    _write_producer_manifest(producer, lane="formal")
+
+    with pytest.raises(
+        AdjudicationError,
+        match="formal result runtime differs",
+    ):
+        create_adjudication_package(
+            producer_root=producer,
+            audit_report=audit_path,
+            output_directory=tmp_path / "package",
+            disposition="pending",
+        )
+    assert not (tmp_path / "package").exists()
+
+
+def test_auditor_exception_cannot_create_adjudication_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer, audit_path, _ = _make_evidence(tmp_path)
+
+    def fail_audit(*_args: object, **_kwargs: object) -> object:
+        raise OSError("auditor failed closed")
+
+    monkeypatch.setattr(adjudication_module.subprocess, "run", fail_audit)
+    with pytest.raises(
+        AdjudicationError,
+        match="fresh independent-audit recomputation failed",
+    ):
+        create_adjudication_package(
+            producer_root=producer,
+            audit_report=audit_path,
+            output_directory=tmp_path / "package",
+            disposition="pending",
+        )
+    assert not (tmp_path / "package").exists()
+
+
 @pytest.mark.parametrize("failure", ["integrity", "completeness"])
 @pytest.mark.parametrize("disposition", ["pending", "accepted"])
 def test_non_rejected_dispositions_require_a_clean_audit(
@@ -264,6 +601,7 @@ def test_non_rejected_dispositions_require_a_clean_audit(
         audit["check_counts"]["failed"] = 1
         audit["findings"] = [{"severity": "error", "code": "tampered"}]
     else:
+        audit["engineering_complete"] = False
         audit["complete_for_claim"] = False
         audit["passed"] = False
         audit["check_counts"]["coverage_gaps"] = 1
@@ -299,6 +637,7 @@ def test_rejected_package_can_preserve_non_clean_audit_with_fatal_review(
         audit["check_counts"]["failed"] = 1
         audit["findings"] = [{"severity": "error", "code": "tampered"}]
     else:
+        audit["engineering_complete"] = False
         audit["complete_for_claim"] = False
         audit["passed"] = False
         audit["check_counts"]["coverage_gaps"] = 1
@@ -359,6 +698,7 @@ def test_rejected_non_clean_audit_requires_fatal_semantic_finding(tmp_path: Path
         ("failed_count", 2),
         ("gap_count", 2),
         ("integrity_passed", True),
+        ("engineering_complete", True),
         ("complete_for_claim", True),
         ("passed", True),
     ],
@@ -370,6 +710,7 @@ def test_rejected_package_refuses_internally_inconsistent_audit_status(
 ) -> None:
     producer, audit_path, audit = _make_evidence(tmp_path)
     audit["integrity_passed"] = False
+    audit["engineering_complete"] = False
     audit["complete_for_claim"] = False
     audit["passed"] = False
     audit["check_counts"]["failed"] = 1

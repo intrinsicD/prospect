@@ -41,16 +41,17 @@ TASK_A = "pendulum_normal_torque"
 TASK_B = "pendulum_reversed_torque"
 TASK_IRRELEVANT = "independent_phase_oscillator"
 FORMAL_SEEDS = (
-    17123296,
-    3280610186,
-    2725263418,
-    3124246399,
-    4093604926,
-    3908390087,
-    3332986400,
-    724244869,
+    339970590,
+    474769515,
+    550273937,
+    438984650,
+    2732731971,
+    2253809848,
+    2206960337,
+    3506881479,
 )
-DEVELOPMENT_SEEDS = (3625750835, 2671781227)
+DEVELOPMENT_SEEDS = (2439054559, 3246851043)
+COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
 T_CRITICAL_N8 = 2.364624251
 
 # Two-sided 95% Student-t critical values indexed by sample size.  WM-001 only
@@ -334,9 +335,28 @@ def _replicate_numeric_values(replicate: Mapping[str, Any]) -> tuple[dict[str, f
 
     def coverage(task: str, condition: str) -> float | None:
         row = prediction[(task, condition)]
-        if row is None or not _is_finite_number(row.get("interval_90_coverage")):
+        if row is None or row.get("coverage_semantics") != COVERAGE_SEMANTICS:
             return None
-        return float(row["interval_90_coverage"])
+        covered = row.get("interval_90_covered_target_count")
+        total = row.get("coverage_target_count")
+        transition_count = row.get("transition_count")
+        stored_fraction = row.get("interval_90_coverage")
+        if (
+            not isinstance(covered, int)
+            or isinstance(covered, bool)
+            or not isinstance(total, int)
+            or isinstance(total, bool)
+            or not isinstance(transition_count, int)
+            or isinstance(transition_count, bool)
+            or total <= 0
+            or covered < 0
+            or covered > total
+            or total != 4 * transition_count
+            or not _is_finite_number(stored_fraction)
+            or float(stored_fraction) != covered / total
+        ):
+            return None
+        return covered / total
 
     required_inputs = {
         "irrelevant_source_nll_improvement_after_irrelevant_vs_cold": (
@@ -416,6 +436,14 @@ def _replicate_numeric_values(replicate: Mapping[str, Any]) -> tuple[dict[str, f
     after_a_coverage = coverage(TASK_A, "after_a")
     if after_a_coverage is not None and math.isfinite(after_a_coverage):
         values["a_after_a_interval_90_coverage"] = after_a_coverage
+        after_a_row = prediction[(TASK_A, "after_a")]
+        assert after_a_row is not None
+        values["_a_after_a_interval_90_covered_target_count"] = float(
+            after_a_row["interval_90_covered_target_count"]
+        )
+        values["_a_after_a_coverage_target_count"] = float(
+            after_a_row["coverage_target_count"]
+        )
     else:
         findings.append(
             _finding(
@@ -589,7 +617,7 @@ def _phase_index(replicate: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
 
 
 def _derive_seed(namespace: str, master_seed: int, index: int) -> int:
-    payload = f"WM-001|1.3.0|{namespace}|{master_seed}|{index}".encode()
+    payload = f"WM-001|1.4.0|{namespace}|{master_seed}|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
@@ -922,11 +950,11 @@ def _structural_checks(
     replicates = _as_rows(result.get("replicates"))
 
     envelope_violations: list[str] = []
-    if result.get("schema") != "prospect.world-model-lifecycle.raw-result.v3":
+    if result.get("schema") != "prospect.world-model-lifecycle.raw-result.v4":
         envelope_violations.append("wrong raw-result schema")
     if result.get("experiment_id") != "WM-001":
         envelope_violations.append("wrong experiment_id")
-    if result.get("protocol_version") != "1.3.0":
+    if result.get("protocol_version") != "1.4.0":
         envelope_violations.append("wrong protocol_version")
     if result.get("protocol_sha256") != expected_protocol_sha256:
         envelope_violations.append("protocol SHA-256 does not match sealed raw bytes")
@@ -1149,7 +1177,8 @@ def _structural_checks(
                         f"{replicate_id}: expected one predictive row for {task}/{condition}, found {len(rows)}"
                     )
                     continue
-                count = rows[0].get("transition_count")
+                predictive_row = rows[0]
+                count = predictive_row.get("transition_count")
                 if not isinstance(count, int) or count <= 0:
                     numeric_source_violations.append(
                         f"{replicate_id}: invalid predictive transition count for {task}/{condition}"
@@ -1165,10 +1194,38 @@ def _structural_checks(
                     "normalized_rmse",
                     "interval_90_coverage",
                 ):
-                    if not _is_finite_number(rows[0].get(field)):
+                    if not _is_finite_number(predictive_row.get(field)):
                         numeric_source_violations.append(f"{replicate_id}: {task}/{condition} has non-finite {field}")
-                evidence_file = rows[0].get("prediction_evidence_file")
-                evidence_bytes = rows[0].get("prediction_evidence_bytes")
+                covered_target_count = predictive_row.get("interval_90_covered_target_count")
+                coverage_target_count = predictive_row.get("coverage_target_count")
+                stored_coverage = predictive_row.get("interval_90_coverage")
+                if predictive_row.get("coverage_semantics") != COVERAGE_SEMANTICS:
+                    numeric_source_violations.append(
+                        f"{replicate_id}: {task}/{condition} has the wrong coverage semantics"
+                    )
+                if (
+                    not isinstance(covered_target_count, int)
+                    or isinstance(covered_target_count, bool)
+                    or not isinstance(coverage_target_count, int)
+                    or isinstance(coverage_target_count, bool)
+                    or coverage_target_count <= 0
+                    or covered_target_count < 0
+                    or covered_target_count > coverage_target_count
+                ):
+                    numeric_source_violations.append(
+                        f"{replicate_id}: {task}/{condition} has invalid coverage counts"
+                    )
+                elif (
+                    not isinstance(count, int)
+                    or coverage_target_count != 4 * count
+                    or not _is_finite_number(stored_coverage)
+                    or float(stored_coverage) != covered_target_count / coverage_target_count
+                ):
+                    numeric_source_violations.append(
+                        f"{replicate_id}: {task}/{condition} coverage counts, transition count, and fraction disagree"
+                    )
+                evidence_file = predictive_row.get("prediction_evidence_file")
+                evidence_bytes = predictive_row.get("prediction_evidence_bytes")
                 if (
                     not isinstance(evidence_file, str)
                     or not evidence_file
@@ -1727,7 +1784,8 @@ def _structural_checks(
                 "info",
                 "K0",
                 "development_claim_ineligible",
-                "Development gates are diagnostic only and cannot support the WM-001 claim.",
+                "Development K3-K6 values are descriptive only: they cannot support the WM-001 claim "
+                "or determine whether a formal binding may launch.",
             )
         )
     return dict(checks), findings
@@ -1757,6 +1815,64 @@ def _metric_check(
         "le": observed <= threshold,
     }
     return _check(check_name, observed, comparator, threshold, comparisons[comparator], metric)
+
+
+def _coverage_count_gate_checks(
+    replicate_values: Sequence[Mapping[str, float]],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    count_pairs: list[tuple[int, int]] = []
+    for row in replicate_values:
+        covered_value = row.get("_a_after_a_interval_90_covered_target_count")
+        total_value = row.get("_a_after_a_coverage_target_count")
+        if (
+            not _is_finite_number(covered_value)
+            or not _is_finite_number(total_value)
+            or not float(covered_value).is_integer()
+            or not float(total_value).is_integer()
+        ):
+            count_pairs = []
+            break
+        covered = int(covered_value)
+        total = int(total_value)
+        if total <= 0 or covered < 0 or covered > total:
+            count_pairs = []
+            break
+        count_pairs.append((covered, total))
+
+    complete = bool(replicate_values) and len(count_pairs) == len(replicate_values)
+    covered_sum = sum(covered for covered, _ in count_pairs)
+    target_sum = sum(total for _, total in count_pairs)
+    evidence = {
+        "replicate_counts": [
+            {"covered_target_count": covered, "coverage_target_count": total}
+            for covered, total in count_pairs
+        ],
+        "covered_target_count_sum": covered_sum,
+        "coverage_target_count_sum": target_sum,
+    }
+    observed: int | float | bool | str = (
+        f"{covered_sum}/{target_sum}" if complete and target_sum > 0 else "missing"
+    )
+    lower_passed = complete and target_sum > 0 and 10 * covered_sum >= 7 * target_sum
+    upper_passed = complete and target_sum > 0 and 100 * covered_sum <= 99 * target_sum
+    return (
+        _check(
+            "after_a_interval_coverage_lower_bound",
+            observed,
+            "10*C >= 7*T",
+            "0.70 inclusive",
+            lower_passed,
+            {**evidence, "left": 10 * covered_sum, "right": 7 * target_sum},
+        ),
+        _check(
+            "after_a_interval_coverage_upper_bound",
+            observed,
+            "100*C <= 99*T",
+            "0.99 inclusive",
+            upper_passed,
+            {**evidence, "left": 100 * covered_sum, "right": 99 * target_sum},
+        ),
+    )
 
 
 def _numeric_gate_checks(
@@ -1832,22 +1948,7 @@ def _numeric_gate_checks(
                 0.0,
                 "a_vs_irrelevant_nll_improvement_ci_lower",
             ),
-            _metric_check(
-                metrics,
-                "a_after_a_interval_90_coverage",
-                "mean",
-                "ge",
-                0.7,
-                "after_a_interval_coverage_lower_bound",
-            ),
-            _metric_check(
-                metrics,
-                "a_after_a_interval_90_coverage",
-                "mean",
-                "le",
-                0.99,
-                "after_a_interval_coverage_upper_bound",
-            ),
+            *_coverage_count_gate_checks(replicate_values),
         )
     )
 

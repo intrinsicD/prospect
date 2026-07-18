@@ -23,7 +23,12 @@ def main() -> int:
     _ensure_deterministic_cuda_environment()
     import torch
 
-    from .artifact import ProducerAttempt
+    from .artifact import (
+        ProducerAttempt,
+        claim_formal_launch,
+        copy_file_exclusive,
+        formal_launch_marker_path,
+    )
     from .binding import verify_live_binding
     from .experiment import ExperimentConfig, run_experiment
 
@@ -39,6 +44,7 @@ def main() -> int:
         help="development-only subset of the two declared diagnostic seeds",
     )
     arguments = parser.parse_args()
+    existing_launch_marker: Path | None = None
     if arguments.lane == "formal":
         if arguments.master_seed:
             parser.error("formal lane cannot override the eight sealed master seeds")
@@ -53,10 +59,21 @@ def main() -> int:
             / binding_digest
             / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}-{os.getpid()}"
         )
+        existing_launch_marker, _ = formal_launch_marker_path(
+            arguments.binding,
+            output,
+        )
+        if existing_launch_marker.exists():
+            print(
+                "WM-001 protocol 1.4 formal launch already consumed; "
+                "same-version retry is forbidden",
+                file=sys.stderr,
+            )
+            return 1
     else:
         seeds = arguments.master_seed or None
         config = ExperimentConfig.development(
-            master_seeds=(seeds if seeds is not None else (3625750835, 2671781227)),
+            master_seeds=(seeds if seeds is not None else (2439054559, 3246851043)),
             device=arguments.device,
         )
         stamp = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}-{os.getpid()}"
@@ -72,6 +89,15 @@ def main() -> int:
                 torch.use_deterministic_algorithms(True)
                 verify_live_binding(binding_for_run, device=config.device)
                 print("WM-001 live implementation binding verified", flush=True)
+                launch_marker = claim_formal_launch(
+                    arguments.binding,
+                    attempt.output_directory,
+                )
+                copy_file_exclusive(
+                    launch_marker,
+                    attempt.output_directory / launch_marker.name,
+                )
+                print("WM-001 sole formal launch atomically claimed", flush=True)
             _, result_path = run_experiment(
                 config,
                 output_directory=attempt.output_directory,

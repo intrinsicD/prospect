@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-raw-result-v3.json",
+  "$id": "https://prospect.local/schemas/wm-001-raw-result-v4.json",
   "title": "WM-001 raw evidence and derived result",
   "type": "object",
   "additionalProperties": false,
@@ -22,13 +22,13 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.raw-result.v3"
+      "const": "prospect.world-model-lifecycle.raw-result.v4"
     },
     "experiment_id": {
       "const": "WM-001"
     },
     "protocol_version": {
-      "const": "1.3.0"
+      "const": "1.4.0"
     },
     "protocol_sha256": {
       "$ref": "#/$defs/sha256"
@@ -72,6 +72,8 @@
         "device",
         "deterministic_algorithms",
         "launcher_process_id",
+        "formal_launch_file",
+        "formal_launch_sha256",
         "resource_telemetry"
       ],
       "properties": {
@@ -106,6 +108,26 @@
         "launcher_process_id": {
           "type": "integer",
           "minimum": 1
+        },
+        "formal_launch_file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "formal-launch.json",
+            null
+          ]
+        },
+        "formal_launch_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "resource_telemetry": {
           "type": "object",
@@ -167,6 +189,16 @@
           "formal_binding_sha256": {
             "$ref": "#/$defs/sha256"
           },
+          "execution": {
+            "properties": {
+              "formal_launch_file": {
+                "const": "formal-launch.json"
+              },
+              "formal_launch_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
           "replicates": {
             "minItems": 8,
             "maxItems": 8,
@@ -216,6 +248,16 @@
         "properties": {
           "claim_eligible": {
             "const": false
+          },
+          "execution": {
+            "properties": {
+              "formal_launch_file": {
+                "const": null
+              },
+              "formal_launch_sha256": {
+                "const": null
+              }
+            }
           }
         }
       }
@@ -768,6 +810,9 @@
         "transition_count",
         "mixture_nll_nats_per_target_dimension",
         "normalized_rmse",
+        "coverage_semantics",
+        "interval_90_covered_target_count",
+        "coverage_target_count",
         "interval_90_coverage",
         "prediction_rows_sha256",
         "prediction_evidence_file",
@@ -829,6 +874,17 @@
         "normalized_rmse": {
           "type": "number",
           "minimum": 0.0
+        },
+        "coverage_semantics": {
+          "const": "wm001-mixture-pit-binary64-count-v1"
+        },
+        "interval_90_covered_target_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coverage_target_count": {
+          "type": "integer",
+          "minimum": 1
         },
         "interval_90_coverage": {
           "type": "number",

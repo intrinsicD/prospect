@@ -18,8 +18,8 @@ that Prospect passes them.
 
 ## Current status
 
-The WM-001 implementation and evidence pipeline exist, and protocol 1.3.0 has
-completed one eight-seed formal attempt. Its immutable producer evidence passed
+The WM-001 implementation and evidence pipeline exist. Protocol 1.3.0 completed
+one eight-seed formal attempt. Its immutable producer evidence passed
 K0–K7, but the mandatory pre-bound independent auditor returned two failures.
 Both were reproduced as auditor defects rather than producer-data corruption:
 one duplicated seed constant disagreed with the sealed protocol, and one
@@ -27,6 +27,14 @@ corrupted-control coverage coordinate fell on numerically underspecified PIT
 endpoint semantics. The attempt has an explicit rejected adjudication and is not
 an accepted demonstration. See the
 [formal results review](../../docs/wm001-v130-formal-results.md).
+
+Protocol 1.4.0 is the active fresh-seed confirmation contract. It changes no
+formal model, learning, controller, budget, control, threshold, or killing
+gate. It replaces underspecified coverage arithmetic with an exact count
+contract over persisted float32 tensors, corrects schedule parity, binds a
+coverage conformance corpus, and permits exactly one new formal attempt. Its
+design and execution policy are recorded in the
+[v1.4 confirmation plan](../../docs/wm001-v140-confirmation-plan.md).
 
 A development run remains diagnostic. A formal producer result is only
 claim-eligible; it is not self-certifying. The lifecycle claim remains unproven
@@ -52,11 +60,12 @@ and transparently derived master seeds. The manipulation threshold reuses the
 existing predictive minimum-effect floor and was fixed before any v1.3.0
 development or formal outcome.
 
-The active auditor now sources the corrected formal schedule and compares
-coverage in discrete target-count space with adversarial tests. These are
-postmortem fixes for a future binding only. They cannot repair or upgrade the
-immutable v1.3.0 attempt, whose audit and auditor-source bytes remain preserved
-in its rejected package.
+The active producer and independent auditor now recompute the same prospectively
+specified scalar-binary64 mixture PIT from persisted float32 evidence and
+require exact covered-target counts with no tolerance. K3 applies the unchanged
+inclusive `[0.70, 0.99]` bounds by integer cross-products. These repairs cannot
+upgrade the immutable v1.3.0 attempt, whose failed audit and auditor bytes
+remain preserved in its rejected package.
 
 ## What the experiment must establish
 
@@ -186,27 +195,30 @@ resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
 
-Development uses only seeds `3625750835` and `2671781227`, four collection
-episodes per learned arm, eight validation episodes for each Pendulum task and
-the oscillator, two behavior episodes per condition, and 300 optimizer steps
-per update. It is useful for correctness, feasibility, and failure diagnosis,
-but it is never claim-eligible and cannot be relabeled.
+The final development rehearsal uses only seeds `2439054559` and `3246851043`
+and the complete formal budgets. It is useful only for schema, deterministic
+execution, exact arithmetic, audit coverage, restart, and custody validation.
+Its K3–K6 performance values are descriptive, cannot decide whether formal may
+launch, are never claim-eligible, and cannot be relabeled.
 
 Formal execution uses the eight sealed master seeds and exact declared budgets.
-No tuning, exclusions, retries, early stopping, extra training, or analysis
-changes are allowed after launch. A crash or incomplete replicate fails the
-active gate.
+The first formal environment reset starts v1.4.0's sole attempt. No resume,
+retry, corrected-audit upgrade, early stopping, extra training, exclusion, or
+analysis change is allowed. A crash, incomplete evidence, gate failure, audit
+failure, or semantic-review failure retires v1.4.0.
 
 There are two pre-outcome bindings:
 
 1. The scientific seal fixes the protocol and result/binding schemas.
 2. A formal implementation binding fixes a clean Git commit and tree, all
    executed source and test digests, dependency closure, runtime, deterministic
-   settings, environment conformance, and checkpoint implementation.
+   settings, environment conformance, exact coverage conformance, auditor/test
+   digests, and checkpoint implementation.
 
 Changing scientific semantics requires a new protocol version. Changing bound
-source, dependencies, or runtime requires a new implementation binding and a new
-formal attempt; previous failed attempts remain evidence.
+source, dependencies, or runtime before the first formal reset requires a new
+implementation binding. After that reset, any such change requires a new
+protocol version; previous failed attempts remain evidence.
 
 ## Executable runbook
 
@@ -230,22 +242,7 @@ epistemic diagnostics.
 
 ### 2. Run and audit the development lane
 
-A one-seed structural run is optional:
-
-```bash
-DEV_SMOKE="bench/world_model_lifecycle/results/development/$(date -u +%Y%m%dT%H%M%SZ)-smoke-$$"
-python -m bench.world_model_lifecycle.run development \
-  --device cuda \
-  --master-seed 3625750835 \
-  --output "$DEV_SMOKE"
-python -m bench.world_model_lifecycle.verify result "$DEV_SMOKE/result.json"
-mkdir -p artifacts/wm001-audits
-python -m bench.world_model_lifecycle.artifact_audit "$DEV_SMOKE" \
-  --output "artifacts/wm001-audits/$(basename "$DEV_SMOKE").json"
-```
-
-The complete two-seed diagnostic uses the same command without
-`--master-seed`:
+Run the single required complete two-seed rehearsal:
 
 ```bash
 DEV_ARTIFACT="bench/world_model_lifecycle/results/development/$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -257,14 +254,17 @@ python -m bench.world_model_lifecycle.artifact_audit "$DEV_ARTIFACT" \
   --output "artifacts/wm001-audits/$(basename "$DEV_ARTIFACT").json"
 ```
 
-The audit output must be outside the immutable producer directory. A development
-audit can establish evidence integrity and expose failure modes, but its numbers
-cannot support the WM-001 claim.
+The audit output must be outside the immutable producer directory. The
+rehearsal must have complete schema/matrix evidence, deterministic execution,
+seed parity, exact coverage agreement, restart parity, custody integrity, and
+zero audit failures or gaps. Its performance gates do not screen formal launch
+and its numbers cannot support the WM-001 claim.
 
 ### 3. Commit the exact candidate and create a formal binding
 
-Resolve every development finding first. Commit the exact candidate source, then
-confirm that the tracked and untracked worktree is clean:
+Resolve every development engineering or audit finding first. Do not use K3–K6
+performance values to modify the candidate. Commit the exact candidate source,
+then confirm that the tracked and untracked worktree is clean:
 
 ```bash
 git status --short --untracked-files=all
@@ -272,8 +272,9 @@ git status --short --untracked-files=all
 
 Create a fresh ignored evidence directory, preserve the final check output, and
 bind that clean commit. The binding function runs 1,024 Pendulum conformance
-cases plus 512 full 200-step paired-action oscillator cases and refuses a
-dependency-lock or runtime mismatch.
+cases, 512 full 200-step paired-action oscillator cases, and the exact coverage
+endpoint/regression corpus; it refuses a source, auditor, test-report,
+dependency-lock, or runtime mismatch.
 
 ```bash
 BINDING_DIR="artifacts/wm001-binding-$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -301,9 +302,9 @@ PY
 python -m bench.world_model_lifecycle.verify binding "$BINDING"
 ```
 
-`create_formal_binding` writes content-addressed copies of the test, Pendulum
-conformance, and oscillator conformance reports beside `formal-binding.json`.
-It refuses to replace any existing binding evidence.
+`create_formal_binding` writes content-addressed copies of the test, Pendulum,
+oscillator, and coverage conformance reports beside `formal-binding.json`. It
+refuses to replace any existing binding evidence.
 
 ### 4. Launch exactly one formal attempt
 
@@ -320,9 +321,15 @@ python -m bench.world_model_lifecycle.run formal \
 
 The launcher rechecks the live source, Git tree, dependency closure, runtime,
 deterministic settings, environment wrapper, and copied binding before the first
-reset. It then copies the protocol, seal, schemas, lock, test report, conformance
-report, binding, and every byte named by the complete bound implementation
-manifest into the attempt.
+reset. Immediately before the first possible reset, it atomically creates the
+single protocol-wide `results/formal/formal-launch.json` and copies those exact
+bytes into the attempt. It also copies the protocol, seal, schemas, lock, test
+report, conformance report, binding, and every byte named by the complete bound
+implementation manifest into the attempt. Any existing protocol-wide launch
+marker blocks every same-version binding.
+
+Do not issue this command a second time for protocol 1.4.0, regardless of the
+first attempt's outcome.
 
 ### 5. Verify custody, recompute, and judge
 
@@ -359,14 +366,20 @@ python -m bench.world_model_lifecycle.adjudication \
 ```
 
 The producer root is finalized before independent audit and is never modified
-afterward. The external adjudication package copies the exact audit report and
-binds it to the producer-manifest, result, auditor-source, and formal-binding
-digests. An `accepted` or `rejected` disposition additionally requires a
-canonical content-addressed semantic review. `pending` and `accepted` packages
-require a complete, clean, passing audit. An explicit `rejected` package may
-instead preserve an identity- and custody-valid failed or incomplete audit, but
-its semantic review must record at least one fatal finding explaining why the
-claim is rejected.
+afterward. Before creating an external adjudication package, adjudication
+captures and verifies the current pre-bound auditor bytes, executes those bytes
+through an inherited descriptor to an exclusive private copy, and requires its
+fresh canonical output to be byte-identical to the supplied report. The formal
+auditor derives its execution device from the binding and requires the result,
+live runtime, accelerator/CUDA identity, and installed dependency bytes to
+match. Adjudication then copies and binds the reproduced report to the
+producer-manifest, result, auditor-source, and formal-binding digests. An
+`accepted` or `rejected` disposition additionally requires a canonical
+content-addressed semantic review. `pending` and `accepted` packages require a
+complete, clean, passing audit. An explicit `rejected` package may instead
+preserve an identity- and custody-valid failed or incomplete audit, but its
+semantic review must record at least one fatal finding explaining why the claim
+is rejected.
 
 The envelope verifier checks schemas, hashes, identities, seed derivation, split
 custody, update ancestry, budgets, gate order, and binding consistency. The

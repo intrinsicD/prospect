@@ -14,6 +14,7 @@ import pytest
 import torch
 
 import bench.world_model_lifecycle.artifact_audit as artifact_audit_module
+from bench.world_model_lifecycle import binding as binding_module
 from bench.world_model_lifecycle.artifact_audit import (
     _GRAPH_RECORD_FIELDS,
     ArtifactAuditError,
@@ -22,18 +23,24 @@ from bench.world_model_lifecycle.artifact_audit import (
     _audit_analytic_transition_dynamics,
     _audit_bound_irrelevant_control,
     _audit_bound_source_snapshot,
+    _audit_formal_runtime_binding,
     _audit_formal_schedule,
     _audit_irrelevant_prediction_manipulation,
     _audit_prediction_coverage,
     _audit_predictions,
     _audit_recomputed_analysis,
     _audit_rejected_probe_full_state,
+    _audit_report,
     _audit_restart_parity_evidence,
     _audit_retained_replay_components,
+    _binary64_mixture_pit_is_covered,
     _decode_sealed_model,
     _derive_seed,
     _EvaluatedCheckpoint,
     _expected_formal_oscillator_conformance,
+    _expected_prediction_target_f32,
+    _expected_prediction_targets_f32,
+    _independent_coverage_count_gate_checks,
     _independent_oscillator_reset,
     _independent_oscillator_step,
     _independent_recompute_aggregate_metrics,
@@ -43,6 +50,7 @@ from bench.world_model_lifecycle.artifact_audit import (
     _replay_cem_action_trace,
     _validate_domain_graph_structure,
     _validate_formal_conformance_report,
+    _validate_formal_coverage_conformance_report,
     _verify_producer_manifest_locally,
     audit_artifact,
     decode_sampling_manifest,
@@ -55,6 +63,7 @@ from bench.world_model_lifecycle.checkpoint import (
 )
 from bench.world_model_lifecycle.learning import WorldModelRuntime
 from bench.world_model_lifecycle.model import (
+    FixedScaling,
     ProbabilisticEnsemble,
     TransitionBatch,
     WorldModelConfig,
@@ -73,6 +82,27 @@ from prospect.domain import TimePoint
 MAGIC = b"PROSPECT-WM001\0"
 TASK_A = "pendulum_normal_torque"
 TASK_IRRELEVANT = "independent_phase_oscillator"
+
+
+def test_complete_development_audit_passes_without_becoming_claim_complete(
+    tmp_path: Path,
+) -> None:
+    audit = _Audit()
+    audit.passed_checks = 1
+
+    report = _audit_report(
+        audit,
+        root=tmp_path,
+        result_path=tmp_path / "result.json",
+        result_sha256="0" * 64,
+        lane="development",
+        require_claim_completeness=True,
+    )
+
+    assert report["integrity_passed"] is True
+    assert report["engineering_complete"] is True
+    assert report["complete_for_claim"] is False
+    assert report["passed"] is True
 
 
 def _canonical(value: object) -> bytes:
@@ -183,7 +213,7 @@ def test_independent_oscillator_replays_reset_dynamics_and_ignored_action() -> N
     assert "transition_dynamics_applied_action_mismatch" in {finding["code"] for finding in tampered.findings}
 
 
-def test_v130_oscillator_manipulation_crossbinds_pair_targets_and_isolation() -> None:
+def test_v140_oscillator_manipulation_crossbinds_pair_targets_and_isolation() -> None:
     transition_id = "transition:oscillator-heldout"
     before = _independent_oscillator_reset(123_456)
     after, reward, _ = _independent_oscillator_step(before.tolist())
@@ -262,7 +292,7 @@ def test_v130_oscillator_manipulation_crossbinds_pair_targets_and_isolation() ->
     _audit_irrelevant_prediction_manipulation(
         valid,
         replicate,
-        replicate_id="v130-test",
+        replicate_id="v140-test",
         transitions_by_id=transitions,
         verified=verified,
     )
@@ -274,7 +304,7 @@ def test_v130_oscillator_manipulation_crossbinds_pair_targets_and_isolation() ->
     _audit_irrelevant_prediction_manipulation(
         target_tampered,
         replicate,
-        replicate_id="v130-test",
+        replicate_id="v140-test",
         transitions_by_id=transitions,
         verified={
             cold_key: prediction(target.copy()),
@@ -284,9 +314,7 @@ def test_v130_oscillator_manipulation_crossbinds_pair_targets_and_isolation() ->
     assert {
         "irrelevant_prediction_pair_binding_mismatch",
         "irrelevant_prediction_analytic_target_mismatch",
-    }.issubset(
-        {finding["code"] for finding in target_tampered.findings}
-    )
+    }.issubset({finding["code"] for finding in target_tampered.findings})
 
     contaminated = json.loads(json.dumps(replicate))
     contaminated["updates"][0]["eligible_transition_ids"].append(transition_id)
@@ -294,7 +322,7 @@ def test_v130_oscillator_manipulation_crossbinds_pair_targets_and_isolation() ->
     _audit_irrelevant_prediction_manipulation(
         isolation_tampered,
         contaminated,
-        replicate_id="v130-test",
+        replicate_id="v140-test",
         transitions_by_id=transitions,
         verified=verified,
     )
@@ -303,7 +331,7 @@ def test_v130_oscillator_manipulation_crossbinds_pair_targets_and_isolation() ->
     }
 
 
-def test_v130_prediction_audit_reopens_both_oscillator_sidecars(
+def test_v140_prediction_audit_reopens_both_oscillator_sidecars(
     tmp_path: Path,
 ) -> None:
     runtime = WorldModelRuntime.initialize(initialization_seed=7)
@@ -366,10 +394,11 @@ def test_v130_prediction_audit_reopens_both_oscillator_sidecars(
             "live_state_sha256": checkpoint.live_state_sha256,
             "split": split,
             "transition_count": 1,
-            "mixture_nll_nats_per_target_dimension": (
-                evidence.mixture_nll_nats_per_target_dimension
-            ),
+            "mixture_nll_nats_per_target_dimension": (evidence.mixture_nll_nats_per_target_dimension),
             "normalized_rmse": evidence.normalized_rmse,
+            "coverage_semantics": "wm001-mixture-pit-binary64-count-v1",
+            "interval_90_covered_target_count": evidence.covered_target_count,
+            "coverage_target_count": evidence.coverage_target_count,
             "interval_90_coverage": evidence.interval_90_coverage,
             "prediction_rows_sha256": hashlib.sha256(payload).hexdigest(),
             "prediction_evidence_file": path.name,
@@ -400,11 +429,39 @@ def test_v130_prediction_audit_reopens_both_oscillator_sidecars(
         valid,
         tmp_path,
         replicate,
-        replicate_id="v130-test",
+        replicate_id="v140-test",
+        device="cpu",
         transitions_by_id={transition_id: transition},
         evaluated_checkpoints=checkpoints,
     )
     assert valid.failed_checks == 0
+
+    altered_targets = decoded.normalized_targets.copy()
+    altered_targets[0, 0] = np.nextafter(
+        altered_targets[0, 0],
+        np.float32(math.inf),
+        dtype=np.float32,
+    )
+    one_ulp_tamper = encode_prediction_evidence(
+        decoded.transition_ids,
+        torch.from_numpy(altered_targets),
+        torch.from_numpy(decoded.member_means),
+        torch.from_numpy(decoded.member_log_variances),
+    )
+    predictive_rows = replicate["predictive_metrics"]
+    assert isinstance(predictive_rows, list)
+    predictive_rows[1] = metric_row("irrelevant", one_ulp_tamper)
+    one_ulp = _Audit()
+    _audit_predictions(
+        one_ulp,
+        tmp_path,
+        replicate,
+        replicate_id="v140-test",
+        device="cpu",
+        transitions_by_id={transition_id: transition},
+        evaluated_checkpoints=checkpoints,
+    )
+    assert "prediction_target_binding_mismatch" in {finding["code"] for finding in one_ulp.findings}
 
     altered_targets = decoded.normalized_targets.copy()
     altered_targets[0, 0] += np.float32(0.25)
@@ -414,15 +471,14 @@ def test_v130_prediction_audit_reopens_both_oscillator_sidecars(
         torch.from_numpy(decoded.member_means),
         torch.from_numpy(decoded.member_log_variances),
     )
-    predictive_rows = replicate["predictive_metrics"]
-    assert isinstance(predictive_rows, list)
     predictive_rows[1] = metric_row("irrelevant", rehashed_tamper)
     tampered = _Audit()
     _audit_predictions(
         tampered,
         tmp_path,
         replicate,
-        replicate_id="v130-test",
+        replicate_id="v140-test",
+        device="cpu",
         transitions_by_id={transition_id: transition},
         evaluated_checkpoints=checkpoints,
     )
@@ -436,13 +492,7 @@ def test_v130_prediction_audit_reopens_both_oscillator_sidecars(
 def test_formal_irrelevant_control_audit_recomputes_source_and_report(
     tmp_path: Path,
 ) -> None:
-    source_path = (
-        tmp_path
-        / "source"
-        / "bench"
-        / "world_model_lifecycle"
-        / "runtime_lane.py"
-    )
+    source_path = tmp_path / "source" / "bench" / "world_model_lifecycle" / "runtime_lane.py"
     source_path.parent.mkdir(parents=True)
     source_payload = b"independently bound oscillator source\n"
     source_path.write_bytes(source_payload)
@@ -469,17 +519,13 @@ def test_formal_irrelevant_control_audit_recomputes_source_and_report(
         tmp_path,
         {**block, "source_sha256": "0" * 64},
     )
-    assert "formal_irrelevant_control_source_mismatch" in {
-        finding["code"] for finding in source_tampered.findings
-    }
+    assert "formal_irrelevant_control_source_mismatch" in {finding["code"] for finding in source_tampered.findings}
 
     semantically_tampered = dict(report)
     semantically_tampered["trajectory_sha256"] = "0" * 64
     body = dict(semantically_tampered)
     body.pop("report_sha256")
-    semantically_tampered["report_sha256"] = hashlib.sha256(
-        _canonical(body)
-    ).hexdigest()
+    semantically_tampered["report_sha256"] = hashlib.sha256(_canonical(body)).hexdigest()
     tampered_payload = _canonical(semantically_tampered) + b"\n"
     report_path.write_bytes(tampered_payload)
     report_tampered = _Audit()
@@ -489,14 +535,10 @@ def test_formal_irrelevant_control_audit_recomputes_source_and_report(
         {
             **block,
             "conformance_report_bytes": len(tampered_payload),
-            "conformance_report_sha256": hashlib.sha256(
-                tampered_payload
-            ).hexdigest(),
+            "conformance_report_sha256": hashlib.sha256(tampered_payload).hexdigest(),
         },
     )
-    assert "formal_irrelevant_control_verification_failed" in {
-        finding["code"] for finding in report_tampered.findings
-    }
+    assert "formal_irrelevant_control_verification_failed" in {finding["code"] for finding in report_tampered.findings}
 
 
 def test_checkpoint_replay_audit_rejects_irrelevant_ids_and_manifests(
@@ -639,9 +681,7 @@ def test_checkpoint_replay_audit_rejects_irrelevant_ids_and_manifests(
         replay_index=contaminated_index,
         replay_sampling_history=replay_sampling,
     )
-    assert "checkpoint_replay_index_isolation_mismatch" in {
-        finding["code"] for finding in index_audit.findings
-    }
+    assert "checkpoint_replay_index_isolation_mismatch" in {finding["code"] for finding in index_audit.findings}
 
     contaminated_sampling = json.loads(json.dumps(replay_sampling))
     contaminated_sampling["manifests"].append(
@@ -661,9 +701,7 @@ def test_checkpoint_replay_audit_rejects_irrelevant_ids_and_manifests(
         replay_index=replay_index,
         replay_sampling_history=contaminated_sampling,
     )
-    assert "checkpoint_replay_sampling_isolation_mismatch" in {
-        finding["code"] for finding in sampling_audit.findings
-    }
+    assert "checkpoint_replay_sampling_isolation_mismatch" in {finding["code"] for finding in sampling_audit.findings}
 
     heldout = {
         **collect_a,
@@ -677,9 +715,7 @@ def test_checkpoint_replay_audit_rejects_irrelevant_ids_and_manifests(
         "transitions": [collect_a, collect_b, heldout],
     }
     contaminated_heldout_index = json.loads(json.dumps(replay_index))
-    contaminated_heldout_index["collect_a"]["transition_ids"].append(
-        heldout["transition_id"]
-    )
+    contaminated_heldout_index["collect_a"]["transition_ids"].append(heldout["transition_id"])
     heldout_audit = _Audit()
     _audit_retained_replay_components(
         heldout_audit,
@@ -689,31 +725,127 @@ def test_checkpoint_replay_audit_rejects_irrelevant_ids_and_manifests(
         replay_index=contaminated_heldout_index,
         replay_sampling_history=replay_sampling,
     )
-    assert "checkpoint_replay_heldout_contamination" in {
-        finding["code"] for finding in heldout_audit.findings
-    }
+    assert "checkpoint_replay_heldout_contamination" in {finding["code"] for finding in heldout_audit.findings}
 
 
 def test_auditor_formal_seed_constant_matches_sealed_protocol() -> None:
-    protocol = json.loads(
-        (artifact_audit_module.HERE / "protocol.json").read_text(encoding="utf-8")
-    )
-    protocol_seeds = tuple(
-        protocol["seed_schedule"]["formal_replicate_master_seeds"]
-    )
+    protocol = json.loads((artifact_audit_module.HERE / "protocol.json").read_text(encoding="utf-8"))
+    protocol_seeds = tuple(protocol["seed_schedule"]["formal_replicate_master_seeds"])
 
     assert artifact_audit_module._FORMAL_SEEDS == protocol_seeds
 
 
-def test_formal_schedule_binds_exact_v130_seed_order_and_replicate_sidecars(
+def test_formal_runtime_binding_selects_only_bound_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime: dict[str, object] = {
+        "platform": "bound-platform",
+        "machine": "bound-machine",
+        "device": "cuda",
+        "accelerator": "bound-gpu",
+        "deterministic_algorithms": True,
+        "thread_count": 4,
+        "interop_thread_count": 4,
+        "cuda_runtime": "12.8",
+        "cuda_driver": "570.00",
+        "cublas_workspace_config": ":4096:8",
+    }
+    packages = [
+        {
+            "name": "python",
+            "version": "3.13.5",
+            "distribution_sha256": "a" * 64,
+        }
+    ]
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_live_runtime_identity",
+        lambda device: dict(runtime),
+    )
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_live_bound_package_rows",
+        lambda rows: rows,
+    )
+    valid = _Audit()
+    selected = _audit_formal_runtime_binding(
+        valid,
+        runtime=runtime,
+        dependencies={"packages": packages},
+        execution={
+            "platform": "bound-platform",
+            "device": "cuda",
+            "deterministic_algorithms": True,
+        },
+    )
+    assert selected == "cuda"
+    assert valid.failed_checks == 0
+
+    mismatched = _Audit()
+    selected = _audit_formal_runtime_binding(
+        mismatched,
+        runtime=runtime,
+        dependencies={"packages": packages},
+        execution={
+            "platform": "bound-platform",
+            "device": "cpu",
+            "deterministic_algorithms": True,
+        },
+    )
+    assert selected == "cuda"
+    assert "formal_result_runtime_binding_mismatch" in {finding["code"] for finding in mismatched.findings}
+
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_live_runtime_identity",
+        lambda device: {**runtime, "cuda_driver": "different-driver"},
+    )
+    live_runtime_mismatch = _Audit()
+    _audit_formal_runtime_binding(
+        live_runtime_mismatch,
+        runtime=runtime,
+        dependencies={"packages": packages},
+        execution={
+            "platform": "bound-platform",
+            "device": "cuda",
+            "deterministic_algorithms": True,
+        },
+    )
+    assert "formal_auditor_runtime_binding_mismatch" in {
+        finding["code"] for finding in live_runtime_mismatch.findings
+    }
+
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_live_runtime_identity",
+        lambda device: dict(runtime),
+    )
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_live_bound_package_rows",
+        lambda rows: [{**packages[0], "distribution_sha256": "b" * 64}],
+    )
+    live_dependency_mismatch = _Audit()
+    _audit_formal_runtime_binding(
+        live_dependency_mismatch,
+        runtime=runtime,
+        dependencies={"packages": packages},
+        execution={
+            "platform": "bound-platform",
+            "device": "cuda",
+            "deterministic_algorithms": True,
+        },
+    )
+    assert "formal_auditor_dependency_binding_mismatch" in {
+        finding["code"] for finding in live_dependency_mismatch.findings
+    }
+
+
+def test_formal_schedule_binds_exact_v140_seed_order_and_replicate_sidecars(
     tmp_path: Path,
 ) -> None:
-    protocol = json.loads(
-        (artifact_audit_module.HERE / "protocol.json").read_text(encoding="utf-8")
-    )
-    seeds = tuple(
-        protocol["seed_schedule"]["formal_replicate_master_seeds"]
-    )
+    protocol = json.loads((artifact_audit_module.HERE / "protocol.json").read_text(encoding="utf-8"))
+    seeds = tuple(protocol["seed_schedule"]["formal_replicate_master_seeds"])
     replicates = [
         {
             "replicate_id": f"wm001-formal-{seed}",
@@ -771,12 +903,183 @@ def test_formal_schedule_binds_exact_v130_seed_order_and_replicate_sidecars(
     first_updates[1], first_updates[2] = first_updates[2], first_updates[1]
     update_order_audit = _Audit()
     _audit_formal_schedule(update_order_audit, tmp_path, wrong_update_order)
-    assert "formal_update_budget_mismatch" in {
-        finding["code"] for finding in update_order_audit.findings
+    assert "formal_update_budget_mismatch" in {finding["code"] for finding in update_order_audit.findings}
+
+
+def test_binary64_coverage_endpoint_classifier_is_exact_and_inclusive() -> None:
+    lower = 0.05
+    upper = 0.95
+
+    assert _binary64_mixture_pit_is_covered(lower)
+    assert not _binary64_mixture_pit_is_covered(math.nextafter(lower, -math.inf))
+    assert _binary64_mixture_pit_is_covered(upper)
+    assert not _binary64_mixture_pit_is_covered(math.nextafter(upper, math.inf))
+    with pytest.raises(ArtifactAuditError, match="non-finite"):
+        _binary64_mixture_pit_is_covered(math.nan)
+
+
+def test_prediction_target_binding_rejects_boundary_flipping_one_ulp() -> None:
+    target = np.frombuffer(bytes.fromhex("ac3cdebd"), dtype="<f4")[0]
+    transition = {
+        "pre_observation": [0.0, 0.0, 0.0],
+        "next_observation": [
+            float(np.multiply(target, np.float32(2.0), dtype=np.float32)),
+            0.0,
+            0.0,
+        ],
+        "reward": 0.0,
     }
+    expected = _expected_prediction_target_f32(transition)
+    batch = TransitionBatch.from_arrays(
+        transition_ids=["boundary"],
+        observations=[[0.0, 0.0, 0.0]],
+        contexts=[0.0],
+        actions=[0.0],
+        next_observations=[transition["next_observation"]],
+        rewards=[0.0],
+    )
+    _, producer_targets = batch.encoded(FixedScaling())
+    assert producer_targets.numpy().astype("<f4", copy=False).tobytes() == expected.tobytes()
+    assert expected[0].tobytes().hex() == "ac3cdebd"
+
+    altered = expected.copy()
+    altered[0] = np.nextafter(
+        altered[0],
+        np.float32(math.inf),
+        dtype=np.float32,
+    )
+    assert np.allclose(altered, expected, rtol=2e-6, atol=2e-7)
+    assert altered.tobytes() != expected.tobytes()
+
+    means = [
+        struct.unpack("<f", bytes.fromhex(value))[0]
+        for value in ("8cd85cbb", "f032d7bb", "d0d5aebc", "fcaa09bc", "0086a53a")
+    ]
+    log_variances = [
+        struct.unpack("<f", bytes.fromhex(value))[0]
+        for value in ("66b8b3c0", "cb11b5c0", "d611b2c0", "86dcb2c0", "9390b2c0")
+    ]
+
+    def pit(value: float) -> float:
+        return (
+            math.fsum(
+                0.5 * (1.0 + math.erf((value - mean) * math.exp(-0.5 * log_variance) / math.sqrt(2.0)))
+                for mean, log_variance in zip(
+                    means,
+                    log_variances,
+                    strict=True,
+                )
+            )
+            / 5
+        )
+
+    assert not _binary64_mixture_pit_is_covered(pit(float(expected[0])))
+    assert _binary64_mixture_pit_is_covered(pit(float(altered[0])))
 
 
-def test_prediction_coverage_allows_exactly_one_target_count_difference() -> None:
+@pytest.mark.skipif(
+    not torch.cuda.is_available(),
+    reason="formal CUDA target arithmetic requires a CUDA runtime",
+)
+def test_cuda_prediction_targets_match_bound_device_reconstruction() -> None:
+    rng = np.random.default_rng(20260718)
+    row_count = 4_096
+    before = np.column_stack(
+        (
+            rng.uniform(-1.0, 1.0, row_count),
+            rng.uniform(-1.0, 1.0, row_count),
+            rng.uniform(-8.0, 8.0, row_count),
+        )
+    )
+    after = np.column_stack(
+        (
+            rng.uniform(-1.0, 1.0, row_count),
+            rng.uniform(-1.0, 1.0, row_count),
+            rng.uniform(-8.0, 8.0, row_count),
+        )
+    )
+    rewards = rng.uniform(-16.2736044, 0.0, row_count)
+    boundary = np.frombuffer(bytes.fromhex("ac3cdebd"), dtype="<f4")[0]
+    before[0] = (0.0, 0.0, 0.0)
+    after[0] = (
+        float(np.multiply(boundary, np.float32(2.0), dtype=np.float32)),
+        0.0,
+        0.0,
+    )
+    rewards[0] = 0.0
+    delta = np.subtract(after, before, dtype=np.float64)
+    reconstructed_after = np.add(before, delta, dtype=np.float64)
+    batch = TransitionBatch.from_arrays(
+        transition_ids=[f"cuda-target:{index}" for index in range(row_count)],
+        observations=before,
+        contexts=np.zeros(row_count),
+        actions=np.zeros(row_count),
+        next_observations=reconstructed_after,
+        rewards=rewards,
+    )
+    _, cuda_targets = batch.encoded(FixedScaling(), device="cuda")
+    actual = cuda_targets.detach().cpu().numpy().astype("<f4", copy=False).tobytes(order="C")
+    transition_rows = [
+        {
+            "pre_observation": before[index].tolist(),
+            "next_observation": after[index].tolist(),
+            "reward": float(rewards[index]),
+        }
+        for index in range(row_count)
+    ]
+    expected = (
+        _expected_prediction_targets_f32(
+            transition_rows,
+            device="cuda",
+        )
+        .astype("<f4", copy=False)
+        .tobytes(order="C")
+    )
+    cpu_bytes = (
+        _expected_prediction_targets_f32(
+            transition_rows,
+            device="cpu",
+        )
+        .astype("<f4", copy=False)
+        .tobytes(order="C")
+    )
+
+    assert actual == expected
+    assert actual != cpu_bytes
+
+
+def test_independent_auditor_accepts_bound_coverage_conformance_corpus() -> None:
+    report = binding_module.run_coverage_conformance()
+
+    _validate_formal_coverage_conformance_report(report)
+
+    tampered = json.loads(json.dumps(report))
+    tampered["cases"][-1]["observed_covered"] = True
+    body = dict(tampered)
+    body.pop("report_sha256")
+    tampered["report_sha256"] = hashlib.sha256(_canonical(body)).hexdigest()
+    with pytest.raises(ArtifactAuditError, match="boundary regression"):
+        _validate_formal_coverage_conformance_report(tampered)
+
+
+def test_independent_coverage_gate_uses_exact_integer_cross_products() -> None:
+    rows = [
+        {
+            "_a_after_a_interval_90_covered_target_count": 4_480.0,
+            "_a_after_a_coverage_target_count": 6_400.0,
+        }
+        for _ in range(8)
+    ]
+    lower, upper = _independent_coverage_count_gate_checks(rows)
+    assert lower["passed"] is True
+    assert upper["passed"] is True
+
+    rows[0]["_a_after_a_interval_90_covered_target_count"] -= 1.0
+    lower, _ = _independent_coverage_count_gate_checks(rows)
+    assert lower["passed"] is False
+
+
+def test_prediction_coverage_requires_exact_independent_count() -> None:
     target_count = 6_400
     recomputed_count = 5_837
     recomputed = PredictionRecomputation(
@@ -791,58 +1094,68 @@ def test_prediction_coverage_allows_exactly_one_target_count_difference() -> Non
         coverage_target_count=target_count,
     )
 
+    exact_row: dict[str, object] = {
+        "coverage_semantics": "wm001-mixture-pit-binary64-count-v1",
+        "transition_count": target_count // 4,
+        "interval_90_covered_target_count": recomputed_count,
+        "coverage_target_count": target_count,
+        "interval_90_coverage": recomputed_count / target_count,
+    }
     exact = _Audit()
     _audit_prediction_coverage(
         exact,
         recomputed,
-        recomputed_count / target_count,
+        exact_row,
         label="exact",
         replicate_id="replicate",
     )
     assert exact.failed_checks == 0
 
+    one_target_row = {
+        **exact_row,
+        "interval_90_covered_target_count": recomputed_count + 1,
+        "interval_90_coverage": (recomputed_count + 1) / target_count,
+    }
     one_target = _Audit()
     _audit_prediction_coverage(
         one_target,
         recomputed,
-        (recomputed_count + 1) / target_count,
+        one_target_row,
         label="one-target",
         replicate_id="replicate",
     )
-    assert one_target.failed_checks == 0
-
-    two_targets = _Audit()
-    _audit_prediction_coverage(
-        two_targets,
-        recomputed,
-        (recomputed_count + 2) / target_count,
-        label="two-targets",
-        replicate_id="replicate",
-    )
-    assert {finding["code"] for finding in two_targets.findings} == {
-        "prediction_coverage_mismatch"
-    }
-    evidence = two_targets.findings[0]["evidence"]
+    assert {finding["code"] for finding in one_target.findings} == {"prediction_coverage_mismatch"}
+    evidence = one_target.findings[0]["evidence"]
     assert isinstance(evidence, dict)
     assert evidence["recomputed_covered_target_count"] == recomputed_count
-    assert evidence["stored_covered_target_count"] == recomputed_count + 2
-    assert evidence["covered_target_count_difference"] == 2
+    assert evidence["stored_covered_target_count"] == recomputed_count + 1
+    assert evidence["covered_target_count_difference"] == 1
 
 
 @pytest.mark.parametrize(
-    "stored",
+    ("updates", "expected_code"),
     [
-        True,
-        "0.9",
-        math.nan,
-        math.inf,
-        -0.1,
-        1.1,
-        (5_837.25 / 6_400),
+        (
+            {"coverage_semantics": "wrong"},
+            "prediction_coverage_semantics_mismatch",
+        ),
+        (
+            {"coverage_target_count": 6_399},
+            "prediction_coverage_count_contract_mismatch",
+        ),
+        (
+            {"interval_90_covered_target_count": True},
+            "prediction_coverage_count_contract_mismatch",
+        ),
+        (
+            {"interval_90_coverage": math.nextafter(5_837 / 6_400, 1.0)},
+            "prediction_coverage_fraction_mismatch",
+        ),
     ],
 )
-def test_prediction_coverage_rejects_malformed_or_non_grid_values(
-    stored: object,
+def test_prediction_coverage_rejects_inconsistent_contract_fields(
+    updates: dict[str, object],
+    expected_code: str,
 ) -> None:
     target_count = 6_400
     recomputed_count = 5_837
@@ -858,18 +1171,24 @@ def test_prediction_coverage_rejects_malformed_or_non_grid_values(
         coverage_target_count=target_count,
     )
 
+    row: dict[str, object] = {
+        "coverage_semantics": "wm001-mixture-pit-binary64-count-v1",
+        "transition_count": target_count // 4,
+        "interval_90_covered_target_count": recomputed_count,
+        "coverage_target_count": target_count,
+        "interval_90_coverage": recomputed_count / target_count,
+    }
+    row.update(updates)
     audit = _Audit()
     _audit_prediction_coverage(
         audit,
         recomputed,
-        stored,
+        row,
         label="adversarial",
         replicate_id="replicate",
     )
 
-    assert {finding["code"] for finding in audit.findings} == {
-        "prediction_coverage_grid_mismatch"
-    }
+    assert expected_code in {finding["code"] for finding in audit.findings}
 
 
 def test_independent_sampling_decoder_checks_shape_and_payload_digest() -> None:
@@ -1025,7 +1344,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.3.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.4.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
@@ -1454,6 +1773,9 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
                 "transition_count": len(validation_ids),
                 "mixture_nll_nats_per_target_dimension": (prediction.mixture_nll_nats_per_target_dimension),
                 "normalized_rmse": prediction.normalized_rmse,
+                "coverage_semantics": "wm001-mixture-pit-binary64-count-v1",
+                "interval_90_covered_target_count": (prediction.covered_target_count),
+                "coverage_target_count": prediction.coverage_target_count,
                 "interval_90_coverage": prediction.interval_90_coverage,
                 "prediction_rows_sha256": hashlib.sha256(prediction_payload).hexdigest(),
                 "prediction_evidence_file": prediction_file.name,
@@ -1501,9 +1823,9 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         },
     }
     result: dict[str, Any] = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v3",
+        "schema": "prospect.world-model-lifecycle.raw-result.v4",
         "experiment_id": "WM-001",
-        "protocol_version": "1.3.0",
+        "protocol_version": "1.4.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),
@@ -1529,13 +1851,14 @@ def test_artifact_audit_recomputes_current_evidence_and_detects_metric_tampering
     )
 
     assert report["integrity_passed"] is True
+    assert report["lane"] == "development"
+    assert report["engineering_complete"] is False
     assert report["complete_for_claim"] is False
     assert report["passed"] is True
     assert {gap["code"] for gap in report["coverage_gaps"]} == {
         "cem_action_trace_replay_absent",
         "checkpoint_domain_graph_semantics_unverified",
         "checkpoint_replay_semantics_unverified",
-        "formal_execution_not_present",
         "irrelevant_prediction_manipulation_absent",
         "producer_custody_not_verified",
         "rejected_probe_full_state_unavailable",
@@ -1748,6 +2071,9 @@ def _two_replicate_analysis_result() -> dict[str, Any]:
                         "condition": condition,
                         "checkpoint_id": condition,
                         "mixture_nll_nats_per_target_dimension": nll,
+                        "coverage_semantics": ("wm001-mixture-pit-binary64-count-v1"),
+                        "interval_90_covered_target_count": 36,
+                        "coverage_target_count": 40,
                         "interval_90_coverage": 0.9,
                     }
                     for condition, nll in (
@@ -1764,6 +2090,9 @@ def _two_replicate_analysis_result() -> dict[str, Any]:
                         "condition": condition,
                         "checkpoint_id": condition,
                         "mixture_nll_nats_per_target_dimension": nll,
+                        "coverage_semantics": ("wm001-mixture-pit-binary64-count-v1"),
+                        "interval_90_covered_target_count": 36,
+                        "coverage_target_count": 40,
                         "interval_90_coverage": 0.9,
                     }
                     for condition, nll in (
@@ -1794,14 +2123,11 @@ def test_two_replicate_ci_preserves_sealed_operation_order() -> None:
     assert metric["ci_95_lower"] == -1562.5183333581233
 
 
-def test_v130_analysis_recomputes_oscillator_manipulation_metric_and_k3() -> None:
+def test_v140_analysis_recomputes_oscillator_manipulation_metric_and_k3() -> None:
     result = _two_replicate_analysis_result()
     metrics, replicate_values = _independent_recompute_aggregate_metrics(result)
     manipulation = next(
-        row
-        for row in metrics
-        if row["name"]
-        == "irrelevant_source_nll_improvement_after_irrelevant_vs_cold"
+        row for row in metrics if row["name"] == "irrelevant_source_nll_improvement_after_irrelevant_vs_cold"
     )
     assert manipulation["replicate_values"] == [1.0, 1.0]
     assert manipulation["mean"] == 1.0

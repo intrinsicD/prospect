@@ -9,6 +9,7 @@ import inspect
 import math
 import os
 import platform
+import struct
 import subprocess
 import sys
 from functools import cache
@@ -20,6 +21,11 @@ from packaging.requirements import Requirement
 
 from .artifact import atomic_write_exclusive
 from .checkpoint import canonical_json_bytes, manifest_schema_sha256
+from .model import (
+    COVERAGE_SEMANTICS,
+    binary64_pit_is_in_inclusive_90_percent_interval,
+    canonical_binary64_mixture_pit,
+)
 from .planning import run_pendulum_conformance
 from .runtime_lane import (
     INDEPENDENT_OSCILLATOR_SOURCE,
@@ -69,6 +75,22 @@ FORMAL_CONFORMANCE_PARAMETERS = {
     "max_speed": 8.0,
     "max_torque": 2.0,
 }
+_V130_BOUNDARY_TARGET_F32_HEX = "ac3cdebd"
+_V130_BOUNDARY_MEANS_F32_HEX = (
+    "8cd85cbb",
+    "f032d7bb",
+    "d0d5aebc",
+    "fcaa09bc",
+    "0086a53a",
+)
+_V130_BOUNDARY_LOG_VARIANCES_F32_HEX = (
+    "66b8b3c0",
+    "cb11b5c0",
+    "d611b2c0",
+    "86dcb2c0",
+    "9390b2c0",
+)
+_V130_BOUNDARY_EXPECTED_PIT_HEX = "0x1.999998b3745adp-5"
 
 
 def sha256_file(path: Path) -> str:
@@ -77,6 +99,88 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _float32_from_little_endian_hex(value: str) -> float:
+    return float(struct.unpack("<f", bytes.fromhex(value))[0])
+
+
+def run_coverage_conformance() -> dict[str, object]:
+    """Exercise the producer reference on fixed endpoint and regression cases."""
+
+    direct_cases = (
+        ("lower-binary64", 0.05, True),
+        ("lower-predecessor", math.nextafter(0.05, -math.inf), False),
+        ("lower-successor", math.nextafter(0.05, math.inf), True),
+        ("upper-binary64", 0.95, True),
+        ("upper-predecessor", math.nextafter(0.95, -math.inf), True),
+        ("upper-successor", math.nextafter(0.95, math.inf), False),
+        ("central", 0.5, True),
+        ("zero-tail", 0.0, False),
+        ("one-tail", 1.0, False),
+    )
+    cases: list[dict[str, object]] = []
+    passed = True
+    for case_id, pit, expected in direct_cases:
+        observed = binary64_pit_is_in_inclusive_90_percent_interval(pit)
+        case_passed = observed is expected
+        cases.append(
+            {
+                "case_id": case_id,
+                "kind": "binary64_pit",
+                "pit_hex": pit.hex(),
+                "expected_covered": expected,
+                "observed_covered": observed,
+                "passed": case_passed,
+            }
+        )
+        passed = passed and case_passed
+
+    target = _float32_from_little_endian_hex(_V130_BOUNDARY_TARGET_F32_HEX)
+    means = tuple(_float32_from_little_endian_hex(value) for value in _V130_BOUNDARY_MEANS_F32_HEX)
+    log_variances = tuple(
+        _float32_from_little_endian_hex(value)
+        for value in _V130_BOUNDARY_LOG_VARIANCES_F32_HEX
+    )
+    pit = canonical_binary64_mixture_pit(target, means, log_variances)
+    observed = binary64_pit_is_in_inclusive_90_percent_interval(pit)
+    regression_passed = pit.hex() == _V130_BOUNDARY_EXPECTED_PIT_HEX and observed is False
+    cases.append(
+        {
+            "case_id": "v130-disclosed-boundary-coordinate",
+            "kind": "float32_mixture_inputs",
+            "provenance": (
+                "v1.3 formal seed 3332986400, task-A corrupted, sidecar row 207, "
+                "target dimension 0; diagnostic only"
+            ),
+            "target_little_endian_f32_hex": _V130_BOUNDARY_TARGET_F32_HEX,
+            "member_means_little_endian_f32_hex": list(_V130_BOUNDARY_MEANS_F32_HEX),
+            "member_log_variances_little_endian_f32_hex": list(
+                _V130_BOUNDARY_LOG_VARIANCES_F32_HEX
+            ),
+            "expected_pit_hex": _V130_BOUNDARY_EXPECTED_PIT_HEX,
+            "observed_pit_hex": pit.hex(),
+            "expected_covered": False,
+            "observed_covered": observed,
+            "passed": regression_passed,
+        }
+    )
+    passed = passed and regression_passed
+    corpus = {"semantics_id": COVERAGE_SEMANTICS, "cases": cases}
+    report: dict[str, object] = {
+        "schema": "prospect.wm001.coverage-conformance.v1",
+        "semantics_id": COVERAGE_SEMANTICS,
+        "python_executable": sys.executable,
+        "python_implementation": platform.python_implementation(),
+        "python_version": platform.python_version(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "corpus_sha256": hashlib.sha256(canonical_json_bytes(corpus)).hexdigest(),
+        "cases": cases,
+        "passed": passed,
+    }
+    report["report_sha256"] = hashlib.sha256(canonical_json_bytes(report)).hexdigest()
+    return report
 
 
 def git_output(*arguments: str) -> str:
@@ -326,6 +430,13 @@ def create_formal_binding(
     oscillator_conformance_digest = hashlib.sha256(oscillator_conformance_bytes).hexdigest()
     oscillator_conformance_filename = f"oscillator-conformance-{oscillator_conformance_digest[:16]}.json"
     oscillator_conformance_path = output_path.with_name(oscillator_conformance_filename)
+    coverage_conformance = run_coverage_conformance()
+    if coverage_conformance.get("passed") is not True:
+        raise RuntimeError("coverage arithmetic conformance did not pass")
+    coverage_conformance_bytes = canonical_json_bytes(coverage_conformance) + b"\n"
+    coverage_conformance_digest = hashlib.sha256(coverage_conformance_bytes).hexdigest()
+    coverage_conformance_filename = f"coverage-conformance-{coverage_conformance_digest[:16]}.json"
+    coverage_conformance_path = output_path.with_name(coverage_conformance_filename)
     test_report_bytes = test_report_path.read_bytes()
     if not test_report_bytes:
         raise RuntimeError("formal binding test report must not be empty")
@@ -336,6 +447,7 @@ def create_formal_binding(
     for candidate in (
         conformance_path,
         oscillator_conformance_path,
+        coverage_conformance_path,
         preserved_test_report_path,
     ):
         if candidate.exists():
@@ -353,10 +465,10 @@ def create_formal_binding(
     verify_lockfile_rows(packages)
     accelerator = torch.cuda.get_device_name(0) if device == "cuda" else None
     binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v3",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v4",
         "experiment_id": "WM-001",
         "protocol": {
-            "version": "1.3.0",
+            "version": "1.4.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),
@@ -407,6 +519,20 @@ def create_formal_binding(
             "conformance_report_bytes": len(oscillator_conformance_bytes),
             "conformance_report_sha256": oscillator_conformance_digest,
         },
+        "coverage_arithmetic": {
+            "semantics_id": COVERAGE_SEMANTICS,
+            "python_executable": sys.executable,
+            "python_implementation": platform.python_implementation(),
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "producer_source_sha256": sha256_file(Path(__file__).with_name("model.py")),
+            "auditor_source_sha256": sha256_file(Path(__file__).with_name("artifact_audit.py")),
+            "formal_test_report_sha256": test_report_digest,
+            "conformance_report_file": coverage_conformance_filename,
+            "conformance_report_bytes": len(coverage_conformance_bytes),
+            "conformance_report_sha256": coverage_conformance_digest,
+        },
         "checkpoint_implementation": {
             "serializer_source_sha256": checkpoint_implementation_sha256(),
             "manifest_schema_sha256": manifest_schema_sha256(),
@@ -443,6 +569,7 @@ def create_formal_binding(
         oscillator_conformance_path,
         oscillator_conformance_bytes,
     )
+    atomic_write_exclusive(coverage_conformance_path, coverage_conformance_bytes)
     atomic_write_exclusive(output_path, canonical_json_bytes(binding) + b"\n")
     return binding
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v3.json",
+  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v4.json",
   "title": "WM-001 formal implementation binding",
   "type": "object",
   "additionalProperties": false,
@@ -14,12 +14,13 @@
     "runtime",
     "environment",
     "irrelevant_control",
+    "coverage_arithmetic",
     "checkpoint_implementation",
     "formal_replicate_master_seeds"
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.formal-binding.v3"
+      "const": "prospect.world-model-lifecycle.formal-binding.v4"
     },
     "experiment_id": {
       "const": "WM-001"
@@ -35,7 +36,7 @@
       ],
       "properties": {
         "version": {
-          "const": "1.3.0"
+          "const": "1.4.0"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -298,6 +299,67 @@
         }
       }
     },
+    "coverage_arithmetic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantics_id",
+        "python_executable",
+        "python_implementation",
+        "python_version",
+        "platform",
+        "machine",
+        "producer_source_sha256",
+        "auditor_source_sha256",
+        "formal_test_report_sha256",
+        "conformance_report_file",
+        "conformance_report_bytes",
+        "conformance_report_sha256"
+      ],
+      "properties": {
+        "semantics_id": {
+          "const": "wm001-mixture-pit-binary64-count-v1"
+        },
+        "python_executable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "python_implementation": {
+          "const": "CPython"
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "machine": {
+          "type": "string",
+          "minLength": 1
+        },
+        "producer_source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "auditor_source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "formal_test_report_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "conformance_report_file": {
+          "$ref": "#/$defs/siblingFilename"
+        },
+        "conformance_report_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "conformance_report_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
     "checkpoint_implementation": {
       "type": "object",
       "additionalProperties": false,
@@ -336,14 +398,14 @@
     },
     "formal_replicate_master_seeds": {
       "const": [
-        17123296,
-        3280610186,
-        2725263418,
-        3124246399,
-        4093604926,
-        3908390087,
-        3332986400,
-        724244869
+        339970590,
+        474769515,
+        550273937,
+        438984650,
+        2732731971,
+        2253809848,
+        2206960337,
+        3506881479
       ]
     }
   },

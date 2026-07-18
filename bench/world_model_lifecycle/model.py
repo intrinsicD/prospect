@@ -35,6 +35,7 @@ MODEL_FORMAT = "prospect.wm001.probabilistic-ensemble.v1"
 OPTIMIZER_FORMAT = "prospect.wm001.adamw.v1"
 SAMPLING_FORMAT = "prospect.wm001.bootstrap-manifest.v1"
 PREDICTION_FORMAT = "prospect.wm001.predictive-evidence.v1"
+COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
 _CONTAINER_MAGIC = b"PROSPECT-WM001\0"
 _LOG_TWO_PI = math.log(2.0 * math.pi)
 
@@ -412,6 +413,9 @@ class PredictiveMetrics:
     mixture_nll_nats_per_target_dimension: float
     normalized_rmse: float
     interval_90_coverage: float
+    interval_90_covered_target_count: int
+    coverage_target_count: int
+    coverage_semantics: str
     transition_count: int
     prediction_rows_sha256: str
     prediction_payload: bytes
@@ -750,7 +754,6 @@ def evaluate_mixture(
     inputs, targets = transitions.encoded(model.config.scaling, device=evaluation_device)
     log_prob_rows: list[Tensor] = []
     squared_error_rows: list[Tensor] = []
-    coverage_rows: list[Tensor] = []
     mean_rows: list[Tensor] = []
     log_variance_rows: list[Tensor] = []
     model.eval()
@@ -766,27 +769,16 @@ def evaluate_mixture(
             mixture_log_prob = torch.logsumexp(member_log_prob, dim=0) - math.log(model.config.ensemble_members)
             ensemble_mean = means.mean(dim=0)
             squared_error = (batch_targets - ensemble_mean).square()
-            z_score = (target_by_member - means) * torch.exp(-0.5 * log_variances)
-            member_cdf = 0.5 * (1.0 + torch.erf(z_score / math.sqrt(2.0)))
-            mixture_pit = member_cdf.mean(dim=0)
-            covered = (mixture_pit >= 0.05) & (mixture_pit <= 0.95)
             log_prob_rows.append(mixture_log_prob.cpu())
             squared_error_rows.append(squared_error.cpu())
-            coverage_rows.append(covered.to(torch.float64).cpu())
             mean_rows.append(means.cpu())
             log_variance_rows.append(log_variances.cpu())
 
     log_prob = torch.cat(log_prob_rows, dim=0).to(torch.float64)
     squared_error = torch.cat(squared_error_rows, dim=0).to(torch.float64)
-    coverage = torch.cat(coverage_rows, dim=0)
     per_target_nll_tensor = -log_prob.mean(dim=0)
     per_target_rmse_tensor = squared_error.mean(dim=0).sqrt()
-    per_target_coverage_tensor = coverage.mean(dim=0)
-    values = (
-        per_target_nll_tensor,
-        per_target_rmse_tensor,
-        per_target_coverage_tensor,
-    )
+    values = (per_target_nll_tensor, per_target_rmse_tensor)
     if not all(bool(torch.isfinite(value).all()) for value in values):
         raise ModelValidationError("predictive metrics contain non-finite values")
     member_means = torch.cat(mean_rows, dim=1)
@@ -797,16 +789,126 @@ def evaluate_mixture(
         member_means,
         member_log_variances,
     )
+    _, stored_targets, stored_means, stored_log_variances = decode_prediction_evidence(prediction_payload)
+    covered_target_count, coverage_target_count, covered_by_target = (
+        canonical_interval_90_coverage_counts(
+            stored_targets,
+            stored_means,
+            stored_log_variances,
+        )
+    )
+    per_target_coverage = tuple(
+        covered / len(transitions)
+        for covered in covered_by_target
+    )
     return PredictiveMetrics(
         mixture_nll_nats_per_target_dimension=float(per_target_nll_tensor.mean()),
         normalized_rmse=float(squared_error.mean().sqrt()),
-        interval_90_coverage=float(coverage.mean()),
+        interval_90_coverage=covered_target_count / coverage_target_count,
+        interval_90_covered_target_count=covered_target_count,
+        coverage_target_count=coverage_target_count,
+        coverage_semantics=COVERAGE_SEMANTICS,
         transition_count=len(transitions),
         prediction_rows_sha256=sha256(prediction_payload).hexdigest(),
         prediction_payload=prediction_payload,
         per_target_nll=tuple(float(value) for value in per_target_nll_tensor),
         per_target_rmse=tuple(float(value) for value in per_target_rmse_tensor),
-        per_target_coverage=tuple(float(value) for value in per_target_coverage_tensor),
+        per_target_coverage=per_target_coverage,
+    )
+
+
+def binary64_pit_is_in_inclusive_90_percent_interval(pit: float) -> bool:
+    """Classify one finite binary64 PIT value using exact rational endpoints."""
+
+    if not math.isfinite(pit):
+        raise ModelValidationError("mixture PIT must be finite")
+    numerator, denominator = pit.as_integer_ratio()
+    return 20 * numerator >= denominator and 20 * numerator <= 19 * denominator
+
+
+def canonical_binary64_mixture_pit(
+    target: float,
+    member_means: Sequence[float],
+    member_log_variances: Sequence[float],
+) -> float:
+    """Compute one mixture PIT in the sealed scalar and member order."""
+
+    if (
+        not math.isfinite(target)
+        or len(member_means) == 0
+        or len(member_means) != len(member_log_variances)
+        or not all(math.isfinite(value) for value in (*member_means, *member_log_variances))
+    ):
+        raise ModelValidationError("mixture PIT inputs must be finite matched member values")
+    sqrt_two = math.sqrt(2.0)
+    member_cdfs = []
+    for mean, log_variance in zip(member_means, member_log_variances, strict=True):
+        z_score = (target - mean) * math.exp(-0.5 * log_variance)
+        member_cdfs.append(0.5 * (1.0 + math.erf(z_score / sqrt_two)))
+    mixture_pit = math.fsum(member_cdfs) / len(member_cdfs)
+    if not math.isfinite(mixture_pit):
+        raise ModelValidationError("mixture PIT is non-finite")
+    return mixture_pit
+
+
+def canonical_interval_90_coverage_counts(
+    normalized_targets: Tensor,
+    member_means: Tensor,
+    member_log_variances: Tensor,
+) -> tuple[int, int, tuple[int, int, int, int]]:
+    """Apply the sealed scalar-binary64 coverage contract to float32 evidence.
+
+    Tensor traversal and member reduction order are deliberately explicit.  The
+    formal producer calls this only after a prediction payload has been encoded
+    and decoded, making these values a function of the exact persisted bytes.
+    """
+
+    targets = normalized_targets.detach().cpu().contiguous()
+    means = member_means.detach().cpu().contiguous()
+    log_variances = member_log_variances.detach().cpu().contiguous()
+    if targets.ndim != 2 or targets.shape[1] != 4:
+        raise ModelValidationError("coverage targets must have shape [rows, 4]")
+    if means.ndim != 3 or means.shape[1:] != targets.shape or means.shape[0] < 1:
+        raise ModelValidationError("coverage means must have shape [members, rows, 4]")
+    if log_variances.shape != means.shape:
+        raise ModelValidationError("coverage log variances must match means")
+    if not all(
+        tensor.dtype == torch.float32 and bool(torch.isfinite(tensor).all())
+        for tensor in (targets, means, log_variances)
+    ):
+        raise ModelValidationError("coverage evidence tensors must be finite float32")
+
+    member_count = int(means.shape[0])
+    row_count = int(targets.shape[0])
+    covered_by_target = [0, 0, 0, 0]
+    for row_index in range(row_count):
+        for target_index in range(4):
+            target = float(targets[row_index, target_index])
+            mixture_pit = canonical_binary64_mixture_pit(
+                target,
+                tuple(
+                    float(means[member_index, row_index, target_index])
+                    for member_index in range(member_count)
+                ),
+                tuple(
+                    float(log_variances[member_index, row_index, target_index])
+                    for member_index in range(member_count)
+                ),
+            )
+            if binary64_pit_is_in_inclusive_90_percent_interval(mixture_pit):
+                covered_by_target[target_index] += 1
+
+    covered_target_count = sum(covered_by_target)
+    coverage_target_count = 4 * row_count
+    return (
+        covered_target_count,
+        coverage_target_count,
+        (
+            covered_by_target[0],
+            covered_by_target[1],
+            covered_by_target[2],
+            covered_by_target[3],
+        ),
     )
 
 
@@ -1160,6 +1262,7 @@ _MEMBER_KEYS = (
 
 
 __all__ = (
+    "COVERAGE_SEMANTICS",
     "FixedScaling",
     "ModelValidationError",
     "OptimizerConfig",
@@ -1168,6 +1271,9 @@ __all__ = (
     "ProbabilisticEnsemble",
     "TransitionBatch",
     "WorldModelConfig",
+    "binary64_pit_is_in_inclusive_90_percent_interval",
+    "canonical_binary64_mixture_pit",
+    "canonical_interval_90_coverage_counts",
     "decode_prediction_evidence",
     "encode_prediction_evidence",
     "evaluate_mixture",

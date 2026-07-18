@@ -8,11 +8,13 @@ import pytest
 pytest.importorskip("torch")
 
 from bench.world_model_lifecycle.model import (
+    COVERAGE_SEMANTICS,
     ModelValidationError,
     OptimizerConfig,
     ProbabilisticEnsemble,
     TransitionBatch,
     WorldModelConfig,
+    binary64_pit_is_in_inclusive_90_percent_interval,
     evaluate_mixture,
     optimizer_from_bytes,
     optimizer_to_bytes,
@@ -163,7 +165,31 @@ def test_corrupted_joint_targets_and_mixture_metrics_are_deterministic() -> None
     )
     assert metrics_small_batches.normalized_rmse == pytest.approx(metrics_one_batch.normalized_rmse, abs=1e-7)
     assert metrics_small_batches.interval_90_coverage == metrics_one_batch.interval_90_coverage
+    assert (
+        metrics_small_batches.interval_90_covered_target_count
+        == metrics_one_batch.interval_90_covered_target_count
+    )
+    assert metrics_one_batch.coverage_semantics == COVERAGE_SEMANTICS
+    assert metrics_one_batch.coverage_target_count == 4 * len(transitions)
+    assert (
+        metrics_one_batch.interval_90_coverage
+        == metrics_one_batch.interval_90_covered_target_count / metrics_one_batch.coverage_target_count
+    )
     assert math.isfinite(metrics_one_batch.mixture_nll_nats_per_target_dimension)
     assert math.isfinite(metrics_one_batch.normalized_rmse)
     assert 0.0 <= metrics_one_batch.interval_90_coverage <= 1.0
     assert metrics_one_batch.transition_count == len(transitions)
+
+
+def test_binary64_coverage_endpoints_are_exact_and_inclusive() -> None:
+    lower = 0.05
+    upper = 0.95
+
+    assert binary64_pit_is_in_inclusive_90_percent_interval(lower)
+    assert binary64_pit_is_in_inclusive_90_percent_interval(upper)
+    assert not binary64_pit_is_in_inclusive_90_percent_interval(math.nextafter(lower, 0.0))
+    assert not binary64_pit_is_in_inclusive_90_percent_interval(math.nextafter(upper, 1.0))
+    assert not binary64_pit_is_in_inclusive_90_percent_interval(0.0)
+    assert not binary64_pit_is_in_inclusive_90_percent_interval(1.0)
+    with pytest.raises(ModelValidationError, match="finite"):
+        binary64_pit_is_in_inclusive_90_percent_interval(math.nan)

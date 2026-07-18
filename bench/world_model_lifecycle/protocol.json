@@ -1,17 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "schema": "prospect.world-model-lifecycle.protocol.v3",
+  "schema": "prospect.world-model-lifecycle.protocol.v4",
   "experiment": {
     "id": "WM-001",
     "title": "Causal world-model learning, behavioral improvement, retention, and restart",
-    "protocol_version": "1.3.0",
+    "protocol_version": "1.4.0",
     "status": "sealed_before_formal_outcomes",
     "thresholds_sealed_before_outcomes": true,
     "revision": {
-      "supersedes": "1.2.0",
-      "superseded_protocol_sha256": "d18c8723094e6dfabdebd834617b5ff2185b51566b8000d573b191d24b76d962",
-      "reason": "Pre-formal adversarial review of v1.2.0 found that its independent-oscillator arm had no held-out own-process manipulation check, so the protocol called the control learned and learnable without evidence that its update worked. The same review found that the claim wording overstated the corrupted-target control as a behavioral comparator even though its killing comparison was predictive. Version 1.3.0 adds a disjoint oscillator validation split and a predeclared proper-score manipulation gate, narrows the corrupted control to prediction, and narrows the oscillator conclusion to this specified nuisance process.",
-      "outcome_use": "No v1.2.0 formal seed was opened and no v1.2.0 formal attempt exists. Two v1.2.0 development replicates were used only for implementation and evidence-design diagnosis and are permanently claim-ineligible. The new oscillator manipulation threshold is the same predeclared minimum meaningful NLL floor used by the other predictive controls and was fixed before any v1.3.0 development or formal outcome. Version 1.3.0 uses a new derivation domain and new master seeds selected before any v1.3.0 outcome by the first four bytes of SHA-256('WM-001|1.3.0|' + lane + '-master|' + decimal(index))."
+      "supersedes": "1.3.0",
+      "superseded_protocol_sha256": "c15ec673be44caf2a2b30dc4b3ea9ee0e0e8108210cd6772567cd0cd1d9ff080",
+      "reason": "The v1.3.0 formal producer artifact passed producer K0-K7, but its mandatory pre-bound independent audit failed because the auditor duplicated one formal seed incorrectly and because producer CUDA float32 and auditor scalar float64 classified one corrupted-control PIT value on opposite sides of the inclusive 0.05 endpoint. Version 1.4.0 sources schedule parity from the sealed protocol in tests, makes coverage a canonical scalar binary64 computation over the exact stored float32 prediction tensors, records integer covered and total target counts, requires exact independent count agreement, and uses a fresh derivation domain and master seeds. Model, training, controller, budgets, controls, thresholds, and killing gates are unchanged.",
+      "outcome_use": "The rejected v1.3.0 outcome is used only to repair evidence semantics and audit custody; it is not used to change a performance threshold, model, optimizer, controller, budget, exclusion, control, or gate. A corrected or rerun v1.3.0 audit remains diagnostic and cannot upgrade that attempt. Version 1.4.0 master seeds were selected before any v1.4.0 development or formal outcome by the first four bytes of SHA-256('WM-001|1.4.0|' + lane + '-master|' + decimal(index)). The v1.4.0 derivation domain has no master or derived-stream collision with v1.3.0."
     },
     "supersession_rule": "Any semantic, seed, budget, metric, threshold, control, or gate change creates a new protocol version and invalidates all formal outcomes collected under an earlier or unbound version."
   },
@@ -365,21 +365,43 @@
     }
   },
   "seed_schedule": {
-    "derivation_domain_version": "1.3.0",
-    "algorithm": "seed(namespace, replicate_master_seed, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.3.0|' + namespace + '|' + decimal(replicate_master_seed) + '|' + decimal(index))",
+    "derivation_domain_version": "1.4.0",
+    "algorithm": "seed(namespace, replicate_master_seed, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.4.0|' + namespace + '|' + decimal(replicate_master_seed) + '|' + decimal(index))",
+    "master_seed_derivation": {
+      "algorithm": "master_seed(lane, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.4.0|' + lane + '-master|' + decimal(index))",
+      "lane_index_domains": {
+        "development": [
+          0,
+          1
+        ],
+        "formal": [
+          0,
+          7
+        ]
+      },
+      "collision_audit": {
+        "current_master_seed_count": 10,
+        "current_derived_stream_count": 1360,
+        "unique_current_derived_stream_count": 1360,
+        "current_internal_collision_count": 0,
+        "master_overlap_with_v1_3_count": 0,
+        "derived_stream_overlap_with_v1_3_count": 0,
+        "rule": "Verifier and independent auditor must derive every current master and all namespace streams from the formulas, require the declared counts and zero internal collision, and compare them with the v1.3.0 masters and derivation-domain streams."
+      }
+    },
     "formal_replicate_master_seeds": [
-      17123296,
-      3280610186,
-      2725263418,
-      3124246399,
-      4093604926,
-      3908390087,
-      3332986400,
-      724244869
+      339970590,
+      474769515,
+      550273937,
+      438984650,
+      2732731971,
+      2253809848,
+      2206960337,
+      3506881479
     ],
     "development_replicate_master_seeds": [
-      3625750835,
-      2671781227
+      2439054559,
+      3246851043
     ],
     "namespaces": {
       "model_initialization": {
@@ -638,7 +660,14 @@
         },
         {
           "name": "heldout_90_percent_interval_coverage",
-          "formula": "fraction of target values whose deterministic ensemble-mixture probability integral transform lies in [0.05, 0.95]"
+          "formula": "Decode the exact stored little-endian IEEE-754 binary32 target, member-mean, and member-log-variance tensors; promote each scalar exactly to CPython IEEE-754 binary64; in member-index order compute z=(target-mean)*math.exp(-0.5*log_variance), member_cdf=0.5*(1+math.erf(z/math.sqrt(2.0))), and mixture_pit=math.fsum(member_cdf_values)/5; classify the resulting finite binary64 value by its exact as_integer_ratio() representation as covered iff 20*numerator >= denominator and 20*numerator <= 19*denominator; report covered_target_count/coverage_target_count, with coverage_target_count=4*transition_count",
+          "semantics_id": "wm001-mixture-pit-binary64-count-v1",
+          "raw_fields": [
+            "interval_90_covered_target_count",
+            "coverage_target_count",
+            "interval_90_coverage",
+            "coverage_semantics"
+          ]
         }
       ]
     },
@@ -731,7 +760,8 @@
       "after_a_90_percent_interval_coverage_bounds_inclusive": [
         0.7,
         0.99
-      ]
+      ],
+      "after_a_coverage_decision_arithmetic": "Across the eight task-A/after-A predictive rows, let C be the integer sum of independently verified interval_90_covered_target_count and T the integer sum of coverage_target_count (formally T=8*6400). The lower bound passes iff 10*C >= 7*T and the upper bound passes iff 100*C <= 99*T. Floating coverage fractions and their mean are descriptive only and never drive either gate."
     },
     "k4_executed_a_improvement": {
       "after_a_vs_cold_mean_return_improvement_min": 100.0,
@@ -849,6 +879,18 @@
         "independent oscillator source SHA-256 and deterministic conformance-test report SHA-256"
       ]
     },
+    "coverage_arithmetic": {
+      "required": [
+        "semantics identifier",
+        "exact CPython executable and platform identity",
+        "content-addressed conformance corpus and report",
+        "synthetic exact and adjacent 0.05 and 0.95 cases",
+        "the disclosed v1.3 boundary-coordinate float32 regression case",
+        "producer-reference and independent-auditor agreement",
+        "auditor-source and formal-test-report SHA-256"
+      ],
+      "launch_rule": "Formal launch requires every bound coverage conformance case to pass under the exact runtime and the independently implemented auditor classifier."
+    },
     "dependencies": {
       "required_root_packages": [
         "python",
@@ -905,34 +947,34 @@
   },
   "lanes": {
     "development": {
-      "purpose": "implementation debugging, feasibility measurement, and failure diagnosis",
+      "purpose": "claim-ineligible implementation, evidence, and custody rehearsal only",
       "master_seeds": [
-        3625750835,
-        2671781227
+        2439054559,
+        3246851043
       ],
-      "budgets": "may be smaller than formal and must be labeled in raw results",
-      "tuning_allowed": true,
+      "budgets": "the complete pre-binding candidate rehearsal uses exactly the formal budgets; any smaller engineering diagnostic must be labeled and cannot satisfy the rehearsal gate",
+      "tuning_allowed": false,
       "claim_eligible": false,
       "result_location": "bench/world_model_lifecycle/results/development/",
-      "rule": "Development outcomes may change implementation choices but cannot change this sealed protocol in place. A desired semantic change requires a new protocol version before another formal attempt."
+      "rule": "Preserve every numbered development attempt. Before binding, exactly one complete two-seed candidate rehearsal must satisfy only engineering, evidence, and custody criteria: schema and matrix completeness, deterministic execution, seed parity, exact coverage counts and conformance, zero independent-audit failures or gaps, restart parity, and custody integrity. K3-K6 development performance values are descriptive, permanently claim-ineligible, and neither a binding nor formal-launch criterion. Development may repair only the v1.4 evidence implementation named in the revision (coverage canonicalization and count fields, seed parity, schemas, verifier, auditor, adjudication, conformance, and custody); it may not tune or change the model, training, optimizer, planner, controller, budget, controls, threshold, exclusion, metric, or gate. No development run may create a formal environment reset. After binding, no development run is permitted for this version. Any scientific change creates a new protocol version."
     },
     "formal": {
       "purpose": "single confirmatory evidence program",
       "master_seeds": [
-        17123296,
-        3280610186,
-        2725263418,
-        3124246399,
-        4093604926,
-        3908390087,
-        3332986400,
-        724244869
+        339970590,
+        474769515,
+        550273937,
+        438984650,
+        2732731971,
+        2253809848,
+        2206960337,
+        3506881479
       ],
       "budgets": "exactly those declared in this protocol",
       "tuning_allowed": false,
       "claim_eligible": true,
       "result_location": "bench/world_model_lifecycle/results/formal/<formal-binding-sha256>/",
-      "launch_rule": "Formal execution is disabled until a complete formal binding validates. Once the first formal environment reset occurs, no code, dependency, seed, budget, metric, threshold, exclusion, or analysis change is allowed for that binding."
+      "launch_rule": "Formal execution is disabled until a complete formal binding validates. Immediately before the first possible formal environment reset, the launcher must atomically create the protocol-wide results/formal/formal-launch.json with exclusive-create semantics, binding the formal-binding digest, attempt directory, Git commit, and Git tree, then copy those exact bytes into the producer root. Any existing protocol-wide marker forbids launch under every same-version binding. The first v1.4 formal environment reset begins the sole permitted producer attempt. It may never be resumed or retried in place or in a new directory. A crash, missing evidence, producer-gate failure, independent-audit failure, or semantic-review failure retires v1.4.0; no corrected audit may upgrade it and no same-version formal rerun is permitted. Once that reset occurs, no code, dependency, seed, budget, metric, threshold, exclusion, or analysis change is allowed for the binding."
     }
   },
   "raw_evidence": {
@@ -942,6 +984,7 @@
       "one run record per replicate and condition",
       "one episode record per executed real episode",
       "one transition lineage record per training and predictive-validation transition",
+      "one predictive-metric record per condition carrying coverage_semantics='wm001-mixture-pit-binary64-count-v1', the exact integer interval_90_covered_target_count, coverage_target_count=4*transition_count, and interval_90_coverage=interval_90_covered_target_count/coverage_target_count",
       "one optimizer-step ancestry record or content-addressed batch manifest per step",
       "one checkpoint component record per stateful component",
       "content-addressed canonical live and fresh-process restored evaluation traces",
@@ -950,10 +993,11 @@
     "content_hash_rule": "Unless a binary tensor format is explicitly bound, hash UTF-8 JSON serialized with sorted keys, separators=(',', ':'), ensure_ascii=false, allow_nan=false, and no insignificant whitespace. A JSONL manifest hashes those canonical records in declared order, each followed by one LF byte.",
     "consumed_multiset_hash_rule": "Each committed update records the unique phase-eligible canonical transition-ID set separately from consumed_sample_count. consumed_multiset_sha256 is SHA-256 over UTF-8 transition IDs in exact optimizer-consumption order, each followed by one LF byte; repetitions are retained. The phase-labeled content-addressed optimizer manifest must reproduce that order exactly.",
     "target_hash_rule": "A transition target hash covers the fixed-scaled [delta_cos_theta, delta_sin_theta, delta_angular_velocity, reward] vector serialized as four little-endian IEEE-754 float64 values.",
+    "prediction_target_binding_rule": "The independent auditor must first require the result platform, device, and deterministic-algorithm setting to equal the pre-outcome runtime binding, require its live platform, machine, accelerator, thread settings, CUDA runtime and driver, cuBLAS setting, and installed dependency bytes to equal that binding, and select the formal arithmetic device only from that binding. It must then reconstruct every persisted prediction-sidecar target from the corresponding raw pre-observation, next-observation, and reward using the producer's exact operation sequence: binary64 delta=next-pre; binary64 reconstructed_next=pre+delta; round pre, reconstructed_next, and reward separately to binary32 on CPU; transfer those binary32 values to the binding's exact execution device; on that device perform binary32 subtraction and division by binary32 [2.0,2.0,16.0], and binary32 reward division by binary32 16.2736044. The resulting four little-endian binary32 values must be byte-identical to the sidecar target; no numeric tolerance, result-selected device, or cross-device substitution is permitted.",
     "aggregation_rule": "The report must be mechanically derivable from raw evidence. A hand-entered aggregate without raw members is a K0 failure.",
-    "producer_artifact_rule": "Create a new exclusive producer-attempt directory before the first reset. Preserve raw JSON, protocol and schema copies, binding, test and conformance reports, the exact bound implementation-source bytes, main and child process stdout/stderr, resource telemetry, checkpoint manifests, all content-addressed sidecars, and a complete producer manifest. Finalize this root before independent audit. Never resume, retry in place, repair, or overwrite it; failed attempts remain immutable evidence.",
+    "producer_artifact_rule": "Create a new exclusive producer-attempt directory before the first reset. For formal execution, atomically claim the sole protocol-wide formal-launch.json immediately before any outcome-producing operation and preserve an exact copied formal-launch.json in the producer root. Preserve raw JSON, protocol and schema copies, binding, test and conformance reports, the exact bound implementation-source bytes, main and child process stdout/stderr, resource telemetry, checkpoint manifests, all content-addressed sidecars, and a complete producer manifest. Finalize this root before independent audit. Never resume, retry in place, repair, or overwrite it; failed attempts remain immutable evidence.",
     "restart_trace_rule": "The producer must persist the original live evaluation and restored evaluation separately before computing a parity summary. The independent audit reopens both bounded canonical payloads and recomputes every comparison; producer summary zeros are never sufficient evidence.",
-    "adjudication_package_rule": "The independent audit must remain outside the immutable producer root. After audit and separate semantic review, create a second exclusive package whose canonical manifest binds the finalized producer-manifest digest, raw-result digest, independent-audit digest, auditor-source digest, semantic-review digest, formal-binding digest, and explicit review disposition. The producer root, external audit report, semantic review, and adjudication manifest together form the formal evidence package; none may be overwritten in place.",
+    "adjudication_package_rule": "The independent audit must remain outside the immutable producer root. Before any adjudication package is created, adjudication must capture and verify the current pre-bound auditor bytes, execute those captured bytes from an exclusive descriptor-bound private copy rather than reopening the live source pathname, rerun them against the finalized producer root, and require the resulting canonical report bytes to equal the supplied external audit report exactly. After that reproduced audit and a separate semantic review, create a second exclusive package whose canonical manifest binds the finalized producer-manifest digest, raw-result digest, independent-audit digest, auditor-source digest, semantic-review digest, formal-binding digest, and explicit review disposition. The producer root, external audit report, semantic review, and adjudication manifest together form the formal evidence package; none may be overwritten in place.",
     "formal_artifact_rule": "Formal evidence uses two custody levels: an immutable pre-outcome producer root followed by an external independently generated adjudication package. No producer output may claim support, and no accepted disposition is valid unless the external audit is complete, passes, and independently recomputes K0 through K7."
   },
   "independent_audit": {
@@ -963,12 +1007,13 @@
       "episode and transition split disjointness",
       "receipt ancestry and consumed-ID eligibility",
       "all primary metrics from raw rows",
+      "every predictive coverage count independently from the persisted binary32 prediction tensors using wm001-mixture-pit-binary64-count-v1, with exact equality of the semantics identifier, covered count, total count, and derived fraction and with no target-count tolerance",
       "all confidence intervals and thresholds",
       "checkpoint component completeness and hashes",
       "fresh-process identity and parity by reopening both raw traces",
       "oscillator-control environment dynamics, action independence, cold ancestry, optimizer-schedule matching, custody isolation, held-out own-process predictive learning, and task-A comparisons"
     ],
-    "claim_rule": "README, roadmap, publication, or capability claims may cite WM-001 only after an independent artifact audit and a separate adversarial semantic review accept all K0-K7 gates. An automated zero-failure count alone is insufficient."
+    "claim_rule": "README, roadmap, publication, or capability claims may cite WM-001 only after the pre-bound auditor's supplied report is reproduced byte-for-byte by a fresh adjudication-time run, that independent artifact audit and a separate adversarial semantic review accept all K0-K7 gates, and the external adjudication package binds every evidence digest. An automated or self-reported zero-failure count alone is insufficient."
   },
   "sources": [
     {

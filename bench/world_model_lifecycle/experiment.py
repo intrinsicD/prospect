@@ -1,8 +1,8 @@
 """End-to-end WM-001 experiment harness.
 
 This module executes the sealed causal sequence.  Formal configuration is
-accepted only at the exact protocol budgets; development configuration keeps
-the same semantics while reducing collection, behavior, and optimizer budgets.
+accepted only at the exact protocol budgets; the v1.4 development rehearsal
+uses the same budgets but remains permanently claim-ineligible.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ import torch
 
 from prospect.domain import AgentSnapshot, EpistemicTransition, TimePoint, UpdateReceipt
 
-from .artifact import atomic_write_exclusive
+from .artifact import atomic_write_exclusive, formal_launch_marker_path
 from .checkpoint import (
     CANONICAL_COMPONENT_IDS,
     ComponentPayload,
@@ -122,10 +122,10 @@ class ExperimentConfig:
         return cls(
             lane="development",
             master_seeds=tuple(master_seeds),
-            collection_episodes=4,
+            collection_episodes=8,
             validation_episodes=8,
-            behavior_episodes=2,
-            optimizer_steps=300,
+            behavior_episodes=32,
+            optimizer_steps=2000,
             device=device or ("cuda" if torch.cuda.is_available() else "cpu"),
         )
 
@@ -634,6 +634,9 @@ def append_predictive_metric(
             "mixture_nll_nats_per_target_dimension": metrics.mixture_nll_nats_per_target_dimension,
             "normalized_rmse": metrics.normalized_rmse,
             "interval_90_coverage": metrics.interval_90_coverage,
+            "interval_90_covered_target_count": metrics.interval_90_covered_target_count,
+            "coverage_target_count": metrics.coverage_target_count,
+            "coverage_semantics": metrics.coverage_semantics,
             "prediction_rows_sha256": metrics.prediction_rows_sha256,
             "prediction_evidence_file": evidence_path.name,
             "prediction_evidence_bytes": len(metrics.prediction_payload),
@@ -2187,7 +2190,7 @@ def run_experiment(
 
     from .analysis import analyze_result
     from .binding import verify_live_binding
-    from .verify import verify_result
+    from .verify import _verify_formal_launch_record, verify_result
 
     config.validate()
     if config.lane == "formal" and not output_prepared:
@@ -2215,6 +2218,34 @@ def run_experiment(
             raise ValueError("prepared output directory was already finalized")
     else:
         output_directory.mkdir(parents=True, exist_ok=False)
+    formal_launch_path = output_directory / "formal-launch.json"
+    formal_launch_sha256: str | None = None
+    if config.lane == "formal":
+        assert formal_binding_path is not None
+        protocol_wide_launch_path, binding_sha256 = formal_launch_marker_path(
+            formal_binding_path,
+            output_directory,
+        )
+        if (
+            not protocol_wide_launch_path.is_file()
+            or protocol_wide_launch_path.is_symlink()
+            or not formal_launch_path.is_file()
+            or formal_launch_path.is_symlink()
+            or protocol_wide_launch_path.read_bytes() != formal_launch_path.read_bytes()
+        ):
+            raise RuntimeError(
+                "formal execution has no unique protocol-wide launch claim"
+            )
+        launch_execution = {
+            "git_commit": _git_value("rev-parse", "HEAD"),
+            "git_tree": _git_value("rev-parse", "HEAD^{tree}"),
+        }
+        _verify_formal_launch_record(
+            formal_launch_path,
+            binding_sha256=binding_sha256,
+            execution=launch_execution,
+        )
+        formal_launch_sha256 = hashlib.sha256(formal_launch_path.read_bytes()).hexdigest()
     started_at = utc_now()
     monotonic_start = time.monotonic()
     conformance = run_pendulum_conformance(samples_per_task=128, seed=20260717)
@@ -2255,9 +2286,9 @@ def run_experiment(
     wall_seconds = time.monotonic() - monotonic_start
     max_cuda_memory = int(torch.cuda.max_memory_allocated()) if config.device == "cuda" else 0
     result: dict[str, object] = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v3",
+        "schema": "prospect.world-model-lifecycle.raw-result.v4",
         "experiment_id": "WM-001",
-        "protocol_version": "1.3.0",
+        "protocol_version": "1.4.0",
         "protocol_sha256": PROTOCOL_SHA256,
         "lane": config.lane,
         "claim_eligible": config.lane == "formal",
@@ -2273,6 +2304,8 @@ def run_experiment(
             "device": config.device,
             "deterministic_algorithms": bool(torch.are_deterministic_algorithms_enabled()),
             "launcher_process_id": os.getpid(),
+            "formal_launch_file": ("formal-launch.json" if config.lane == "formal" else None),
+            "formal_launch_sha256": formal_launch_sha256,
             "resource_telemetry": {
                 "wall_seconds": wall_seconds,
                 "max_cuda_memory_bytes": max_cuda_memory,

@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+import bench.world_model_lifecycle.analysis as analysis_module
 from bench.world_model_lifecycle.analysis import (
     T_CRITICAL_N8,
     analyze_result,
@@ -24,19 +25,19 @@ TASK_IRRELEVANT = "independent_phase_oscillator"
 ZERO = "0" * 64
 
 
-def test_scientific_revision_uses_fresh_v130_seed_domain() -> None:
-    master = 3_625_750_835
-    assert derive_seed("model_initialization", master, 0) == 3_253_132_054
-    assert derive_seed("planner", master, 0) == 826_517_252
-    assert derive_seed("collection_action", master, 1) == 3_844_929_773
-    assert derive_seed("irrelevant_collection_action", master, 0) == 2_287_310_208
-    assert derive_seed("collect_irrelevant_episode", master, 0) == 3_635_045_576
-    assert derive_seed("predictive_validation_irrelevant_action", master, 0) == 2_172_027_332
-    assert derive_seed("predictive_validation_irrelevant_episode", master, 0) == 2_942_674_611
+def test_scientific_revision_uses_fresh_v140_seed_domain() -> None:
+    master = 2_439_054_559
+    assert derive_seed("model_initialization", master, 0) == 1_466_780_240
+    assert derive_seed("planner", master, 0) == 373_649_697
+    assert derive_seed("collection_action", master, 1) == 1_817_379_484
+    assert derive_seed("irrelevant_collection_action", master, 0) == 3_386_351_785
+    assert derive_seed("collect_irrelevant_episode", master, 0) == 1_386_339_495
+    assert derive_seed("predictive_validation_irrelevant_action", master, 0) == 2_351_740_535
+    assert derive_seed("predictive_validation_irrelevant_episode", master, 0) == 1_501_666_155
 
 
 def _seed(namespace: str, master: int, index: int) -> int:
-    payload = f"WM-001|1.3.0|{namespace}|{master}|{index}".encode()
+    payload = f"WM-001|1.4.0|{namespace}|{master}|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big")
 
 
@@ -205,7 +206,7 @@ def _update(
 def _development_result() -> dict[str, Any]:
     protocol = json.loads((HERE / "protocol.json").read_text())
     protocol_sha = sha256((HERE / "protocol.json").read_bytes()).hexdigest()
-    master = 3_625_750_835
+    master = 2_439_054_559
     replicate_id = f"dev-{master}"
     cold = _digest("cold")
     after_a = _digest("after-a")
@@ -453,6 +454,9 @@ def _development_result() -> dict[str, Any]:
             "transition_count": 200,
             "mixture_nll_nats_per_target_dimension": nll,
             "normalized_rmse": 0.1,
+            "coverage_semantics": "wm001-mixture-pit-binary64-count-v1",
+            "interval_90_covered_target_count": int(coverage * 800),
+            "coverage_target_count": 800,
             "interval_90_coverage": coverage,
             "prediction_rows_sha256": _digest(f"prediction:{task}:{condition}"),
             "prediction_evidence_file": f"{task}-{condition}.bin",
@@ -639,9 +643,9 @@ def _development_result() -> dict[str, Any]:
         },
     }
     return {
-        "schema": "prospect.world-model-lifecycle.raw-result.v3",
+        "schema": "prospect.world-model-lifecycle.raw-result.v4",
         "experiment_id": "WM-001",
-        "protocol_version": "1.3.0",
+        "protocol_version": "1.4.0",
         "protocol_sha256": protocol_sha,
         "lane": "development",
         "claim_eligible": False,
@@ -696,6 +700,52 @@ def test_first_failed_numeric_gate_stops_the_ordered_prefix() -> None:
     assert [gate["gate"] for gate in gates] == ["K0", "K1", "K2", "K3"]
     assert gates[-1]["passed"] is False
     assert gates[-1]["stop_reason"].startswith("Stop.")
+
+
+def test_k0_rejects_coverage_fraction_or_count_disagreement() -> None:
+    result = _development_result()
+    after_a = next(
+        row
+        for row in result["replicates"][0]["predictive_metrics"]
+        if row["task_id"] == TASK_A and row["condition"] == "after_a"
+    )
+    after_a["interval_90_covered_target_count"] += 1
+
+    analysis = analyze_result(result)
+    gates = analysis["gate_results"]
+
+    assert [gate["gate"] for gate in gates] == ["K0"]
+    assert gates[0]["passed"] is False
+    assert any(
+        "coverage counts, transition count, and fraction disagree" in finding["message"]
+        for finding in analysis["audit_findings"]
+    )
+
+
+def test_k3_coverage_bounds_use_exact_integer_cross_products() -> None:
+    at_lower = [
+        {
+            "_a_after_a_interval_90_covered_target_count": 4_480.0,
+            "_a_after_a_coverage_target_count": 6_400.0,
+        }
+        for _ in range(8)
+    ]
+    below_lower = copy.deepcopy(at_lower)
+    below_lower[0]["_a_after_a_interval_90_covered_target_count"] -= 1.0
+    at_upper = [
+        {
+            "_a_after_a_interval_90_covered_target_count": 6_336.0,
+            "_a_after_a_coverage_target_count": 6_400.0,
+        }
+        for _ in range(8)
+    ]
+    above_upper = copy.deepcopy(at_upper)
+    above_upper[0]["_a_after_a_interval_90_covered_target_count"] += 1.0
+
+    assert all(check["passed"] for check in analysis_module._coverage_count_gate_checks(at_lower))
+    assert analysis_module._coverage_count_gate_checks(below_lower)[0]["passed"] is False
+    assert all(check["passed"] for check in analysis_module._coverage_count_gate_checks(at_upper))
+    assert analysis_module._coverage_count_gate_checks(above_upper)[1]["passed"] is False
 
 
 def test_k3_rejects_irrelevant_evidence_matching_task_a_prediction() -> None:
