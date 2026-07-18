@@ -155,6 +155,9 @@ def test_raw_result_schema_binds_v140_heldout_split_and_formal_counts() -> None:
     replicate_limits = schema["allOf"][0]["then"]["properties"]["replicates"]["items"]["allOf"][1]["properties"]
     predictive_schema = schema["$defs"]["predictiveMetric"]
     predictive_properties = predictive_schema["properties"]
+    gate_comparators = schema["$defs"]["gateCheck"]["properties"]["comparator"][
+        "enum"
+    ]
 
     assert schema["$id"].endswith("wm-001-raw-result-v4.json")
     assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v4"
@@ -183,6 +186,15 @@ def test_raw_result_schema_binds_v140_heldout_split_and_formal_counts() -> None:
         "minimum": 0.0,
         "maximum": 1.0,
     }
+    assert gate_comparators == [
+        "eq",
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "10*C >= 7*T",
+        "100*C <= 99*T",
+    ]
     assert replicate_limits["derived_seeds"] == {"minItems": 21, "maxItems": 21}
     assert replicate_limits["episodes"] == {"minItems": 496, "maxItems": 496}
     assert replicate_limits["transitions"] == {"minItems": 99200, "maxItems": 99200}
