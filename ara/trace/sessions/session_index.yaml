@@ -8,8 +8,8 @@ sessions:
     open_threads: 2
   - id: "2026-07-18_001"
     date: "2026-07-18"
-    summary: "Completed and rejected WM-001 v1.3 formal acceptance while retaining bounded mechanism evidence and hardening the next audit path."
-    turn_count: 2
-    events_count: 14
+    summary: "Rejected v1.3, hardened v1.4, and isolated a development finalization failure to a corrected schema-enum omission."
+    turn_count: 3
+    events_count: 15
     claims_touched: [C01]
     open_threads: 2

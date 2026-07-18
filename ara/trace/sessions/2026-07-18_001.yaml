@@ -2,9 +2,9 @@ session:
   id: "2026-07-18_001"
   date: "2026-07-18"
   started: "2026-07-18T07:31+02:00"
-  last_turn: "2026-07-18T07:49+02:00"
-  turn_count: 2
-  summary: "Completed and rejected WM-001 v1.3 formal acceptance while retaining bounded mechanism evidence and hardening the next audit path."
+  last_turn: "2026-07-18T14:27+02:00"
+  turn_count: 3
+  summary: "Rejected v1.3, hardened v1.4, and isolated a development finalization failure to a corrected schema-enum omission."
 
 events_logged:
   - turn: 1
@@ -91,6 +91,12 @@ events_logged:
     routing: crystallized
     provenance: ai-suggested
     summary: "Crystallized rejected-evidence custody without weaker acceptance as R04."
+  - turn: 3
+    type: experiment
+    id: N06
+    routing: direct
+    provenance: ai-executed
+    summary: "Verified the unchanged v1.4 development result passes the corrected schema and complete producer verifier."
 
 ai_actions:
   - turn: 1
@@ -114,6 +120,15 @@ ai_actions:
       - "artifacts/wm001-audits/"
       - "artifacts/wm001-adjudications/"
       - "ara/"
+  - turn: 3
+    action: >-
+      Performed a read-only post-run engineering review of the failed v1.4
+      development attempt, verified manifest custody and the corrected producer
+      envelope, checked the protocol seal and binding regression suite, and
+      suppressed all performance values.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
 
 claims_touched:
   - id: C01
@@ -127,6 +142,10 @@ key_context:
     excerpt: >-
       The user requested the first maturity program be written down, executed
       end to end, and returned with results for the next decision.
+  - turn: 3
+    excerpt: >-
+      The v1.4 attempt-1 producer result passes unchanged after the sealed K3
+      comparator vocabulary is represented in the raw-result schema.
 
 open_threads:
   - "Design and seal WM-001 v1.4 with exact coverage semantics, fresh seeds, and the corrected auditor before a new formal attempt."
@@ -135,3 +154,4 @@ open_threads:
 ai_suggestions_pending:
   - "Treat any corrected-auditor replay of v1.3 as diagnostic only."
   - "Use a new protocol and seed domain for the next confirmatory attempt."
+  - "Commit the three-file v1.4 schema correction, preserve attempt 1 as failed evidence, and run attempt 2 in a fresh directory."

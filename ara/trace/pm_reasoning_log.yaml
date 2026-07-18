@@ -16,3 +16,8 @@ entries:
       - "Staged and immediately crystallized O07-O09 through artifact commitment into C01 and R03-R04."
       - "Left O03 staged: its early candidate mentions reservoir replay, while the sealed experiment used balanced replay; no exact closure signal applies to that wording."
       - "Kept C01 explicitly bounded and separate from formal acceptance because the pre-bound audit did not pass."
+  - turn: "2026-07-18_001#3"
+    notes:
+      - "Routed the post-run engineering verification directly as experiment N06; it is a completed attempt-specific result, not a general claim."
+      - "Did not stage or crystallize a broader capability claim because no new behavioral outcome was inspected and attempt 2 has not run."
+      - "Recorded GO for a fresh development attempt only as a pending AI suggestion; the user has not yet committed to that disposition."

@@ -93,3 +93,25 @@ tree:
       - "artifacts/wm001-audits/formal-fcb54469-20260718-v130.json"
     status: resolved
     children: []
+  - id: N06
+    type: experiment
+    title: "Audit v1.4 development finalization failure"
+    provenance: ai-executed
+    timestamp: "2026-07-18T14:27+02:00"
+    result: >-
+      The immutable failed development attempt retained valid custody for all
+      74 manifested files. After adding the two already-sealed K3 comparator
+      labels to the raw-result schema, the unchanged result produced zero
+      schema errors and passed the complete producer result verifier. Protocol
+      seal verification, exact sealed-file hashes, diff hygiene, and all 21
+      binding tests passed. The recorded producer exception was limited to the
+      prior comparator-enum omission; no second producer-side finalization
+      blocker was found.
+    evidence:
+      - "bench/world_model_lifecycle/results/development/20260718-v140-rehearsal"
+      - "bench/world_model_lifecycle/schemas/raw-result.schema.json"
+      - "tests/test_world_model_binding.py"
+      - "bench/world_model_lifecycle/SEALED_PROTOCOL.sha256"
+    also_depends_on: [N05]
+    status: resolved
+    children: []
