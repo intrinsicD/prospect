@@ -72,7 +72,10 @@ TARGET = EpistemicTarget(
 TASK_CONTEXTS = {
     "pendulum_normal_torque": 0.0,
     "pendulum_reversed_torque": 1.0,
+    "independent_phase_oscillator": 2.0,
 }
+INDEPENDENT_OSCILLATOR_TASK = "independent_phase_oscillator"
+INDEPENDENT_OSCILLATOR_SOURCE = "prospect:IndependentPhaseOscillator-v1"
 
 
 class PredictiveBackend(Protocol):
@@ -553,8 +556,169 @@ class _UncalibratedEffectAssessor:
         )
 
 
+class IndependentPhaseOscillatorEnvironment:
+    """Deterministic action-independent nuisance process for a causal control.
+
+    The reset seed selects an initial phase and angular velocity.  Thereafter
+    the oscillator advances autonomously for exactly 200 steps:
+
+    ``phase[t+1] = wrap(phase[t] + STEP_SECONDS * velocity)``
+
+    Its observation is ``[cos(phase), sin(phase), velocity]`` and its reward is
+    ``cos(phase)`` after the transition.  The action argument is deliberately
+    ignored, making the process causally independent of intended torque while
+    retaining the same observation/reward shapes as the two Pendulum tasks.
+    """
+
+    STEP_SECONDS = 0.05
+    HORIZON = 200
+
+    def __init__(self) -> None:
+        self._phase: float | None = None
+        self._velocity: float | None = None
+        self._step_index = 0
+        self._closed = False
+
+    def reset(self, *, seed: int | None = None) -> tuple[np.ndarray, dict[str, object]]:
+        if seed is None or isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            raise ValueError("independent oscillator reset requires a nonnegative integer seed")
+        digest = hashlib.sha256(f"{INDEPENDENT_OSCILLATOR_SOURCE}:{seed}".encode("ascii")).digest()
+        phase_unit = int.from_bytes(digest[:8], "big") / float(1 << 64)
+        velocity_unit = int.from_bytes(digest[8:16], "big") / float(1 << 64)
+        self._phase = (2.0 * phase_unit - 1.0) * math.pi
+        self._velocity = 0.5 + velocity_unit
+        self._step_index = 0
+        self._closed = False
+        return self._observation(), {"reset_seed": seed}
+
+    def step(
+        self,
+        action: np.ndarray,
+    ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
+        del action
+        if self._closed:
+            raise RuntimeError("cannot step a closed independent oscillator")
+        if self._phase is None or self._velocity is None:
+            raise RuntimeError("independent oscillator must be reset before stepping")
+        if self._step_index >= self.HORIZON:
+            raise RuntimeError("independent oscillator cannot step past its 200-step horizon")
+        self._phase = math.remainder(
+            self._phase + self.STEP_SECONDS * self._velocity,
+            2.0 * math.pi,
+        )
+        self._step_index += 1
+        observation = self._observation()
+        reward = float(math.cos(self._phase))
+        return (
+            observation,
+            reward,
+            False,
+            self._step_index == self.HORIZON,
+            {"step_index": self._step_index},
+        )
+
+    def close(self) -> None:
+        self._closed = True
+
+    def _observation(self) -> np.ndarray:
+        if self._phase is None or self._velocity is None:
+            raise RuntimeError("independent oscillator has no state before reset")
+        return np.asarray(
+            [math.cos(self._phase), math.sin(self._phase), self._velocity],
+            dtype=np.float64,
+        )
+
+
+def run_independent_phase_oscillator_conformance(
+    *,
+    cases: int = 512,
+    seed: int = 20260718,
+) -> dict[str, object]:
+    """Exercise deterministic reset, dynamics, horizon, and action independence."""
+
+    if cases < 1 or isinstance(cases, bool):
+        raise ValueError("oscillator conformance requires at least one case")
+    if seed < 0 or isinstance(seed, bool):
+        raise ValueError("oscillator conformance seed must be nonnegative")
+    trajectory = hashlib.sha256()
+    max_reset_difference = 0.0
+    max_observation_difference = 0.0
+    max_reward_difference = 0.0
+    premature_or_missing_truncations = 0
+    unexpected_terminations = 0
+    for case_index in range(cases):
+        reset_seed = seed + case_index
+        negative = IndependentPhaseOscillatorEnvironment()
+        positive = IndependentPhaseOscillatorEnvironment()
+        negative_reset, _ = negative.reset(seed=reset_seed)
+        positive_reset, _ = positive.reset(seed=reset_seed)
+        max_reset_difference = max(
+            max_reset_difference,
+            float(np.max(np.abs(negative_reset - positive_reset), initial=0.0)),
+        )
+        trajectory.update(reset_seed.to_bytes(8, "big", signed=False))
+        trajectory.update(np.asarray(negative_reset, dtype="<f8").tobytes())
+        for step_index in range(IndependentPhaseOscillatorEnvironment.HORIZON):
+            negative_row = negative.step(np.asarray([-2.0], dtype=np.float64))
+            positive_row = positive.step(np.asarray([2.0], dtype=np.float64))
+            negative_observation, negative_reward, negative_terminated, negative_truncated, _ = negative_row
+            positive_observation, positive_reward, positive_terminated, positive_truncated, _ = positive_row
+            max_observation_difference = max(
+                max_observation_difference,
+                float(
+                    np.max(
+                        np.abs(negative_observation - positive_observation),
+                        initial=0.0,
+                    )
+                ),
+            )
+            max_reward_difference = max(
+                max_reward_difference,
+                abs(float(negative_reward) - float(positive_reward)),
+            )
+            unexpected_terminations += int(negative_terminated or positive_terminated)
+            expected_truncation = step_index == IndependentPhaseOscillatorEnvironment.HORIZON - 1
+            premature_or_missing_truncations += int(
+                negative_truncated is not expected_truncation or positive_truncated is not expected_truncation
+            )
+            trajectory.update(np.asarray(negative_observation, dtype="<f8").tobytes())
+            trajectory.update(np.asarray([negative_reward], dtype="<f8").tobytes())
+            trajectory.update(bytes((int(negative_terminated), int(negative_truncated))))
+        negative.close()
+        positive.close()
+    report: dict[str, object] = {
+        "schema": "prospect.wm001.independent-phase-oscillator-conformance.v1",
+        "source_id": INDEPENDENT_OSCILLATOR_SOURCE,
+        "cases": cases,
+        "steps_per_case": IndependentPhaseOscillatorEnvironment.HORIZON,
+        "seed": seed,
+        "max_reset_absolute_difference": max_reset_difference,
+        "max_action_pair_observation_absolute_difference": max_observation_difference,
+        "max_action_pair_reward_absolute_difference": max_reward_difference,
+        "unexpected_terminations": unexpected_terminations,
+        "premature_or_missing_truncations": premature_or_missing_truncations,
+        "trajectory_sha256": trajectory.hexdigest(),
+        "passed": (
+            max_reset_difference == 0.0
+            and max_observation_difference == 0.0
+            and max_reward_difference == 0.0
+            and unexpected_terminations == 0
+            and premature_or_missing_truncations == 0
+        ),
+    }
+    canonical = json.dumps(
+        report,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    report["report_sha256"] = hashlib.sha256(canonical).hexdigest()
+    return report
+
+
 class PendulumRuntimeEnvironment:
-    """Turn one Gymnasium Pendulum step into externally evidenced records."""
+    """Turn one task-aware WM-001 environment step into canonical records."""
 
     def __init__(
         self,
@@ -569,6 +733,18 @@ class PendulumRuntimeEnvironment:
         self._task_id = task_id
         self._context = _task_context(task_id)
         self._identities = identities
+        if task_id == INDEPENDENT_OSCILLATOR_TASK:
+            self._modality = "independent_phase_oscillator_state"
+            self._state_source_id = INDEPENDENT_OSCILLATOR_SOURCE
+            self._state_source_kind = "simulated_distractor_environment"
+            self._reward_source_id = INDEPENDENT_OSCILLATOR_SOURCE
+            self._reward_source_kind = "simulated_distractor_environment_reward"
+        else:
+            self._modality = "gymnasium_pendulum_state"
+            self._state_source_id = "gymnasium:Pendulum-v1"
+            self._state_source_kind = "simulated_environment"
+            self._reward_source_id = "gymnasium:Pendulum-v1"
+            self._reward_source_kind = "simulated_environment_reward"
 
     def step(self, intention: object) -> EnvironmentStep:
         intended = cast(Any, intention)
@@ -577,7 +753,10 @@ class PendulumRuntimeEnvironment:
         context = float(parameters["task_context"])
         if context != self._context:
             raise RuntimeError("intended action carries the wrong observed task context")
-        applied = command if context == 0.0 else -command
+        if self._task_id == INDEPENDENT_OSCILLATOR_TASK:
+            applied = 0.0
+        else:
+            applied = command if context == 0.0 else -command
         next_observation, reward, terminated, truncated, _ = cast(Any, self._environment).step(
             np.asarray([applied], dtype=np.float32)
         )
@@ -595,7 +774,7 @@ class PendulumRuntimeEnvironment:
         observation = Observation(
             observation_id=observation_id,
             agent_id=self._agent_id,
-            modality="gymnasium_pendulum_state",
+            modality=self._modality,
             evidence=Evidence(
                 evidence_id=observation_id,
                 payload={
@@ -609,9 +788,9 @@ class PendulumRuntimeEnvironment:
                     evidence_id=observation_id,
                     origin=EvidenceOrigin.OBSERVED,
                     provenance=Provenance(
-                        source_id="gymnasium:Pendulum-v1",
+                        source_id=self._state_source_id,
                         trust=TrustLevel.VERIFIED,
-                        source_kind="simulated_environment",
+                        source_kind=self._state_source_kind,
                     ),
                 ),
             ),
@@ -634,9 +813,9 @@ class PendulumRuntimeEnvironment:
                     evidence_id=outcome_evidence_id,
                     origin=EvidenceOrigin.OBSERVED,
                     provenance=Provenance(
-                        source_id="gymnasium:Pendulum-v1",
+                        source_id=self._reward_source_id,
                         trust=TrustLevel.VERIFIED,
-                        source_kind="simulated_environment_reward",
+                        source_kind=self._reward_source_kind,
                     ),
                 ),
             ),
@@ -838,11 +1017,14 @@ def _initialize_episode_runtime(
     model_owner: OwnedModel | None,
     learner: TransactionalLearner | None,
 ) -> tuple[object, PendulumRuntimeEnvironment, EpistemicAgent, np.ndarray]:
-    import gymnasium as gym
-
     del run_id, episode_id
-    environment = gym.make("Pendulum-v1")
-    reset_observation, _ = environment.reset(seed=int(reset_seed))
+    if task_id == INDEPENDENT_OSCILLATOR_TASK:
+        environment: object = IndependentPhaseOscillatorEnvironment()
+    else:
+        import gymnasium as gym
+
+        environment = gym.make("Pendulum-v1")
+    reset_observation, _ = cast(Any, environment).reset(seed=int(reset_seed))
     initial_observation = np.asarray(reset_observation, dtype=np.float64)
     initial = initial_snapshot(
         observation=initial_observation,
@@ -850,6 +1032,7 @@ def _initialize_episode_runtime(
         model_version=backend.version,
         identities=custody.identities,
         at=TimePoint(start_tick),
+        task_id=task_id,
     )
     assessor = _WorldModelCandidateAssessor(
         backend=backend,
@@ -1028,7 +1211,7 @@ def run_episode(
             if result.experience.terminated or result.experience.truncated:
                 break
     finally:
-        environment.close()
+        cast(Any, environment).close()
     if len(transitions) != 200 or not transitions[-1].experience.truncated:
         raise RuntimeError("WM-001 requires exactly 200 accepted actions and a TimeLimit truncation")
     episode = EpisodeEvidence(
@@ -1053,14 +1236,16 @@ def initial_snapshot(
     model_version: str,
     identities: CounterIdentitySource,
     at: TimePoint,
+    task_id: str | None = None,
 ) -> AgentSnapshot:
     """Create an episode-local recurrent state while preserving persistent versions."""
 
+    oscillator_reset = task_id == INDEPENDENT_OSCILLATOR_TASK
     reset_id = identities.next("reset-observation")
     reset_observation = Observation(
         observation_id=reset_id,
         agent_id=AGENT_ID,
-        modality="gymnasium_pendulum_reset_state",
+        modality=("independent_phase_oscillator_reset_state" if oscillator_reset else "gymnasium_pendulum_reset_state"),
         evidence=Evidence(
             evidence_id=reset_id,
             payload={
@@ -1073,9 +1258,13 @@ def initial_snapshot(
                 evidence_id=reset_id,
                 origin=EvidenceOrigin.OBSERVED,
                 provenance=Provenance(
-                    source_id="gymnasium:Pendulum-v1:reset",
+                    source_id=(
+                        f"{INDEPENDENT_OSCILLATOR_SOURCE}:reset" if oscillator_reset else "gymnasium:Pendulum-v1:reset"
+                    ),
                     trust=TrustLevel.VERIFIED,
-                    source_kind="simulated_environment_reset",
+                    source_kind=(
+                        "simulated_distractor_environment_reset" if oscillator_reset else "simulated_environment_reset"
+                    ),
                 ),
             ),
         ),
@@ -1246,6 +1435,10 @@ __all__ = (
     "CollectionEvidence",
     "Controller",
     "EpisodeEvidence",
+    "INDEPENDENT_OSCILLATOR_SOURCE",
+    "INDEPENDENT_OSCILLATOR_TASK",
+    "run_independent_phase_oscillator_conformance",
+    "IndependentPhaseOscillatorEnvironment",
     "POLICY_VERSION",
     "PendulumEpisodeSession",
     "PendulumRuntimeEnvironment",

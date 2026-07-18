@@ -248,8 +248,13 @@ class ProducerAttempt(AbstractContextManager["ProducerAttempt"]):
         binding = _load_json(binding_path)
         source = binding.get("source", {})
         environment = binding.get("environment", {})
-        if not isinstance(source, dict) or not isinstance(environment, dict):
-            raise ValueError("formal binding source/environment blocks are invalid")
+        irrelevant_control = binding.get("irrelevant_control", {})
+        if (
+            not isinstance(source, dict)
+            or not isinstance(environment, dict)
+            or not isinstance(irrelevant_control, dict)
+        ):
+            raise ValueError("formal binding source/environment/control blocks are invalid")
         test_report = _safe_sibling(
             binding_path,
             source.get("test_report_file"),
@@ -259,6 +264,11 @@ class ProducerAttempt(AbstractContextManager["ProducerAttempt"]):
             binding_path,
             environment.get("conformance_report_file"),
             field="environment.conformance_report_file",
+        )
+        oscillator_conformance_report = _safe_sibling(
+            binding_path,
+            irrelevant_control.get("conformance_report_file"),
+            field="irrelevant_control.conformance_report_file",
         )
         copies = (
             (binding_path, Path("formal-binding.json")),
@@ -275,6 +285,10 @@ class ProducerAttempt(AbstractContextManager["ProducerAttempt"]):
             (LOCKFILE_PATH, Path("requirements-wm001.lock")),
             (test_report, Path(test_report.name)),
             (conformance_report, Path(conformance_report.name)),
+            (
+                oscillator_conformance_report,
+                Path(oscillator_conformance_report.name),
+            ),
             *_bound_implementation_copies(source),
         )
         for origin, relative in copies:

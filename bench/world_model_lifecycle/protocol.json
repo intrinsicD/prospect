@@ -1,24 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "schema": "prospect.world-model-lifecycle.protocol.v2",
+  "schema": "prospect.world-model-lifecycle.protocol.v3",
   "experiment": {
     "id": "WM-001",
     "title": "Causal world-model learning, behavioral improvement, retention, and restart",
-    "protocol_version": "1.1.1",
+    "protocol_version": "1.3.0",
     "status": "sealed_before_formal_outcomes",
     "thresholds_sealed_before_outcomes": true,
     "revision": {
-      "supersedes": "1.1.0",
-      "superseded_protocol_sha256": "b5e2fb45c462dd8db08c35596e7c42d046444f21bfca12f4c0215b846b993e3e",
-      "reason": "Pre-formal custody review found that v1.1.0 used the phrase formal artifact for both the immutable producer root and the later independent audit, even though placing the audit inside the already-finalized producer root would invalidate its manifest. Version 1.1.1 defines an external, content-addressed adjudication package and strengthens implementation-source and conformance custody. Tasks, model, optimizer, planner, controls, master seeds, budgets, thresholds, metrics, and killing gates are unchanged.",
-      "outcome_use": "No formal outcome was generated under v1.0 or v1.1.0. Development artifacts under v1.1.0 were diagnostic and were not used to change numerical thresholds."
+      "supersedes": "1.2.0",
+      "superseded_protocol_sha256": "d18c8723094e6dfabdebd834617b5ff2185b51566b8000d573b191d24b76d962",
+      "reason": "Pre-formal adversarial review of v1.2.0 found that its independent-oscillator arm had no held-out own-process manipulation check, so the protocol called the control learned and learnable without evidence that its update worked. The same review found that the claim wording overstated the corrupted-target control as a behavioral comparator even though its killing comparison was predictive. Version 1.3.0 adds a disjoint oscillator validation split and a predeclared proper-score manipulation gate, narrows the corrupted control to prediction, and narrows the oscillator conclusion to this specified nuisance process.",
+      "outcome_use": "No v1.2.0 formal seed was opened and no v1.2.0 formal attempt exists. Two v1.2.0 development replicates were used only for implementation and evidence-design diagnosis and are permanently claim-ineligible. The new oscillator manipulation threshold is the same predeclared minimum meaningful NLL floor used by the other predictive controls and was fixed before any v1.3.0 development or formal outcome. Version 1.3.0 uses a new derivation domain and new master seeds selected before any v1.3.0 outcome by the first four bytes of SHA-256('WM-001|1.3.0|' + lane + '-master|' + decimal(index))."
     },
     "supersession_rule": "Any semantic, seed, budget, metric, threshold, control, or gate change creates a new protocol version and invalidates all formal outcomes collected under an earlier or unbound version."
   },
-  "claim": "The same Prospect agent collects identified real experience, changes one shared persistent probabilistic world model because of exactly that experience, improves held-out prediction and executed control, learns a conflicting second task without task-specific model copies, retains the first-task gain through replay, and reproduces the retained state and behavior after a fresh-process restore.",
+  "claim": "On the sealed WM-001 Pendulum/oscillator fixture, the same Prospect A/B agent collects identified task-A real experience, changes one shared persistent probabilistic world model because of exactly that experience, improves held-out task-A prediction beyond frozen, target-permuted, and separately verified learned-oscillator controls, improves executed task-A return beyond cold, frozen, and that learned-oscillator control, learns the conflicting observed-context task B without task-specific model copies, retains the task-A gain through replay under demonstrated naive interference, and reproduces the retained state and one predeclared 200-step continuation per task after a same-machine, same-dependency fresh-process restore.",
   "null_hypothesis": {
     "id": "H0-WM-001",
-    "statement": "Experience-linked world-model learning does not cause reliable held-out predictive improvement, executed-control improvement, second-task plasticity, first-task retention, and fresh-process persistence beyond matched frozen, corrupted-target, naive-sequential, and random controls.",
+    "statement": "Task-A experience-linked world-model learning does not cause reliable held-out predictive improvement beyond matched frozen, corrupted-target, and validated oscillator-trained controls; executed-control improvement beyond cold, frozen, oscillator-trained, and random controls; second-task plasticity; first-task retention; and fresh-process persistence.",
     "rejection_rule": "Reject only if every killing gate K0 through K7 passes in order in the formal lane. Passing a later numerical check cannot rescue an earlier failed gate."
   },
   "scope": {
@@ -39,17 +39,19 @@
     ]
   },
   "causal_chain": [
-    "initialize one cold shared model and record its parameter digest",
+    "initialize one cold shared model, record its parameter digest, and fork an isolated cold oscillator control",
     "collect task-A real experience through the authoritative agent lifecycle",
+    "collect real experience from the independent phase oscillator in isolated custody",
     "prepare candidate weights from the exact task-A transition IDs without mutating the live model",
     "validate ancestry and candidate state, then atomically commit the candidate",
+    "train the isolated oscillator control with the task-A optimizer schedule and verify its own-process held-out predictive gain",
     "evaluate frozen held-out task-A prediction and executed MPC behavior",
     "collect task-B real experience through the same lifecycle and shared model",
     "train task B with balanced task-A replay through the same weights and heads",
     "demonstrate that a matched B-only learner measurably forgets A",
     "evaluate B plasticity and A retention with learning disabled",
     "checkpoint every declared stateful component and restore in a fresh process",
-    "reproduce identities, predictions, actions, and executed returns"
+    "persist both live and restored evaluation traces and reproduce identities, predictions, actions, and executed returns by independently reopening them"
   ],
   "evaluation_scheduling_rule": "A paired evaluation condition may execute after a later causal phase only when it reloads immutable content-addressed bytes for the declared checkpoint, resets the exact paired environment and planner RNG seeds, and has learning and replay writes disabled. Scheduling does not change the condition's causal checkpoint identity.",
   "environment": {
@@ -103,13 +105,27 @@
       ]
     },
     "reward": "The unmodified Pendulum-v1 reward computed from physical state and applied torque. The primary behavior metric is the undiscounted sum of 200 rewards.",
-    "source_guard": "The formal binding must record the exact Gymnasium version, installed distribution hash, wrapper source hash, and a conformance-test digest for all semantic parameters above."
+    "source_guard": "The formal binding must record the exact Gymnasium version, installed distribution hash, wrapper source hash, and a conformance-test digest for all semantic parameters above.",
+    "irrelevant_control_environment": {
+      "id": "independent_phase_oscillator",
+      "source_id": "prospect:IndependentPhaseOscillator-v1",
+      "purpose": "A valid and learnable real-evidence process that is causally independent of Pendulum task A while sharing the three-value observation interface.",
+      "reset": "SHA-256(source_id + ':' + decimal reset seed) deterministically maps its first and second unsigned 64-bit words to phase in [-pi, pi) and angular frequency in [0.5, 1.5).",
+      "dynamics": "theta_next = IEEE remainder(theta + 0.05 * angular_frequency, 2*pi); angular_frequency is constant.",
+      "observation": "[cos(theta), sin(theta), angular_frequency]",
+      "action": "The seeded intended action remains recorded but is ignored by the process; canonical applied action is exactly 0.0.",
+      "reward": "cos(theta_next)",
+      "episode_horizon": 200,
+      "termination": "No natural terminal state; truncation occurs at exactly 200 accepted actions.",
+      "isolation": "Its custody, real transition IDs, receipts, optimizer state, model checkpoint, and RNG streams are isolated from the A/B agent. They may be used only by the irrelevant control and must be absent from the retained K7 checkpoint."
+    }
   },
   "tasks": {
     "context_is_observed": true,
     "context_encoding": {
       "task_a": 0.0,
-      "task_b": 1.0
+      "task_b": 1.0,
+      "task_irrelevant": 2.0
     },
     "task_a": {
       "id": "pendulum_normal_torque",
@@ -121,7 +137,13 @@
       "context": 1.0,
       "actuation": "applied_torque = -clip(intended_torque, -2, 2)"
     },
+    "task_irrelevant": {
+      "id": "independent_phase_oscillator",
+      "context": 2.0,
+      "actuation": "applied_action = 0.0 for every intended action"
+    },
     "shared_parameter_constraint": "Both tasks must use the identical ensemble members, trunks, output heads, optimizer slots, and model version stream. The context scalar may be an input; task-keyed models, adapters, heads, routing tables, or checkpoint copies are forbidden.",
+    "irrelevant_branch_constraint": "The irrelevant arm uses an exact cold compound-state fork of the same architecture and optimizer. It is a causal control, not part of the persistent A/B agent: its experience, optimizer, receipt, and after-irrelevant checkpoint must not enter the A/B replay stream or final K7 checkpoint.",
     "interference_requirement": "The matched naive B-only update must cause a statistically reliable task-A return loss. If it does not, WM-001 has not tested retention and stops at K5."
   },
   "representation_and_model": {
@@ -246,6 +268,15 @@
       ],
       "optimizer_steps": 2000
     },
+    "task_a_irrelevant_update": {
+      "eligible_replay": [
+        "collect_irrelevant"
+      ],
+      "optimizer_steps": 2000,
+      "fork": "exact cold model, optimizer, and model-version bytes",
+      "sampling_schedule": "Reuse ensemble_bootstrap_a[0..4] and minibatch_order_a[0]. Because collect_a and collect_irrelevant both contain exactly 1,600 transitions, the decoded sampled-index tensor must be byte-identical to train_a.",
+      "isolation": "The resulting irrelevant checkpoint is first required to improve held-out prediction on the oscillator itself, is then evaluated on held-out task A, and is never merged into the task-A/task-B agent."
+    },
     "task_b_replay_update": {
       "eligible_replay": [
         "collect_a",
@@ -277,9 +308,9 @@
     ],
     "rules": [
       "No episode or transition may occur in more than one split.",
-      "Only collect_a and collect_b are eligible for gradient updates.",
+      "Only collect_a and collect_b are eligible for updates to the persistent A/B agent. collect_irrelevant is eligible only for the isolated train_a_irrelevant control.",
       "Prediction-validation and behavior-evaluation episodes are held out from replay, optimizer state, normalization, calibration fitting, and hyperparameter selection.",
-      "All controls within a replicate consume the same eligible real transition IDs and use paired evaluation reset seeds.",
+      "Frozen and corrupted controls use task-A custody as declared. The oscillator arm instead uses its own causally independent real IDs with the same transition count and byte-identical optimizer index schedule, and must first pass a disjoint own-process predictive manipulation check. Every task-A evaluated checkpoint uses the exact paired validation and behavior reset seeds and planner budget.",
       "A formal result must enumerate every episode ID and transition ID rather than reporting only counts."
     ],
     "formal": {
@@ -288,6 +319,18 @@
         "episodes_per_replicate": 8,
         "transitions_per_replicate": 1600,
         "purpose": "task-A training experience"
+      },
+      "collect_irrelevant": {
+        "task": "task_irrelevant",
+        "episodes_per_replicate": 8,
+        "transitions_per_replicate": 1600,
+        "purpose": "independent-oscillator training experience for the isolated nuisance-process control"
+      },
+      "predictive_validation_irrelevant": {
+        "task": "task_irrelevant",
+        "episodes_per_replicate": 8,
+        "transitions_per_replicate": 1600,
+        "purpose": "disjoint held-out manipulation check that the oscillator update learned its source process"
       },
       "predictive_validation_a": {
         "task": "task_a",
@@ -322,21 +365,21 @@
     }
   },
   "seed_schedule": {
-    "derivation_domain_version": "1.0.0",
-    "algorithm": "seed(namespace, replicate_master_seed, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.0.0|' + namespace + '|' + decimal(replicate_master_seed) + '|' + decimal(index)); the 1.0.0 seed-domain tag is intentionally retained by evidence-only protocol revision 1.1 so every pre-existing declared stream is unchanged",
+    "derivation_domain_version": "1.3.0",
+    "algorithm": "seed(namespace, replicate_master_seed, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.3.0|' + namespace + '|' + decimal(replicate_master_seed) + '|' + decimal(index))",
     "formal_replicate_master_seeds": [
-      104729,
-      130363,
-      155921,
-      181081,
-      206369,
-      232003,
-      257371,
-      283009
+      17123296,
+      3280610186,
+      2725263418,
+      3124246399,
+      4093604926,
+      3908390087,
+      3332986400,
+      724244869
     ],
     "development_replicate_master_seeds": [
-      101,
-      211
+      3625750835,
+      2671781227
     ],
     "namespaces": {
       "model_initialization": {
@@ -348,6 +391,14 @@
       "collection_action": {
         "count": 2,
         "index_meaning": "0=task_a, 1=task_b"
+      },
+      "irrelevant_collection_action": {
+        "count": 1,
+        "index_meaning": "0=independent_phase_oscillator"
+      },
+      "predictive_validation_irrelevant_action": {
+        "count": 1,
+        "index_meaning": "0=independent_phase_oscillator"
       },
       "predictive_validation_action": {
         "count": 2,
@@ -373,6 +424,12 @@
         "count": 1
       },
       "collect_a_episode": {
+        "count": 8
+      },
+      "collect_irrelevant_episode": {
+        "count": 8
+      },
+      "predictive_validation_irrelevant_episode": {
         "count": 8
       },
       "predictive_validation_a_episode": {
@@ -403,6 +460,14 @@
       "episodes": 8,
       "environment_steps": 1600
     },
+    "irrelevant_control_collection_per_replicate": {
+      "episodes": 8,
+      "environment_steps": 1600
+    },
+    "irrelevant_control_prediction_validation_per_replicate": {
+      "episodes": 8,
+      "environment_steps": 1600
+    },
     "prediction_validation_per_task_per_replicate": {
       "episodes": 8,
       "environment_steps": 1600
@@ -413,7 +478,7 @@
     },
     "gradient_updates_per_phase": 2000,
     "batch_size": 256,
-    "matched_compute_rule": "Learned, corrupted-target, replay, and naive-sequential conditions use identical architecture, initialization, batch size, optimizer-step count, and planner budget. Frozen performs zero optimizer steps but uses the identical evaluation planner budget.",
+    "matched_compute_rule": "Task-A, corrupted-target, irrelevant-evidence, replay, and naive-sequential conditions use identical architecture, batch size, optimizer-step count, and planner budget. Task-A, corrupted-target, and irrelevant-evidence all fork the exact cold compound state. Task-A and irrelevant-evidence have equal 1,600-transition datasets and byte-identical optimizer sample-index schedules. Frozen performs zero optimizer steps but uses the identical evaluation planner budget.",
     "budget_overrun_rule": "Any formal overrun, early stop, extra data, extra optimizer step, or extra hyperparameter search fails K0. Resource telemetry may not redefine a budget after outcomes."
   },
   "controls": {
@@ -422,8 +487,14 @@
       "implementation": "clone the cold checkpoint; consume no gradient update; use identical held-out evaluation and MPC budgets"
     },
     "corrupted_target": {
-      "purpose": "tests whether correct transition linkage, rather than optimizer activity or target marginals, explains prediction and behavior",
-      "implementation": "apply one seeded permutation to the joint fixed-scaled (delta_cos_theta, delta_sin_theta, delta_angular_velocity, reward) training-target vector across collect_a while leaving inputs, learned-target marginals, transition counts, initialization, minibatch schedule, and update budget matched"
+      "purpose": "tests whether correct transition linkage, rather than optimizer activity or target marginals, explains held-out predictive improvement",
+      "implementation": "apply one seeded permutation to the joint fixed-scaled (delta_cos_theta, delta_sin_theta, delta_angular_velocity, reward) training-target vector across collect_a while leaving inputs, learned-target marginals, transition counts, initialization, minibatch schedule, and update budget matched; its executed behavior is retained as descriptive evidence but is not a killing behavioral comparison"
+    },
+    "irrelevant_evidence": {
+      "purpose": "tests whether valid experience from this specified independent nuisance process plus matched optimizer activity is sufficient to explain the task-A gain",
+      "implementation": "fork the exact cold compound state; collect 1,600 transitions from the independent phase oscillator in isolated custody; train 2,000 AdamW steps with task-A bootstrap and minibatch streams; preserve after-irrelevant bytes; require those bytes to improve NLL over cold on a separate 1,600-transition oscillator validation split; then evaluate the same bytes on the paired held-out task-A prediction and control budgets",
+      "manipulation_check": "Across eight formal replicates, NLL_irrelevant(cold) - NLL_irrelevant(after_irrelevant) must have mean at least 0.05 nats/target-dimension and a two-sided 95% Student-t interval with lower bound strictly greater than zero.",
+      "hard_negative_note": "The oscillator shares circular coordinates and is learnable by the same architecture, so generic representation transfer is possible. It simultaneously differs from task A in context, action causality, reward, velocity, and target marginals. Passing therefore supports only that task-A evidence beats this declared learned nuisance process; it is not a general theorem that every causally irrelevant dataset would lose."
     },
     "naive_sequential": {
       "purpose": "demonstrates actual A/B interference and supplies the no-retention baseline",
@@ -442,7 +513,10 @@
     {
       "index": 0,
       "name": "bind_and_initialize",
-      "output_checkpoint": "cold"
+      "outputs": [
+        "cold",
+        "cold_irrelevant_fork"
+      ]
     },
     {
       "index": 1,
@@ -451,8 +525,9 @@
     },
     {
       "index": 2,
-      "name": "evaluate_cold_a",
-      "learning_allowed": false
+      "name": "collect_irrelevant",
+      "live_checkpoint": "cold_irrelevant_fork",
+      "custody": "isolated_control"
     },
     {
       "index": 3,
@@ -462,24 +537,45 @@
     },
     {
       "index": 4,
-      "name": "evaluate_after_a",
-      "tasks": [
-        "task_a",
-        "task_b"
-      ],
-      "learning_allowed": false
+      "name": "train_a_irrelevant_transaction",
+      "input_checkpoint": "cold_irrelevant_fork",
+      "output_checkpoint": "irrelevant"
     },
     {
       "index": 5,
-      "name": "run_frozen_and_corrupted_a_controls"
+      "name": "validate_irrelevant_learning_and_run_frozen_and_corrupted_a_controls",
+      "required_comparison": "held-out oscillator NLL of irrelevant checkpoint versus cold checkpoint"
     },
     {
       "index": 6,
+      "name": "evaluate_paired_a_conditions",
+      "tasks": [
+        "task_a"
+      ],
+      "conditions": [
+        "cold",
+        "frozen",
+        "corrupted",
+        "irrelevant",
+        "after_a",
+        "random",
+        "oracle"
+      ],
+      "learning_allowed": false,
+      "replay_writes_allowed": false
+    },
+    {
+      "index": 7,
+      "name": "evaluate_after_a_on_task_b",
+      "learning_allowed": false
+    },
+    {
+      "index": 8,
       "name": "collect_b",
       "live_checkpoint": "after_a"
     },
     {
-      "index": 7,
+      "index": 9,
       "name": "fork_post_a_checkpoint",
       "outputs": [
         "replay_candidate",
@@ -487,17 +583,17 @@
       ]
     },
     {
-      "index": 8,
+      "index": 10,
       "name": "train_b_replay_transaction",
       "output_checkpoint": "after_b_replay"
     },
     {
-      "index": 9,
+      "index": 11,
       "name": "train_b_naive_transaction",
       "output_checkpoint": "after_b_naive"
     },
     {
-      "index": 10,
+      "index": 12,
       "name": "evaluate_after_b",
       "tasks": [
         "task_a",
@@ -506,17 +602,26 @@
       "learning_allowed": false
     },
     {
-      "index": 11,
+      "index": 13,
       "name": "checkpoint_after_b_replay"
     },
     {
-      "index": 12,
+      "index": 14,
       "name": "restore_fresh_process_and_evaluate",
       "tasks": [
         "task_a",
         "task_b"
       ],
-      "learning_allowed": false
+      "learning_allowed": false,
+      "required_raw_evidence": [
+        "live_evaluation",
+        "restored_evaluation"
+      ]
+    },
+    {
+      "index": 15,
+      "name": "independently_reopen_and_compare_both_restart_traces",
+      "producer_summary_is_not_authoritative": true
     }
   ],
   "metrics": {
@@ -548,6 +653,35 @@
         "validity": "oracle_mean_return must exceed random_mean_return by at least 100 return units"
       }
     },
+    "causal_specificity": {
+      "manipulation_check": {
+        "name": "irrelevant_source_nll_improvement_after_irrelevant_vs_cold",
+        "formula": "NLL_independent_oscillator(cold) - NLL_independent_oscillator(after_irrelevant) on the disjoint predictive_validation_irrelevant split",
+        "higher_is_better": true
+      },
+      "primary": [
+        {
+          "name": "a_nll_improvement_after_a_vs_irrelevant",
+          "formula": "NLL_A(after_irrelevant) - NLL_A(after_a)",
+          "higher_is_better": true
+        },
+        {
+          "name": "a_return_improvement_after_a_vs_irrelevant",
+          "formula": "mean_return_A(after_a) - mean_return_A(after_irrelevant) on paired reset seeds",
+          "higher_is_better": true
+        }
+      ],
+      "descriptive": [
+        {
+          "name": "a_irrelevant_nll_improvement_vs_frozen",
+          "formula": "NLL_A(frozen) - NLL_A(after_irrelevant)"
+        },
+        {
+          "name": "a_irrelevant_return_improvement_vs_frozen",
+          "formula": "mean_return_A(after_irrelevant) - mean_return_A(frozen)"
+        }
+      ]
+    },
     "retention": {
       "name": "seed_level_retained_a_gain_fraction",
       "formula": "For each formal replicate i: (A_after_B_replay_i - A_cold_i) / (A_after_A_i - A_cold_i), using the 32-episode paired mean returns.",
@@ -568,11 +702,13 @@
       "protocol raw-byte SHA-256 equals SEALED_PROTOCOL.sha256",
       "formal binding was sealed before the first formal environment reset",
       "exactly 8 complete formal replicates and every declared episode, transition, optimizer step, control, seed, and resource record are present",
+      "each replicate contains exactly 496 real episodes, 99,200 real transitions, 20 policy runs, 12 predictive rows, 7 evaluated checkpoints, 5 committed updates plus the rejected probe, and 5 optimizer manifests",
       "source tree is clean at the bound commit and dependency/runtime hashes match the formal binding"
     ],
     "k1_trace_and_isolation": [
       "100% unique real transition IDs",
-      "100% of learner-consumed transition IDs resolve to eligible collect_a or collect_b real ExperienceEvents",
+      "100% of persistent-agent learner-consumed transition IDs resolve to eligible collect_a or collect_b real ExperienceEvents; 100% of irrelevant-control IDs resolve only to collect_irrelevant",
+      "0 collect_irrelevant IDs, receipts, optimizer state, or checkpoint bytes occur in persistent A/B replay or the K7 checkpoint",
       "0 prediction-validation or behavior-evaluation transition IDs occur in any replay sample, optimizer batch, fitted statistic, or candidate update",
       "0 imagined transitions occur in the real-experience namespace",
       "100% action-time model and parameter digests match the live committed checkpoint"
@@ -584,10 +720,14 @@
       "the first post-commit prediction and every later evaluation prediction bind the new committed parameter digest"
     ],
     "k3_predictive_learning": {
+      "irrelevant_source_vs_cold_mean_nll_improvement_min": 0.05,
+      "irrelevant_source_vs_cold_nll_improvement_ci_lower_strictly_greater_than": 0.0,
       "a_vs_frozen_mean_nll_improvement_min": 0.05,
       "a_vs_frozen_nll_improvement_ci_lower_strictly_greater_than": 0.0,
       "a_vs_corrupted_mean_nll_improvement_min": 0.05,
       "a_vs_corrupted_nll_improvement_ci_lower_strictly_greater_than": 0.0,
+      "a_vs_irrelevant_mean_nll_improvement_min": 0.05,
+      "a_vs_irrelevant_nll_improvement_ci_lower_strictly_greater_than": 0.0,
       "after_a_90_percent_interval_coverage_bounds_inclusive": [
         0.7,
         0.99
@@ -598,6 +738,8 @@
       "after_a_vs_cold_return_improvement_ci_lower_strictly_greater_than": 0.0,
       "after_a_vs_frozen_mean_return_improvement_min": 100.0,
       "after_a_vs_frozen_return_improvement_ci_lower_strictly_greater_than": 0.0,
+      "after_a_vs_irrelevant_mean_return_improvement_min": 100.0,
+      "after_a_vs_irrelevant_return_improvement_ci_lower_strictly_greater_than": 0.0,
       "after_a_oracle_normalized_score_min": 0.2,
       "oracle_vs_random_mean_return_gap_min": 100.0
     },
@@ -640,7 +782,8 @@
       "prediction_max_absolute_difference": 0.0,
       "action_max_absolute_difference": 0.0,
       "episode_return_max_absolute_difference": 0.0,
-      "identity_or_lineage_mismatches_allowed": 0
+      "identity_or_lineage_mismatches_allowed": 0,
+      "raw_trace_custody": "Both the original live evaluation and fresh-process restored evaluation must be preserved as content-addressed canonical JSON sidecars. The independent auditor must reopen both, recompute all identity, prediction, action, return, process, reset-seed, and component comparisons, and reject reliance on producer-derived parity scalars."
     }
   },
   "killing_order": [
@@ -702,7 +845,8 @@
         "Git tree SHA",
         "implementation manifest mapping every executed source file to SHA-256",
         "environment-wrapper source SHA-256",
-        "conformance-test report SHA-256"
+        "Pendulum conformance-test report SHA-256",
+        "independent oscillator source SHA-256 and deterministic conformance-test report SHA-256"
       ]
     },
     "dependencies": {
@@ -763,8 +907,8 @@
     "development": {
       "purpose": "implementation debugging, feasibility measurement, and failure diagnosis",
       "master_seeds": [
-        101,
-        211
+        3625750835,
+        2671781227
       ],
       "budgets": "may be smaller than formal and must be labeled in raw results",
       "tuning_allowed": true,
@@ -775,14 +919,14 @@
     "formal": {
       "purpose": "single confirmatory evidence program",
       "master_seeds": [
-        104729,
-        130363,
-        155921,
-        181081,
-        206369,
-        232003,
-        257371,
-        283009
+        17123296,
+        3280610186,
+        2725263418,
+        3124246399,
+        4093604926,
+        3908390087,
+        3332986400,
+        724244869
       ],
       "budgets": "exactly those declared in this protocol",
       "tuning_allowed": false,
@@ -800,6 +944,7 @@
       "one transition lineage record per training and predictive-validation transition",
       "one optimizer-step ancestry record or content-addressed batch manifest per step",
       "one checkpoint component record per stateful component",
+      "content-addressed canonical live and fresh-process restored evaluation traces",
       "one gate observation per predeclared threshold"
     ],
     "content_hash_rule": "Unless a binary tensor format is explicitly bound, hash UTF-8 JSON serialized with sorted keys, separators=(',', ':'), ensure_ascii=false, allow_nan=false, and no insignificant whitespace. A JSONL manifest hashes those canonical records in declared order, each followed by one LF byte.",
@@ -807,7 +952,8 @@
     "target_hash_rule": "A transition target hash covers the fixed-scaled [delta_cos_theta, delta_sin_theta, delta_angular_velocity, reward] vector serialized as four little-endian IEEE-754 float64 values.",
     "aggregation_rule": "The report must be mechanically derivable from raw evidence. A hand-entered aggregate without raw members is a K0 failure.",
     "producer_artifact_rule": "Create a new exclusive producer-attempt directory before the first reset. Preserve raw JSON, protocol and schema copies, binding, test and conformance reports, the exact bound implementation-source bytes, main and child process stdout/stderr, resource telemetry, checkpoint manifests, all content-addressed sidecars, and a complete producer manifest. Finalize this root before independent audit. Never resume, retry in place, repair, or overwrite it; failed attempts remain immutable evidence.",
-    "adjudication_package_rule": "The independent audit must remain outside the immutable producer root. After audit, create a second exclusive package whose canonical manifest binds the finalized producer-manifest digest, raw-result digest, independent-audit digest, auditor-source digest, formal-binding digest, and explicit review disposition. The producer root, external audit report, and adjudication manifest together form the formal evidence package; none may be overwritten in place.",
+    "restart_trace_rule": "The producer must persist the original live evaluation and restored evaluation separately before computing a parity summary. The independent audit reopens both bounded canonical payloads and recomputes every comparison; producer summary zeros are never sufficient evidence.",
+    "adjudication_package_rule": "The independent audit must remain outside the immutable producer root. After audit and separate semantic review, create a second exclusive package whose canonical manifest binds the finalized producer-manifest digest, raw-result digest, independent-audit digest, auditor-source digest, semantic-review digest, formal-binding digest, and explicit review disposition. The producer root, external audit report, semantic review, and adjudication manifest together form the formal evidence package; none may be overwritten in place.",
     "formal_artifact_rule": "Formal evidence uses two custody levels: an immutable pre-outcome producer root followed by an external independently generated adjudication package. No producer output may claim support, and no accepted disposition is valid unless the external audit is complete, passes, and independently recomputes K0 through K7."
   },
   "independent_audit": {
@@ -819,11 +965,17 @@
       "all primary metrics from raw rows",
       "all confidence intervals and thresholds",
       "checkpoint component completeness and hashes",
-      "fresh-process identity and parity"
+      "fresh-process identity and parity by reopening both raw traces",
+      "oscillator-control environment dynamics, action independence, cold ancestry, optimizer-schedule matching, custody isolation, held-out own-process predictive learning, and task-A comparisons"
     ],
-    "claim_rule": "README, roadmap, publication, or capability claims may cite WM-001 only after an independent semantic audit accepts all K0-K7 gates."
+    "claim_rule": "README, roadmap, publication, or capability claims may cite WM-001 only after an independent artifact audit and a separate adversarial semantic review accept all K0-K7 gates. An automated zero-failure count alone is insufficient."
   },
   "sources": [
+    {
+      "role": "prespecified independent learned-source control semantics",
+      "name": "Prospect IndependentPhaseOscillator-v1",
+      "formal_binding": "exact runtime_lane.py source hash plus independently reproduced reset, trajectory, reward, horizon, provenance, and action-independence conformance digest"
+    },
     {
       "role": "environment semantics",
       "name": "Gymnasium Pendulum-v1",

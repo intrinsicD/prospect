@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v2.json",
+  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v3.json",
   "title": "WM-001 formal implementation binding",
   "type": "object",
   "additionalProperties": false,
@@ -13,12 +13,13 @@
     "dependencies",
     "runtime",
     "environment",
+    "irrelevant_control",
     "checkpoint_implementation",
     "formal_replicate_master_seeds"
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.formal-binding.v2"
+      "const": "prospect.world-model-lifecycle.formal-binding.v3"
     },
     "experiment_id": {
       "const": "WM-001"
@@ -34,7 +35,7 @@
       ],
       "properties": {
         "version": {
-          "const": "1.1.1"
+          "const": "1.3.0"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -264,6 +265,39 @@
         }
       }
     },
+    "irrelevant_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "source_id",
+        "source_sha256",
+        "conformance_report_file",
+        "conformance_report_bytes",
+        "conformance_report_sha256"
+      ],
+      "properties": {
+        "id": {
+          "const": "independent_phase_oscillator"
+        },
+        "source_id": {
+          "const": "prospect:IndependentPhaseOscillator-v1"
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "conformance_report_file": {
+          "$ref": "#/$defs/siblingFilename"
+        },
+        "conformance_report_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "conformance_report_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
     "checkpoint_implementation": {
       "type": "object",
       "additionalProperties": false,
@@ -302,14 +336,14 @@
     },
     "formal_replicate_master_seeds": {
       "const": [
-        104729,
-        130363,
-        155921,
-        181081,
-        206369,
-        232003,
-        257371,
-        283009
+        17123296,
+        3280610186,
+        2725263418,
+        3124246399,
+        4093604926,
+        3908390087,
+        3332986400,
+        724244869
       ]
     }
   },

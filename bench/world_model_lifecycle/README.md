@@ -25,16 +25,24 @@ remains unproven until a finalized formal artifact passes the independent
 artifact audit and a separate semantic results review accepts every killing gate
 K0 through K7.
 
-Protocol 1.1.1 supersedes 1.1.0 before any formal outcome was generated. The
-patch separates the immutable producer root from the later independent
-adjudication package, makes the implementation-file manifest complete by
-construction, preserves the exact bound source bytes, and makes the 1,024-case
-environment-conformance budget unbypassable. It does not change tasks, model,
-optimizer, planner, controls, master seeds, budgets, metrics, thresholds, or
-killing gates. Version 1.1.0 diagnostic artifacts remain identified by protocol
-SHA-256 `b5e2fb45c462dd8db08c35596e7c42d046444f21bfca12f4c0215b846b993e3e`;
-the preserved 1.0.0 protocol is identified by Git commit
-`a4e4733ba5f857a0bd88af7105183a143d305976`.
+Protocol 1.3.0 supersedes two non-accepted predecessors. The first v1.1.1
+formal artifact supports bounded K0–K6 pilot evidence, but adversarial review
+rejected the complete claim because the original live K7 trace was not retained
+and no learned independent-source control existed. Protocol 1.2.0 repaired
+those defects, but pre-formal review then found that it never verified that the
+new oscillator control had learned its own process. No v1.2.0 formal seed was
+opened; its two development replicates remain diagnostic only. Neither
+predecessor is repaired or relabeled.
+
+Version 1.3.0 preserves separate content-addressed live and restored K7 traces
+and uses an isolated independent phase-oscillator learner that forks the exact
+cold compound state, uses the same data count and optimizer index schedule as
+task A, and is evaluated on the same held-out task-A prediction and control
+budgets. A new disjoint oscillator validation split must first prove that this
+control learned its source process. The protocol uses a fresh derivation domain
+and transparently derived master seeds. The manipulation threshold reuses the
+existing predictive minimum-effect floor and was fixed before any v1.3.0
+development or formal outcome.
 
 ## What the experiment must establish
 
@@ -58,8 +66,8 @@ The evidence ladder is intentionally strict:
 |---|---|---|
 | Bind | K0 | Protocol, implementation, dependencies, runtime, seeds, and budgets are the predeclared ones. |
 | Collect | K1 | Real experience has unique lineage and training is isolated from validation, behavior, and imagined transitions. |
-| Learn | K2–K3 | A failure-atomic update changed the declared shared model from eligible experience, and correct experience beats frozen and corrupted controls on held-out predictive NLL. |
-| Improve | K4 | The updated model improves executed task-A return under the same frozen MPC and paired evaluation budget. |
+| Learn | K2–K3 | A failure-atomic update changed the declared shared model from eligible experience; the oscillator arm first learns its own held-out process; and task-A experience beats frozen, corrupted, and that verified learned-source control on held-out predictive NLL. |
+| Improve | K4 | The updated model improves executed task-A return beyond cold, frozen, and the verified oscillator-trained control under the same frozen MPC and paired evaluation budget. |
 | Interfere | K5 | The same weights learn task B, and the matched naive B-only path demonstrates that A/B interference is real. |
 | Retain | K6 | Balanced replay preserves the prespecified fraction of the A gain without an unacceptable loss of B plasticity. |
 | Persist | K7 | All 15 declared stateful components restore in another process with exact identity, prediction, action, and return parity. |
@@ -81,13 +89,16 @@ an intrinsic planning reward in WM-001.
 
 Each formal replicate follows the sealed sequence:
 
-1. initialize and preserve the cold shared model;
+1. initialize the cold shared model and fork an exact isolated control state;
 2. collect eight complete task-A episodes;
-3. evaluate cold held-out prediction;
+3. collect eight independent-oscillator episodes in isolated custody;
 4. prepare, validate, and commit the 2,000-step task-A update;
-5. reload immutable condition checkpoints and evaluate with learning and replay
-   writes disabled;
-6. run matched frozen and joint-target-permutation controls;
+5. train the matched oscillator arm, verify its disjoint own-process predictive
+   gain, and run the frozen and joint-target-permutation controls from their
+   cold forks;
+6. reload immutable cold, frozen, corrupted, irrelevant, and learned checkpoints
+   and evaluate them on identical held-out task-A budgets with learning and
+   replay writes disabled;
 7. collect eight complete task-B episodes through the same agent;
 8. fork the post-A state into balanced A/B replay and naive B-only updates;
 9. require the naive path to learn B and measurably forget A;
@@ -105,6 +116,12 @@ The required controls are:
 - **frozen cold model:** rules out collection or repeated evaluation alone;
 - **corrupted joint target:** preserves target marginals and optimizer budget
   while breaking the input/outcome relationship;
+- **independent learned-source evidence:** uses real, action-independent
+  oscillator experience with matched cold ancestry, transition count, optimizer
+  steps, sampled-index schedule, validation rows, planner budget, and behavior
+  resets; a separate held-out oscillator split first verifies that its update
+  learned. It is one prespecified nuisance process, not a universal
+  causal-relevance control;
 - **naive sequential learner:** demonstrates interference and provides the
   no-retention baseline;
 - **executed random policy:** supplies a paired lower bound; and
@@ -155,10 +172,11 @@ resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
 
-Development uses only seeds `101` and `211`, four collection episodes per task,
-eight validation episodes per task, two behavior episodes per condition, and
-300 optimizer steps per update. It is useful for correctness, feasibility, and
-failure diagnosis, but it is never claim-eligible and cannot be relabeled.
+Development uses only seeds `3625750835` and `2671781227`, four collection
+episodes per learned arm, eight validation episodes for each Pendulum task and
+the oscillator, two behavior episodes per condition, and 300 optimizer steps
+per update. It is useful for correctness, feasibility, and failure diagnosis,
+but it is never claim-eligible and cannot be relabeled.
 
 Formal execution uses the eight sealed master seeds and exact declared budgets.
 No tuning, exclusions, retries, early stopping, extra training, or analysis
@@ -204,7 +222,7 @@ A one-seed structural run is optional:
 DEV_SMOKE="bench/world_model_lifecycle/results/development/$(date -u +%Y%m%dT%H%M%SZ)-smoke-$$"
 python -m bench.world_model_lifecycle.run development \
   --device cuda \
-  --master-seed 101 \
+  --master-seed 3625750835 \
   --output "$DEV_SMOKE"
 python -m bench.world_model_lifecycle.verify result "$DEV_SMOKE/result.json"
 mkdir -p artifacts/wm001-audits
@@ -239,8 +257,9 @@ git status --short --untracked-files=all
 ```
 
 Create a fresh ignored evidence directory, preserve the final check output, and
-bind that clean commit. The binding function also runs 1,024 Pendulum conformance
-cases and refuses a dependency-lock or runtime mismatch.
+bind that clean commit. The binding function runs 1,024 Pendulum conformance
+cases plus 512 full 200-step paired-action oscillator cases and refuses a
+dependency-lock or runtime mismatch.
 
 ```bash
 BINDING_DIR="artifacts/wm001-binding-$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -268,9 +287,9 @@ PY
 python -m bench.world_model_lifecycle.verify binding "$BINDING"
 ```
 
-`create_formal_binding` writes content-addressed copies of the test and
-conformance reports beside `formal-binding.json`. It refuses to replace any
-existing binding evidence.
+`create_formal_binding` writes content-addressed copies of the test, Pendulum
+conformance, and oscillator conformance reports beside `formal-binding.json`.
+It refuses to replace any existing binding evidence.
 
 ### 4. Launch exactly one formal attempt
 
@@ -328,9 +347,9 @@ python -m bench.world_model_lifecycle.adjudication \
 The producer root is finalized before independent audit and is never modified
 afterward. The external adjudication package copies the exact audit report and
 binds it to the producer-manifest, result, auditor-source, and formal-binding
-digests. An `accepted` disposition is only created after the separate semantic
-results review; `pending` records the completed independent artifact audit
-without asserting the capability claim.
+digests. An `accepted` or `rejected` disposition additionally requires a
+canonical content-addressed semantic review; `pending` records the completed
+independent artifact audit without asserting the capability claim.
 
 The envelope verifier checks schemas, hashes, identities, seed derivation, split
 custody, update ancestry, budgets, gate order, and binding consistency. The

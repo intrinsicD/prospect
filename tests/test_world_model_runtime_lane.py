@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from collections.abc import Sequence
 from itertools import pairwise
 
@@ -8,10 +9,13 @@ import numpy as np
 import pytest
 
 from bench.world_model_lifecycle.runtime_lane import (
+    INDEPENDENT_OSCILLATOR_SOURCE,
+    IndependentPhaseOscillatorEnvironment,
     PendulumEpisodeSession,
     PresetActionController,
     RuntimeCustody,
     run_episode,
+    transition_lineage_row,
 )
 
 
@@ -43,6 +47,96 @@ class _SequenceController:
         action = self._actions[self._index]
         self._index += 1
         return action, 0.0
+
+
+def test_independent_phase_oscillator_has_exact_seeded_reset_and_dynamics() -> None:
+    environment = IndependentPhaseOscillatorEnvironment()
+    initial, reset_info = environment.reset(seed=710_003)
+
+    np.testing.assert_allclose(
+        initial,
+        np.asarray([0.9428705678878576, -0.3331592595303768, 1.2768786504270468]),
+        rtol=0.0,
+        atol=1e-15,
+    )
+    assert reset_info == {"reset_seed": 710_003}
+    phase = math.atan2(float(initial[1]), float(initial[0]))
+    expected_phase = phase + environment.STEP_SECONDS * float(initial[2])
+    next_observation, reward, terminated, truncated, step_info = environment.step(np.asarray([1.75], dtype=np.float32))
+    np.testing.assert_allclose(
+        next_observation,
+        np.asarray([math.cos(expected_phase), math.sin(expected_phase), initial[2]]),
+        rtol=0.0,
+        atol=1e-15,
+    )
+    assert reward == pytest.approx(math.cos(expected_phase), abs=1e-15)
+    assert (terminated, truncated, step_info) == (False, False, {"step_index": 1})
+    assert np.isfinite(next_observation).all()
+    assert -1.0 <= reward <= 1.0
+
+    repeated, _ = environment.reset(seed=710_003)
+    np.testing.assert_array_equal(repeated, initial)
+
+
+def test_independent_phase_oscillator_is_action_independent_for_full_horizon() -> None:
+    left = IndependentPhaseOscillatorEnvironment()
+    right = IndependentPhaseOscillatorEnvironment()
+    left_initial, _ = left.reset(seed=810_007)
+    right_initial, _ = right.reset(seed=810_007)
+    np.testing.assert_array_equal(left_initial, right_initial)
+
+    for step_index in range(200):
+        left_step = left.step(np.asarray([-2.0], dtype=np.float32))
+        right_step = right.step(np.asarray([2.0], dtype=np.float32))
+        np.testing.assert_array_equal(left_step[0], right_step[0])
+        assert left_step[1:] == right_step[1:]
+        assert left_step[2] is False
+        assert left_step[3] is (step_index == 199)
+    with pytest.raises(RuntimeError, match="200-step horizon"):
+        left.step(np.asarray([0.0], dtype=np.float32))
+
+
+def test_independent_phase_oscillator_uses_canonical_runtime_evidence() -> None:
+    actions = np.linspace(-2.0, 2.0, 200)
+    custody = RuntimeCustody.create("wm001-independent-oscillator")
+    episode, _ = run_episode(
+        run_id="independent-control",
+        task_id="independent_phase_oscillator",
+        episode_id="independent-control:episode:0",
+        reset_seed=910_009,
+        controller=_SequenceController(actions),
+        backend=_StaticBackend(),
+        custody=custody,
+    )
+
+    assert len(episode.transitions) == 200
+    assert episode.intended_actions == tuple(float(action) for action in actions)
+    assert episode.applied_actions == (0.0,) * 200
+    assert all(not transition.experience.terminated for transition in episode.transitions)
+    assert all(not transition.experience.truncated for transition in episode.transitions[:-1])
+    assert episode.transitions[-1].experience.truncated
+    assert custody.ledger.transition_count == len(custody.store) == 200
+
+    first = episode.transitions[0]
+    reset = first.experience.decision.belief.information_set.observations[0]
+    assert reset.modality == "independent_phase_oscillator_reset_state"
+    assert reset.evidence.lineage.provenance.source_id == f"{INDEPENDENT_OSCILLATOR_SOURCE}:reset"
+    for transition in episode.transitions:
+        event = transition.experience
+        observation = event.observation
+        outcome = event.outcome
+        physical = np.asarray(observation.evidence.payload["physical_observation"], dtype=np.float64)
+        assert event.task_id == "independent_phase_oscillator"
+        assert observation.modality == "independent_phase_oscillator_state"
+        assert observation.evidence.payload["task_context"] == 2.0
+        assert observation.evidence.lineage.provenance.source_id == INDEPENDENT_OSCILLATOR_SOURCE
+        assert outcome.evidence.lineage.provenance.source_id == INDEPENDENT_OSCILLATOR_SOURCE
+        assert outcome.evidence.payload["applied_torque"] == 0.0
+        assert np.isfinite(physical).all()
+        assert -1.0 <= float(outcome.evidence.payload["reward"]) <= 1.0
+        lineage = transition_lineage_row(transition, split="irrelevant_evidence")
+        assert lineage["task_context"] == 2.0
+        assert lineage["applied_action"] == 0.0
 
 
 def test_two_interleaved_episode_sessions_match_sequential_authoritative_runs() -> None:

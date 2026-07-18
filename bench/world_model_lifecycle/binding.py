@@ -21,6 +21,10 @@ from packaging.requirements import Requirement
 from .artifact import atomic_write_exclusive
 from .checkpoint import canonical_json_bytes, manifest_schema_sha256
 from .planning import run_pendulum_conformance
+from .runtime_lane import (
+    INDEPENDENT_OSCILLATOR_SOURCE,
+    run_independent_phase_oscillator_conformance,
+)
 from .verify import (
     BINDING_SCHEMA_PATH,
     FORMAL_SEEDS,
@@ -49,6 +53,8 @@ CHECKPOINT_IMPLEMENTATION_SOURCES = (
 FORMAL_CONFORMANCE_CASES = 1024
 FORMAL_CONFORMANCE_SAMPLES_PER_TASK = 512
 FORMAL_CONFORMANCE_SEED = 20260717
+FORMAL_OSCILLATOR_CONFORMANCE_CASES = 512
+FORMAL_OSCILLATOR_CONFORMANCE_SEED = 20260718
 FORMAL_CONFORMANCE_TOLERANCES = {
     "observation_atol": 2e-6,
     "reward_atol": 1e-9,
@@ -310,6 +316,16 @@ def create_formal_binding(
     conformance_digest = hashlib.sha256(conformance_bytes).hexdigest()
     conformance_filename = f"pendulum-conformance-{conformance_digest[:16]}.json"
     conformance_path = output_path.with_name(conformance_filename)
+    oscillator_conformance = run_independent_phase_oscillator_conformance(
+        cases=FORMAL_OSCILLATOR_CONFORMANCE_CASES,
+        seed=FORMAL_OSCILLATOR_CONFORMANCE_SEED,
+    )
+    if oscillator_conformance.get("passed") is not True:
+        raise RuntimeError("independent oscillator conformance did not pass")
+    oscillator_conformance_bytes = canonical_json_bytes(oscillator_conformance) + b"\n"
+    oscillator_conformance_digest = hashlib.sha256(oscillator_conformance_bytes).hexdigest()
+    oscillator_conformance_filename = f"oscillator-conformance-{oscillator_conformance_digest[:16]}.json"
+    oscillator_conformance_path = output_path.with_name(oscillator_conformance_filename)
     test_report_bytes = test_report_path.read_bytes()
     if not test_report_bytes:
         raise RuntimeError("formal binding test report must not be empty")
@@ -317,7 +333,11 @@ def create_formal_binding(
     test_report_suffix = test_report_path.suffix or ".txt"
     test_report_filename = f"formal-test-report-{test_report_digest[:16]}{test_report_suffix}"
     preserved_test_report_path = output_path.with_name(test_report_filename)
-    for candidate in (conformance_path, preserved_test_report_path):
+    for candidate in (
+        conformance_path,
+        oscillator_conformance_path,
+        preserved_test_report_path,
+    ):
         if candidate.exists():
             raise FileExistsError(f"refusing to replace formal binding evidence: {candidate}")
 
@@ -333,10 +353,10 @@ def create_formal_binding(
     verify_lockfile_rows(packages)
     accelerator = torch.cuda.get_device_name(0) if device == "cuda" else None
     binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v2",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v3",
         "experiment_id": "WM-001",
         "protocol": {
-            "version": "1.1.1",
+            "version": "1.3.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),
@@ -379,6 +399,14 @@ def create_formal_binding(
             "conformance_report_bytes": len(conformance_bytes),
             "conformance_report_sha256": conformance_digest,
         },
+        "irrelevant_control": {
+            "id": "independent_phase_oscillator",
+            "source_id": INDEPENDENT_OSCILLATOR_SOURCE,
+            "source_sha256": sha256_file(Path(__file__).with_name("runtime_lane.py")),
+            "conformance_report_file": oscillator_conformance_filename,
+            "conformance_report_bytes": len(oscillator_conformance_bytes),
+            "conformance_report_sha256": oscillator_conformance_digest,
+        },
         "checkpoint_implementation": {
             "serializer_source_sha256": checkpoint_implementation_sha256(),
             "manifest_schema_sha256": manifest_schema_sha256(),
@@ -411,6 +439,10 @@ def create_formal_binding(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_exclusive(preserved_test_report_path, test_report_bytes)
     atomic_write_exclusive(conformance_path, conformance_bytes)
+    atomic_write_exclusive(
+        oscillator_conformance_path,
+        oscillator_conformance_bytes,
+    )
     atomic_write_exclusive(output_path, canonical_json_bytes(binding) + b"\n")
     return binding
 

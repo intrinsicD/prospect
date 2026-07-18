@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-raw-result-v2.json",
+  "$id": "https://prospect.local/schemas/wm-001-raw-result-v3.json",
   "title": "WM-001 raw evidence and derived result",
   "type": "object",
   "additionalProperties": false,
@@ -22,13 +22,13 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.raw-result.v2"
+      "const": "prospect.world-model-lifecycle.raw-result.v3"
     },
     "experiment_id": {
       "const": "WM-001"
     },
     "protocol_version": {
-      "const": "1.1.1"
+      "const": "1.3.0"
     },
     "protocol_sha256": {
       "$ref": "#/$defs/sha256"
@@ -169,7 +169,46 @@
           },
           "replicates": {
             "minItems": 8,
-            "maxItems": 8
+            "maxItems": 8,
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/replicate"
+                },
+                {
+                  "properties": {
+                    "derived_seeds": {
+                      "minItems": 21,
+                      "maxItems": 21
+                    },
+                    "episodes": {
+                      "minItems": 496,
+                      "maxItems": 496
+                    },
+                    "transitions": {
+                      "minItems": 99200,
+                      "maxItems": 99200
+                    },
+                    "updates": {
+                      "minItems": 6,
+                      "maxItems": 6
+                    },
+                    "optimizer_batch_manifests": {
+                      "minItems": 5,
+                      "maxItems": 5
+                    },
+                    "predictive_metrics": {
+                      "minItems": 12,
+                      "maxItems": 12
+                    },
+                    "policy_runs": {
+                      "minItems": 20,
+                      "maxItems": 20
+                    }
+                  }
+                }
+              ]
+            }
           }
         }
       },
@@ -226,7 +265,8 @@
             "train_a",
             "train_b_replay",
             "train_b_naive",
-            "train_a_corrupted"
+            "train_a_corrupted",
+            "train_a_irrelevant"
           ]
         }
       }
@@ -315,7 +355,8 @@
         "task_id": {
           "enum": [
             "pendulum_normal_torque",
-            "pendulum_reversed_torque"
+            "pendulum_reversed_torque",
+            "independent_phase_oscillator"
           ]
         },
         "split": {
@@ -324,6 +365,8 @@
             "predictive_validation_a",
             "behavior_evaluation_a",
             "collect_b",
+            "collect_irrelevant",
+            "predictive_validation_irrelevant",
             "predictive_validation_b",
             "behavior_evaluation_b"
           ]
@@ -336,6 +379,7 @@
             "after_a",
             "frozen",
             "corrupted",
+            "irrelevant",
             "after_b_replay",
             "after_b_naive",
             "random",
@@ -348,6 +392,7 @@
             "after_a",
             "frozen",
             "corrupted",
+            "irrelevant",
             "after_b_replay",
             "after_b_naive",
             "random",
@@ -449,18 +494,28 @@
         "task_id": {
           "enum": [
             "pendulum_normal_torque",
-            "pendulum_reversed_torque"
+            "pendulum_reversed_torque",
+            "independent_phase_oscillator"
           ]
         },
         "task_context": {
           "enum": [
             0.0,
-            1.0
+            1.0,
+            2.0
           ]
         },
         "split": {
-          "type": "string",
-          "minLength": 1
+          "enum": [
+            "collect_a",
+            "predictive_validation_a",
+            "behavior_evaluation_a",
+            "collect_b",
+            "collect_irrelevant",
+            "predictive_validation_irrelevant",
+            "predictive_validation_b",
+            "behavior_evaluation_b"
+          ]
         },
         "step_index": {
           "type": "integer",
@@ -566,6 +621,7 @@
             "train_b_replay",
             "train_b_naive",
             "train_a_corrupted",
+            "train_a_irrelevant",
             "rejected_update_probe"
           ]
         },
@@ -597,7 +653,8 @@
           "items": {
             "enum": [
               "collect_a",
-              "collect_b"
+              "collect_b",
+              "collect_irrelevant"
             ]
           }
         },
@@ -720,7 +777,8 @@
         "task_id": {
           "enum": [
             "pendulum_normal_torque",
-            "pendulum_reversed_torque"
+            "pendulum_reversed_torque",
+            "independent_phase_oscillator"
           ]
         },
         "condition": {
@@ -729,6 +787,7 @@
             "after_a",
             "frozen",
             "corrupted",
+            "irrelevant",
             "after_b_replay",
             "after_b_naive"
           ]
@@ -739,6 +798,7 @@
             "after_a",
             "frozen",
             "corrupted",
+            "irrelevant",
             "after_b_replay",
             "after_b_naive"
           ]
@@ -756,6 +816,7 @@
         "split": {
           "enum": [
             "predictive_validation_a",
+            "predictive_validation_irrelevant",
             "predictive_validation_b"
           ]
         },
@@ -817,7 +878,8 @@
         "task_id": {
           "enum": [
             "pendulum_normal_torque",
-            "pendulum_reversed_torque"
+            "pendulum_reversed_torque",
+            "independent_phase_oscillator"
           ]
         },
         "split": {
@@ -826,6 +888,8 @@
             "predictive_validation_a",
             "behavior_evaluation_a",
             "collect_b",
+            "collect_irrelevant",
+            "predictive_validation_irrelevant",
             "predictive_validation_b",
             "behavior_evaluation_b"
           ]
@@ -838,6 +902,7 @@
             "after_a",
             "frozen",
             "corrupted",
+            "irrelevant",
             "after_b_replay",
             "after_b_naive",
             "random",
@@ -850,6 +915,7 @@
             "after_a",
             "frozen",
             "corrupted",
+            "irrelevant",
             "after_b_replay",
             "after_b_naive",
             "random",
@@ -964,6 +1030,7 @@
             "cold",
             "frozen",
             "corrupted",
+            "irrelevant",
             "after_a",
             "after_b_replay",
             "after_b_naive"
@@ -1055,7 +1122,9 @@
         "identity_or_lineage_mismatches",
         "prediction_max_abs_difference",
         "action_max_abs_difference",
-        "episode_return_max_abs_difference"
+        "episode_return_max_abs_difference",
+        "live_evaluation",
+        "restored_evaluation"
       ],
       "properties": {
         "checkpoint_manifest_sha256": {
@@ -1094,6 +1163,12 @@
         "episode_return_max_abs_difference": {
           "type": "number",
           "minimum": 0.0
+        },
+        "live_evaluation": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "restored_evaluation": {
+          "$ref": "#/$defs/fileRef"
         }
       }
     },
@@ -1168,8 +1243,8 @@
         },
         "evaluated_checkpoints": {
           "type": "array",
-          "minItems": 6,
-          "maxItems": 6,
+          "minItems": 7,
+          "maxItems": 7,
           "items": {
             "$ref": "#/$defs/evaluatedCheckpoint"
           }

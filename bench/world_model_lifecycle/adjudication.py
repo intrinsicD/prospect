@@ -1,9 +1,10 @@
 """External, immutable adjudication packages for finalized WM-001 evidence.
 
 The producer artifact is the first custody level.  This module creates a
-separate second level after an independent audit has completed.  The package
-copies the audit report verbatim and binds its bytes to the finalized producer
-manifest, raw result, auditor source, and (for formal runs) pre-run binding.
+separate second level after an independent audit and semantic review have
+completed.  The package copies both reports verbatim and binds their bytes to
+the finalized producer manifest, raw result, auditor source, and pre-run
+binding.
 """
 
 from __future__ import annotations
@@ -30,10 +31,12 @@ AUDITOR_SOURCE_PATH = HERE / "artifact_audit.py"
 AUDITOR_SOURCE_NAME = "bench/world_model_lifecycle/artifact_audit.py"
 ADJUDICATION_MANIFEST_NAME = "adjudication-manifest.json"
 COPIED_AUDIT_NAME = "independent-audit-report.json"
+COPIED_SEMANTIC_REVIEW_NAME = "semantic-review.json"
 
 _MAX_PRODUCER_MANIFEST_BYTES = 64 << 20
 _MAX_RESULT_BYTES = 4 << 30
 _MAX_AUDIT_BYTES = 64 << 20
+_MAX_SEMANTIC_REVIEW_BYTES = 16 << 20
 _MAX_AUDITOR_SOURCE_BYTES = 64 << 20
 _SHA256_LENGTH = 64
 _GATES = tuple(f"K{index}" for index in range(8))
@@ -165,10 +168,10 @@ def _verify_result_identity(
     result_payload: bytes,
 ) -> tuple[str, str | None]:
     if (
-        result.get("schema") != "prospect.world-model-lifecycle.raw-result.v2"
+        result.get("schema") != "prospect.world-model-lifecycle.raw-result.v3"
         or result.get("experiment_id") != "WM-001"
     ):
-        raise AdjudicationError("raw result is not a WM-001 raw-result v2 document")
+        raise AdjudicationError("raw result is not a WM-001 raw-result v3 document")
     lane = result.get("lane")
     if lane not in {"development", "formal"}:
         raise AdjudicationError("raw result lane is invalid")
@@ -298,12 +301,46 @@ def _verify_formal_auditor_snapshot(
         raise AdjudicationError("formal source snapshot and adjudication auditor source do not agree")
 
 
+def _verify_semantic_review(
+    review: Mapping[str, object],
+    *,
+    producer_root: Path,
+    result_sha256: str,
+    audit_sha256: str,
+    disposition: Disposition,
+) -> None:
+    if review.get("schema") != "prospect.wm001.semantic-review.v1":
+        raise AdjudicationError("semantic review has the wrong schema")
+    if (
+        review.get("artifact_root") != str(producer_root)
+        or review.get("result_sha256") != result_sha256
+        or review.get("independent_audit_sha256") != audit_sha256
+    ):
+        raise AdjudicationError("semantic review identifies different upstream evidence")
+    verdict = review.get("verdict")
+    if verdict not in {"accepted", "rejected"} or verdict != disposition:
+        raise AdjudicationError("semantic review verdict differs from adjudication disposition")
+    if not isinstance(review.get("reviewer"), str) or not review.get("reviewer"):
+        raise AdjudicationError("semantic review has no reviewer identity")
+    if not isinstance(review.get("conclusion"), str) or not review.get("conclusion"):
+        raise AdjudicationError("semantic review has no conclusion")
+    reviewed_gates = review.get("reviewed_gates")
+    if reviewed_gates != list(_GATES):
+        raise AdjudicationError("semantic review did not inspect K0 through K7 in order")
+    fatal_findings = review.get("fatal_findings")
+    if not isinstance(fatal_findings, list):
+        raise AdjudicationError("semantic review fatal_findings must be an array")
+    if disposition == "accepted" and fatal_findings:
+        raise AdjudicationError("accepted semantic review contains unresolved fatal findings")
+
+
 def create_adjudication_package(
     *,
     producer_root: Path,
     audit_report: Path,
     output_directory: Path,
     disposition: Disposition,
+    semantic_review: Path | None = None,
 ) -> dict[str, object]:
     """Create one external package without replacing any existing path."""
 
@@ -377,8 +414,48 @@ def create_adjudication_package(
             auditor_source_sha256=auditor_source_sha256,
         )
 
+    review_payload: bytes | None = None
+    review_sha256: str | None = None
+    review_path: Path | None = None
+    if semantic_review is not None:
+        review_path = _resolve_external_audit(semantic_review, producer_root=root)
+        review_payload = _read_regular_file(
+            review_path,
+            limit=_MAX_SEMANTIC_REVIEW_BYTES,
+            label="semantic review",
+        )
+        review = _parse_canonical_json_object(
+            review_payload,
+            label="semantic review",
+        )
+        review_sha256 = _sha256(review_payload)
+        _verify_semantic_review(
+            review,
+            producer_root=root,
+            result_sha256=result_sha256,
+            audit_sha256=audit_sha256,
+            disposition=disposition,
+        )
+    elif disposition in {"accepted", "rejected"}:
+        raise AdjudicationError(f"{disposition} adjudication requires a separate semantic review")
+
+    files = [
+        {
+            "path": COPIED_AUDIT_NAME,
+            "bytes": len(audit_payload),
+            "sha256": audit_sha256,
+        }
+    ]
+    if review_payload is not None and review_sha256 is not None:
+        files.append(
+            {
+                "path": COPIED_SEMANTIC_REVIEW_NAME,
+                "bytes": len(review_payload),
+                "sha256": review_sha256,
+            }
+        )
     manifest: dict[str, object] = {
-        "schema": "prospect.wm001.adjudication-package.v1",
+        "schema": "prospect.wm001.adjudication-package.v2",
         "experiment_id": "WM-001",
         "lane": lane,
         "disposition": disposition,
@@ -391,16 +468,12 @@ def create_adjudication_package(
         "audit_sha256": audit_sha256,
         "auditor_source_file": AUDITOR_SOURCE_NAME,
         "auditor_source_sha256": auditor_source_sha256,
+        "semantic_review_file": (COPIED_SEMANTIC_REVIEW_NAME if review_sha256 is not None else None),
+        "semantic_review_sha256": review_sha256,
         "formal_binding_file": ("formal-binding.json" if formal_binding_sha256 is not None else None),
         "formal_binding_sha256": formal_binding_sha256,
-        "files": [
-            {
-                "path": COPIED_AUDIT_NAME,
-                "bytes": len(audit_payload),
-                "sha256": audit_sha256,
-            }
-        ],
-        "file_count": 1,
+        "files": files,
+        "file_count": len(files),
         "manifest_excludes": [ADJUDICATION_MANIFEST_NAME],
     }
 
@@ -427,11 +500,26 @@ def create_adjudication_package(
             label="independent auditor source",
         )
         != auditor_source_payload
+        or (
+            review_path is not None
+            and review_payload is not None
+            and _read_regular_file(
+                review_path,
+                limit=_MAX_SEMANTIC_REVIEW_BYTES,
+                label="semantic review",
+            )
+            != review_payload
+        )
     ):
         raise AdjudicationError("upstream evidence changed before package publication")
 
     package.mkdir(mode=0o700, exist_ok=False)
     atomic_write_exclusive(package / COPIED_AUDIT_NAME, audit_payload)
+    if review_payload is not None:
+        atomic_write_exclusive(
+            package / COPIED_SEMANTIC_REVIEW_NAME,
+            review_payload,
+        )
     atomic_write_exclusive(
         package / ADJUDICATION_MANIFEST_NAME,
         _canonical_json_bytes(manifest) + b"\n",
@@ -448,6 +536,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--producer", required=True, type=Path)
     parser.add_argument("--audit", required=True, type=Path)
+    parser.add_argument("--semantic-review", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument(
         "--disposition",
@@ -465,6 +554,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             audit_report=arguments.audit,
             output_directory=arguments.output,
             disposition=arguments.disposition,
+            semantic_review=arguments.semantic_review,
         )
     except (ValueError, OSError) as error:
         print(f"adjudication package refused: {error}", file=sys.stderr)
@@ -476,6 +566,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 __all__ = (
     "ADJUDICATION_MANIFEST_NAME",
     "COPIED_AUDIT_NAME",
+    "COPIED_SEMANTIC_REVIEW_NAME",
     "AdjudicationError",
     "Disposition",
     "create_adjudication_package",

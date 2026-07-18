@@ -98,8 +98,10 @@ def test_formal_attempt_preserves_all_pre_outcome_inputs(tmp_path: Path) -> None
     binding_directory.mkdir()
     test_report = binding_directory / "tests.txt"
     conformance = binding_directory / "conformance.json"
+    oscillator_conformance = binding_directory / "oscillator-conformance.json"
     test_report.write_text("tests passed\n", encoding="utf-8")
     conformance.write_text('{"passed":true}\n', encoding="utf-8")
+    oscillator_conformance.write_text('{"passed":true}\n', encoding="utf-8")
     binding_path = binding_directory / "binding.json"
     binding_path.write_text(
         json.dumps(
@@ -109,6 +111,9 @@ def test_formal_attempt_preserves_all_pre_outcome_inputs(tmp_path: Path) -> None
                     "test_report_file": test_report.name,
                 },
                 "environment": {"conformance_report_file": conformance.name},
+                "irrelevant_control": {
+                    "conformance_report_file": oscillator_conformance.name,
+                },
             }
         ),
         encoding="utf-8",
@@ -128,6 +133,7 @@ def test_formal_attempt_preserves_all_pre_outcome_inputs(tmp_path: Path) -> None
         "requirements-wm001.lock",
         test_report.name,
         conformance.name,
+        oscillator_conformance.name,
         "source/Makefile",
     }
     assert expected <= {
@@ -146,6 +152,10 @@ def test_formal_cli_verifies_live_copied_binding_before_outcomes(
         '{"passed":true}\n',
         encoding="utf-8",
     )
+    (binding_directory / "oscillator-conformance.json").write_text(
+        '{"passed":true}\n',
+        encoding="utf-8",
+    )
     binding_path = binding_directory / "binding.json"
     binding_path.write_text(
         json.dumps(
@@ -155,6 +165,9 @@ def test_formal_cli_verifies_live_copied_binding_before_outcomes(
                     "test_report_file": "tests.txt",
                 },
                 "environment": {"conformance_report_file": "conformance.json"},
+                "irrelevant_control": {
+                    "conformance_report_file": "oscillator-conformance.json",
+                },
             }
         ),
         encoding="utf-8",
@@ -225,6 +238,10 @@ def test_formal_input_source_snapshot_rejects_bound_digest_change(
         '{"passed":true}\n',
         encoding="utf-8",
     )
+    (binding_directory / "oscillator-conformance.json").write_text(
+        '{"passed":true}\n',
+        encoding="utf-8",
+    )
     row = _implementation_row()
     row["sha256"] = "0" * 64
     binding_path = binding_directory / "binding.json"
@@ -237,6 +254,9 @@ def test_formal_input_source_snapshot_rejects_bound_digest_change(
                 },
                 "environment": {
                     "conformance_report_file": "conformance.json",
+                },
+                "irrelevant_control": {
+                    "conformance_report_file": "oscillator-conformance.json",
                 },
             }
         ),
@@ -260,7 +280,7 @@ def test_experiment_entrypoint_refuses_unowned_or_existing_output(
         )
 
     development = experiment_module.ExperimentConfig.development(
-        master_seeds=(101,),
+        master_seeds=(3625750835,),
         device="cpu",
     )
     with pytest.raises(FileExistsError):

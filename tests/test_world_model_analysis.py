@@ -20,17 +20,23 @@ from bench.world_model_lifecycle.verify import derive_seed
 HERE = Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle"
 TASK_A = "pendulum_normal_torque"
 TASK_B = "pendulum_reversed_torque"
+TASK_IRRELEVANT = "independent_phase_oscillator"
 ZERO = "0" * 64
 
 
-def test_evidence_only_revision_retains_v1_seed_domain() -> None:
-    assert derive_seed("model_initialization", 104729, 0) == 1_602_050_133
-    assert derive_seed("planner", 101, 0) == 420_727_259
-    assert derive_seed("collection_action", 211, 1) == 2_558_949_316
+def test_scientific_revision_uses_fresh_v130_seed_domain() -> None:
+    master = 3_625_750_835
+    assert derive_seed("model_initialization", master, 0) == 3_253_132_054
+    assert derive_seed("planner", master, 0) == 826_517_252
+    assert derive_seed("collection_action", master, 1) == 3_844_929_773
+    assert derive_seed("irrelevant_collection_action", master, 0) == 2_287_310_208
+    assert derive_seed("collect_irrelevant_episode", master, 0) == 3_635_045_576
+    assert derive_seed("predictive_validation_irrelevant_action", master, 0) == 2_172_027_332
+    assert derive_seed("predictive_validation_irrelevant_episode", master, 0) == 2_942_674_611
 
 
 def _seed(namespace: str, master: int, index: int) -> int:
-    payload = f"WM-001|1.0.0|{namespace}|{master}|{index}".encode()
+    payload = f"WM-001|1.3.0|{namespace}|{master}|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big")
 
 
@@ -96,7 +102,7 @@ def _episode(
             "run_id": run_id,
             "episode_id": episode_id,
             "task_id": task,
-            "task_context": 0.0 if task == TASK_A else 1.0,
+            "task_context": (0.0 if task == TASK_A else 1.0 if task == TASK_B else 2.0),
             "split": split,
             "step_index": step,
             "real_or_imagined": "real",
@@ -199,11 +205,12 @@ def _update(
 def _development_result() -> dict[str, Any]:
     protocol = json.loads((HERE / "protocol.json").read_text())
     protocol_sha = sha256((HERE / "protocol.json").read_bytes()).hexdigest()
-    master = 101
-    replicate_id = "dev-101"
+    master = 3_625_750_835
+    replicate_id = f"dev-{master}"
     cold = _digest("cold")
     after_a = _digest("after-a")
     corrupted = _digest("corrupted")
+    irrelevant = _digest("irrelevant")
     replay = _digest("replay")
     naive = _digest("naive")
     versions = {
@@ -211,6 +218,7 @@ def _development_result() -> dict[str, Any]:
         "frozen": "model-0",
         "after_a": "model-1",
         "corrupted": "model-corrupted",
+        "irrelevant": "model-irrelevant",
         "after_b_replay": "model-2-replay",
         "after_b_naive": "model-2-naive",
         "random": "random-v1",
@@ -223,6 +231,7 @@ def _development_result() -> dict[str, Any]:
         "frozen": cold,
         "after_a": after_a,
         "corrupted": corrupted,
+        "irrelevant": irrelevant,
         "after_b_replay": replay,
         "after_b_naive": naive,
         "random": _digest("random"),
@@ -235,6 +244,7 @@ def _development_result() -> dict[str, Any]:
         (TASK_A, "after_a"): -700.0,
         (TASK_A, "frozen"): -1000.0,
         (TASK_A, "corrupted"): -950.0,
+        (TASK_A, "irrelevant"): -950.0,
         (TASK_A, "after_b_replay"): -720.0,
         (TASK_A, "after_b_naive"): -900.0,
         (TASK_A, "random"): -1300.0,
@@ -251,7 +261,7 @@ def _development_result() -> dict[str, Any]:
     def add(task: str, split: str, condition: str, seed: int, value: float) -> None:
         checkpoint_id = (
             "cold"
-            if split == "collect_a"
+            if split in {"collect_a", "collect_irrelevant"}
             else "after_a"
             if split
             in {
@@ -259,6 +269,8 @@ def _development_result() -> dict[str, Any]:
                 "predictive_validation_a",
                 "predictive_validation_b",
             }
+            else "irrelevant"
+            if split == "predictive_validation_irrelevant"
             else condition
         )
         episode, rows = _episode(
@@ -291,6 +303,13 @@ def _development_result() -> dict[str, Any]:
         -1000.0,
     )
     add(
+        TASK_IRRELEVANT,
+        "collect_irrelevant",
+        "collection_random",
+        _seed("collect_irrelevant_episode", master, 0),
+        100.0,
+    )
+    add(
         TASK_A,
         "predictive_validation_a",
         "validation_random",
@@ -304,11 +323,19 @@ def _development_result() -> dict[str, Any]:
         _seed("predictive_validation_b_episode", master, 0),
         -1000.0,
     )
+    add(
+        TASK_IRRELEVANT,
+        "predictive_validation_irrelevant",
+        "validation_random",
+        _seed("predictive_validation_irrelevant_episode", master, 0),
+        100.0,
+    )
     for condition in (
         "cold",
         "after_a",
         "frozen",
         "corrupted",
+        "irrelevant",
         "after_b_replay",
         "after_b_naive",
         "random",
@@ -330,10 +357,14 @@ def _development_result() -> dict[str, Any]:
             returns[(TASK_B, condition)],
         )
 
-    collect_a_ids = episodes[0]["transition_ids"]
-    collect_b_ids = episodes[1]["transition_ids"]
+    collect_a_ids = next(episode["transition_ids"] for episode in episodes if episode["split"] == "collect_a")
+    collect_b_ids = next(episode["transition_ids"] for episode in episodes if episode["split"] == "collect_b")
+    collect_irrelevant_ids = next(
+        episode["transition_ids"] for episode in episodes if episode["split"] == "collect_irrelevant"
+    )
     a_inputs = list(collect_a_ids)
     b_inputs = list(collect_b_ids)
+    irrelevant_inputs = list(collect_irrelevant_ids)
     replay_inputs = [*collect_a_ids, *collect_b_ids]
     updates = [
         _update("train_a", cold, after_a, "model-0", "model-1", ["collect_a"], a_inputs),
@@ -345,6 +376,15 @@ def _development_result() -> dict[str, Any]:
             "model-corrupted",
             ["collect_a"],
             a_inputs,
+        ),
+        _update(
+            "train_a_irrelevant",
+            cold,
+            irrelevant,
+            "model-0",
+            "model-irrelevant",
+            ["collect_irrelevant"],
+            irrelevant_inputs,
         ),
         _update(
             "train_b_replay",
@@ -370,7 +410,7 @@ def _development_result() -> dict[str, Any]:
             after_a,
             "model-1",
             "model-1",
-            [],
+            ["collect_a"],
             [],
             rejected=True,
         ),
@@ -378,16 +418,19 @@ def _development_result() -> dict[str, Any]:
     cold_live_state = _digest("cold:compound")
     updates[0]["live_state_before_sha256"] = cold_live_state
     updates[1]["live_state_before_sha256"] = cold_live_state
+    updates[2]["live_state_before_sha256"] = cold_live_state
+    updates[2]["sampling_manifest_sha256"] = updates[0]["sampling_manifest_sha256"]
     post_a_live_state = updates[0]["live_state_after_sha256"]
-    updates[2]["live_state_before_sha256"] = post_a_live_state
     updates[3]["live_state_before_sha256"] = post_a_live_state
     updates[4]["live_state_before_sha256"] = post_a_live_state
-    updates[4]["live_state_after_sha256"] = post_a_live_state
+    updates[5]["live_state_before_sha256"] = post_a_live_state
+    updates[5]["live_state_after_sha256"] = post_a_live_state
     update_by_phase = {row["phase"]: row for row in updates}
     live_states = {
         "cold": update_by_phase["train_a"]["live_state_before_sha256"],
         "frozen": update_by_phase["train_a"]["live_state_before_sha256"],
         "corrupted": update_by_phase["train_a_corrupted"]["live_state_after_sha256"],
+        "irrelevant": update_by_phase["train_a_irrelevant"]["live_state_after_sha256"],
         "after_a": update_by_phase["train_a"]["live_state_after_sha256"],
         "after_b_replay": update_by_phase["train_b_replay"]["live_state_after_sha256"],
         "after_b_naive": update_by_phase["train_b_naive"]["live_state_after_sha256"],
@@ -400,7 +443,13 @@ def _development_result() -> dict[str, Any]:
             "model_version": versions[condition],
             "parameter_sha256": digests[condition],
             "live_state_sha256": live_states[condition],
-            "split": "predictive_validation_a" if task == TASK_A else "predictive_validation_b",
+            "split": (
+                "predictive_validation_a"
+                if task == TASK_A
+                else "predictive_validation_b"
+                if task == TASK_B
+                else "predictive_validation_irrelevant"
+            ),
             "transition_count": 200,
             "mixture_nll_nats_per_target_dimension": nll,
             "normalized_rmse": 0.1,
@@ -414,11 +463,14 @@ def _development_result() -> dict[str, Any]:
             (TASK_A, "after_a", 0.10, 0.90),
             (TASK_A, "frozen", 0.40, 0.7),
             (TASK_A, "corrupted", 0.50, 0.6),
+            (TASK_A, "irrelevant", 0.38, 0.7),
             (TASK_A, "after_b_replay", 0.12, 0.9),
             (TASK_A, "after_b_naive", 0.30, 0.8),
             (TASK_B, "after_a", 0.50, 0.7),
             (TASK_B, "after_b_replay", 0.20, 0.9),
             (TASK_B, "after_b_naive", 0.18, 0.9),
+            (TASK_IRRELEVANT, "cold", 0.70, 0.7),
+            (TASK_IRRELEVANT, "irrelevant", 0.10, 0.9),
         )
     ]
     components = [
@@ -443,7 +495,13 @@ def _development_result() -> dict[str, Any]:
     policy_runs: list[dict[str, Any]] = []
     for episode in episodes:
         task_index = 0 if episode["task_id"] == TASK_A else 1
-        if episode["split"] in {"collect_a", "collect_b"}:
+        if episode["split"] == "collect_irrelevant":
+            seed_namespace, seed_index = "irrelevant_collection_action", 0
+            controller_kind = "uniform_random"
+        elif episode["split"] == "predictive_validation_irrelevant":
+            seed_namespace, seed_index = "predictive_validation_irrelevant_action", 0
+            controller_kind = "uniform_random"
+        elif episode["split"] in {"collect_a", "collect_b"}:
             seed_namespace, seed_index = "collection_action", task_index
             controller_kind = "uniform_random"
         elif episode["split"] in {"predictive_validation_a", "predictive_validation_b"}:
@@ -517,6 +575,7 @@ def _development_result() -> dict[str, Any]:
             "cold",
             "frozen",
             "corrupted",
+            "irrelevant",
             "after_a",
             "after_b_replay",
             "after_b_naive",
@@ -534,10 +593,16 @@ def _development_result() -> dict[str, Any]:
                 "phase": phase,
                 "media_type": "application/json",
                 "bytes": 1,
-                "sha256": _digest(f"batch:{phase}"),
+                "sha256": (_digest("batch:train_a") if phase == "train_a_irrelevant" else _digest(f"batch:{phase}")),
                 "filename": f"{phase}.bin",
             }
-            for phase in ("train_a", "train_a_corrupted", "train_b_replay", "train_b_naive")
+            for phase in (
+                "train_a",
+                "train_a_corrupted",
+                "train_a_irrelevant",
+                "train_b_replay",
+                "train_b_naive",
+            )
         ],
         "predictive_metrics": predictive,
         "policy_runs": policy_runs,
@@ -559,12 +624,24 @@ def _development_result() -> dict[str, Any]:
             "prediction_max_abs_difference": 0.0,
             "action_max_abs_difference": 0.0,
             "episode_return_max_abs_difference": 0.0,
+            "live_evaluation": {
+                "media_type": "application/vnd.prospect.wm001.restart-evaluation+json",
+                "bytes": 1,
+                "sha256": _digest("live-evaluation"),
+                "filename": "live-evaluation.json",
+            },
+            "restored_evaluation": {
+                "media_type": "application/vnd.prospect.wm001.restart-evaluation+json",
+                "bytes": 1,
+                "sha256": _digest("restored-evaluation"),
+                "filename": "restored-evaluation.json",
+            },
         },
     }
     return {
-        "schema": "prospect.world-model-lifecycle.raw-result.v2",
+        "schema": "prospect.world-model-lifecycle.raw-result.v3",
         "experiment_id": "WM-001",
-        "protocol_version": "1.1.1",
+        "protocol_version": "1.3.0",
         "protocol_sha256": protocol_sha,
         "lane": "development",
         "claim_eligible": False,
@@ -586,10 +663,22 @@ def test_analysis_recomputes_rows_and_passes_development_gates_diagnostically() 
     assert [gate["gate"] for gate in analysis["gate_results"]] == [f"K{index}" for index in range(8)]
     assert all(gate["passed"] for gate in analysis["gate_results"])
     assert not any(gate["claim_supported"] for gate in analysis["gate_results"])
-    assert "fabricated" not in {metric["name"] for metric in analysis["aggregate_metrics"]}
-    retention = next(metric for metric in analysis["aggregate_metrics"] if metric["name"] == "retained_a_gain_fraction")
+    metrics = {metric["name"]: metric for metric in analysis["aggregate_metrics"]}
+    assert "fabricated" not in metrics
+    assert metrics["a_nll_improvement_after_a_vs_irrelevant"]["replicate_values"] == pytest.approx([0.28])
+    assert metrics["a_irrelevant_nll_improvement_vs_frozen"]["replicate_values"] == pytest.approx([0.02])
+    assert metrics["a_return_improvement_after_a_vs_irrelevant"]["replicate_values"] == pytest.approx([250.0])
+    assert metrics["a_irrelevant_return_improvement_vs_frozen"]["replicate_values"] == pytest.approx([50.0])
+    retention = metrics["retained_a_gain_fraction"]
     assert retention["replicate_values"] == pytest.approx([280.0 / 300.0])
     assert retention["ci_95_lower"] == pytest.approx(retention["mean"])
+    gates = {gate["gate"]: gate for gate in analysis["gate_results"]}
+    k3_checks = {check["name"]: check for check in gates["K3"]["checks"]}
+    k4_checks = {check["name"]: check for check in gates["K4"]["checks"]}
+    assert k3_checks["a_vs_irrelevant_mean_nll_improvement"]["passed"] is True
+    assert k3_checks["a_vs_irrelevant_nll_improvement_ci_lower"]["passed"] is True
+    assert k4_checks["after_a_vs_irrelevant_mean_return_improvement"]["passed"] is True
+    assert k4_checks["after_a_vs_irrelevant_return_improvement_ci_lower"]["passed"] is True
     assert any(finding["code"] == "development_claim_ineligible" for finding in analysis["audit_findings"])
 
 
@@ -607,6 +696,24 @@ def test_first_failed_numeric_gate_stops_the_ordered_prefix() -> None:
     assert [gate["gate"] for gate in gates] == ["K0", "K1", "K2", "K3"]
     assert gates[-1]["passed"] is False
     assert gates[-1]["stop_reason"].startswith("Stop.")
+
+
+def test_k3_rejects_irrelevant_evidence_matching_task_a_prediction() -> None:
+    result = _development_result()
+    irrelevant = next(
+        row
+        for row in result["replicates"][0]["predictive_metrics"]
+        if row["task_id"] == TASK_A and row["condition"] == "irrelevant"
+    )
+    irrelevant["mixture_nll_nats_per_target_dimension"] = 0.10
+
+    gates = analyze_result(result)["gate_results"]
+
+    assert [gate["gate"] for gate in gates] == ["K0", "K1", "K2", "K3"]
+    assert gates[-1]["passed"] is False
+    failed = {check["name"] for check in gates[-1]["checks"] if not check["passed"]}
+    assert "a_vs_irrelevant_mean_nll_improvement" in failed
+    assert "a_vs_irrelevant_nll_improvement_ci_lower" in failed
 
 
 def test_k0_rejects_reselected_environment_reset_seed() -> None:

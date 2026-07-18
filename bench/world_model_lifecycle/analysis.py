@@ -39,8 +39,18 @@ PROTOCOL_PATH = HERE / "protocol.json"
 
 TASK_A = "pendulum_normal_torque"
 TASK_B = "pendulum_reversed_torque"
-FORMAL_SEEDS = (104729, 130363, 155921, 181081, 206369, 232003, 257371, 283009)
-DEVELOPMENT_SEEDS = (101, 211)
+TASK_IRRELEVANT = "independent_phase_oscillator"
+FORMAL_SEEDS = (
+    17123296,
+    3280610186,
+    2725263418,
+    3124246399,
+    4093604926,
+    3908390087,
+    3332986400,
+    724244869,
+)
+DEVELOPMENT_SEEDS = (3625750835, 2671781227)
 T_CRITICAL_N8 = 2.364624251
 
 # Two-sided 95% Student-t critical values indexed by sample size.  WM-001 only
@@ -62,6 +72,7 @@ _BEHAVIOR_CONDITIONS = {
         "after_a",
         "frozen",
         "corrupted",
+        "irrelevant",
         "after_b_replay",
         "after_b_naive",
         "random",
@@ -76,8 +87,17 @@ _BEHAVIOR_CONDITIONS = {
     ),
 }
 _PREDICTIVE_CONDITIONS = {
-    TASK_A: ("cold", "after_a", "frozen", "corrupted", "after_b_replay", "after_b_naive"),
+    TASK_A: (
+        "cold",
+        "after_a",
+        "frozen",
+        "corrupted",
+        "irrelevant",
+        "after_b_replay",
+        "after_b_naive",
+    ),
     TASK_B: ("after_a", "after_b_replay", "after_b_naive"),
+    TASK_IRRELEVANT: ("cold", "irrelevant"),
 }
 _BEHAVIOR_SPLIT = {
     TASK_A: "behavior_evaluation_a",
@@ -86,11 +106,18 @@ _BEHAVIOR_SPLIT = {
 _PREDICTIVE_SPLIT = {
     TASK_A: "predictive_validation_a",
     TASK_B: "predictive_validation_b",
+    TASK_IRRELEVANT: "predictive_validation_irrelevant",
 }
 _EPISODE_CONTRACTS = frozenset(
     {
         ("collect_a", TASK_A, "collection_random", "cold"),
         ("collect_b", TASK_B, "collection_random", "after_a"),
+        (
+            "collect_irrelevant",
+            TASK_IRRELEVANT,
+            "collection_random",
+            "cold",
+        ),
         (
             "predictive_validation_a",
             TASK_A,
@@ -102,6 +129,12 @@ _EPISODE_CONTRACTS = frozenset(
             TASK_B,
             "validation_random",
             "after_a",
+        ),
+        (
+            "predictive_validation_irrelevant",
+            TASK_IRRELEVANT,
+            "validation_random",
+            "irrelevant",
         ),
         *(("behavior_evaluation_a", TASK_A, condition, condition) for condition in _BEHAVIOR_CONDITIONS[TASK_A]),
         *(("behavior_evaluation_b", TASK_B, condition, condition) for condition in _BEHAVIOR_CONDITIONS[TASK_B]),
@@ -119,12 +152,17 @@ _PREDICTIVE_CONTRACTS = frozenset(
         for condition in conditions
     }
 )
-_COLLECTION_SPLITS = ("collect_a", "collect_b")
-_VALIDATION_SPLITS = ("predictive_validation_a", "predictive_validation_b")
+_COLLECTION_SPLITS = ("collect_a", "collect_b", "collect_irrelevant")
+_VALIDATION_SPLITS = (
+    "predictive_validation_a",
+    "predictive_validation_b",
+    "predictive_validation_irrelevant",
+)
 _HELD_OUT_SPLITS = frozenset(
     {
         "predictive_validation_a",
         "predictive_validation_b",
+        "predictive_validation_irrelevant",
         "behavior_evaluation_a",
         "behavior_evaluation_b",
     }
@@ -150,6 +188,7 @@ _REQUIRED_COMPONENTS = frozenset(
 )
 _COMMITTED_PHASES = (
     "train_a",
+    "train_a_irrelevant",
     "train_a_corrupted",
     "train_b_replay",
     "train_b_naive",
@@ -157,15 +196,21 @@ _COMMITTED_PHASES = (
 _EXPECTED_ELIGIBLE_SPLITS = {
     "train_a": frozenset({"collect_a"}),
     "train_a_corrupted": frozenset({"collect_a"}),
+    "train_a_irrelevant": frozenset({"collect_irrelevant"}),
     "train_b_replay": frozenset({"collect_a", "collect_b"}),
     "train_b_naive": frozenset({"collect_b"}),
 }
 _METRIC_UNITS = {
+    "irrelevant_source_nll_improvement_after_irrelevant_vs_cold": "nats/target-dimension",
     "a_nll_improvement_after_a_vs_frozen": "nats/target-dimension",
     "a_nll_improvement_after_a_vs_corrupted": "nats/target-dimension",
+    "a_nll_improvement_after_a_vs_irrelevant": "nats/target-dimension",
+    "a_irrelevant_nll_improvement_vs_frozen": "nats/target-dimension",
     "a_after_a_interval_90_coverage": "fraction",
     "a_return_improvement_after_a_vs_cold": "return",
     "a_return_improvement_after_a_vs_frozen": "return",
+    "a_return_improvement_after_a_vs_irrelevant": "return",
+    "a_irrelevant_return_improvement_vs_frozen": "return",
     "a_after_a_oracle_normalized_score": "fraction",
     "a_oracle_vs_random_return_gap": "return",
     "b_nll_improvement_after_b_replay_vs_before_b": "nats/target-dimension",
@@ -294,14 +339,34 @@ def _replicate_numeric_values(replicate: Mapping[str, Any]) -> tuple[dict[str, f
         return float(row["interval_90_coverage"])
 
     required_inputs = {
+        "irrelevant_source_nll_improvement_after_irrelevant_vs_cold": (
+            nll(TASK_IRRELEVANT, "cold"),
+            nll(TASK_IRRELEVANT, "irrelevant"),
+        ),
         "a_nll_improvement_after_a_vs_frozen": (nll(TASK_A, "frozen"), nll(TASK_A, "after_a")),
         "a_nll_improvement_after_a_vs_corrupted": (nll(TASK_A, "corrupted"), nll(TASK_A, "after_a")),
+        "a_nll_improvement_after_a_vs_irrelevant": (
+            nll(TASK_A, "irrelevant"),
+            nll(TASK_A, "after_a"),
+        ),
+        "a_irrelevant_nll_improvement_vs_frozen": (
+            nll(TASK_A, "frozen"),
+            nll(TASK_A, "irrelevant"),
+        ),
         "a_return_improvement_after_a_vs_cold": (
             returns[(TASK_A, "after_a")],
             returns[(TASK_A, "cold")],
         ),
         "a_return_improvement_after_a_vs_frozen": (
             returns[(TASK_A, "after_a")],
+            returns[(TASK_A, "frozen")],
+        ),
+        "a_return_improvement_after_a_vs_irrelevant": (
+            returns[(TASK_A, "after_a")],
+            returns[(TASK_A, "irrelevant")],
+        ),
+        "a_irrelevant_return_improvement_vs_frozen": (
+            returns[(TASK_A, "irrelevant")],
             returns[(TASK_A, "frozen")],
         ),
         "a_oracle_vs_random_return_gap": (
@@ -524,7 +589,7 @@ def _phase_index(replicate: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
 
 
 def _derive_seed(namespace: str, master_seed: int, index: int) -> int:
-    payload = f"WM-001|1.0.0|{namespace}|{master_seed}|{index}".encode()
+    payload = f"WM-001|1.3.0|{namespace}|{master_seed}|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
@@ -540,8 +605,10 @@ def _episode_seed_schedule_violations(
     split_namespaces = {
         "collect_a": "collect_a_episode",
         "collect_b": "collect_b_episode",
+        "collect_irrelevant": "collect_irrelevant_episode",
         "predictive_validation_a": "predictive_validation_a_episode",
         "predictive_validation_b": "predictive_validation_b_episode",
+        "predictive_validation_irrelevant": "predictive_validation_irrelevant_episode",
     }
     for split, namespace in split_namespaces.items():
         rows = [episode for episode in episodes if episode.get("split") == split]
@@ -679,15 +746,18 @@ def _policy_and_snapshot_violations(
         elif run.get("seed") != _derive_seed(namespace, master_seed, seed_index):
             policy_violations.append(f"{replicate_id}: run {run_id} did not use its declared seed")
 
-        task_index = 0 if run.get("task_id") == TASK_A else 1
         split = run.get("split")
         condition = run.get("condition")
         expected_seed_ref = (
-            ("collection_action", task_index)
-            if split in _COLLECTION_SPLITS
-            else ("predictive_validation_action", task_index)
+            ("irrelevant_collection_action", 0)
+            if split == "collect_irrelevant"
+            else ("predictive_validation_irrelevant_action", 0)
+            if split == "predictive_validation_irrelevant"
+            else ("collection_action", 0 if run.get("task_id") == TASK_A else 1)
+            if split in {"collect_a", "collect_b"}
+            else ("predictive_validation_action", 0 if run.get("task_id") == TASK_A else 1)
             if split in _VALIDATION_SPLITS
-            else ("random_policy_action", task_index)
+            else ("random_policy_action", 0 if run.get("task_id") == TASK_A else 1)
             if condition == "random"
             else ("planner", 0)
         )
@@ -774,6 +844,7 @@ def _policy_and_snapshot_violations(
         "cold",
         "frozen",
         "corrupted",
+        "irrelevant",
         "after_a",
         "after_b_replay",
         "after_b_naive",
@@ -791,6 +862,7 @@ def _policy_and_snapshot_violations(
     update_by_phase = _phase_index(replicate)
     for condition, phase in (
         ("corrupted", "train_a_corrupted"),
+        ("irrelevant", "train_a_irrelevant"),
         ("after_a", "train_a"),
         ("after_b_replay", "train_b_replay"),
         ("after_b_naive", "train_b_naive"),
@@ -850,11 +922,11 @@ def _structural_checks(
     replicates = _as_rows(result.get("replicates"))
 
     envelope_violations: list[str] = []
-    if result.get("schema") != "prospect.world-model-lifecycle.raw-result.v2":
+    if result.get("schema") != "prospect.world-model-lifecycle.raw-result.v3":
         envelope_violations.append("wrong raw-result schema")
     if result.get("experiment_id") != "WM-001":
         envelope_violations.append("wrong experiment_id")
-    if result.get("protocol_version") != "1.1.1":
+    if result.get("protocol_version") != "1.3.0":
         envelope_violations.append("wrong protocol_version")
     if result.get("protocol_sha256") != expected_protocol_sha256:
         envelope_violations.append("protocol SHA-256 does not match sealed raw bytes")
@@ -916,6 +988,22 @@ def _structural_checks(
         transitions = _as_rows(replicate.get("transitions"))
         predictive = _as_rows(replicate.get("predictive_metrics"))
         updates = _as_rows(replicate.get("updates"))
+        policy_runs = _as_rows(replicate.get("policy_runs"))
+        evaluated_checkpoints = _as_rows(replicate.get("evaluated_checkpoints"))
+        if lane == "formal":
+            exact_counts = {
+                "episodes": (len(episodes), 496),
+                "transitions": (len(transitions), 99200),
+                "predictive rows": (len(predictive), 12),
+                "policy runs": (len(policy_runs), 20),
+                "evaluated checkpoints": (len(evaluated_checkpoints), 7),
+                "updates including rejected probe": (len(updates), 6),
+            }
+            for label, (observed_count, expected_count) in exact_counts.items():
+                if observed_count != expected_count:
+                    budget_violations.append(
+                        f"{replicate_id}: formal {label} count is {observed_count}, expected {expected_count}"
+                    )
         transition_ids_by_split: dict[str, set[str]] = defaultdict(set)
         for transition in transitions:
             transition_id = transition.get("transition_id")
@@ -939,9 +1027,32 @@ def _structural_checks(
                     )
             if not isinstance(transition.get("run_id"), str) or not transition.get("run_id"):
                 budget_violations.append(f"{replicate_id}: {transition_id} has no run ID")
-            expected_context = 0.0 if transition.get("task_id") == TASK_A else 1.0
+            expected_context = {
+                TASK_A: 0.0,
+                TASK_B: 1.0,
+                TASK_IRRELEVANT: 2.0,
+            }.get(str(transition.get("task_id")))
             if transition.get("task_context") != expected_context:
                 budget_violations.append(f"{replicate_id}: {transition_id} task context differs")
+            intended = transition.get("intended_action")
+            applied = transition.get("applied_action")
+            if _is_finite_number(intended) and _is_finite_number(applied):
+                expected_applied = (
+                    -float(intended)
+                    if transition.get("task_id") == TASK_B
+                    else 0.0
+                    if transition.get("task_id") == TASK_IRRELEVANT
+                    else float(intended)
+                )
+                if not math.isclose(
+                    float(applied),
+                    expected_applied,
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    budget_violations.append(
+                        f"{replicate_id}: {transition_id} applied action differs from task semantics"
+                    )
 
         if isinstance(master_seed, int):
             declared = {
@@ -1164,7 +1275,6 @@ def _structural_checks(
                     budget_violations.append(f"{replicate_id}: corrupted permutation artifact digest differs")
             elif permutation_digest is not None or permutation_file is not None:
                 budget_violations.append(f"{replicate_id}: {phase} unexpectedly names a target permutation")
-
         checkpoint_archive = replicate.get("checkpoint_archive")
         if not isinstance(checkpoint_archive, Mapping):
             budget_violations.append(f"{replicate_id}: checkpoint archive reference is missing")
@@ -1370,6 +1480,7 @@ def _structural_checks(
 
         train_a = phases.get("train_a")
         corrupted = phases.get("train_a_corrupted")
+        irrelevant = phases.get("train_a_irrelevant")
         replay = phases.get("train_b_replay")
         naive = phases.get("train_b_naive")
         if train_a is not None and corrupted is not None:
@@ -1379,6 +1490,13 @@ def _structural_checks(
                 branch_violations.append(f"{replicate_id}: corrupted control did not fork from cold version")
             if corrupted.get("live_state_before_sha256") != train_a.get("live_state_before_sha256"):
                 branch_violations.append(f"{replicate_id}: corrupted control did not fork from cold compound state")
+        if train_a is not None and irrelevant is not None:
+            if irrelevant.get("predecessor_parameter_sha256") != train_a.get("predecessor_parameter_sha256"):
+                branch_violations.append(f"{replicate_id}: irrelevant control did not fork from cold parameters")
+            if irrelevant.get("predecessor_model_version") != train_a.get("predecessor_model_version"):
+                branch_violations.append(f"{replicate_id}: irrelevant control did not fork from cold version")
+            if irrelevant.get("live_state_before_sha256") != train_a.get("live_state_before_sha256"):
+                branch_violations.append(f"{replicate_id}: irrelevant control did not fork from cold compound state")
         if train_a is not None:
             for name, branch_update in (("train_b_replay", replay), ("train_b_naive", naive)):
                 if branch_update is None:
@@ -1404,13 +1522,13 @@ def _structural_checks(
             after_reference = probe.get("full_state_after_file")
             if before_full_state != after_full_state:
                 rejection_violations.append(f"{replicate_id}: rejected probe changed full-state bytes")
-            for label, reference, expected_digest in (
+            for label, reference, expected_reference_digest in (
                 ("before", before_reference, before_full_state),
                 ("after", after_reference, after_full_state),
             ):
                 if (
                     not isinstance(reference, Mapping)
-                    or reference.get("sha256") != expected_digest
+                    or reference.get("sha256") != expected_reference_digest
                     or reference.get("media_type") != "application/vnd.prospect.wm001.rejected-probe-state+json"
                     or not isinstance(reference.get("bytes"), int)
                     or int(reference.get("bytes", 0)) <= 0
@@ -1440,6 +1558,8 @@ def _structural_checks(
             expected_digest["after_a"] = train_a.get("committed_parameter_sha256")
         if corrupted is not None:
             expected_digest["corrupted"] = corrupted.get("committed_parameter_sha256")
+        if irrelevant is not None:
+            expected_digest["irrelevant"] = irrelevant.get("committed_parameter_sha256")
         if replay is not None:
             expected_digest["after_b_replay"] = replay.get("committed_parameter_sha256")
         if naive is not None:
@@ -1458,6 +1578,7 @@ def _structural_checks(
             "cold",
             "frozen",
             "corrupted",
+            "irrelevant",
             "after_a",
             "after_b_replay",
             "after_b_naive",
@@ -1506,6 +1627,21 @@ def _structural_checks(
             parity_violations.append(f"{replicate_id}: restore is not marked fresh-process")
         if parity.get("original_process_id") == parity.get("restored_process_id"):
             parity_violations.append(f"{replicate_id}: restore reused the original process ID")
+        for trace_name in ("live_evaluation", "restored_evaluation"):
+            trace = parity.get(trace_name)
+            if (
+                not isinstance(trace, Mapping)
+                or trace.get("media_type") != "application/vnd.prospect.wm001.restart-evaluation+json"
+                or not isinstance(trace.get("bytes"), int)
+                or int(trace.get("bytes", 0)) <= 0
+                or not isinstance(trace.get("sha256"), str)
+                or len(str(trace.get("sha256"))) != 64
+                or not isinstance(trace.get("filename"), str)
+                or not trace.get("filename")
+                or "/" in str(trace.get("filename"))
+                or "\\" in str(trace.get("filename"))
+            ):
+                parity_violations.append(f"{replicate_id}: {trace_name} raw trace reference is invalid")
         mismatches = parity.get("component_hash_mismatches")
         if not isinstance(mismatches, list) or mismatches:
             parity_violations.append(f"{replicate_id}: checkpoint component hash mismatches are nonzero")
@@ -1634,6 +1770,22 @@ def _numeric_gate_checks(
         (
             _metric_check(
                 metrics,
+                "irrelevant_source_nll_improvement_after_irrelevant_vs_cold",
+                "mean",
+                "ge",
+                0.05,
+                "irrelevant_source_vs_cold_mean_nll_improvement",
+            ),
+            _metric_check(
+                metrics,
+                "irrelevant_source_nll_improvement_after_irrelevant_vs_cold",
+                "ci_95_lower",
+                "gt",
+                0.0,
+                "irrelevant_source_vs_cold_nll_improvement_ci_lower",
+            ),
+            _metric_check(
+                metrics,
                 "a_nll_improvement_after_a_vs_frozen",
                 "mean",
                 "ge",
@@ -1663,6 +1815,22 @@ def _numeric_gate_checks(
                 "gt",
                 0.0,
                 "a_vs_corrupted_nll_improvement_ci_lower",
+            ),
+            _metric_check(
+                metrics,
+                "a_nll_improvement_after_a_vs_irrelevant",
+                "mean",
+                "ge",
+                0.05,
+                "a_vs_irrelevant_mean_nll_improvement",
+            ),
+            _metric_check(
+                metrics,
+                "a_nll_improvement_after_a_vs_irrelevant",
+                "ci_95_lower",
+                "gt",
+                0.0,
+                "a_vs_irrelevant_nll_improvement_ci_lower",
             ),
             _metric_check(
                 metrics,
@@ -1716,6 +1884,22 @@ def _numeric_gate_checks(
                 "gt",
                 0.0,
                 "after_a_vs_frozen_return_improvement_ci_lower",
+            ),
+            _metric_check(
+                metrics,
+                "a_return_improvement_after_a_vs_irrelevant",
+                "mean",
+                "ge",
+                100.0,
+                "after_a_vs_irrelevant_mean_return_improvement",
+            ),
+            _metric_check(
+                metrics,
+                "a_return_improvement_after_a_vs_irrelevant",
+                "ci_95_lower",
+                "gt",
+                0.0,
+                "after_a_vs_irrelevant_return_improvement_ci_lower",
             ),
             _metric_check(
                 metrics,

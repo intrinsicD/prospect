@@ -72,6 +72,7 @@ from .planning import (
 )
 from .runtime_lane import (
     AGENT_ID,
+    INDEPENDENT_OSCILLATOR_TASK,
     CollectionEvidence,
     EpisodeEvidence,
     PendulumEpisodeSession,
@@ -82,6 +83,7 @@ from .runtime_lane import (
     collect_episodes,
     make_branch_learning_agent,
     run_episode,
+    run_independent_phase_oscillator_conformance,
     transition_arrays,
     transition_lineage_row,
 )
@@ -1274,6 +1276,7 @@ def run_restart_parity(
         "device": device,
     }
     spec_path = output_directory / f"{rows.replicate_id}-restart-spec.json"
+    original_path = output_directory / f"{rows.replicate_id}-live-evaluation.json"
     restored_path = output_directory / f"{rows.replicate_id}-restored-evaluation.json"
     atomic_write_exclusive(spec_path, canonical_json_bytes(specification) + b"\n")
     original = evaluate_live_state(
@@ -1285,6 +1288,10 @@ def run_restart_parity(
         checkpoint_manifest_sha256=checkpoint_manifest_sha256,
         component_hashes={str(row["component_id"]): str(row["sha256"]) for row in component_rows},
         boundary_snapshot=boundary_snapshot,
+    )
+    atomic_write_exclusive(
+        original_path,
+        canonical_json_bytes(original) + b"\n",
     )
     environment = dict(os.environ)
     environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
@@ -1317,7 +1324,20 @@ def run_restart_parity(
     if completed.returncode != 0:
         raise RuntimeError(f"fresh-process restore failed with exit {completed.returncode}: {completed.stderr}")
     restored = load_evaluation(restored_path)
-    return compare_parity(original, restored)
+    parity = compare_parity(original, restored)
+
+    def evaluation_reference(path: Path) -> dict[str, object]:
+        payload = path.read_bytes()
+        return {
+            "media_type": "application/vnd.prospect.wm001.restart-evaluation+json",
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "filename": path.name,
+        }
+
+    parity["live_evaluation"] = evaluation_reference(original_path)
+    parity["restored_evaluation"] = evaluation_reference(restored_path)
+    return parity
 
 
 def run_replicate(
@@ -1339,6 +1359,7 @@ def run_replicate(
     cold = runtime.fork(device=config.device)
     frozen = runtime.fork(device=config.device)
     corrupted = runtime.fork(device=config.device)
+    irrelevant = runtime.fork(device=config.device)
     cold_parameter_sha256 = runtime.digest
     cold_live_state_sha256 = runtime.live_state_digest
     preserve_evaluated_checkpoint(
@@ -1368,6 +1389,13 @@ def run_replicate(
         optimizer_steps=config.optimizer_steps,
         training_mode="joint_target_permuted",
         target_permutation_seed=rows.seed("corrupted_target_permutation"),
+        device=config.device,
+    )
+    irrelevant_learner = TransactionalWorldModelLearner(
+        phase="train_a_irrelevant",
+        bootstrap_seeds=[rows.seed("ensemble_bootstrap_a", index) for index in range(5)],
+        minibatch_order_seed=rows.seed("minibatch_order_a"),
+        optimizer_steps=config.optimizer_steps,
         device=config.device,
     )
     custody = RuntimeCustody.create(f"{replicate_id}:canonical")
@@ -1411,8 +1439,54 @@ def run_replicate(
         rng_start_sha256=collection_rng_a_start,
         actions_before=collection_actions_a_before,
     )
+    irrelevant_custody = RuntimeCustody.create(f"{replicate_id}:control:irrelevant")
+    irrelevant_action_seed = rows.seed("irrelevant_collection_action")
+    irrelevant_controller = UniformRandomController(irrelevant_action_seed)
+    irrelevant_rng_start = irrelevant_controller.rng_digest
+    irrelevant_actions_before = irrelevant_controller.actions_emitted
+    irrelevant_started = utc_now()
+    collection_irrelevant = collect_episodes(
+        run_id=f"{replicate_id}:collect-irrelevant",
+        task_id=INDEPENDENT_OSCILLATOR_TASK,
+        episode_seeds=[rows.seed("collect_irrelevant_episode", index) for index in range(config.collection_episodes)],
+        controller_factory=lambda _: irrelevant_controller,
+        backend=irrelevant,
+        custody=irrelevant_custody,
+        model_owner=irrelevant.owner,
+        learner=irrelevant_learner,
+    )
+    irrelevant_completed = utc_now()
+    append_collection_rows(
+        rows,
+        collection_irrelevant,
+        split="collect_irrelevant",
+        condition="collection_random",
+        checkpoint_id="cold",
+        learning_allowed=True,
+        replay_writes_allowed=True,
+        started_at=irrelevant_started,
+        completed_at=irrelevant_completed,
+    )
+    append_collection_policy_run(
+        rows,
+        collection_irrelevant,
+        split="collect_irrelevant",
+        condition="collection_random",
+        checkpoint_id="cold",
+        controller=irrelevant_controller,
+        seed_namespace="irrelevant_collection_action",
+        seed_index=0,
+        seed=irrelevant_action_seed,
+        rng_start_sha256=irrelevant_rng_start,
+        actions_before=irrelevant_actions_before,
+    )
     print(
-        f"[{utc_now()}] {replicate_id}: collected A={len(collection_a.transitions)}; train candidates",
+        (
+            f"[{utc_now()}] {replicate_id}: collected "
+            f"A={len(collection_a.transitions)}, "
+            f"irrelevant={len(collection_irrelevant.transitions)}; "
+            "train candidates"
+        ),
         flush=True,
     )
     replay_a = custody.replay.require_transitions(collection_a.transitions)
@@ -1432,11 +1506,20 @@ def run_replicate(
         replay_a,
         at=TimePoint(collection_a.next_tick),
     )
+    replay_irrelevant = collection_irrelevant.custody.replay.require_transitions(collection_irrelevant.transitions)
+    irrelevant_receipt = collection_irrelevant.final_agent.learn(
+        replay_irrelevant,
+        at=TimePoint(collection_irrelevant.next_tick),
+    )
     corrupted_receipt = corrupted_agent.learn(
         corrupted_custody.replay.require_transitions(replay_a),
         at=TimePoint(collection_a.next_tick),
     )
-    if learner_a.last_evidence is None or corrupted_learner.last_evidence is None:
+    if (
+        learner_a.last_evidence is None
+        or corrupted_learner.last_evidence is None
+        or irrelevant_learner.last_evidence is None
+    ):
         raise RuntimeError("transactional learners did not retain their preparation evidence")
     append_update_row(
         rows,
@@ -1460,6 +1543,22 @@ def run_replicate(
         runtime=runtime,
         output_directory=output_directory,
     )
+    preserve_evaluated_checkpoint(
+        rows,
+        condition="irrelevant",
+        runtime=irrelevant,
+        output_directory=output_directory,
+    )
+    append_update_row(
+        rows,
+        irrelevant_receipt,
+        irrelevant_learner.last_evidence,
+        phase="train_a_irrelevant",
+        eligible_splits=("collect_irrelevant",),
+        committed_parameter_sha256=irrelevant.digest,
+        committed_live_state_sha256=irrelevant.live_state_digest,
+        manifest_directory=output_directory,
+    )
     append_update_row(
         rows,
         corrupted_receipt,
@@ -1470,6 +1569,94 @@ def run_replicate(
         committed_live_state_sha256=corrupted.live_state_digest,
         manifest_directory=output_directory,
     )
+
+    validation_irrelevant_action_seed = rows.seed(
+        "predictive_validation_irrelevant_action",
+    )
+    validation_irrelevant_controller = UniformRandomController(
+        validation_irrelevant_action_seed,
+    )
+    validation_irrelevant_rng_start = validation_irrelevant_controller.rng_digest
+    validation_irrelevant_actions_before = validation_irrelevant_controller.actions_emitted
+    validation_irrelevant_backend = load_evaluated_checkpoint(
+        rows,
+        condition="irrelevant",
+        output_directory=output_directory,
+        device=config.device,
+    )
+    validation_irrelevant_parameter_sha256 = validation_irrelevant_backend.digest
+    validation_irrelevant_live_state_sha256 = validation_irrelevant_backend.live_state_digest
+    validation_irrelevant_started = utc_now()
+    validation_irrelevant = collect_episodes(
+        run_id=f"{replicate_id}:predictive-validation-irrelevant",
+        task_id=INDEPENDENT_OSCILLATOR_TASK,
+        episode_seeds=[
+            rows.seed("predictive_validation_irrelevant_episode", index) for index in range(config.validation_episodes)
+        ],
+        controller_factory=lambda _: validation_irrelevant_controller,
+        backend=validation_irrelevant_backend,
+        custody=RuntimeCustody.create(f"{replicate_id}:validation-irrelevant"),
+    )
+    validation_irrelevant_completed = utc_now()
+    if validation_irrelevant.custody.replay.event_count != 0:
+        raise RuntimeError("irrelevant validation unexpectedly wrote to replay")
+    if (
+        validation_irrelevant_backend.digest != validation_irrelevant_parameter_sha256
+        or validation_irrelevant_backend.live_state_digest != validation_irrelevant_live_state_sha256
+    ):
+        raise RuntimeError("irrelevant validation mutated its evaluated checkpoint")
+    append_collection_rows(
+        rows,
+        validation_irrelevant,
+        split="predictive_validation_irrelevant",
+        condition="validation_random",
+        checkpoint_id="irrelevant",
+        learning_allowed=False,
+        replay_writes_allowed=False,
+        started_at=validation_irrelevant_started,
+        completed_at=validation_irrelevant_completed,
+    )
+    append_collection_policy_run(
+        rows,
+        validation_irrelevant,
+        split="predictive_validation_irrelevant",
+        condition="validation_random",
+        checkpoint_id="irrelevant",
+        controller=validation_irrelevant_controller,
+        seed_namespace="predictive_validation_irrelevant_action",
+        seed_index=0,
+        seed=validation_irrelevant_action_seed,
+        rng_start_sha256=validation_irrelevant_rng_start,
+        actions_before=validation_irrelevant_actions_before,
+    )
+    validation_irrelevant_batch = to_transition_batch(
+        validation_irrelevant.transitions,
+    )
+    evaluation_irrelevant_backends = {
+        "cold": load_evaluated_checkpoint(
+            rows,
+            condition="cold",
+            output_directory=output_directory,
+            device=config.device,
+        ),
+        "irrelevant": validation_irrelevant_backend,
+    }
+    for condition, backend in evaluation_irrelevant_backends.items():
+        metrics = evaluate_mixture(
+            backend.model,
+            validation_irrelevant_batch,
+            device=config.device,
+        )
+        append_predictive_metric(
+            rows,
+            metrics,
+            runtime=backend,
+            task_id=INDEPENDENT_OSCILLATOR_TASK,
+            condition=condition,
+            checkpoint_id=condition,
+            split="predictive_validation_irrelevant",
+            evidence_directory=output_directory,
+        )
 
     probe = RejectedUpdateProbeLearner()
     probe_at = TimePoint(receipt_a.completed_at.tick + 1)
@@ -1573,7 +1760,13 @@ def run_replicate(
             output_directory=output_directory,
             device=config.device,
         )
-        for condition in ("cold", "frozen", "corrupted", "after_a")
+        for condition in (
+            "cold",
+            "frozen",
+            "corrupted",
+            "irrelevant",
+            "after_a",
+        )
     }
     for condition, backend in evaluation_a_backends.items():
         metrics = evaluate_mixture(
@@ -1782,12 +1975,12 @@ def run_replicate(
         raise RuntimeError("B learners did not retain preparation evidence")
     append_update_row(
         rows,
-        naive_receipt,
-        learner_b_naive.last_evidence,
-        phase="train_b_naive",
-        eligible_splits=("collect_b",),
-        committed_parameter_sha256=naive.digest,
-        committed_live_state_sha256=naive.live_state_digest,
+        replay_receipt,
+        learner_b_replay.last_evidence,
+        phase="train_b_replay",
+        eligible_splits=("collect_a", "collect_b"),
+        committed_parameter_sha256=runtime.digest,
+        committed_live_state_sha256=runtime.live_state_digest,
         manifest_directory=output_directory,
     )
     preserve_evaluated_checkpoint(
@@ -1804,12 +1997,12 @@ def run_replicate(
     )
     append_update_row(
         rows,
-        replay_receipt,
-        learner_b_replay.last_evidence,
-        phase="train_b_replay",
-        eligible_splits=("collect_a", "collect_b"),
-        committed_parameter_sha256=runtime.digest,
-        committed_live_state_sha256=runtime.live_state_digest,
+        naive_receipt,
+        learner_b_naive.last_evidence,
+        phase="train_b_naive",
+        eligible_splits=("collect_b",),
+        committed_parameter_sha256=naive.digest,
+        committed_live_state_sha256=naive.live_state_digest,
         manifest_directory=output_directory,
     )
 
@@ -2027,6 +2220,12 @@ def run_experiment(
     conformance = run_pendulum_conformance(samples_per_task=128, seed=20260717)
     if not conformance["passed"]:
         raise RuntimeError("Pendulum semantic conformance preflight failed")
+    oscillator_conformance = run_independent_phase_oscillator_conformance(
+        cases=32,
+        seed=20260718,
+    )
+    if oscillator_conformance["passed"] is not True:
+        raise RuntimeError("independent oscillator conformance preflight failed")
     replicate_results: list[dict[str, object]] = []
     for master_seed in config.master_seeds:
         replicate = run_replicate(
@@ -2056,9 +2255,9 @@ def run_experiment(
     wall_seconds = time.monotonic() - monotonic_start
     max_cuda_memory = int(torch.cuda.max_memory_allocated()) if config.device == "cuda" else 0
     result: dict[str, object] = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v2",
+        "schema": "prospect.world-model-lifecycle.raw-result.v3",
         "experiment_id": "WM-001",
-        "protocol_version": "1.1.1",
+        "protocol_version": "1.3.0",
         "protocol_sha256": PROTOCOL_SHA256,
         "lane": config.lane,
         "claim_eligible": config.lane == "formal",
@@ -2089,6 +2288,8 @@ def run_experiment(
                 "validation_conformance_planner_reward_max_abs_error": (
                     conformance["max_planner_reward_absolute_error"]
                 ),
+                "oscillator_conformance_cases": oscillator_conformance["cases"],
+                "oscillator_conformance_trajectory_sha256": (oscillator_conformance["trajectory_sha256"]),
             },
         },
         "replicates": replicate_results,

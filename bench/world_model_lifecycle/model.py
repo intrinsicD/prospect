@@ -202,8 +202,9 @@ class TransitionBatch:
                 raise ModelValidationError(f"{name} must use float32")
             if not bool(torch.isfinite(tensor).all()):
                 raise ModelValidationError(f"{name} contains non-finite values")
-        if not bool((self.contexts == 0.0).logical_or(self.contexts == 1.0).all()):
-            raise ModelValidationError("WM-001 contexts must be exactly 0 or 1")
+        valid_context = (self.contexts == 0.0).logical_or(self.contexts == 1.0).logical_or(self.contexts == 2.0)
+        if not bool(valid_context.all()):
+            raise ModelValidationError("WM-001 contexts must be exactly 0, 1, or 2")
         if not bool((self.actions.abs() <= 2.0 + 1e-6).all()):
             raise ModelValidationError("intended actions exceed Pendulum bounds")
 

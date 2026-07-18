@@ -56,7 +56,7 @@ def main() -> int:
     else:
         seeds = arguments.master_seed or None
         config = ExperimentConfig.development(
-            master_seeds=(seeds if seeds is not None else (101, 211)),
+            master_seeds=(seeds if seeds is not None else (3625750835, 2671781227)),
             device=arguments.device,
         )
         stamp = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}-{os.getpid()}"

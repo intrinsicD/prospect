@@ -11,6 +11,7 @@ from bench.world_model_lifecycle.adjudication import (
     ADJUDICATION_MANIFEST_NAME,
     AUDITOR_SOURCE_PATH,
     COPIED_AUDIT_NAME,
+    COPIED_SEMANTIC_REVIEW_NAME,
     AdjudicationError,
     create_adjudication_package,
     main,
@@ -84,7 +85,7 @@ def _make_evidence(
         binding_payload = _write_json(
             producer / "formal-binding.json",
             {
-                "schema": "prospect.world-model-lifecycle.formal-binding.v2",
+                "schema": "prospect.world-model-lifecycle.formal-binding.v3",
                 "experiment_id": "WM-001",
             },
         )
@@ -94,7 +95,7 @@ def _make_evidence(
         snapshot.write_bytes(b"different auditor\n" if auditor_snapshot_mismatch else AUDITOR_SOURCE_PATH.read_bytes())
 
     result = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v2",
+        "schema": "prospect.world-model-lifecycle.raw-result.v3",
         "experiment_id": "WM-001",
         "lane": lane,
         "claim_eligible": lane == "formal",
@@ -137,29 +138,92 @@ def _make_evidence(
     return producer, audit_path, audit
 
 
+def _make_semantic_review(
+    tmp_path: Path,
+    *,
+    producer: Path,
+    audit_path: Path,
+    verdict: str,
+    fatal_findings: list[object] | None = None,
+) -> Path:
+    review_path = tmp_path / f"semantic-review-{verdict}.json"
+    _write_json(
+        review_path,
+        {
+            "schema": "prospect.wm001.semantic-review.v1",
+            "artifact_root": str(producer.resolve()),
+            "result_sha256": _digest((producer / "result.json").read_bytes()),
+            "independent_audit_sha256": _digest(audit_path.read_bytes()),
+            "reviewer": "independent-semantic-review-fixture",
+            "reviewed_gates": [f"K{index}" for index in range(8)],
+            "verdict": verdict,
+            "fatal_findings": fatal_findings or [],
+            "conclusion": f"fixture semantic verdict: {verdict}",
+        },
+    )
+    return review_path
+
+
 def test_formal_acceptance_creates_canonical_external_package(tmp_path: Path) -> None:
     producer, audit_path, _ = _make_evidence(tmp_path)
+    review_path = _make_semantic_review(
+        tmp_path,
+        producer=producer,
+        audit_path=audit_path,
+        verdict="accepted",
+    )
     output = tmp_path / "adjudication"
     audit_payload = audit_path.read_bytes()
+    review_payload = review_path.read_bytes()
 
     manifest = create_adjudication_package(
         producer_root=producer,
         audit_report=audit_path,
         output_directory=output,
         disposition="accepted",
+        semantic_review=review_path,
     )
 
     stored_manifest = (output / ADJUDICATION_MANIFEST_NAME).read_bytes()
     assert stored_manifest == _canonical(manifest)
     assert (output / COPIED_AUDIT_NAME).read_bytes() == audit_payload
-    assert manifest["schema"] == "prospect.wm001.adjudication-package.v1"
+    assert manifest["schema"] == "prospect.wm001.adjudication-package.v2"
     assert manifest["lane"] == "formal"
     assert manifest["disposition"] == "accepted"
     assert manifest["producer_manifest_sha256"] == _digest((producer / "producer-manifest.json").read_bytes())
     assert manifest["result_sha256"] == _digest((producer / "result.json").read_bytes())
     assert manifest["audit_sha256"] == _digest(audit_payload)
     assert manifest["auditor_source_sha256"] == _digest(AUDITOR_SOURCE_PATH.read_bytes())
+    assert manifest["semantic_review_sha256"] == _digest(review_payload)
     assert manifest["formal_binding_sha256"] == _digest((producer / "formal-binding.json").read_bytes())
+    assert (output / COPIED_SEMANTIC_REVIEW_NAME).read_bytes() == review_payload
+
+
+def test_formal_acceptance_requires_clean_semantic_review(tmp_path: Path) -> None:
+    producer, audit_path, _ = _make_evidence(tmp_path)
+    with pytest.raises(AdjudicationError, match="semantic review"):
+        create_adjudication_package(
+            producer_root=producer,
+            audit_report=audit_path,
+            output_directory=tmp_path / "missing-review",
+            disposition="accepted",
+        )
+
+    review_path = _make_semantic_review(
+        tmp_path,
+        producer=producer,
+        audit_path=audit_path,
+        verdict="accepted",
+        fatal_findings=[{"severity": "fatal"}],
+    )
+    with pytest.raises(AdjudicationError, match="fatal findings"):
+        create_adjudication_package(
+            producer_root=producer,
+            audit_report=audit_path,
+            semantic_review=review_path,
+            output_directory=tmp_path / "fatal-review",
+            disposition="accepted",
+        )
 
 
 def test_development_can_be_pending_but_cannot_be_accepted(tmp_path: Path) -> None:

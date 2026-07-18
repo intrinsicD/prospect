@@ -12,6 +12,216 @@ from bench.world_model_lifecycle import verify as verify_module
 from bench.world_model_lifecycle.planning import run_pendulum_conformance
 
 
+def test_protocol_130_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (3625750835, 2671781227)
+    assert verify_module.FORMAL_SEEDS == (
+        17123296,
+        3280610186,
+        2725263418,
+        3124246399,
+        4093604926,
+        3908390087,
+        3332986400,
+        724244869,
+    )
+    assert [
+        verify_module.derive_seed(
+            "predictive_validation_irrelevant_episode",
+            3625750835,
+            index,
+        )
+        for index in range(8)
+    ] == [
+        2942674611,
+        2293535130,
+        4012898876,
+        2683320388,
+        907306470,
+        412736665,
+        2342122439,
+        3346769572,
+    ]
+    assert (
+        verify_module.derive_seed(
+            "predictive_validation_irrelevant_action",
+            2671781227,
+            0,
+        )
+        == 1797070682
+    )
+
+
+def test_protocol_130_irrelevant_control_contract_is_bound() -> None:
+    assert (
+        "collect_irrelevant",
+        verify_module.TASK_IRRELEVANT,
+        "collection_random",
+        "cold",
+    ) in verify_module.EPISODE_CONTRACTS
+    assert (
+        "predictive_validation_irrelevant",
+        verify_module.TASK_IRRELEVANT,
+        "validation_random",
+        "irrelevant",
+    ) in verify_module.EPISODE_CONTRACTS
+    assert (
+        "predictive_validation_irrelevant",
+        verify_module.TASK_IRRELEVANT,
+        "cold",
+        "cold",
+    ) in verify_module.PREDICTIVE_CONTRACTS
+    assert (
+        "predictive_validation_irrelevant",
+        verify_module.TASK_IRRELEVANT,
+        "irrelevant",
+        "irrelevant",
+    ) in verify_module.PREDICTIVE_CONTRACTS
+    assert (
+        "predictive_validation_a",
+        verify_module.TASK_A,
+        "irrelevant",
+        "irrelevant",
+    ) in verify_module.PREDICTIVE_CONTRACTS
+    assert (
+        "behavior_evaluation_a",
+        verify_module.TASK_A,
+        "irrelevant",
+        "irrelevant",
+    ) in verify_module.EPISODE_CONTRACTS
+
+
+def test_formal_binding_schema_binds_protocol_130_and_fresh_seeds() -> None:
+    schema = json.loads(
+        verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
+    )
+
+    assert schema["$id"].endswith("wm-001-formal-binding-v3.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v3"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.3.0"
+    assert (
+        tuple(
+            schema["properties"]["formal_replicate_master_seeds"]["const"],
+        )
+        == verify_module.FORMAL_SEEDS
+    )
+
+
+def test_raw_result_schema_binds_v130_heldout_split_and_formal_counts() -> None:
+    schema = json.loads(
+        verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
+    )
+    replicate_limits = schema["allOf"][0]["then"]["properties"]["replicates"]["items"]["allOf"][1]["properties"]
+
+    assert schema["properties"]["protocol_version"]["const"] == "1.3.0"
+    assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
+    assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
+    assert "predictive_validation_irrelevant" in schema["$defs"]["predictiveMetric"]["properties"]["split"]["enum"]
+    assert replicate_limits["derived_seeds"] == {"minItems": 21, "maxItems": 21}
+    assert replicate_limits["episodes"] == {"minItems": 496, "maxItems": 496}
+    assert replicate_limits["transitions"] == {"minItems": 99200, "maxItems": 99200}
+    assert replicate_limits["predictive_metrics"] == {"minItems": 12, "maxItems": 12}
+    assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
+
+
+def test_formal_matrix_verifier_requires_every_exact_v130_row() -> None:
+    episodes: list[dict[str, object]] = []
+    transitions: list[dict[str, object]] = []
+    for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
+        split, task_id, condition, checkpoint_id = contract
+        episodes.extend(
+            [
+                {
+                    "split": split,
+                    "task_id": task_id,
+                    "condition": condition,
+                    "checkpoint_id": checkpoint_id,
+                }
+            ]
+            * count
+        )
+        transitions.extend([{"split": split}] * (count * 200))
+    predictive = [
+        {
+            "split": split,
+            "task_id": task_id,
+            "condition": condition,
+            "checkpoint_id": checkpoint_id,
+            "transition_count": 1_600,
+        }
+        for split, task_id, condition, checkpoint_id in verify_module.PREDICTIVE_CONTRACTS
+    ]
+    policy_runs = [
+        {
+            "split": split,
+            "task_id": task_id,
+            "condition": condition,
+            "checkpoint_id": checkpoint_id,
+        }
+        for split, task_id, condition, checkpoint_id in verify_module.EPISODE_CONTRACTS
+    ]
+    updates = [
+        {
+            "phase": phase,
+            "status": "committed",
+            "optimizer_steps": 2_000,
+        }
+        for phase in verify_module.COMMITTED_PHASE_SPLITS
+    ]
+    updates.append(
+        {
+            "phase": "rejected_update_probe",
+            "status": "rejected",
+            "optimizer_steps": 0,
+        }
+    )
+    replicate = {
+        "episodes": episodes,
+        "transitions": transitions,
+        "predictive_metrics": predictive,
+        "policy_runs": policy_runs,
+        "updates": updates,
+        "optimizer_batch_manifests": [
+            {"phase": phase}
+            for phase in verify_module.COMMITTED_PHASE_SPLITS
+        ],
+    }
+
+    verify_module._verify_formal_matrix(replicate, replicate_id="formal-fixture")
+    replicate["predictive_metrics"] = predictive[:-1]
+    with pytest.raises(verify_module.Violation, match="predictive matrix"):
+        verify_module._verify_formal_matrix(replicate, replicate_id="formal-fixture")
+
+
+def test_update_eligibility_categorically_excludes_heldout_oscillator_rows() -> None:
+    local_transitions = {
+        "collect-a": {"split": "collect_a"},
+        "oscillator-heldout": {"split": "predictive_validation_irrelevant"},
+    }
+    valid_update = {
+        "phase": "train_a",
+        "eligible_splits": ["collect_a"],
+        "eligible_transition_count": 1,
+        "eligible_transition_ids": ["collect-a"],
+    }
+    verify_module._verify_update_eligibility(
+        valid_update,
+        local_transitions=local_transitions,
+        replicate_id="fixture",
+    )
+
+    contaminated = {
+        **valid_update,
+        "eligible_transition_count": 2,
+        "eligible_transition_ids": ["collect-a", "oscillator-heldout"],
+    }
+    with pytest.raises(verify_module.Violation, match="held-out or phase-ineligible"):
+        verify_module._verify_update_eligibility(
+            contaminated,
+            local_transitions=local_transitions,
+            replicate_id="fixture",
+        )
+
+
 def test_implementation_manifest_ignores_generated_attempt_source_copies() -> None:
     paths = {str(row["path"]) for row in binding_module.implementation_files()}
 

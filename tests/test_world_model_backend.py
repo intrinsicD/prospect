@@ -54,6 +54,29 @@ def _transitions(rows: int = 64) -> TransitionBatch:
     )
 
 
+def test_transition_context_contract_accepts_control_and_rejects_unknown_context() -> None:
+    base = _transitions(rows=8)
+    control = TransitionBatch.from_arrays(
+        transition_ids=base.transition_ids,
+        observations=base.observations.numpy(),
+        contexts=np.full(8, 2.0, dtype=np.float32),
+        actions=base.actions.numpy(),
+        next_observations=base.next_observations.numpy(),
+        rewards=base.rewards.numpy(),
+    )
+    control.validate()
+
+    with pytest.raises(ModelValidationError, match="exactly 0, 1, or 2"):
+        TransitionBatch.from_arrays(
+            transition_ids=base.transition_ids,
+            observations=base.observations.numpy(),
+            contexts=np.full(8, 3.0, dtype=np.float32),
+            actions=base.actions.numpy(),
+            next_observations=base.next_observations.numpy(),
+            rewards=base.rewards.numpy(),
+        )
+
+
 def test_model_snapshot_is_canonical_safe_and_versioned_by_sha256() -> None:
     model = ProbabilisticEnsemble(_tiny_config(), initialization_seed=71)
     payload = model.to_bytes()

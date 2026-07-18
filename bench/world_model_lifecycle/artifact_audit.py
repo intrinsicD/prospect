@@ -25,9 +25,10 @@ import argparse
 import base64
 import binascii
 import hashlib
-import importlib
 import json
 import math
+import os
+import stat
 import statistics
 import struct
 import sys
@@ -35,10 +36,15 @@ import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import numpy.typing as npt
+
+# Audit-local CUDA replay must request deterministic cuBLAS before its first
+# Torch matrix multiplication.  The producer launcher makes the same request,
+# but an external auditor cannot assume the caller exported it.
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 HERE = Path(__file__).resolve().parent
 RESULT_SCHEMA_PATH = HERE / "schemas" / "raw-result.schema.json"
@@ -59,13 +65,17 @@ _PENDULUM_REWARD_ATOL = 2e-5
 _PENDULUM_MAX_SPEED = 8.0
 _PENDULUM_MAX_TORQUE = 2.0
 _PENDULUM_TIME_STEP = 0.05
+_OSCILLATOR_SOURCE = "prospect:IndependentPhaseOscillator-v1"
+_OSCILLATOR_TIME_STEP = 0.05
+_OSCILLATOR_OBSERVATION_ATOL = 1e-12
+_OSCILLATOR_REWARD_ATOL = 1e-12
+_FORMAL_OSCILLATOR_CONFORMANCE_CASES = 512
+_FORMAL_OSCILLATOR_CONFORMANCE_SEED = 20260718
 _CEM_PLANNING_HORIZON = 10
 _CEM_OPTIM_STEPS = 3
 _CEM_NUM_CANDIDATES = 64
 _CEM_TOP_K = 8
-# Protocol 1.1 is an evidence-only repair.  Its experimental random streams
-# intentionally retain the v1.0 seed-domain tag so no task outcome changes.
-_SEED_HASH_DOMAIN_VERSION = "1.0.0"
+_SEED_HASH_DOMAIN_VERSION = "1.3.0"
 _EPISODE_HORIZON = 200
 _GRAPH_SCHEMA = "prospect.wm001.domain-graph.v1"
 _MAX_GRAPH_NODES = 250_000
@@ -384,7 +394,7 @@ _GRAPH_ENUM_TYPES = frozenset(
     }
 )
 
-# A formal result retains roughly 700k transition rows inline.  Four GiB is a
+# A formal result retains roughly 800k transition rows inline.  Four GiB is a
 # hard safety ceiling, not a target; moving transition rows to independently
 # hashed columnar sidecars is the natural follow-up if WM-001 grows.
 _MAX_RESULT_BYTES = 4 << 30
@@ -393,6 +403,7 @@ _MAX_OWNED_MODEL_BYTES = 256 << 20
 _MAX_MANIFEST_BYTES = 64 << 20
 _MAX_PERMUTATION_BYTES = 64 << 20
 _MAX_REJECTED_STATE_BYTES = 512 << 20
+_MAX_RESTART_EVALUATION_BYTES = 16 << 20
 _MAX_CHECKPOINT_BYTES = 4 << 30
 _MAX_CONTAINER_HEADER_BYTES = 1 << 20
 _MAX_CHECKPOINT_MANIFEST_BYTES = 1 << 20
@@ -400,6 +411,26 @@ _MAX_CHECKPOINT_COMPONENT_BYTES = 1 << 30
 _MAX_CHECKPOINT_TOTAL_BYTES = 4 << 30
 _MAX_SOURCE_FILE_BYTES = 64 << 20
 _MAX_SOURCE_SNAPSHOT_BYTES = 512 << 20
+_MAX_PRODUCER_MANIFEST_BYTES = 64 << 20
+_MAX_PRODUCER_FILE_BYTES = 4 << 30
+_MAX_PRODUCER_TOTAL_BYTES = 16 << 30
+_MAX_PRODUCER_FILES = 100_000
+_MAX_PRODUCER_TREE_ENTRIES = 200_000
+_PRODUCER_MANIFEST_NAME = "producer-manifest.json"
+_PRODUCER_MANIFEST_FIELDS = frozenset(
+    {
+        "schema",
+        "experiment_id",
+        "lane",
+        "status",
+        "started_at_utc",
+        "completed_at_utc",
+        "error",
+        "manifest_excludes",
+        "file_count",
+        "files",
+    }
+)
 _FORMAL_CONFORMANCE_KEYS = frozenset(
     {
         "schema",
@@ -442,9 +473,26 @@ _FORMAL_CONFORMANCE_TOLERANCES = {
 
 _TASK_A = "pendulum_normal_torque"
 _TASK_B = "pendulum_reversed_torque"
-_TASK_CONTEXT = {_TASK_A: 0.0, _TASK_B: 1.0}
+_TASK_IRRELEVANT = "independent_phase_oscillator"
+_TASK_CONTEXT = {
+    _TASK_A: 0.0,
+    _TASK_B: 1.0,
+    _TASK_IRRELEVANT: 2.0,
+}
+_FORMAL_SEEDS = (
+    17_123_296,
+    3_280_611_227,
+    2_725_263_418,
+    3_124_246_399,
+    4_093_604_926,
+    3_908_390_087,
+    3_332_986_400,
+    724_244_869,
+)
+_DEVELOPMENT_SEEDS = (3_625_750_835, 2_671_781_227)
 _EXPECTED_PHASE_SPLITS = {
     "train_a": ("collect_a",),
+    "train_a_irrelevant": ("collect_irrelevant",),
     "train_a_corrupted": ("collect_a",),
     "train_b_replay": ("collect_a", "collect_b"),
     "train_b_naive": ("collect_b",),
@@ -453,6 +501,8 @@ _EXPECTED_SEED_COUNTS = {
     "model_initialization": 1,
     "torch_runtime": 1,
     "collection_action": 2,
+    "irrelevant_collection_action": 1,
+    "predictive_validation_irrelevant_action": 1,
     "predictive_validation_action": 2,
     "random_policy_action": 2,
     "ensemble_bootstrap_a": 5,
@@ -461,6 +511,8 @@ _EXPECTED_SEED_COUNTS = {
     "minibatch_order_b": 1,
     "corrupted_target_permutation": 1,
     "collect_a_episode": 8,
+    "collect_irrelevant_episode": 8,
+    "predictive_validation_irrelevant_episode": 8,
     "predictive_validation_a_episode": 8,
     "behavior_evaluation_a_episode": 32,
     "collect_b_episode": 8,
@@ -1049,6 +1101,7 @@ def _audit_evaluated_checkpoints(
         "cold",
         "frozen",
         "corrupted",
+        "irrelevant",
         "after_a",
         "after_b_replay",
         "after_b_naive",
@@ -1056,7 +1109,7 @@ def _audit_evaluated_checkpoints(
     audit.require(
         set(result) == expected_conditions,
         code="evaluated_checkpoint_set_mismatch",
-        message=f"{replicate_id} does not retain exactly the six evaluated learned states",
+        message=f"{replicate_id} does not retain exactly the seven evaluated learned states",
         replicate_id=replicate_id,
     )
     shared_tensor_names = {
@@ -1090,6 +1143,7 @@ def _audit_evaluated_checkpoints(
     phase_conditions = {
         "train_a": ("cold", "after_a"),
         "train_a_corrupted": ("cold", "corrupted"),
+        "train_a_irrelevant": ("cold", "irrelevant"),
         "train_b_replay": ("after_a", "after_b_replay"),
         "train_b_naive": ("after_a", "after_b_naive"),
     }
@@ -1155,6 +1209,10 @@ def _audit_predictions(
     transitions_by_id: Mapping[str, Mapping[str, object]],
     evaluated_checkpoints: Mapping[str, _EvaluatedCheckpoint],
 ) -> None:
+    verified: dict[
+        tuple[str, str, str],
+        PredictionRecomputation,
+    ] = {}
     for index, row in enumerate(_mapping_rows(replicate.get("predictive_metrics"))):
         label = f"{replicate_id} predictive metric {index}"
         try:
@@ -1180,6 +1238,13 @@ def _audit_predictions(
             condition = row.get("condition")
             if not isinstance(split, str) or not isinstance(task_id, str):
                 raise ArtifactAuditError(f"{label} lacks a valid task and split")
+            if isinstance(condition, str):
+                key = (task_id, split, condition)
+                if key in verified:
+                    raise ArtifactAuditError(
+                        f"{label} duplicates predictive condition {key!r}"
+                    )
+                verified[key] = recomputed
             expected_ids = _ordered_validation_ids(replicate, task_id=task_id, split=split)
             audit.require(
                 recomputed.transition_ids == expected_ids,
@@ -1309,6 +1374,179 @@ def _audit_predictions(
         except (ArtifactAuditError, OSError, ValueError) as error:
             audit.error("prediction_evidence_invalid", f"{label}: {error}", replicate_id=replicate_id)
 
+    _audit_irrelevant_prediction_manipulation(
+        audit,
+        replicate,
+        replicate_id=replicate_id,
+        transitions_by_id=transitions_by_id,
+        verified=verified,
+    )
+
+
+def _audit_irrelevant_prediction_manipulation(
+    audit: _Audit,
+    replicate: Mapping[str, object],
+    *,
+    replicate_id: str,
+    transitions_by_id: Mapping[str, Mapping[str, object]],
+    verified: Mapping[tuple[str, str, str], PredictionRecomputation],
+) -> None:
+    """Cross-bind both v1.3 oscillator sidecars to one analytic held-out set."""
+
+    split = "predictive_validation_irrelevant"
+    expected_ids = _ordered_validation_ids(
+        replicate,
+        task_id=_TASK_IRRELEVANT,
+        split=split,
+    )
+    predictive_rows = [
+        row
+        for row in _mapping_rows(replicate.get("predictive_metrics"))
+        if row.get("task_id") == _TASK_IRRELEVANT
+        or row.get("split") == split
+    ]
+    if not expected_ids and not predictive_rows:
+        audit.gap(
+            "irrelevant_prediction_manipulation_absent",
+            (
+                f"{replicate_id} has no held-out oscillator prediction pair "
+                "for the protocol-v1.3 manipulation check."
+            ),
+            evidence_needed=(
+                "Cold and after-irrelevant prediction sidecars over the same "
+                "disjoint predictive_validation_irrelevant transitions."
+            ),
+        )
+        return
+
+    expected_keys = {
+        (_TASK_IRRELEVANT, split, "cold"),
+        (_TASK_IRRELEVANT, split, "irrelevant"),
+    }
+    actual_contracts = {
+        (
+            row.get("task_id"),
+            row.get("split"),
+            row.get("condition"),
+            row.get("checkpoint_id"),
+        )
+        for row in predictive_rows
+    }
+    expected_contracts = {
+        (_TASK_IRRELEVANT, split, "cold", "cold"),
+        (_TASK_IRRELEVANT, split, "irrelevant", "irrelevant"),
+    }
+    pair = {key: verified[key] for key in expected_keys if key in verified}
+    audit.require(
+        actual_contracts == expected_contracts
+        and len(predictive_rows) == 2
+        and set(pair) == expected_keys,
+        code="irrelevant_prediction_pair_incomplete",
+        message=(
+            f"{replicate_id} does not contain exactly the independently "
+            "decoded cold and after-irrelevant oscillator sidecars"
+        ),
+        replicate_id=replicate_id,
+    )
+    if set(pair) != expected_keys:
+        return
+
+    cold = pair[(_TASK_IRRELEVANT, split, "cold")]
+    irrelevant = pair[(_TASK_IRRELEVANT, split, "irrelevant")]
+    audit.require(
+        bool(expected_ids)
+        and cold.transition_ids == expected_ids
+        and irrelevant.transition_ids == expected_ids
+        and np.array_equal(
+            cold.normalized_targets,
+            irrelevant.normalized_targets,
+        ),
+        code="irrelevant_prediction_pair_binding_mismatch",
+        message=(
+            f"{replicate_id} oscillator checkpoints were not scored on the "
+            "same ordered held-out transition IDs and byte-identical targets"
+        ),
+        replicate_id=replicate_id,
+    )
+
+    analytic_targets: list[list[float]] = []
+    analytic_valid = True
+    for transition_id in expected_ids:
+        row = transitions_by_id.get(transition_id)
+        before = None if row is None else row.get("pre_observation")
+        if (
+            row is None
+            or row.get("task_id") != _TASK_IRRELEVANT
+            or row.get("split") != split
+            or not isinstance(before, list)
+            or len(before) != 3
+            or any(_finite_float(value) is None for value in before)
+        ):
+            analytic_valid = False
+            break
+        try:
+            expected_next, expected_reward, expected_applied = (
+                _independent_oscillator_step(before)
+            )
+        except ArtifactAuditError:
+            analytic_valid = False
+            break
+        if expected_applied != 0.0:
+            analytic_valid = False
+            break
+        analytic_targets.append(
+            [
+                (float(expected_next[0]) - float(before[0])) / 2.0,
+                (float(expected_next[1]) - float(before[1])) / 2.0,
+                (float(expected_next[2]) - float(before[2])) / 16.0,
+                expected_reward / _TARGET_REWARD_SCALE,
+            ]
+        )
+    analytic_array = np.asarray(analytic_targets, dtype=np.float32)
+    analytic_match = (
+        analytic_valid
+        and analytic_array.shape == cold.normalized_targets.shape
+        and np.allclose(
+            cold.normalized_targets,
+            analytic_array,
+            rtol=2e-6,
+            atol=2e-7,
+        )
+        and np.allclose(
+            irrelevant.normalized_targets,
+            analytic_array,
+            rtol=2e-6,
+            atol=2e-7,
+        )
+    )
+    audit.require(
+        bool(analytic_match),
+        code="irrelevant_prediction_analytic_target_mismatch",
+        message=(
+            f"{replicate_id} oscillator prediction targets are not independently "
+            "derivable from the bound autonomous analytic dynamics"
+        ),
+        replicate_id=replicate_id,
+    )
+
+    heldout_ids = set(expected_ids)
+    update_ids: set[str] = set()
+    for update in _mapping_rows(replicate.get("updates")):
+        eligible = update.get("eligible_transition_ids")
+        if isinstance(eligible, list):
+            update_ids.update(
+                identity for identity in eligible if isinstance(identity, str)
+            )
+    audit.require(
+        bool(heldout_ids) and heldout_ids.isdisjoint(update_ids),
+        code="irrelevant_validation_training_contamination",
+        message=(
+            f"{replicate_id} held-out oscillator validation IDs occur in a "
+            "candidate update's eligible training identities"
+        ),
+        replicate_id=replicate_id,
+    )
+
 
 def _consumption_sha256(
     indices: npt.NDArray[np.uint32],
@@ -1366,7 +1604,7 @@ def _reconstruct_optimizer_sampling(
     except ImportError as error:
         raise ArtifactAuditError("Torch is unavailable for optimizer RNG replay") from error
 
-    if phase in {"train_a", "train_a_corrupted"}:
+    if phase in {"train_a", "train_a_corrupted", "train_a_irrelevant"}:
         bootstrap_namespace = "ensemble_bootstrap_a"
         order_namespace = "minibatch_order_a"
         balanced = False
@@ -1826,6 +2064,7 @@ def _audit_optimizer_manifests(
         (row for row in update_rows if row.get("phase") == "train_a"),
         None,
     )
+    decoded_indices: dict[str, npt.NDArray[np.uint32]] = {}
     committed_phases: set[str] = set()
     for update in update_rows:
         phase = update.get("phase")
@@ -1924,6 +2163,7 @@ def _audit_optimizer_manifests(
                 replicate_id=replicate_id,
             )
             manifest = decode_sampling_manifest(payload)
+            decoded_indices[phase] = manifest.indices
             expected_identity_digest = hashlib.sha256(
                 json.dumps(
                     list(eligible_ids),
@@ -2020,6 +2260,19 @@ def _audit_optimizer_manifests(
         message=f"{replicate_id} optimizer manifest phases do not exactly match committed updates",
         replicate_id=replicate_id,
     )
+    train_a_indices = decoded_indices.get("train_a")
+    irrelevant_indices = decoded_indices.get("train_a_irrelevant")
+    audit.require(
+        train_a_indices is not None
+        and irrelevant_indices is not None
+        and np.array_equal(train_a_indices, irrelevant_indices),
+        code="irrelevant_control_sampling_schedule_mismatch",
+        message=(
+            f"{replicate_id} irrelevant-control and task-A updates do not use "
+            "the same bootstrap/minibatch sample-index schedule"
+        ),
+        replicate_id=replicate_id,
+    )
     audit.limitation(
         "Bootstrap, balanced-minibatch, minibatch-order, and corruption-permutation "
         "bytes are regenerated without producer sampling code, but exact replay uses "
@@ -2039,6 +2292,10 @@ def _finite_float(value: object) -> float | None:
         return None
     result = float(value)
     return result if math.isfinite(result) else None
+
+
+def _is_sha256(value: object) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(character in "0123456789abcdef" for character in value)
 
 
 def _derive_seed(namespace: str, master_seed: int, index: int = 0) -> int:
@@ -2075,6 +2332,49 @@ def _independent_pendulum_reset(seed: int) -> npt.NDArray[np.float32]:
         [math.cos(theta), math.sin(theta), angular_velocity],
         dtype=np.float32,
     )
+
+
+def _independent_oscillator_reset(seed: int) -> npt.NDArray[np.float64]:
+    """Reconstruct the sealed distractor reset without producer runtime code."""
+
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        raise ArtifactAuditError("independent oscillator reset seed must be a non-negative integer")
+    digest = hashlib.sha256(f"{_OSCILLATOR_SOURCE}:{seed}".encode("ascii")).digest()
+    phase_unit = int.from_bytes(digest[:8], "big") / float(1 << 64)
+    velocity_unit = int.from_bytes(digest[8:16], "big") / float(1 << 64)
+    phase = (2.0 * phase_unit - 1.0) * math.pi
+    velocity = 0.5 + velocity_unit
+    return np.asarray(
+        [math.cos(phase), math.sin(phase), velocity],
+        dtype=np.float64,
+    )
+
+
+def _independent_oscillator_step(
+    observation: Sequence[object],
+) -> tuple[npt.NDArray[np.float64], float, float]:
+    """Reconstruct one autonomous oscillator transition.
+
+    The action is absent by construction: the environment advances only from
+    phase and constant velocity and reports an applied action of exactly zero.
+    """
+
+    if len(observation) != 3:
+        raise ArtifactAuditError("independent oscillator observation must contain three values")
+    parsed = tuple(_finite_float(value) for value in observation)
+    if any(value is None for value in parsed):
+        raise ArtifactAuditError("independent oscillator observation contains a non-finite value")
+    cosine, sine, velocity = (float(value) for value in parsed if value is not None)
+    phase = math.atan2(sine, cosine)
+    next_phase = math.remainder(
+        phase + _OSCILLATOR_TIME_STEP * velocity,
+        2.0 * math.pi,
+    )
+    next_observation = np.asarray(
+        [math.cos(next_phase), math.sin(next_phase), velocity],
+        dtype=np.float64,
+    )
+    return next_observation, float(math.cos(next_phase)), 0.0
 
 
 def _independent_pendulum_step(
@@ -2139,10 +2439,11 @@ def _audit_analytic_transition_dynamics(
     replicate_id: str,
     transition_id: str,
 ) -> None:
-    """Check one raw row against independently implemented Pendulum dynamics."""
+    """Check one raw row against its independently implemented dynamics."""
 
     before = row.get("pre_observation")
     after = row.get("next_observation")
+    task_id = row.get("task_id")
     context = _finite_float(row.get("task_context"))
     intended = _finite_float(row.get("intended_action"))
     applied = _finite_float(row.get("applied_action"))
@@ -2164,11 +2465,20 @@ def _audit_analytic_transition_dynamics(
         )
         return
     try:
-        expected_observation, expected_reward, expected_applied = _independent_pendulum_step(
-            before,
-            context=context,
-            intended_action=intended,
-        )
+        if task_id == _TASK_IRRELEVANT:
+            if context != _TASK_CONTEXT[_TASK_IRRELEVANT]:
+                raise ArtifactAuditError("independent oscillator context must be exactly two")
+            expected_observation, expected_reward, expected_applied = _independent_oscillator_step(before)
+            observation_tolerance = _OSCILLATOR_OBSERVATION_ATOL
+            reward_tolerance = _OSCILLATOR_REWARD_ATOL
+        else:
+            expected_observation, expected_reward, expected_applied = _independent_pendulum_step(
+                before,
+                context=context,
+                intended_action=intended,
+            )
+            observation_tolerance = _PENDULUM_OBSERVATION_ATOL
+            reward_tolerance = _PENDULUM_REWARD_ATOL
     except ArtifactAuditError as error:
         audit.error(
             "transition_dynamics_source_invalid",
@@ -2182,28 +2492,28 @@ def _audit_analytic_transition_dynamics(
     reward_error = abs(reward - expected_reward)
     applied_error = abs(applied - expected_applied)
     audit.require(
-        observation_error <= _PENDULUM_OBSERVATION_ATOL,
+        observation_error <= observation_tolerance,
         code="transition_dynamics_observation_mismatch",
         message=(
             f"{replicate_id} transition {transition_id} next observation is not "
-            "consistent with analytic Pendulum-v1 dynamics"
+            "consistent with the sealed analytic task dynamics"
         ),
         replicate_id=replicate_id,
         evidence={
             "max_absolute_error": observation_error,
-            "absolute_tolerance": _PENDULUM_OBSERVATION_ATOL,
+            "absolute_tolerance": observation_tolerance,
         },
     )
     audit.require(
-        reward_error <= _PENDULUM_REWARD_ATOL,
+        reward_error <= reward_tolerance,
         code="transition_dynamics_reward_mismatch",
         message=(
-            f"{replicate_id} transition {transition_id} reward is not consistent with analytic Pendulum-v1 dynamics"
+            f"{replicate_id} transition {transition_id} reward is not consistent with the sealed analytic task dynamics"
         ),
         replicate_id=replicate_id,
         evidence={
             "absolute_error": reward_error,
-            "absolute_tolerance": _PENDULUM_REWARD_ATOL,
+            "absolute_tolerance": reward_tolerance,
         },
     )
     audit.require(
@@ -2297,15 +2607,26 @@ def _audit_transition_and_episode_rows(
         reset_seed = episode.get("reset_seed")
         first_observation = present_rows[0].get("pre_observation")
         try:
-            expected_reset = _independent_pendulum_reset(reset_seed)  # type: ignore[arg-type]
-            reset_matches = (
-                isinstance(first_observation, list)
-                and len(first_observation) == 3
-                and np.array_equal(
-                    np.asarray(first_observation, dtype=np.float32),
-                    expected_reset,
+            if episode.get("task_id") == _TASK_IRRELEVANT:
+                expected_reset = _independent_oscillator_reset(reset_seed)  # type: ignore[arg-type]
+                reset_matches = (
+                    isinstance(first_observation, list)
+                    and len(first_observation) == 3
+                    and np.array_equal(
+                        np.asarray(first_observation, dtype=np.float64),
+                        expected_reset,
+                    )
                 )
-            )
+            else:
+                expected_pendulum_reset = _independent_pendulum_reset(reset_seed)  # type: ignore[arg-type]
+                reset_matches = (
+                    isinstance(first_observation, list)
+                    and len(first_observation) == 3
+                    and np.array_equal(
+                        np.asarray(first_observation, dtype=np.float32),
+                        expected_pendulum_reset,
+                    )
+                )
         except (ArtifactAuditError, TypeError, ValueError):
             reset_matches = False
         audit.require(
@@ -2313,7 +2634,7 @@ def _audit_transition_and_episode_rows(
             code="episode_reset_observation_mismatch",
             message=(
                 f"{replicate_id} episode {episode_id} first pre-observation "
-                "does not exactly replay from its Gymnasium reset seed"
+                "does not exactly replay from its sealed task reset seed"
             ),
             replicate_id=replicate_id,
         )
@@ -2425,12 +2746,14 @@ def _audit_transition_and_episode_rows(
             action_valid = math.isclose(applied, intended, rel_tol=0.0, abs_tol=1e-7)
         elif intended is not None and applied is not None and task_id == _TASK_B:
             action_valid = math.isclose(applied, -intended, rel_tol=0.0, abs_tol=1e-7)
+        elif intended is not None and applied is not None and task_id == _TASK_IRRELEVANT:
+            action_valid = applied == 0.0
         else:
             action_valid = False
         audit.require(
             action_valid,
             code="transition_applied_action_mismatch",
-            message=f"{replicate_id} transition {transition_id} applied torque violates task semantics",
+            message=f"{replicate_id} transition {transition_id} applied action violates task semantics",
             replicate_id=replicate_id,
         )
         raw_target = row.get("scaled_target")
@@ -2512,10 +2835,11 @@ def _audit_transition_and_episode_rows(
             transition_id=transition_id,
         )
     audit.limitation(
-        "Episode reset observations are reconstructed from the documented "
-        "Gymnasium 0.29.1 default_rng/PCG64 Pendulum reset algorithm without "
-        "importing Gymnasium; exact replay consequently relies on NumPy's bound "
-        "Generator semantics."
+        "Pendulum reset observations are reconstructed from the documented "
+        "Gymnasium 0.29.1 default_rng/PCG64 algorithm without importing "
+        "Gymnasium; exact replay consequently relies on NumPy's bound Generator "
+        "semantics. The independent oscillator is reconstructed directly from "
+        "its SHA-256 reset and autonomous analytic dynamics."
     )
     return transitions_by_id
 
@@ -2526,6 +2850,18 @@ def _expected_policy_contract(
     split: object,
     condition: object,
 ) -> tuple[tuple[str, int], str, Mapping[str, int] | None] | None:
+    if task_id == _TASK_IRRELEVANT and split == "collect_irrelevant" and condition == "collection_random":
+        return ("irrelevant_collection_action", 0), "uniform_random", None
+    if (
+        task_id == _TASK_IRRELEVANT
+        and split == "predictive_validation_irrelevant"
+        and condition == "validation_random"
+    ):
+        return (
+            ("predictive_validation_irrelevant_action", 0),
+            "uniform_random",
+            None,
+        )
     task_index = {_TASK_A: 0, _TASK_B: 1}.get(str(task_id))
     if task_index is None:
         return None
@@ -2548,6 +2884,7 @@ def _expected_policy_contract(
         "cold",
         "frozen",
         "corrupted",
+        "irrelevant",
         "after_a",
         "after_b_replay",
         "after_b_naive",
@@ -2568,6 +2905,13 @@ def _expected_policy_contract(
 
 
 def _expected_reset_namespace(*, task_id: object, split: object) -> str | None:
+    if task_id == _TASK_IRRELEVANT and split == "collect_irrelevant":
+        return "collect_irrelevant_episode"
+    if (
+        task_id == _TASK_IRRELEVANT
+        and split == "predictive_validation_irrelevant"
+    ):
+        return "predictive_validation_irrelevant_episode"
     suffix = {_TASK_A: "a", _TASK_B: "b"}.get(str(task_id))
     if suffix is None:
         return None
@@ -2651,7 +2995,7 @@ def _replay_cem_action_trace(
     """Replay complete CEM decisions with an audit-local Torch implementation.
 
     ``observed_states`` is step-major ``[steps, paired episodes, 3]``.  A
-    ``None`` model selects the analytic oracle; otherwise the six retained
+    ``None`` model selects the analytic oracle; otherwise the seven retained
     snapshot's sealed five-member tensor map is used.  The implementation
     mirrors the public CEM algorithm (Gaussian sample, action projection,
     rollout, top-k, elite mean/std) but imports neither producer planning nor
@@ -2955,8 +3299,8 @@ def _audit_policy_runs(
             "derived_seed_schedule_incomplete",
             f"{replicate_id} does not retain the exact full seed namespace/count schedule.",
             evidence_needed=(
-                "All 17 sealed namespace rows, in full declared counts, with each value "
-                "regenerated from the v1.0 experimental seed hash domain."
+                "Every sealed namespace row, in full declared counts, with each value "
+                "regenerated from the v1.3 experimental seed hash domain."
             ),
         )
 
@@ -3130,7 +3474,7 @@ def _audit_policy_runs(
                     ],
                     dtype=np.float32,
                 )
-                expected_actions = np.asarray(
+                expected_cem_actions = np.asarray(
                     [
                         [
                             episode_transitions[episode_index][step]["intended_action"]
@@ -3177,7 +3521,7 @@ def _audit_policy_runs(
                     policy.get("rng_start_sha256") == start_digest and policy.get("rng_end_sha256") == end_digest
                 )
                 audit.require(
-                    np.array_equal(replayed_actions, expected_actions),
+                    np.array_equal(replayed_actions, expected_cem_actions),
                     code="cem_policy_action_replay_mismatch",
                     message=(
                         f"{label} complete action trace does not exactly replay "
@@ -3225,6 +3569,7 @@ def _audit_policy_runs(
                 "cold",
                 "frozen",
                 "corrupted",
+                "irrelevant",
                 "after_a",
                 "after_b_replay",
                 "after_b_naive",
@@ -3280,6 +3625,433 @@ def _audit_policy_runs(
         message=f"{replicate_id} policy runs do not partition every real episode exactly once",
         replicate_id=replicate_id,
     )
+
+
+def _decode_restart_evaluation(
+    payload: bytes,
+    *,
+    label: str,
+) -> Mapping[str, object]:
+    """Decode one retained K7 continuation without producer parity helpers."""
+
+    if not payload.endswith(b"\n"):
+        raise ArtifactAuditError(f"{label} lacks its canonical trailing newline")
+    raw = _json_without_duplicate_keys(payload[:-1], label=label)
+    expected_fields = {
+        "schema",
+        "process_id",
+        "checkpoint_manifest_sha256",
+        "component_hashes",
+        "model_version",
+        "parameter_sha256",
+        "boundary_state",
+        "post_evaluation_custody",
+        "tasks",
+    }
+    if (
+        not isinstance(raw, dict)
+        or set(raw) != expected_fields
+        or raw.get("schema") != "prospect.wm001.restart-evaluation.v1"
+        or payload != _canonical_json_bytes(raw) + b"\n"
+    ):
+        raise ArtifactAuditError(f"{label} is not a canonical restart evaluation")
+    if (
+        type(raw.get("process_id")) is not int
+        or int(raw["process_id"]) < 1
+        or not _is_sha256(raw.get("checkpoint_manifest_sha256"))
+        or not isinstance(raw.get("model_version"), str)
+        or not raw.get("model_version")
+        or not _is_sha256(raw.get("parameter_sha256"))
+    ):
+        raise ArtifactAuditError(f"{label} has invalid process or model identity")
+
+    component_hashes = raw.get("component_hashes")
+    if (
+        not isinstance(component_hashes, dict)
+        or set(component_hashes) != set(_CANONICAL_COMPONENT_IDS)
+        or any(not _is_sha256(component_hashes.get(component_id)) for component_id in _CANONICAL_COMPONENT_IDS)
+    ):
+        raise ArtifactAuditError(f"{label} has an invalid canonical component-hash set")
+
+    custody_fields = {"experiences", "transitions", "updates", "replay_events"}
+
+    def validate_custody(value: object, *, field: str) -> None:
+        if (
+            not isinstance(value, dict)
+            or set(value) != custody_fields
+            or any(type(value.get(name)) is not int or int(value[name]) < 0 for name in custody_fields)
+        ):
+            raise ArtifactAuditError(f"{label} {field} is invalid")
+
+    boundary = raw.get("boundary_state")
+    boundary_fields = {
+        "snapshot_id",
+        "agent_id",
+        "captured_at",
+        "belief_id",
+        "latest_update_id",
+        "configuration_version",
+        "memory_version",
+        "knowledge_version",
+        "model_version",
+        "representation_version",
+        "policy_version",
+        "custody",
+    }
+    if not isinstance(boundary, dict) or set(boundary) != boundary_fields:
+        raise ArtifactAuditError(f"{label} boundary state has an unexpected field set")
+    if any(
+        not isinstance(boundary.get(field), str) or not boundary.get(field)
+        for field in boundary_fields - {"captured_at", "custody"}
+    ):
+        raise ArtifactAuditError(f"{label} boundary state has an invalid identity")
+    captured_at = boundary.get("captured_at")
+    if (
+        not isinstance(captured_at, list)
+        or len(captured_at) != 2
+        or not isinstance(captured_at[0], str)
+        or not captured_at[0]
+        or type(captured_at[1]) is not int
+        or int(captured_at[1]) < 0
+    ):
+        raise ArtifactAuditError(f"{label} boundary timestamp is invalid")
+    validate_custody(boundary.get("custody"), field="boundary custody")
+    validate_custody(
+        raw.get("post_evaluation_custody"),
+        field="post-evaluation custody",
+    )
+
+    tasks = raw.get("tasks")
+    if (
+        not isinstance(tasks, list)
+        or len(tasks) != 2
+        or [task.get("task_id") for task in tasks if isinstance(task, Mapping)] != [_TASK_A, _TASK_B]
+    ):
+        raise ArtifactAuditError(f"{label} must contain task A then task B")
+    for task_index, task in enumerate(tasks):
+        if not isinstance(task, dict) or set(task) != {
+            "task_id",
+            "reset_seed",
+            "return",
+            "actions",
+            "predictions",
+            "identities",
+        }:
+            raise ArtifactAuditError(f"{label} task {task_index} has an unexpected field set")
+        actions = task.get("actions")
+        predictions = task.get("predictions")
+        identities = task.get("identities")
+        if (
+            type(task.get("reset_seed")) is not int
+            or int(task["reset_seed"]) < 0
+            or _finite_float(task.get("return")) is None
+            or not isinstance(actions, list)
+            or len(actions) != _EPISODE_HORIZON
+            or any(
+                _finite_float(action) is None
+                or float(action) < -_PENDULUM_MAX_TORQUE
+                or float(action) > _PENDULUM_MAX_TORQUE
+                for action in actions
+            )
+            or not isinstance(predictions, list)
+            or len(predictions) != _EPISODE_HORIZON
+            or not isinstance(identities, list)
+            or len(identities) != _EPISODE_HORIZON
+        ):
+            raise ArtifactAuditError(f"{label} task {task_index} has invalid scalar or trace dimensions")
+        for step_index, prediction in enumerate(predictions):
+            if not isinstance(prediction, dict) or set(prediction) != {
+                "member_means",
+                "member_variances",
+            }:
+                raise ArtifactAuditError(f"{label} task {task_index} prediction {step_index} is malformed")
+            for field, require_nonnegative in (
+                ("member_means", False),
+                ("member_variances", True),
+            ):
+                matrix = prediction.get(field)
+                if (
+                    not isinstance(matrix, list)
+                    or len(matrix) != 5
+                    or any(not isinstance(member, list) or len(member) != 3 for member in matrix)
+                    or any(
+                        _finite_float(item) is None or (require_nonnegative and float(item) < 0.0)
+                        for member in matrix
+                        for item in member
+                    )
+                ):
+                    raise ArtifactAuditError(f"{label} task {task_index} prediction {step_index} {field} is invalid")
+        for step_index, identity_row in enumerate(identities):
+            if (
+                not isinstance(identity_row, list)
+                or len(identity_row) != 4
+                or any(not isinstance(identity, str) or not identity for identity in identity_row)
+            ):
+                raise ArtifactAuditError(f"{label} task {task_index} identity row {step_index} is invalid")
+    return raw
+
+
+def _restart_trace_differences(
+    live: Mapping[str, object],
+    restored: Mapping[str, object],
+) -> dict[str, object]:
+    """Recompute K7 differences from both retained traces."""
+
+    live_components = cast(Mapping[str, object], live["component_hashes"])
+    restored_components = cast(Mapping[str, object], restored["component_hashes"])
+    component_mismatches = [
+        component_id
+        for component_id in _CANONICAL_COMPONENT_IDS
+        if live_components.get(component_id) != restored_components.get(component_id)
+    ]
+    identity_mismatches = int(live.get("boundary_state") != restored.get("boundary_state"))
+    identity_mismatches += int(live.get("post_evaluation_custody") != restored.get("post_evaluation_custody"))
+    prediction_difference = 0.0
+    action_difference = 0.0
+    return_difference = 0.0
+    live_tasks = cast(list[Mapping[str, object]], live["tasks"])
+    restored_tasks = cast(list[Mapping[str, object]], restored["tasks"])
+    for live_task, restored_task in zip(live_tasks, restored_tasks, strict=True):
+        if (
+            live_task.get("task_id"),
+            live_task.get("reset_seed"),
+        ) != (
+            restored_task.get("task_id"),
+            restored_task.get("reset_seed"),
+        ):
+            raise ArtifactAuditError("restart traces use different task/reset assignments")
+        live_actions = np.asarray(live_task["actions"], dtype=np.float64)
+        restored_actions = np.asarray(restored_task["actions"], dtype=np.float64)
+        action_difference = max(
+            action_difference,
+            float(
+                np.max(
+                    np.abs(live_actions - restored_actions),
+                    initial=0.0,
+                )
+            ),
+        )
+        live_predictions = np.asarray(
+            [
+                [prediction["member_means"], prediction["member_variances"]]
+                for prediction in cast(
+                    list[Mapping[str, object]],
+                    live_task["predictions"],
+                )
+            ],
+            dtype=np.float64,
+        )
+        restored_predictions = np.asarray(
+            [
+                [prediction["member_means"], prediction["member_variances"]]
+                for prediction in cast(
+                    list[Mapping[str, object]],
+                    restored_task["predictions"],
+                )
+            ],
+            dtype=np.float64,
+        )
+        prediction_difference = max(
+            prediction_difference,
+            float(
+                np.max(
+                    np.abs(live_predictions - restored_predictions),
+                    initial=0.0,
+                )
+            ),
+        )
+        return_difference = max(
+            return_difference,
+            abs(float(cast(int | float, live_task["return"])) - float(cast(int | float, restored_task["return"]))),
+        )
+        live_identities = cast(list[list[str]], live_task["identities"])
+        restored_identities = cast(list[list[str]], restored_task["identities"])
+        identity_mismatches += sum(
+            int(before != after)
+            for before, after in zip(
+                live_identities,
+                restored_identities,
+                strict=True,
+            )
+        )
+    live_pid = cast(int, live["process_id"])
+    restored_pid = cast(int, restored["process_id"])
+    return {
+        "checkpoint_manifest_sha256": live["checkpoint_manifest_sha256"],
+        "original_process_id": live_pid,
+        "restored_process_id": restored_pid,
+        "fresh_process": live_pid != restored_pid,
+        "component_hash_mismatches": component_mismatches,
+        "identity_or_lineage_mismatches": identity_mismatches,
+        "prediction_max_abs_difference": prediction_difference,
+        "action_max_abs_difference": action_difference,
+        "episode_return_max_abs_difference": return_difference,
+    }
+
+
+def _audit_restart_parity_evidence(
+    audit: _Audit,
+    root: Path,
+    replicate: Mapping[str, object],
+    *,
+    replicate_id: str,
+    launcher_process_id: object,
+) -> None:
+    """Reopen both K7 paths and independently reproduce the parity row."""
+
+    parity = replicate.get("restart_parity")
+    if not isinstance(parity, Mapping):
+        audit.gap(
+            "restart_original_and_restored_trace_unavailable",
+            "K7 has no restart-parity row or retained live/fresh-process trace pair.",
+            evidence_needed=(
+                "Content-addressed live-continuation and restored-continuation "
+                "files whose exact differences can be independently recomputed."
+            ),
+        )
+        return
+    live_reference = parity.get("live_evaluation")
+    restored_reference = parity.get("restored_evaluation")
+    if not isinstance(live_reference, Mapping) or not isinstance(
+        restored_reference,
+        Mapping,
+    ):
+        audit.gap(
+            "restart_original_and_restored_trace_unavailable",
+            (
+                "K7 reports derived parity values but does not retain both the "
+                "original live continuation and the fresh-process continuation."
+            ),
+            evidence_needed=(
+                "Content-addressed live-continuation and restored-continuation "
+                "files whose exact differences can be independently recomputed."
+            ),
+        )
+        return
+    try:
+        expected_media_type = "application/vnd.prospect.wm001.restart-evaluation+json"
+        if (
+            live_reference.get("media_type") != expected_media_type
+            or restored_reference.get("media_type") != expected_media_type
+        ):
+            raise ArtifactAuditError("restart evaluation media type differs from the sealed format")
+        _, live_payload = _verify_file_reference(
+            root,
+            live_reference,
+            limit=_MAX_RESTART_EVALUATION_BYTES,
+            label=f"{replicate_id} live restart evaluation",
+        )
+        _, restored_payload = _verify_file_reference(
+            root,
+            restored_reference,
+            limit=_MAX_RESTART_EVALUATION_BYTES,
+            label=f"{replicate_id} restored restart evaluation",
+        )
+        live = _decode_restart_evaluation(
+            live_payload,
+            label=f"{replicate_id} live restart evaluation",
+        )
+        restored = _decode_restart_evaluation(
+            restored_payload,
+            label=f"{replicate_id} restored restart evaluation",
+        )
+        audit.require(
+            all(
+                live.get(field) == restored.get(field)
+                for field in (
+                    "checkpoint_manifest_sha256",
+                    "model_version",
+                    "parameter_sha256",
+                )
+            ),
+            code="restart_static_identity_mismatch",
+            message=(f"{replicate_id} restart traces bind different checkpoint/model identities"),
+            replicate_id=replicate_id,
+        )
+        audit.require(
+            type(launcher_process_id) is int
+            and live.get("process_id") == launcher_process_id
+            and restored.get("process_id") != launcher_process_id,
+            code="restart_process_identity_mismatch",
+            message=(
+                f"{replicate_id} retained traces do not bind the live "
+                "continuation to the launcher and the restored continuation "
+                "to a distinct process"
+            ),
+            replicate_id=replicate_id,
+        )
+
+        master_seed = replicate.get("master_seed")
+        expected_reset_seeds = (
+            _derive_seed(
+                "behavior_evaluation_a_episode",
+                int(master_seed),
+                0,
+            )
+            if type(master_seed) is int
+            else None,
+            _derive_seed(
+                "behavior_evaluation_b_episode",
+                int(master_seed),
+                0,
+            )
+            if type(master_seed) is int
+            else None,
+        )
+        live_tasks = cast(list[Mapping[str, object]], live["tasks"])
+        audit.require(
+            tuple(task.get("reset_seed") for task in live_tasks) == expected_reset_seeds,
+            code="restart_reset_seed_mismatch",
+            message=(f"{replicate_id} restart traces do not use the sealed task reset seeds"),
+            replicate_id=replicate_id,
+        )
+
+        checkpoint_components = {
+            row.get("component_id"): row.get("sha256") for row in _mapping_rows(replicate.get("checkpoint_components"))
+        }
+        audit.require(
+            checkpoint_components == live.get("component_hashes")
+            and checkpoint_components == restored.get("component_hashes"),
+            code="restart_component_binding_mismatch",
+            message=(f"{replicate_id} restart traces do not bind the checkpoint component rows"),
+            replicate_id=replicate_id,
+        )
+        retained_updates = [
+            row
+            for row in _mapping_rows(replicate.get("updates"))
+            if row.get("phase") == "train_b_replay" and row.get("status") == "committed"
+        ]
+        retained_update: Mapping[str, object] = retained_updates[0] if len(retained_updates) == 1 else {}
+        live_boundary = cast(Mapping[str, object], live["boundary_state"])
+        audit.require(
+            len(retained_updates) == 1
+            and live.get("parameter_sha256") == retained_update.get("committed_parameter_sha256")
+            and live.get("model_version") == retained_update.get("committed_model_version")
+            and live_boundary.get("latest_update_id") == retained_update.get("receipt_id")
+            and live_boundary.get("model_version") == retained_update.get("committed_model_version"),
+            code="restart_retained_state_lineage_mismatch",
+            message=(f"{replicate_id} restart traces do not continue the retained B-replay state"),
+            replicate_id=replicate_id,
+        )
+
+        recomputed = _restart_trace_differences(live, restored)
+        stored_summary = {
+            key: value for key, value in parity.items() if key not in {"live_evaluation", "restored_evaluation"}
+        }
+        audit.require(
+            _canonical_json_bytes(stored_summary) == _canonical_json_bytes(recomputed),
+            code="restart_parity_recomputation_mismatch",
+            message=(
+                f"{replicate_id} stored K7 differences differ from the independently reopened live/restored traces"
+            ),
+            replicate_id=replicate_id,
+        )
+    except (ArtifactAuditError, KeyError, TypeError, ValueError) as error:
+        audit.error(
+            "restart_evidence_invalid",
+            f"{replicate_id} restart evidence: {error}",
+            replicate_id=replicate_id,
+        )
 
 
 def _stream_zip_member_digest(
@@ -3507,7 +4279,7 @@ def _validate_checkpoint_domain_component(
     payload: bytes,
     *,
     component_id: str,
-) -> None:
+) -> Mapping[str, object]:
     raw = _json_without_duplicate_keys(
         payload,
         label=f"checkpoint {component_id}",
@@ -3671,6 +4443,280 @@ def _validate_checkpoint_domain_component(
             or snapshot.get("pending_intentions") != {"$tuple": []}
         ):
             raise ArtifactAuditError("agent domain graph snapshot differs from runtime custody")
+    return raw
+
+
+def _decode_checkpoint_replay_component(
+    payload: bytes,
+    *,
+    component_id: str,
+) -> Mapping[str, object]:
+    """Decode one canonical replay component without producer serializers."""
+
+    raw = _json_without_duplicate_keys(
+        payload,
+        label=f"checkpoint {component_id}",
+    )
+    expected_fields = (
+        {
+            "schema",
+            "canonical_experience_rows",
+            "collect_a",
+            "collect_b",
+        }
+        if component_id == "replay_index"
+        else {"schema", "manifests"}
+        if component_id == "replay_sampling_history"
+        else None
+    )
+    expected_schema = {
+        "replay_index": "prospect.wm001.replay-index.v1",
+        "replay_sampling_history": "prospect.wm001.replay-sampling-history.v1",
+    }.get(component_id)
+    if (
+        expected_fields is None
+        or expected_schema is None
+        or not isinstance(raw, dict)
+        or set(raw) != expected_fields
+        or raw.get("schema") != expected_schema
+        or payload != _canonical_json_bytes(raw)
+    ):
+        raise ArtifactAuditError(
+            f"checkpoint {component_id} violates its canonical format"
+        )
+    return raw
+
+
+def _expected_checkpoint_transition_dataset(
+    rows: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    return {
+        "transition_ids": [row.get("transition_id") for row in rows],
+        "observations": [row.get("pre_observation") for row in rows],
+        "contexts": [row.get("task_context") for row in rows],
+        "actions": [row.get("intended_action") for row in rows],
+        "next_observations": [row.get("next_observation") for row in rows],
+        "rewards": [row.get("reward") for row in rows],
+    }
+
+
+def _audit_retained_replay_components(
+    audit: _Audit,
+    root: Path,
+    replicate: Mapping[str, object],
+    *,
+    replicate_id: str,
+    replay_index: Mapping[str, object],
+    replay_sampling_history: Mapping[str, object],
+) -> None:
+    """Bind retained replay bytes to only the persistent A/B agent evidence."""
+
+    transitions = _mapping_rows(replicate.get("transitions"))
+    heldout_ids = {
+        str(row["transition_id"])
+        for row in transitions
+        if str(row.get("split", "")).startswith(
+            ("predictive_validation_", "behavior_evaluation_")
+        )
+        and isinstance(row.get("transition_id"), str)
+    }
+    expected_by_split = {
+        split: [
+            row
+            for row in transitions
+            if row.get("split") == split
+        ]
+        for split in ("collect_a", "collect_b")
+    }
+    expected_rows = [
+        *expected_by_split["collect_a"],
+        *expected_by_split["collect_b"],
+    ]
+    canonical_experiences = replay_index.get("canonical_experience_rows")
+    experience_linkage_valid = False
+    if isinstance(canonical_experiences, list):
+        expected_links = [
+            (
+                row.get("run_id"),
+                row.get("task_id"),
+                row.get("episode_id"),
+                row.get("step_index"),
+            )
+            for row in expected_rows
+        ]
+        actual_links: list[tuple[object, object, object, object]] = []
+        experience_ids: list[object] = []
+        experience_rows_valid = True
+        for row in canonical_experiences:
+            if (
+                not isinstance(row, Mapping)
+                or set(row)
+                != {
+                    "experience_id",
+                    "run_id",
+                    "task_id",
+                    "episode_id",
+                    "step_index",
+                    "closed_at",
+                }
+            ):
+                experience_rows_valid = False
+                continue
+            closed_at = row.get("closed_at")
+            if (
+                not isinstance(row.get("experience_id"), str)
+                or not row.get("experience_id")
+                or row.get("task_id") not in {_TASK_A, _TASK_B}
+                or not isinstance(closed_at, list)
+                or len(closed_at) != 2
+                or not isinstance(closed_at[0], str)
+                or not closed_at[0]
+                or type(closed_at[1]) is not int
+                or int(closed_at[1]) < 0
+            ):
+                experience_rows_valid = False
+            experience_ids.append(row.get("experience_id"))
+            actual_links.append(
+                (
+                    row.get("run_id"),
+                    row.get("task_id"),
+                    row.get("episode_id"),
+                    row.get("step_index"),
+                )
+            )
+        experience_linkage_valid = (
+            experience_rows_valid
+            and len(experience_ids) == len(set(experience_ids))
+            and actual_links == expected_links
+        )
+    replay_dataset_valid = (
+        replay_index.get("collect_a")
+        == _expected_checkpoint_transition_dataset(
+            expected_by_split["collect_a"]
+        )
+        and replay_index.get("collect_b")
+        == _expected_checkpoint_transition_dataset(
+            expected_by_split["collect_b"]
+        )
+        and all(
+            row.get("task_id") in {_TASK_A, _TASK_B}
+            and row.get("split") in {"collect_a", "collect_b"}
+            for row in expected_rows
+        )
+    )
+    audit.require(
+        experience_linkage_valid and replay_dataset_valid,
+        code="checkpoint_replay_index_isolation_mismatch",
+        message=(
+            f"{replicate_id} retained replay index is not exactly the ordered "
+            "collect-A/collect-B evidence or contains irrelevant-control custody"
+        ),
+        replicate_id=replicate_id,
+    )
+    retained_transition_ids: set[str] = set()
+    for split in ("collect_a", "collect_b"):
+        dataset = replay_index.get(split)
+        if not isinstance(dataset, Mapping):
+            continue
+        identities = dataset.get("transition_ids")
+        if isinstance(identities, list):
+            retained_transition_ids.update(
+                identity
+                for identity in identities
+                if isinstance(identity, str)
+            )
+    audit.require(
+        retained_transition_ids.isdisjoint(heldout_ids),
+        code="checkpoint_replay_heldout_contamination",
+        message=(
+            f"{replicate_id} retained checkpoint replay contains a "
+            "prediction-validation or behavior-evaluation transition ID"
+        ),
+        replicate_id=replicate_id,
+    )
+
+    expected_updates = [
+        row
+        for row in _mapping_rows(replicate.get("updates"))
+        if row.get("phase") in {"train_a", "train_b_replay"}
+        and row.get("status") == "committed"
+    ]
+    expected_phases = ("train_a", "train_b_replay")
+    result_manifests = {
+        str(row.get("phase")): row
+        for row in _mapping_rows(
+            replicate.get("optimizer_batch_manifests")
+        )
+        if row.get("phase") in expected_phases
+    }
+    retained_manifests = replay_sampling_history.get("manifests")
+    sampling_valid = (
+        isinstance(retained_manifests, list)
+        and tuple(
+            row.get("phase")
+            for row in retained_manifests
+            if isinstance(row, Mapping)
+        )
+        == expected_phases
+        and tuple(row.get("phase") for row in expected_updates)
+        == expected_phases
+        and set(result_manifests) == set(expected_phases)
+    )
+    if isinstance(retained_manifests, list):
+        updates_by_phase = {
+            str(row.get("phase")): row for row in expected_updates
+        }
+        for row in retained_manifests:
+            if not isinstance(row, Mapping) or set(row) != {
+                "phase",
+                "sha256",
+                "bytes",
+                "payload_base64",
+            }:
+                sampling_valid = False
+                continue
+            phase = row.get("phase")
+            if phase not in expected_phases:
+                sampling_valid = False
+                continue
+            try:
+                payload = _decode_strict_base64(
+                    row.get("payload_base64"),
+                    label=f"{replicate_id} checkpoint {phase} replay manifest",
+                )
+                reference = result_manifests[str(phase)]
+                _, external_payload = _verify_file_reference(
+                    root,
+                    reference,
+                    limit=_MAX_MANIFEST_BYTES,
+                    label=f"{replicate_id} retained {phase} optimizer manifest",
+                )
+                update = updates_by_phase[str(phase)]
+                sampling_valid = sampling_valid and (
+                    row.get("bytes") == len(payload)
+                    and row.get("sha256")
+                    == hashlib.sha256(payload).hexdigest()
+                    and payload == external_payload
+                    and update.get("sampling_manifest_sha256")
+                    == row.get("sha256")
+                )
+            except (
+                ArtifactAuditError,
+                KeyError,
+                OSError,
+                TypeError,
+                ValueError,
+            ):
+                sampling_valid = False
+    audit.require(
+        sampling_valid,
+        code="checkpoint_replay_sampling_isolation_mismatch",
+        message=(
+            f"{replicate_id} retained replay sampling history is not exactly "
+            "train-A then train-B-replay or contains an irrelevant-control manifest"
+        ),
+        replicate_id=replicate_id,
+    )
 
 
 def _audit_checkpoint(
@@ -3754,7 +4800,8 @@ def _audit_checkpoint(
                 raise ArtifactAuditError("checkpoint manifest has invalid component or metadata fields")
             expected_paths = {_CHECKPOINT_MANIFEST}
             archive_components: dict[str, Mapping[str, object]] = {}
-            domain_components_verified: set[str] = set()
+            verified_domain_components: dict[str, Mapping[str, object]] = {}
+            verified_replay_components: dict[str, Mapping[str, object]] = {}
             total_bytes = 0
             for entry in component_entries:
                 if not isinstance(entry, Mapping) or set(entry) != {
@@ -3793,18 +4840,31 @@ def _audit_checkpoint(
                     "agent_runtime",
                 }:
                     if entry.get("media_type") == "application/json" and size <= 512 << 20:
-                        _validate_checkpoint_domain_component(
+                        verified_domain_components[component_id] = _validate_checkpoint_domain_component(
                             archive.read(info),
                             component_id=component_id,
                         )
-                        domain_components_verified.add(component_id)
+                if component_id in {
+                    "replay_index",
+                    "replay_sampling_history",
+                }:
+                    if (
+                        entry.get("media_type") == "application/json"
+                        and size <= 512 << 20
+                    ):
+                        verified_replay_components[component_id] = (
+                            _decode_checkpoint_replay_component(
+                                archive.read(info),
+                                component_id=component_id,
+                            )
+                        )
                 expected_paths.add(str(member_path))
                 archive_components[component_id] = entry
             if set(names) != expected_paths:
                 raise ArtifactAuditError("checkpoint ZIP member set differs from its manifest")
             if set(archive_components) != set(_CANONICAL_COMPONENT_IDS):
                 raise ArtifactAuditError("checkpoint does not contain all and only 15 canonical components")
-            if domain_components_verified != {
+            if set(verified_domain_components) != {
                 "experience_store",
                 "update_receipts",
                 "agent_runtime",
@@ -3819,6 +4879,95 @@ def _audit_checkpoint(
                         "Canonical bounded experience_store, update_receipts, and "
                         "agent_runtime JSON components using only the allowlisted graph grammar."
                     ),
+                )
+            else:
+                heldout_transition_ids = {
+                    str(row["transition_id"])
+                    for row in _mapping_rows(replicate.get("transitions"))
+                    if str(row.get("split", "")).startswith(
+                        (
+                            "predictive_validation_",
+                            "behavior_evaluation_",
+                        )
+                    )
+                    and isinstance(row.get("transition_id"), str)
+                }
+                expected_transition_rows = [
+                    row
+                    for row in _mapping_rows(replicate.get("transitions"))
+                    if row.get("split") in {"collect_a", "collect_b"}
+                ]
+                expected_update_rows = [
+                    row
+                    for row in _mapping_rows(replicate.get("updates"))
+                    if row.get("phase") in {"train_a", "train_b_replay"} and row.get("status") == "committed"
+                ]
+                experience_component = verified_domain_components["experience_store"]
+                receipts_component = verified_domain_components["update_receipts"]
+                audit.require(
+                    experience_component.get("transition_rows") == expected_transition_rows
+                    and all(row.get("task_id") in {_TASK_A, _TASK_B} for row in expected_transition_rows)
+                    and not any(row.get("split") == "collect_irrelevant" for row in expected_transition_rows),
+                    code="checkpoint_irrelevant_experience_isolation_mismatch",
+                    message=(
+                        f"{replicate_id} retained checkpoint experience is not "
+                        "exactly the ordered collect-A/collect-B evidence"
+                    ),
+                    replicate_id=replicate_id,
+                )
+                checkpoint_transition_ids = {
+                    str(row["transition_id"])
+                    for row in _mapping_rows(
+                        experience_component.get("transition_rows")
+                    )
+                    if isinstance(row.get("transition_id"), str)
+                }
+                audit.require(
+                    checkpoint_transition_ids.isdisjoint(
+                        heldout_transition_ids
+                    ),
+                    code="checkpoint_heldout_experience_contamination",
+                    message=(
+                        f"{replicate_id} retained checkpoint experience contains "
+                        "a prediction-validation or behavior-evaluation transition ID"
+                    ),
+                    replicate_id=replicate_id,
+                )
+                audit.require(
+                    receipts_component.get("updates") == expected_update_rows
+                    and tuple(row.get("phase") for row in expected_update_rows) == ("train_a", "train_b_replay"),
+                    code="checkpoint_irrelevant_update_isolation_mismatch",
+                    message=(
+                        f"{replicate_id} retained checkpoint receipts are not exactly train-A then train-B-replay"
+                    ),
+                    replicate_id=replicate_id,
+                )
+            if set(verified_replay_components) != {
+                "replay_index",
+                "replay_sampling_history",
+            }:
+                audit.gap(
+                    "checkpoint_replay_semantics_unverified",
+                    (
+                        f"{replicate_id} checkpoint does not expose canonical "
+                        "JSON replay_index and replay_sampling_history components."
+                    ),
+                    evidence_needed=(
+                        "Canonical bounded replay-index and sampling-history "
+                        "JSON that can be cross-bound to collect-A/collect-B "
+                        "rows and retained optimizer manifests."
+                    ),
+                )
+            else:
+                _audit_retained_replay_components(
+                    audit,
+                    root,
+                    replicate,
+                    replicate_id=replicate_id,
+                    replay_index=verified_replay_components["replay_index"],
+                    replay_sampling_history=verified_replay_components[
+                        "replay_sampling_history"
+                    ],
                 )
 
             result_rows = _mapping_rows(replicate.get("checkpoint_components"))
@@ -3890,24 +5039,275 @@ def _audit_checkpoint(
         )
 
 
+_StableFileIdentity = tuple[int, int, int, int, int, int]
+
+
+def _stable_file_identity(value: os.stat_result) -> _StableFileIdentity:
+    """Return metadata whose change makes a custody read non-atomic."""
+
+    return (
+        value.st_dev,
+        value.st_ino,
+        value.st_mode,
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_ctime_ns,
+    )
+
+
+def _read_stable_regular_file(
+    path: Path,
+    limit: int,
+    *,
+    label: str,
+    capture_payload: bool,
+) -> tuple[bytes | None, int, str, _StableFileIdentity]:
+    """Hash one bounded regular file while rejecting replacement or mutation."""
+
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise ArtifactAuditError(f"{label} cannot be opened safely: {error}") from error
+    chunks: list[bytes] = []
+    digest = hashlib.sha256()
+    observed_bytes = 0
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise ArtifactAuditError(f"{label} must be a regular non-symlink file")
+        if before.st_size > limit:
+            raise ArtifactAuditError(f"{label} exceeds its {limit}-byte audit limit")
+        while True:
+            chunk = os.read(descriptor, 1 << 20)
+            if not chunk:
+                break
+            observed_bytes += len(chunk)
+            if observed_bytes > limit:
+                raise ArtifactAuditError(f"{label} exceeds its {limit}-byte audit limit")
+            digest.update(chunk)
+            if capture_payload:
+                chunks.append(chunk)
+        after = os.fstat(descriptor)
+    except OSError as error:
+        raise ArtifactAuditError(f"{label} cannot be read safely: {error}") from error
+    finally:
+        os.close(descriptor)
+
+    try:
+        current = path.lstat()
+    except OSError as error:
+        raise ArtifactAuditError(f"{label} changed while it was being read: {error}") from error
+    before_identity = _stable_file_identity(before)
+    after_identity = _stable_file_identity(after)
+    current_identity = _stable_file_identity(current)
+    if (
+        before_identity != after_identity
+        or after_identity != current_identity
+        or not stat.S_ISREG(current.st_mode)
+        or observed_bytes != after.st_size
+    ):
+        raise ArtifactAuditError(f"{label} changed while it was being read")
+    payload = b"".join(chunks) if capture_payload else None
+    return payload, observed_bytes, digest.hexdigest(), after_identity
+
+
+def _scan_producer_tree(root: Path) -> dict[str, _StableFileIdentity]:
+    """Enumerate one symlink-free producer tree without following aliases."""
+
+    try:
+        root_stat = root.lstat()
+    except OSError as error:
+        raise ArtifactAuditError(f"producer artifact root cannot be inspected: {error}") from error
+    if root.is_symlink() or not stat.S_ISDIR(root_stat.st_mode):
+        raise ArtifactAuditError("producer artifact root must be a regular non-symlink directory")
+
+    files: dict[str, _StableFileIdentity] = {}
+    pending = [(root, Path())]
+    entry_count = 0
+    while pending:
+        directory, relative_directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                entries = sorted(iterator, key=lambda entry: entry.name)
+        except OSError as error:
+            raise ArtifactAuditError(f"producer artifact tree cannot be scanned: {error}") from error
+        for entry in entries:
+            entry_count += 1
+            if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
+                raise ArtifactAuditError("producer artifact tree exceeds its audit entry limit")
+            relative_path = relative_directory / entry.name
+            relative = relative_path.as_posix()
+            try:
+                entry_stat = entry.stat(follow_symlinks=False)
+            except OSError as error:
+                raise ArtifactAuditError(f"producer artifact entry cannot be inspected: {relative}") from error
+            if stat.S_ISLNK(entry_stat.st_mode):
+                raise ArtifactAuditError(f"producer artifact tree contains a symbolic link: {relative}")
+            if stat.S_ISDIR(entry_stat.st_mode):
+                pending.append((Path(entry.path), relative_path))
+                continue
+            if not stat.S_ISREG(entry_stat.st_mode):
+                raise ArtifactAuditError(f"producer artifact tree contains a non-regular file: {relative}")
+            if relative != _PRODUCER_MANIFEST_NAME:
+                files[relative] = _stable_file_identity(entry_stat)
+                if len(files) > _MAX_PRODUCER_FILES:
+                    raise ArtifactAuditError("producer manifest exceeds its audit file-count limit")
+    return files
+
+
+def _safe_producer_relative_path(root: Path, value: object, *, index: int) -> tuple[str, Path]:
+    if not isinstance(value, str) or not value or "\x00" in value or "\\" in value:
+        raise ArtifactAuditError(f"producer manifest files[{index}].path is invalid")
+    relative = Path(value)
+    if (
+        relative.is_absolute()
+        or value == _PRODUCER_MANIFEST_NAME
+        or ".." in relative.parts
+        or "." in relative.parts
+        or relative.as_posix() != value
+    ):
+        raise ArtifactAuditError(f"unsafe producer manifest path: {value}")
+    candidate = root / relative
+    try:
+        root_resolved = root.resolve(strict=True)
+        resolved = candidate.resolve(strict=True)
+    except OSError as error:
+        raise ArtifactAuditError(f"manifested producer file is missing: {value}") from error
+    if not resolved.is_relative_to(root_resolved):
+        raise ArtifactAuditError(f"manifested producer file escapes the artifact root: {value}")
+    return value, candidate
+
+
+def _verify_producer_manifest_locally(root: Path) -> tuple[dict[str, object], str]:
+    """Independently verify finalized producer custody from untrusted bytes."""
+
+    root_before = root.lstat()
+    if root.is_symlink() or not stat.S_ISDIR(root_before.st_mode):
+        raise ArtifactAuditError("producer artifact root must be a regular non-symlink directory")
+    manifest_path = root / _PRODUCER_MANIFEST_NAME
+    raw_manifest, _, manifest_digest, manifest_identity = _read_stable_regular_file(
+        manifest_path,
+        _MAX_PRODUCER_MANIFEST_BYTES,
+        label="producer manifest",
+        capture_payload=True,
+    )
+    if raw_manifest is None or not raw_manifest.endswith(b"\n"):
+        raise ArtifactAuditError("producer manifest lacks its canonical trailing newline")
+    manifest_raw = _json_without_duplicate_keys(raw_manifest[:-1], label="producer manifest")
+    if (
+        not isinstance(manifest_raw, dict)
+        or set(manifest_raw) != _PRODUCER_MANIFEST_FIELDS
+        or raw_manifest != _canonical_json_bytes(manifest_raw) + b"\n"
+    ):
+        raise ArtifactAuditError("producer manifest is not canonical JSON plus one LF")
+    manifest: dict[str, object] = manifest_raw
+    if manifest.get("schema") != "prospect.wm001.producer-manifest.v1":
+        raise ArtifactAuditError("producer manifest schema identity is invalid")
+    if manifest.get("experiment_id") != "WM-001":
+        raise ArtifactAuditError("producer manifest experiment identity is invalid")
+    if manifest.get("lane") not in {"development", "formal"}:
+        raise ArtifactAuditError("producer manifest lane identity is invalid")
+    status = manifest.get("status")
+    error = manifest.get("error")
+    if status not in {"completed", "failed"}:
+        raise ArtifactAuditError("producer manifest status is invalid")
+    if status == "completed" and error is not None:
+        raise ArtifactAuditError("completed producer manifest must not contain an error")
+    if status == "failed" and (
+        not isinstance(error, dict)
+        or set(error) != {"type", "message"}
+        or not isinstance(error.get("type"), str)
+        or not error.get("type")
+        or not isinstance(error.get("message"), str)
+    ):
+        raise ArtifactAuditError("failed producer manifest has an invalid error identity")
+    if any(
+        not isinstance(manifest.get(field), str) or not str(manifest[field]).endswith("Z")
+        for field in ("started_at_utc", "completed_at_utc")
+    ):
+        raise ArtifactAuditError("producer manifest timestamps are invalid")
+    if manifest.get("manifest_excludes") != [_PRODUCER_MANIFEST_NAME]:
+        raise ArtifactAuditError("producer manifest exclusion contract is invalid")
+
+    rows = manifest.get("files")
+    file_count = manifest.get("file_count")
+    if not isinstance(rows, list):
+        raise ArtifactAuditError("producer manifest files must be an array")
+    if type(file_count) is not int or file_count != len(rows):
+        raise ArtifactAuditError("producer manifest file_count is invalid")
+    if len(rows) > _MAX_PRODUCER_FILES:
+        raise ArtifactAuditError("producer manifest exceeds its audit file-count limit")
+
+    references: dict[str, tuple[Path, int, str]] = {}
+    total_bytes = 0
+    previous_path = ""
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict) or set(row) != {"path", "bytes", "sha256"}:
+            raise ArtifactAuditError(f"producer manifest files[{index}] has an invalid field set")
+        relative, path = _safe_producer_relative_path(root, row.get("path"), index=index)
+        byte_count = row.get("bytes")
+        expected_digest = row.get("sha256")
+        if (
+            relative in references
+            or relative <= previous_path
+            or type(byte_count) is not int
+            or byte_count < 0
+            or byte_count > _MAX_PRODUCER_FILE_BYTES
+            or not _is_sha256(expected_digest)
+        ):
+            raise ArtifactAuditError(f"producer manifest files[{index}] has invalid identity metadata")
+        total_bytes += byte_count
+        if total_bytes > _MAX_PRODUCER_TOTAL_BYTES:
+            raise ArtifactAuditError("producer manifest exceeds its aggregate byte limit")
+        references[relative] = (path, byte_count, str(expected_digest))
+        previous_path = relative
+
+    initial_tree = _scan_producer_tree(root)
+    if set(references) != set(initial_tree):
+        unmanifested = sorted(set(initial_tree) - set(references))
+        missing = sorted(set(references) - set(initial_tree))
+        raise ArtifactAuditError(f"producer manifest file set changed; unmanifested={unmanifested}, missing={missing}")
+    for relative, (path, expected_bytes, expected_digest) in references.items():
+        _, actual_bytes, actual_digest, identity = _read_stable_regular_file(
+            path,
+            _MAX_PRODUCER_FILE_BYTES,
+            label=f"manifested producer file {relative}",
+            capture_payload=False,
+        )
+        if identity != initial_tree[relative]:
+            raise ArtifactAuditError(f"manifested producer file changed before reading: {relative}")
+        if actual_bytes != expected_bytes:
+            raise ArtifactAuditError(f"manifested producer file size changed: {relative}")
+        if actual_digest != expected_digest:
+            raise ArtifactAuditError(f"manifested producer file digest changed: {relative}")
+
+    final_tree = _scan_producer_tree(root)
+    if initial_tree != final_tree:
+        raise ArtifactAuditError("producer artifact tree changed while custody was being verified")
+    final_manifest, _, final_digest, final_manifest_identity = _read_stable_regular_file(
+        manifest_path,
+        _MAX_PRODUCER_MANIFEST_BYTES,
+        label="producer manifest",
+        capture_payload=True,
+    )
+    if (
+        final_manifest != raw_manifest
+        or final_digest != manifest_digest
+        or final_manifest_identity != manifest_identity
+        or _stable_file_identity(root.lstat()) != _stable_file_identity(root_before)
+    ):
+        raise ArtifactAuditError("producer manifest or artifact root changed during verification")
+    return manifest, manifest_digest
+
+
 def _verify_finalized_custody(audit: _Audit, root: Path) -> None:
     try:
-        artifact_module = importlib.import_module("bench.world_model_lifecycle.artifact")
-        manifest_raw: object = artifact_module.verify_producer_manifest(root)
-        if not isinstance(manifest_raw, dict):
-            raise ArtifactAuditError("producer manifest verifier returned a non-object")
-        manifest: Mapping[str, object] = manifest_raw
-        manifest_path = root / "producer-manifest.json"
+        manifest, manifest_digest = _verify_producer_manifest_locally(root)
         audit.custody = {
             "producer_manifest_checked": True,
             "producer_manifest_status": manifest.get("status"),
-            "producer_manifest_sha256": hashlib.sha256(
-                _read_bounded(
-                    manifest_path,
-                    64 << 20,
-                    label="producer manifest",
-                )
-            ).hexdigest(),
+            "producer_manifest_sha256": manifest_digest,
         }
         audit.require(
             manifest.get("status") == "completed",
@@ -3919,7 +5319,7 @@ def _verify_finalized_custody(audit: _Audit, root: Path) -> None:
             "externally signed or transparency-log anchored; filesystem-level replacement "
             "of the entire root and manifest is outside this audit's threat model."
         )
-    except (ArtifactAuditError, ImportError, OSError, ValueError) as error:
+    except (ArtifactAuditError, OSError, ValueError) as error:
         audit.error(
             "producer_manifest_verification_failed",
             f"finalized producer custody failed verification: {error}",
@@ -4009,6 +5409,156 @@ def _validate_formal_conformance_report(report: object) -> None:
     expected_sha256 = hashlib.sha256(_canonical_json_bytes(body)).hexdigest()
     if report_sha256 != expected_sha256:
         raise ArtifactAuditError("Pendulum conformance self-hash changed")
+
+
+def _expected_formal_oscillator_conformance() -> dict[str, object]:
+    """Recompute the sealed distractor conformance report from its equations."""
+
+    trajectory = hashlib.sha256()
+    for case_index in range(_FORMAL_OSCILLATOR_CONFORMANCE_CASES):
+        reset_seed = _FORMAL_OSCILLATOR_CONFORMANCE_SEED + case_index
+        digest = hashlib.sha256(
+            f"{_OSCILLATOR_SOURCE}:{reset_seed}".encode("ascii")
+        ).digest()
+        phase_unit = int.from_bytes(digest[:8], "big") / float(1 << 64)
+        velocity_unit = int.from_bytes(digest[8:16], "big") / float(1 << 64)
+        phase = (2.0 * phase_unit - 1.0) * math.pi
+        velocity = 0.5 + velocity_unit
+        trajectory.update(reset_seed.to_bytes(8, "big", signed=False))
+        trajectory.update(
+            struct.pack(
+                "<3d",
+                math.cos(phase),
+                math.sin(phase),
+                velocity,
+            )
+        )
+        for step_index in range(_EPISODE_HORIZON):
+            phase = math.remainder(
+                phase + _OSCILLATOR_TIME_STEP * velocity,
+                2.0 * math.pi,
+            )
+            trajectory.update(
+                struct.pack(
+                    "<3d",
+                    math.cos(phase),
+                    math.sin(phase),
+                    velocity,
+                )
+            )
+            trajectory.update(struct.pack("<d", math.cos(phase)))
+            trajectory.update(
+                bytes(
+                    (
+                        0,
+                        int(step_index == _EPISODE_HORIZON - 1),
+                    )
+                )
+            )
+    report: dict[str, object] = {
+        "schema": (
+            "prospect.wm001.independent-phase-oscillator-conformance.v1"
+        ),
+        "source_id": _OSCILLATOR_SOURCE,
+        "cases": _FORMAL_OSCILLATOR_CONFORMANCE_CASES,
+        "steps_per_case": _EPISODE_HORIZON,
+        "seed": _FORMAL_OSCILLATOR_CONFORMANCE_SEED,
+        "max_reset_absolute_difference": 0.0,
+        "max_action_pair_observation_absolute_difference": 0.0,
+        "max_action_pair_reward_absolute_difference": 0.0,
+        "unexpected_terminations": 0,
+        "premature_or_missing_truncations": 0,
+        "trajectory_sha256": trajectory.hexdigest(),
+        "passed": True,
+    }
+    report["report_sha256"] = hashlib.sha256(
+        _canonical_json_bytes(report)
+    ).hexdigest()
+    return report
+
+
+def _validate_formal_oscillator_conformance_report(
+    report: object,
+) -> None:
+    """Reject a self-consistent report unless every semantic value replays."""
+
+    if report != _expected_formal_oscillator_conformance():
+        raise ArtifactAuditError(
+            "independent oscillator conformance differs from the independently "
+            "recomputed sealed trajectories"
+        )
+
+
+def _audit_bound_irrelevant_control(
+    audit: _Audit,
+    root: Path,
+    block: Mapping[str, object],
+) -> None:
+    """Bind the distractor implementation and conformance independently."""
+
+    try:
+        source_path = (
+            root
+            / "source"
+            / "bench"
+            / "world_model_lifecycle"
+            / "runtime_lane.py"
+        )
+        source_payload = _read_bounded(
+            source_path,
+            _MAX_SOURCE_FILE_BYTES,
+            label="bound independent oscillator source",
+        )
+        audit.require(
+            block.get("id") == _TASK_IRRELEVANT
+            and block.get("source_id") == _OSCILLATOR_SOURCE
+            and block.get("source_sha256")
+            == hashlib.sha256(source_payload).hexdigest(),
+            code="formal_irrelevant_control_source_mismatch",
+            message=(
+                "formal irrelevant-control identity/source digest differs from "
+                "the bound runtime source snapshot"
+            ),
+        )
+        report_path = _resolve_artifact_file(
+            root,
+            block.get("conformance_report_file"),
+            label="independent oscillator conformance report",
+        )
+        report_payload = _read_bounded(
+            report_path,
+            64 << 20,
+            label="independent oscillator conformance report",
+        )
+        audit.require(
+            block.get("conformance_report_bytes") == len(report_payload)
+            and block.get("conformance_report_sha256")
+            == hashlib.sha256(report_payload).hexdigest(),
+            code="formal_irrelevant_conformance_file_mismatch",
+            message=(
+                "copied independent oscillator conformance report differs "
+                "from its formal binding"
+            ),
+        )
+        report = _json_without_duplicate_keys(
+            report_payload,
+            label="independent oscillator conformance report",
+        )
+        if (
+            not isinstance(report, dict)
+            or report_payload != _canonical_json_bytes(report) + b"\n"
+        ):
+            raise ArtifactAuditError(
+                "independent oscillator conformance report is not canonical JSON"
+            )
+        _validate_formal_oscillator_conformance_report(report)
+    except (ArtifactAuditError, OSError, TypeError, ValueError) as error:
+        audit.error(
+            "formal_irrelevant_control_verification_failed",
+            str(error),
+        )
+    else:
+        audit.passed_checks += 1
 
 
 def _is_bound_implementation_path(path: Path) -> bool:
@@ -4171,6 +5721,7 @@ def _audit_formal_input_package(
         dependencies = binding.get("dependencies")
         source = binding.get("source")
         environment = binding.get("environment")
+        irrelevant_control = binding.get("irrelevant_control")
         execution = result.get("execution")
         if not all(
             isinstance(value, Mapping)
@@ -4179,6 +5730,7 @@ def _audit_formal_input_package(
                 dependencies,
                 source,
                 environment,
+                irrelevant_control,
                 execution,
             )
         ):
@@ -4187,6 +5739,7 @@ def _audit_formal_input_package(
         assert isinstance(dependencies, Mapping)
         assert isinstance(source, Mapping)
         assert isinstance(environment, Mapping)
+        assert isinstance(irrelevant_control, Mapping)
         assert isinstance(execution, Mapping)
         lock_payload = _read_bounded(
             lock_path,
@@ -4221,6 +5774,11 @@ def _audit_formal_input_package(
             message="formal result source identity differs from its pre-run binding",
         )
         _audit_bound_source_snapshot(audit, root, source)
+        _audit_bound_irrelevant_control(
+            audit,
+            root,
+            irrelevant_control,
+        )
         audit.require(
             result.get("claim_eligible") is True,
             code="formal_claim_eligibility_mismatch",
@@ -4301,14 +5859,222 @@ def _audit_formal_input_package(
         audit.error("formal_input_package_invalid", str(error))
 
 
+def _audit_formal_schedule(
+    audit: _Audit,
+    root: Path,
+    result: Mapping[str, object],
+) -> None:
+    """Independently enforce the complete v1.3 formal replicate schedule."""
+
+    if result.get("lane") != "formal":
+        return
+    replicates = _mapping_rows(result.get("replicates"))
+    seeds = tuple(replicate.get("master_seed") for replicate in replicates)
+    replicate_ids = tuple(replicate.get("replicate_id") for replicate in replicates)
+    expected_ids = tuple(f"wm001-formal-{seed}" for seed in _FORMAL_SEEDS)
+    audit.require(
+        seeds == _FORMAL_SEEDS and replicate_ids == expected_ids,
+        code="formal_replicate_schedule_mismatch",
+        message=(
+            "formal result does not contain the exact ordered eight v1.3 master seeds and seed-bound replicate IDs"
+        ),
+    )
+
+    behavior_conditions = {
+        _TASK_A: (
+            "cold",
+            "after_a",
+            "frozen",
+            "corrupted",
+            "irrelevant",
+            "after_b_replay",
+            "after_b_naive",
+            "random",
+            "oracle",
+        ),
+        _TASK_B: (
+            "after_a",
+            "after_b_replay",
+            "after_b_naive",
+            "random",
+            "oracle",
+        ),
+    }
+    predictive_conditions = {
+        _TASK_A: (
+            "cold",
+            "after_a",
+            "frozen",
+            "corrupted",
+            "irrelevant",
+            "after_b_replay",
+            "after_b_naive",
+        ),
+        _TASK_B: ("after_a", "after_b_replay", "after_b_naive"),
+        _TASK_IRRELEVANT: ("cold", "irrelevant"),
+    }
+    episode_contracts: dict[tuple[str, str, str, str], int] = {
+        ("collect_a", _TASK_A, "collection_random", "cold"): 8,
+        ("collect_b", _TASK_B, "collection_random", "after_a"): 8,
+        (
+            "collect_irrelevant",
+            _TASK_IRRELEVANT,
+            "collection_random",
+            "cold",
+        ): 8,
+        (
+            "predictive_validation_a",
+            _TASK_A,
+            "validation_random",
+            "after_a",
+        ): 8,
+        (
+            "predictive_validation_b",
+            _TASK_B,
+            "validation_random",
+            "after_a",
+        ): 8,
+        (
+            "predictive_validation_irrelevant",
+            _TASK_IRRELEVANT,
+            "validation_random",
+            "irrelevant",
+        ): 8,
+    }
+    for task_id, conditions in behavior_conditions.items():
+        split = "behavior_evaluation_a" if task_id == _TASK_A else "behavior_evaluation_b"
+        for condition in conditions:
+            episode_contracts[(split, task_id, condition, condition)] = 32
+
+    for replicate in replicates:
+        replicate_id = str(replicate.get("replicate_id", "<missing>"))
+        episodes = _mapping_rows(replicate.get("episodes"))
+        actual_episode_contracts: dict[tuple[object, object, object, object], int] = {}
+        for episode in episodes:
+            key = (
+                episode.get("split"),
+                episode.get("task_id"),
+                episode.get("condition"),
+                episode.get("checkpoint_id"),
+            )
+            actual_episode_contracts[key] = actual_episode_contracts.get(key, 0) + 1
+        audit.require(
+            actual_episode_contracts == episode_contracts
+            and len(episodes) == 496
+            and all(episode.get("environment_steps") == _EPISODE_HORIZON for episode in episodes),
+            code="formal_episode_budget_mismatch",
+            message=(
+                f"{replicate_id} does not contain exactly the 496 sealed "
+                "whole episodes across A, B, and the independent distractor"
+            ),
+            replicate_id=replicate_id,
+        )
+
+        transitions = _mapping_rows(replicate.get("transitions"))
+        split_counts: dict[object, int] = {}
+        for transition in transitions:
+            transition_split = transition.get("split")
+            split_counts[transition_split] = split_counts.get(transition_split, 0) + 1
+        expected_split_counts: dict[str, int] = {}
+        for (split, _task, _condition, _checkpoint), episode_count in episode_contracts.items():
+            expected_split_counts[split] = expected_split_counts.get(split, 0) + episode_count * _EPISODE_HORIZON
+        audit.require(
+            len(transitions) == 99_200 and split_counts == expected_split_counts,
+            code="formal_transition_budget_mismatch",
+            message=(
+                f"{replicate_id} does not retain exactly 99,200 real "
+                "transitions partitioned by the sealed episode schedule"
+            ),
+            replicate_id=replicate_id,
+        )
+
+        predictive = _mapping_rows(replicate.get("predictive_metrics"))
+        actual_predictive: dict[tuple[object, object, object], int] = {}
+        predictive_counts_valid = True
+        for row in predictive:
+            predictive_key = (
+                row.get("task_id"),
+                row.get("condition"),
+                row.get("checkpoint_id"),
+            )
+            actual_predictive[predictive_key] = actual_predictive.get(predictive_key, 0) + 1
+            predictive_counts_valid = predictive_counts_valid and row.get("transition_count") == 1_600
+        expected_predictive = {
+            (task_id, condition, condition): 1
+            for task_id, conditions in predictive_conditions.items()
+            for condition in conditions
+        }
+        audit.require(
+            actual_predictive == expected_predictive and len(predictive) == 12 and predictive_counts_valid,
+            code="formal_predictive_budget_mismatch",
+            message=(
+                f"{replicate_id} predictive matrix is not exactly twelve "
+                "condition rows over 1,600 paired validation transitions each"
+            ),
+            replicate_id=replicate_id,
+        )
+
+        policy_runs = _mapping_rows(replicate.get("policy_runs"))
+        audit.require(
+            len(policy_runs) == 20,
+            code="formal_policy_run_budget_mismatch",
+            message=(
+                f"{replicate_id} does not contain exactly 20 policy runs "
+                "covering every sealed collection, validation, and behavior condition"
+            ),
+            replicate_id=replicate_id,
+        )
+
+        updates = _mapping_rows(replicate.get("updates"))
+        committed = [row for row in updates if row.get("status") == "committed"]
+        rejected = [row for row in updates if row.get("status") == "rejected"]
+        expected_committed = tuple(_EXPECTED_PHASE_SPLITS)
+        audit.require(
+            tuple(row.get("phase") for row in committed) == expected_committed
+            and all(row.get("optimizer_steps") == 2_000 for row in committed)
+            and len(rejected) == 1
+            and rejected[0].get("phase") == "rejected_update_probe"
+            and rejected[0].get("optimizer_steps") == 0,
+            code="formal_update_budget_mismatch",
+            message=(
+                f"{replicate_id} does not contain the exact ordered five "
+                "matched 2,000-step updates plus the zero-step rejection probe"
+            ),
+            replicate_id=replicate_id,
+        )
+
+        sidecar_name = f"{replicate_id}.json"
+        try:
+            sidecar = _read_bounded(
+                _resolve_artifact_file(root, sidecar_name, label=f"{replicate_id} sidecar"),
+                _MAX_RESULT_BYTES,
+                label=f"{replicate_id} sidecar",
+            )
+            expected_sidecar = _canonical_json_bytes(replicate) + b"\n"
+            sidecar_matches = sidecar == expected_sidecar
+        except (ArtifactAuditError, OSError, TypeError, ValueError):
+            sidecar_matches = False
+        audit.require(
+            sidecar_matches,
+            code="formal_replicate_sidecar_mismatch",
+            message=(
+                f"{replicate_id} embedded result row is not byte-for-byte "
+                "cross-bound to its canonical per-replicate sidecar"
+            ),
+            replicate_id=replicate_id,
+        )
+
+
 _ANALYSIS_TASK_A = "pendulum_normal_torque"
 _ANALYSIS_TASK_B = "pendulum_reversed_torque"
+_ANALYSIS_TASK_IRRELEVANT = "independent_phase_oscillator"
 _ANALYSIS_BEHAVIOR_CONDITIONS: Mapping[str, tuple[str, ...]] = {
     _ANALYSIS_TASK_A: (
         "cold",
         "after_a",
         "frozen",
         "corrupted",
+        "irrelevant",
         "after_b_replay",
         "after_b_naive",
         "random",
@@ -4328,10 +6094,12 @@ _ANALYSIS_PREDICTIVE_CONDITIONS: Mapping[str, tuple[str, ...]] = {
         "after_a",
         "frozen",
         "corrupted",
+        "irrelevant",
         "after_b_replay",
         "after_b_naive",
     ),
     _ANALYSIS_TASK_B: ("after_a", "after_b_replay", "after_b_naive"),
+    _ANALYSIS_TASK_IRRELEVANT: ("cold", "irrelevant"),
 }
 _ANALYSIS_BEHAVIOR_SPLITS = {
     _ANALYSIS_TASK_A: "behavior_evaluation_a",
@@ -4340,13 +6108,19 @@ _ANALYSIS_BEHAVIOR_SPLITS = {
 _ANALYSIS_PREDICTIVE_SPLITS = {
     _ANALYSIS_TASK_A: "predictive_validation_a",
     _ANALYSIS_TASK_B: "predictive_validation_b",
+    _ANALYSIS_TASK_IRRELEVANT: "predictive_validation_irrelevant",
 }
 _ANALYSIS_METRIC_UNITS: Mapping[str, str] = {
+    "irrelevant_source_nll_improvement_after_irrelevant_vs_cold": "nats/target-dimension",
     "a_nll_improvement_after_a_vs_frozen": "nats/target-dimension",
     "a_nll_improvement_after_a_vs_corrupted": "nats/target-dimension",
+    "a_nll_improvement_after_a_vs_irrelevant": "nats/target-dimension",
+    "a_irrelevant_nll_improvement_vs_frozen": "nats/target-dimension",
     "a_after_a_interval_90_coverage": "fraction",
     "a_return_improvement_after_a_vs_cold": "return",
     "a_return_improvement_after_a_vs_frozen": "return",
+    "a_return_improvement_after_a_vs_irrelevant": "return",
+    "a_irrelevant_return_improvement_vs_frozen": "return",
     "a_after_a_oracle_normalized_score": "fraction",
     "a_oracle_vs_random_return_gap": "return",
     "b_nll_improvement_after_b_replay_vs_before_b": "nats/target-dimension",
@@ -4402,6 +6176,20 @@ _ANALYSIS_NUMERIC_GATE_DECLARATIONS: Mapping[
 ] = {
     "K3": (
         (
+            "irrelevant_source_nll_improvement_after_irrelevant_vs_cold",
+            "mean",
+            "ge",
+            0.05,
+            "irrelevant_source_vs_cold_mean_nll_improvement",
+        ),
+        (
+            "irrelevant_source_nll_improvement_after_irrelevant_vs_cold",
+            "ci_95_lower",
+            "gt",
+            0.0,
+            "irrelevant_source_vs_cold_nll_improvement_ci_lower",
+        ),
+        (
             "a_nll_improvement_after_a_vs_frozen",
             "mean",
             "ge",
@@ -4428,6 +6216,20 @@ _ANALYSIS_NUMERIC_GATE_DECLARATIONS: Mapping[
             "gt",
             0.0,
             "a_vs_corrupted_nll_improvement_ci_lower",
+        ),
+        (
+            "a_nll_improvement_after_a_vs_irrelevant",
+            "mean",
+            "ge",
+            0.05,
+            "a_vs_irrelevant_mean_nll_improvement",
+        ),
+        (
+            "a_nll_improvement_after_a_vs_irrelevant",
+            "ci_95_lower",
+            "gt",
+            0.0,
+            "a_vs_irrelevant_nll_improvement_ci_lower",
         ),
         (
             "a_after_a_interval_90_coverage",
@@ -4472,6 +6274,20 @@ _ANALYSIS_NUMERIC_GATE_DECLARATIONS: Mapping[
             "gt",
             0.0,
             "after_a_vs_frozen_return_improvement_ci_lower",
+        ),
+        (
+            "a_return_improvement_after_a_vs_irrelevant",
+            "mean",
+            "ge",
+            100.0,
+            "after_a_vs_irrelevant_mean_return_improvement",
+        ),
+        (
+            "a_return_improvement_after_a_vs_irrelevant",
+            "ci_95_lower",
+            "gt",
+            0.0,
+            "after_a_vs_irrelevant_return_improvement_ci_lower",
         ),
         (
             "a_after_a_oracle_normalized_score",
@@ -4695,6 +6511,10 @@ def _analysis_replicate_values(
         "mixture_nll_nats_per_target_dimension",
     )
     operands: Mapping[str, tuple[float | None, float | None]] = {
+        "irrelevant_source_nll_improvement_after_irrelevant_vs_cold": (
+            nll(_ANALYSIS_TASK_IRRELEVANT, "cold"),
+            nll(_ANALYSIS_TASK_IRRELEVANT, "irrelevant"),
+        ),
         "a_nll_improvement_after_a_vs_frozen": (
             nll(_ANALYSIS_TASK_A, "frozen"),
             nll(_ANALYSIS_TASK_A, "after_a"),
@@ -4703,12 +6523,28 @@ def _analysis_replicate_values(
             nll(_ANALYSIS_TASK_A, "corrupted"),
             nll(_ANALYSIS_TASK_A, "after_a"),
         ),
+        "a_nll_improvement_after_a_vs_irrelevant": (
+            nll(_ANALYSIS_TASK_A, "irrelevant"),
+            nll(_ANALYSIS_TASK_A, "after_a"),
+        ),
+        "a_irrelevant_nll_improvement_vs_frozen": (
+            nll(_ANALYSIS_TASK_A, "frozen"),
+            nll(_ANALYSIS_TASK_A, "irrelevant"),
+        ),
         "a_return_improvement_after_a_vs_cold": (
             returns[(_ANALYSIS_TASK_A, "after_a")],
             returns[(_ANALYSIS_TASK_A, "cold")],
         ),
         "a_return_improvement_after_a_vs_frozen": (
             returns[(_ANALYSIS_TASK_A, "after_a")],
+            returns[(_ANALYSIS_TASK_A, "frozen")],
+        ),
+        "a_return_improvement_after_a_vs_irrelevant": (
+            returns[(_ANALYSIS_TASK_A, "after_a")],
+            returns[(_ANALYSIS_TASK_A, "irrelevant")],
+        ),
+        "a_irrelevant_return_improvement_vs_frozen": (
+            returns[(_ANALYSIS_TASK_A, "irrelevant")],
             returns[(_ANALYSIS_TASK_A, "frozen")],
         ),
         "a_oracle_vs_random_return_gap": (
@@ -5199,10 +7035,10 @@ def audit_artifact(
         )
         _validate_result_schema(audit, result, schema_path=schema_path)
     audit.require(
-        result.get("schema") == "prospect.world-model-lifecycle.raw-result.v2"
+        result.get("schema") == "prospect.world-model-lifecycle.raw-result.v3"
         and result.get("experiment_id") == "WM-001",
         code="result_identity_mismatch",
-        message="artifact is not a WM-001 raw-result v2 document",
+        message="artifact is not a WM-001 raw-result v3 document",
     )
     protocol_source = root / "protocol.json" if (root / "protocol.json").is_file() else HERE / "protocol.json"
     try:
@@ -5216,9 +7052,9 @@ def audit_artifact(
     except ArtifactAuditError:
         protocol_digest = ""
     audit.require(
-        result.get("protocol_version") == "1.1.1" and result.get("protocol_sha256") == protocol_digest,
+        result.get("protocol_version") == "1.3.0" and result.get("protocol_sha256") == protocol_digest,
         code="result_protocol_binding_mismatch",
-        message="result does not bind the exact WM-001 protocol 1.1.1 bytes",
+        message="result does not bind the exact WM-001 protocol 1.3.0 bytes",
     )
     replicates = _mapping_rows(result.get("replicates"))
     audit.require(
@@ -5227,6 +7063,7 @@ def audit_artifact(
         message="result has no auditable replicate rows",
     )
     _audit_formal_input_package(audit, root, result)
+    _audit_formal_schedule(audit, root, result)
     seen_replicates: set[str] = set()
     execution = result.get("execution")
     device = (
@@ -5286,6 +7123,13 @@ def audit_artifact(
             replicate,
             replicate_id=replicate_id,
         )
+        _audit_restart_parity_evidence(
+            audit,
+            root,
+            replicate,
+            replicate_id=replicate_id,
+            launcher_process_id=(execution.get("launcher_process_id") if isinstance(execution, Mapping) else None),
+        )
     _audit_recomputed_analysis(audit, result)
     _declare_current_coverage_gaps(
         audit,
@@ -5331,6 +7175,7 @@ def _audit_report(
             "owned_model_state": _MAX_OWNED_MODEL_BYTES,
             "optimizer_manifest": _MAX_MANIFEST_BYTES,
             "target_permutation": _MAX_PERMUTATION_BYTES,
+            "restart_evaluation": _MAX_RESTART_EVALUATION_BYTES,
             "checkpoint_archive": _MAX_CHECKPOINT_BYTES,
             "source_file": _MAX_SOURCE_FILE_BYTES,
             "source_snapshot": _MAX_SOURCE_SNAPSHOT_BYTES,

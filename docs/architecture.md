@@ -178,6 +178,45 @@ the complete ladder unless the same agent, learner, experience ancestry,
 executed held-out behavior, interference path, and restored state form one
 continuous causal chain.
 
+## First end-to-end evidence program
+
+WM-001 protocol 1.3.0 is the first confirmatory implementation of this
+architecture. It is deliberately narrow: a five-member probabilistic ensemble
+learns two observed-context Pendulum actuator regimes, supplies a fixed-budget
+CEM controller, and uses balanced replay for continual-learning retention.
+
+Its causal controls separate several explanations that a simple before/after
+score would conflate:
+
+- a frozen cold model tests evaluation and collection repetition;
+- a joint-target permutation keeps target marginals and optimizer work while
+  breaking the input/outcome link;
+- an independently evolving, action-independent phase oscillator supplies a
+  prespecified nuisance-process control from the exact cold compound state with
+  a matched transition count and optimizer index schedule; a disjoint
+  own-process split must first verify that the control actually learned;
+- a naive B-only update demonstrates actual interference;
+- random control and true-dynamics CEM bound executed behavior.
+
+The required evidence path is end to end: immutable real records, exact receipt
+ancestry, held-out prediction, paired real-environment return, interference,
+retention, a 15-component checkpoint, and fresh-process behavior. Both the live
+and restored K7 evaluation traces are persisted and independently reopened.
+Formal evidence uses fresh unseen seeds and an implementation binding over a
+clean commit. The producer cannot accept its own claim; an external artifact
+audit and a separate adversarial semantic review must both pass before an
+accepted adjudication package can exist.
+
+The first protocol-1.1.1 formal attempt is preserved as a rejected attempt. It
+provided bounded K0–K6 pilot evidence, but its original live K7 evaluation was
+not retained and an independent learned-source control did not yet exist.
+Protocol 1.2.0 repaired those two evidence defects, but its pre-formal
+development review found that the oscillator arm had no held-out manipulation
+check. No v1.2.0 formal seed was opened. Protocol 1.3.0 adds that check, narrows
+the conclusion to this specified learned nuisance process, uses a new seed
+domain and transparently derived masters, and does not repair or relabel prior
+artifacts.
+
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget

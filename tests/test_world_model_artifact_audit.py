@@ -13,21 +13,36 @@ import numpy as np
 import pytest
 import torch
 
+import bench.world_model_lifecycle.artifact_audit as artifact_audit_module
 from bench.world_model_lifecycle.artifact_audit import (
     _GRAPH_RECORD_FIELDS,
     ArtifactAuditError,
+    PredictionRecomputation,
     _Audit,
+    _audit_analytic_transition_dynamics,
+    _audit_bound_irrelevant_control,
     _audit_bound_source_snapshot,
+    _audit_formal_schedule,
+    _audit_irrelevant_prediction_manipulation,
+    _audit_predictions,
     _audit_recomputed_analysis,
     _audit_rejected_probe_full_state,
+    _audit_restart_parity_evidence,
+    _audit_retained_replay_components,
     _decode_sealed_model,
     _derive_seed,
+    _EvaluatedCheckpoint,
+    _expected_formal_oscillator_conformance,
+    _independent_oscillator_reset,
+    _independent_oscillator_step,
     _independent_recompute_aggregate_metrics,
     _independent_recompute_gate_results,
+    _read_stable_regular_file,
     _reconstruct_optimizer_sampling,
     _replay_cem_action_trace,
     _validate_domain_graph_structure,
     _validate_formal_conformance_report,
+    _verify_producer_manifest_locally,
     audit_artifact,
     decode_sampling_manifest,
     recompute_prediction_evidence,
@@ -56,6 +71,7 @@ from prospect.domain import TimePoint
 
 MAGIC = b"PROSPECT-WM001\0"
 TASK_A = "pendulum_normal_torque"
+TASK_IRRELEVANT = "independent_phase_oscillator"
 
 
 def _canonical(value: object) -> bytes:
@@ -112,6 +128,642 @@ def test_independent_prediction_decoder_recomputes_simple_gaussian_metrics() -> 
         recompute_prediction_evidence(bytes(corrupted))
 
 
+def test_independent_oscillator_replays_reset_dynamics_and_ignored_action() -> None:
+    seed = 123_456
+    source = "prospect:IndependentPhaseOscillator-v1"
+    digest = hashlib.sha256(f"{source}:{seed}".encode("ascii")).digest()
+    phase = (2.0 * int.from_bytes(digest[:8], "big") / float(1 << 64) - 1.0) * math.pi
+    velocity = 0.5 + int.from_bytes(digest[8:16], "big") / float(1 << 64)
+    expected_reset = np.asarray(
+        [math.cos(phase), math.sin(phase), velocity],
+        dtype=np.float64,
+    )
+    reset = _independent_oscillator_reset(seed)
+    assert np.array_equal(reset, expected_reset)
+
+    next_phase = math.remainder(phase + 0.05 * velocity, 2.0 * math.pi)
+    expected_next = np.asarray(
+        [math.cos(next_phase), math.sin(next_phase), velocity],
+        dtype=np.float64,
+    )
+    actual_next, reward, applied = _independent_oscillator_step(reset.tolist())
+    assert np.allclose(actual_next, expected_next, rtol=0.0, atol=1e-15)
+    assert reward == pytest.approx(math.cos(next_phase), abs=1e-15)
+    assert applied == 0.0
+
+    row = {
+        "task_id": TASK_IRRELEVANT,
+        "task_context": 2.0,
+        "pre_observation": reset.tolist(),
+        "next_observation": actual_next.tolist(),
+        "intended_action": 1.75,
+        "applied_action": 0.0,
+        "reward": reward,
+    }
+    audit = _Audit()
+    _audit_analytic_transition_dynamics(
+        audit,
+        row,
+        replicate_id="oscillator-test",
+        transition_id="transition:0",
+    )
+    assert audit.failed_checks == 0
+
+    row["applied_action"] = 1.75
+    tampered = _Audit()
+    _audit_analytic_transition_dynamics(
+        tampered,
+        row,
+        replicate_id="oscillator-test",
+        transition_id="transition:0",
+    )
+    assert "transition_dynamics_applied_action_mismatch" in {finding["code"] for finding in tampered.findings}
+
+
+def test_v130_oscillator_manipulation_crossbinds_pair_targets_and_isolation() -> None:
+    transition_id = "transition:oscillator-heldout"
+    before = _independent_oscillator_reset(123_456)
+    after, reward, _ = _independent_oscillator_step(before.tolist())
+    target = np.asarray(
+        [
+            [
+                (after[0] - before[0]) / 2.0,
+                (after[1] - before[1]) / 2.0,
+                (after[2] - before[2]) / 16.0,
+                reward / 16.2736044,
+            ]
+        ],
+        dtype=np.float32,
+    )
+
+    def prediction(normalized_targets: np.ndarray) -> PredictionRecomputation:
+        means = np.zeros((5, 1, 4), dtype=np.float32)
+        return PredictionRecomputation(
+            transition_ids=(transition_id,),
+            normalized_targets=normalized_targets,
+            member_means=means,
+            member_log_variances=means,
+            mixture_nll_nats_per_target_dimension=1.0,
+            normalized_rmse=1.0,
+            interval_90_coverage=0.9,
+        )
+
+    split = "predictive_validation_irrelevant"
+    cold_key = (TASK_IRRELEVANT, split, "cold")
+    irrelevant_key = (TASK_IRRELEVANT, split, "irrelevant")
+    replicate: dict[str, object] = {
+        "episodes": [
+            {
+                "task_id": TASK_IRRELEVANT,
+                "split": split,
+                "transition_ids": [transition_id],
+            }
+        ],
+        "predictive_metrics": [
+            {
+                "task_id": TASK_IRRELEVANT,
+                "split": split,
+                "condition": "cold",
+                "checkpoint_id": "cold",
+            },
+            {
+                "task_id": TASK_IRRELEVANT,
+                "split": split,
+                "condition": "irrelevant",
+                "checkpoint_id": "irrelevant",
+            },
+        ],
+        "updates": [
+            {
+                "phase": "train_a_irrelevant",
+                "eligible_transition_ids": ["transition:oscillator-training"],
+            }
+        ],
+    }
+    transitions = {
+        transition_id: {
+            "transition_id": transition_id,
+            "task_id": TASK_IRRELEVANT,
+            "split": split,
+            "pre_observation": before.tolist(),
+        }
+    }
+    verified = {
+        cold_key: prediction(target.copy()),
+        irrelevant_key: prediction(target.copy()),
+    }
+
+    valid = _Audit()
+    _audit_irrelevant_prediction_manipulation(
+        valid,
+        replicate,
+        replicate_id="v130-test",
+        transitions_by_id=transitions,
+        verified=verified,
+    )
+    assert valid.failed_checks == 0
+
+    altered = target.copy()
+    altered[0, 0] += np.float32(0.25)
+    target_tampered = _Audit()
+    _audit_irrelevant_prediction_manipulation(
+        target_tampered,
+        replicate,
+        replicate_id="v130-test",
+        transitions_by_id=transitions,
+        verified={
+            cold_key: prediction(target.copy()),
+            irrelevant_key: prediction(altered),
+        },
+    )
+    assert {
+        "irrelevant_prediction_pair_binding_mismatch",
+        "irrelevant_prediction_analytic_target_mismatch",
+    }.issubset(
+        {finding["code"] for finding in target_tampered.findings}
+    )
+
+    contaminated = json.loads(json.dumps(replicate))
+    contaminated["updates"][0]["eligible_transition_ids"].append(transition_id)
+    isolation_tampered = _Audit()
+    _audit_irrelevant_prediction_manipulation(
+        isolation_tampered,
+        contaminated,
+        replicate_id="v130-test",
+        transitions_by_id=transitions,
+        verified=verified,
+    )
+    assert "irrelevant_validation_training_contamination" in {
+        finding["code"] for finding in isolation_tampered.findings
+    }
+
+
+def test_v130_prediction_audit_reopens_both_oscillator_sidecars(
+    tmp_path: Path,
+) -> None:
+    runtime = WorldModelRuntime.initialize(initialization_seed=7)
+    transition_id = "transition:oscillator-heldout"
+    before = _independent_oscillator_reset(123_456)
+    after, reward, _ = _independent_oscillator_step(before.tolist())
+    batch = TransitionBatch.from_arrays(
+        transition_ids=[transition_id],
+        observations=np.asarray([before], dtype=np.float32),
+        contexts=[2.0],
+        actions=[1.25],
+        next_observations=np.asarray([after], dtype=np.float32),
+        rewards=[reward],
+    )
+    produced = evaluate_mixture(runtime.model, batch)
+    decoded = recompute_prediction_evidence(produced.prediction_payload)
+    split = "predictive_validation_irrelevant"
+    transition = {
+        "transition_id": transition_id,
+        "task_id": TASK_IRRELEVANT,
+        "task_context": 2.0,
+        "split": split,
+        "pre_observation": before.tolist(),
+        "intended_action": 1.25,
+        "next_observation": after.tolist(),
+        "reward": reward,
+        "scaled_target": decoded.normalized_targets[0].tolist(),
+    }
+    checkpoint = _EvaluatedCheckpoint(
+        condition="cold",
+        model_version=runtime.version,
+        parameter_sha256=runtime.digest,
+        live_state_sha256=runtime.live_state_digest,
+        model_tensors=_decode_sealed_model(runtime.model_bytes),
+    )
+    checkpoints = {
+        "cold": checkpoint,
+        "irrelevant": _EvaluatedCheckpoint(
+            condition="irrelevant",
+            model_version=checkpoint.model_version,
+            parameter_sha256=checkpoint.parameter_sha256,
+            live_state_sha256=checkpoint.live_state_sha256,
+            model_tensors=checkpoint.model_tensors,
+        ),
+    }
+
+    def metric_row(
+        condition: str,
+        payload: bytes,
+    ) -> dict[str, object]:
+        evidence = recompute_prediction_evidence(payload)
+        path = tmp_path / f"{condition}-oscillator-predictions.bin"
+        path.write_bytes(payload)
+        return {
+            "task_id": TASK_IRRELEVANT,
+            "condition": condition,
+            "checkpoint_id": condition,
+            "model_version": checkpoint.model_version,
+            "parameter_sha256": checkpoint.parameter_sha256,
+            "live_state_sha256": checkpoint.live_state_sha256,
+            "split": split,
+            "transition_count": 1,
+            "mixture_nll_nats_per_target_dimension": (
+                evidence.mixture_nll_nats_per_target_dimension
+            ),
+            "normalized_rmse": evidence.normalized_rmse,
+            "interval_90_coverage": evidence.interval_90_coverage,
+            "prediction_rows_sha256": hashlib.sha256(payload).hexdigest(),
+            "prediction_evidence_file": path.name,
+            "prediction_evidence_bytes": len(payload),
+        }
+
+    replicate: dict[str, object] = {
+        "episodes": [
+            {
+                "task_id": TASK_IRRELEVANT,
+                "split": split,
+                "transition_ids": [transition_id],
+            }
+        ],
+        "predictive_metrics": [
+            metric_row("cold", produced.prediction_payload),
+            metric_row("irrelevant", produced.prediction_payload),
+        ],
+        "updates": [
+            {
+                "phase": "train_a_irrelevant",
+                "eligible_transition_ids": ["transition:oscillator-training"],
+            }
+        ],
+    }
+    valid = _Audit()
+    _audit_predictions(
+        valid,
+        tmp_path,
+        replicate,
+        replicate_id="v130-test",
+        transitions_by_id={transition_id: transition},
+        evaluated_checkpoints=checkpoints,
+    )
+    assert valid.failed_checks == 0
+
+    altered_targets = decoded.normalized_targets.copy()
+    altered_targets[0, 0] += np.float32(0.25)
+    rehashed_tamper = encode_prediction_evidence(
+        decoded.transition_ids,
+        torch.from_numpy(altered_targets),
+        torch.from_numpy(decoded.member_means),
+        torch.from_numpy(decoded.member_log_variances),
+    )
+    predictive_rows = replicate["predictive_metrics"]
+    assert isinstance(predictive_rows, list)
+    predictive_rows[1] = metric_row("irrelevant", rehashed_tamper)
+    tampered = _Audit()
+    _audit_predictions(
+        tampered,
+        tmp_path,
+        replicate,
+        replicate_id="v130-test",
+        transitions_by_id={transition_id: transition},
+        evaluated_checkpoints=checkpoints,
+    )
+    assert {
+        "prediction_target_binding_mismatch",
+        "irrelevant_prediction_pair_binding_mismatch",
+        "irrelevant_prediction_analytic_target_mismatch",
+    }.issubset({finding["code"] for finding in tampered.findings})
+
+
+def test_formal_irrelevant_control_audit_recomputes_source_and_report(
+    tmp_path: Path,
+) -> None:
+    source_path = (
+        tmp_path
+        / "source"
+        / "bench"
+        / "world_model_lifecycle"
+        / "runtime_lane.py"
+    )
+    source_path.parent.mkdir(parents=True)
+    source_payload = b"independently bound oscillator source\n"
+    source_path.write_bytes(source_payload)
+    report = _expected_formal_oscillator_conformance()
+    report_payload = _canonical(report) + b"\n"
+    report_path = tmp_path / "oscillator-conformance.json"
+    report_path.write_bytes(report_payload)
+    block: dict[str, object] = {
+        "id": TASK_IRRELEVANT,
+        "source_id": "prospect:IndependentPhaseOscillator-v1",
+        "source_sha256": hashlib.sha256(source_payload).hexdigest(),
+        "conformance_report_file": report_path.name,
+        "conformance_report_bytes": len(report_payload),
+        "conformance_report_sha256": hashlib.sha256(report_payload).hexdigest(),
+    }
+
+    valid = _Audit()
+    _audit_bound_irrelevant_control(valid, tmp_path, block)
+    assert valid.failed_checks == 0
+
+    source_tampered = _Audit()
+    _audit_bound_irrelevant_control(
+        source_tampered,
+        tmp_path,
+        {**block, "source_sha256": "0" * 64},
+    )
+    assert "formal_irrelevant_control_source_mismatch" in {
+        finding["code"] for finding in source_tampered.findings
+    }
+
+    semantically_tampered = dict(report)
+    semantically_tampered["trajectory_sha256"] = "0" * 64
+    body = dict(semantically_tampered)
+    body.pop("report_sha256")
+    semantically_tampered["report_sha256"] = hashlib.sha256(
+        _canonical(body)
+    ).hexdigest()
+    tampered_payload = _canonical(semantically_tampered) + b"\n"
+    report_path.write_bytes(tampered_payload)
+    report_tampered = _Audit()
+    _audit_bound_irrelevant_control(
+        report_tampered,
+        tmp_path,
+        {
+            **block,
+            "conformance_report_bytes": len(tampered_payload),
+            "conformance_report_sha256": hashlib.sha256(
+                tampered_payload
+            ).hexdigest(),
+        },
+    )
+    assert "formal_irrelevant_control_verification_failed" in {
+        finding["code"] for finding in report_tampered.findings
+    }
+
+
+def test_checkpoint_replay_audit_rejects_irrelevant_ids_and_manifests(
+    tmp_path: Path,
+) -> None:
+    collect_a = {
+        "transition_id": "transition:a",
+        "run_id": "run:a",
+        "task_id": TASK_A,
+        "episode_id": "episode:a",
+        "step_index": 0,
+        "split": "collect_a",
+        "pre_observation": [1.0, 0.0, 0.0],
+        "task_context": 0.0,
+        "intended_action": 0.25,
+        "next_observation": [0.99, 0.1, 0.05],
+        "reward": -0.1,
+    }
+    collect_b = {
+        "transition_id": "transition:b",
+        "run_id": "run:b",
+        "task_id": "pendulum_reversed_torque",
+        "episode_id": "episode:b",
+        "step_index": 0,
+        "split": "collect_b",
+        "pre_observation": [1.0, 0.0, 0.0],
+        "task_context": 1.0,
+        "intended_action": -0.25,
+        "next_observation": [0.99, -0.1, -0.05],
+        "reward": -0.2,
+    }
+
+    manifest_payloads = {
+        "train_a": b"train-a-sampling",
+        "train_b_replay": b"train-b-replay-sampling",
+    }
+    manifest_rows: list[dict[str, object]] = []
+    update_rows: list[dict[str, object]] = []
+    retained_rows: list[dict[str, object]] = []
+    for phase, payload in manifest_payloads.items():
+        path = tmp_path / f"{phase}.bin"
+        path.write_bytes(payload)
+        digest = hashlib.sha256(payload).hexdigest()
+        manifest_rows.append(
+            {
+                "phase": phase,
+                "media_type": "application/octet-stream",
+                "bytes": len(payload),
+                "sha256": digest,
+                "filename": path.name,
+            }
+        )
+        update_rows.append(
+            {
+                "phase": phase,
+                "status": "committed",
+                "sampling_manifest_sha256": digest,
+            }
+        )
+        retained_rows.append(
+            {
+                "phase": phase,
+                "sha256": digest,
+                "bytes": len(payload),
+                "payload_base64": base64.b64encode(payload).decode("ascii"),
+            }
+        )
+
+    def dataset(row: dict[str, object]) -> dict[str, object]:
+        return {
+            "transition_ids": [row["transition_id"]],
+            "observations": [row["pre_observation"]],
+            "contexts": [row["task_context"]],
+            "actions": [row["intended_action"]],
+            "next_observations": [row["next_observation"]],
+            "rewards": [row["reward"]],
+        }
+
+    replay_index: dict[str, object] = {
+        "schema": "prospect.wm001.replay-index.v1",
+        "canonical_experience_rows": [
+            {
+                "experience_id": "experience:a",
+                "run_id": "run:a",
+                "task_id": TASK_A,
+                "episode_id": "episode:a",
+                "step_index": 0,
+                "closed_at": ["wm001", 1],
+            },
+            {
+                "experience_id": "experience:b",
+                "run_id": "run:b",
+                "task_id": "pendulum_reversed_torque",
+                "episode_id": "episode:b",
+                "step_index": 0,
+                "closed_at": ["wm001", 2],
+            },
+        ],
+        "collect_a": dataset(collect_a),
+        "collect_b": dataset(collect_b),
+    }
+    replay_sampling = {
+        "schema": "prospect.wm001.replay-sampling-history.v1",
+        "manifests": retained_rows,
+    }
+    replicate = {
+        "transitions": [collect_a, collect_b],
+        "updates": update_rows,
+        "optimizer_batch_manifests": manifest_rows,
+    }
+
+    valid = _Audit()
+    _audit_retained_replay_components(
+        valid,
+        tmp_path,
+        replicate,
+        replicate_id="replicate",
+        replay_index=replay_index,
+        replay_sampling_history=replay_sampling,
+    )
+    assert valid.failed_checks == 0
+
+    contaminated_index = json.loads(json.dumps(replay_index))
+    contaminated_index["canonical_experience_rows"].append(
+        {
+            "experience_id": "experience:irrelevant",
+            "run_id": "run:irrelevant",
+            "task_id": TASK_IRRELEVANT,
+            "episode_id": "episode:irrelevant",
+            "step_index": 0,
+            "closed_at": ["wm001", 3],
+        }
+    )
+    index_audit = _Audit()
+    _audit_retained_replay_components(
+        index_audit,
+        tmp_path,
+        replicate,
+        replicate_id="replicate",
+        replay_index=contaminated_index,
+        replay_sampling_history=replay_sampling,
+    )
+    assert "checkpoint_replay_index_isolation_mismatch" in {
+        finding["code"] for finding in index_audit.findings
+    }
+
+    contaminated_sampling = json.loads(json.dumps(replay_sampling))
+    contaminated_sampling["manifests"].append(
+        {
+            "phase": "train_a_irrelevant",
+            "sha256": "0" * 64,
+            "bytes": 1,
+            "payload_base64": "AA==",
+        }
+    )
+    sampling_audit = _Audit()
+    _audit_retained_replay_components(
+        sampling_audit,
+        tmp_path,
+        replicate,
+        replicate_id="replicate",
+        replay_index=replay_index,
+        replay_sampling_history=contaminated_sampling,
+    )
+    assert "checkpoint_replay_sampling_isolation_mismatch" in {
+        finding["code"] for finding in sampling_audit.findings
+    }
+
+    heldout = {
+        **collect_a,
+        "transition_id": "transition:heldout",
+        "run_id": "run:heldout",
+        "episode_id": "episode:heldout",
+        "split": "predictive_validation_a",
+    }
+    heldout_replicate = {
+        **replicate,
+        "transitions": [collect_a, collect_b, heldout],
+    }
+    contaminated_heldout_index = json.loads(json.dumps(replay_index))
+    contaminated_heldout_index["collect_a"]["transition_ids"].append(
+        heldout["transition_id"]
+    )
+    heldout_audit = _Audit()
+    _audit_retained_replay_components(
+        heldout_audit,
+        tmp_path,
+        heldout_replicate,
+        replicate_id="replicate",
+        replay_index=contaminated_heldout_index,
+        replay_sampling_history=replay_sampling,
+    )
+    assert "checkpoint_replay_heldout_contamination" in {
+        finding["code"] for finding in heldout_audit.findings
+    }
+
+
+def test_formal_schedule_binds_exact_v130_seed_order_and_replicate_sidecars(
+    tmp_path: Path,
+) -> None:
+    seeds = (
+        17_123_296,
+        3_280_611_227,
+        2_725_263_418,
+        3_124_246_399,
+        4_093_604_926,
+        3_908_390_087,
+        3_332_986_400,
+        724_244_869,
+    )
+    replicates = [
+        {
+            "replicate_id": f"wm001-formal-{seed}",
+            "master_seed": seed,
+            "episodes": [],
+            "transitions": [],
+            "predictive_metrics": [],
+            "updates": [
+                {
+                    "phase": phase,
+                    "status": "committed",
+                    "optimizer_steps": 2_000,
+                }
+                for phase in (
+                    "train_a",
+                    "train_a_irrelevant",
+                    "train_a_corrupted",
+                    "train_b_replay",
+                    "train_b_naive",
+                )
+            ]
+            + [
+                {
+                    "phase": "rejected_update_probe",
+                    "status": "rejected",
+                    "optimizer_steps": 0,
+                }
+            ],
+        }
+        for seed in seeds
+    ]
+    for replicate in replicates:
+        (tmp_path / f"{replicate['replicate_id']}.json").write_bytes(_canonical(replicate) + b"\n")
+    result = {"lane": "formal", "replicates": replicates}
+    audit = _Audit()
+    _audit_formal_schedule(audit, tmp_path, result)
+    codes = {finding["code"] for finding in audit.findings}
+    assert "formal_replicate_schedule_mismatch" not in codes
+    assert "formal_replicate_sidecar_mismatch" not in codes
+    assert "formal_update_budget_mismatch" not in codes
+
+    first = replicates[0]
+    (tmp_path / f"{first['replicate_id']}.json").write_bytes(b"{}\n")
+    tampered_sidecar = _Audit()
+    _audit_formal_schedule(tampered_sidecar, tmp_path, result)
+    assert "formal_replicate_sidecar_mismatch" in {finding["code"] for finding in tampered_sidecar.findings}
+
+    reordered = {"lane": "formal", "replicates": list(reversed(replicates))}
+    tampered_order = _Audit()
+    _audit_formal_schedule(tampered_order, tmp_path, reordered)
+    assert "formal_replicate_schedule_mismatch" in {finding["code"] for finding in tampered_order.findings}
+
+    wrong_update_order = json.loads(json.dumps(result))
+    first_updates = wrong_update_order["replicates"][0]["updates"]
+    first_updates[1], first_updates[2] = first_updates[2], first_updates[1]
+    update_order_audit = _Audit()
+    _audit_formal_schedule(update_order_audit, tmp_path, wrong_update_order)
+    assert "formal_update_budget_mismatch" in {
+        finding["code"] for finding in update_order_audit.findings
+    }
+
+
 def test_independent_sampling_decoder_checks_shape_and_payload_digest() -> None:
     indices = np.arange(5 * 256, dtype="<u4").reshape(1, 5, 256) % 3
     payload = _sampling_payload(indices, ["a", "b", "c"])
@@ -128,7 +780,7 @@ def test_independent_sampling_decoder_checks_shape_and_payload_digest() -> None:
 
 
 def test_independent_sampling_replay_matches_balanced_producer_bytes() -> None:
-    master_seed = 101
+    master_seed = 1_905_245_264
     transition_ids = ("a0", "a1", "b0", "b1")
     transitions = TransitionBatch.from_arrays(
         transition_ids=transition_ids,
@@ -229,26 +881,29 @@ def _episode(
     parameter_sha256: str,
     model_version: str,
     reset_seed: int,
+    task_id: str = TASK_A,
+    applied_actions: list[float] | None = None,
 ) -> dict[str, object]:
     run_id = f"run:{split}"
+    realized = actions if applied_actions is None else applied_actions
     return {
         "episode_id": episode_id,
         "run_id": run_id,
-        "task_id": TASK_A,
+        "task_id": task_id,
         "split": split,
-        "condition": "collection_random" if split == "collect_a" else "validation_random",
+        "condition": "collection_random" if split.startswith("collect_") else "validation_random",
         "checkpoint_id": "cold",
         "reset_seed": reset_seed,
         "process_id": 1,
         "model_version": model_version,
         "parameter_sha256": parameter_sha256,
-        "learning_allowed": split == "collect_a",
-        "replay_writes_allowed": split == "collect_a",
+        "learning_allowed": split in {"collect_a", "collect_irrelevant"},
+        "replay_writes_allowed": split in {"collect_a", "collect_irrelevant"},
         "environment_steps": len(transition_ids),
         "return": math.fsum(rewards),
         "started_at_utc": "2026-07-17T00:00:00Z",
         "completed_at_utc": "2026-07-17T00:01:00Z",
-        "action_trace_sha256": hashlib.sha256(_canonical({"intended": actions, "applied": actions})).hexdigest(),
+        "action_trace_sha256": hashlib.sha256(_canonical({"intended": actions, "applied": realized})).hexdigest(),
         "transition_ids": transition_ids,
     }
 
@@ -262,19 +917,24 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.0.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.3.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
     collect_ids = [f"collect:{index}" for index in range(200)]
+    irrelevant_ids = [f"irrelevant:{index}" for index in range(200)]
     validation_ids = [f"validation:{index}" for index in range(200)]
     collect_seed = seed("collection_action")
+    irrelevant_seed = seed("irrelevant_collection_action")
     validation_seed = seed("predictive_validation_action")
     collect_reset_seed = seed("collect_a_episode")
+    irrelevant_reset_seed = seed("collect_irrelevant_episode")
     validation_reset_seed = seed("predictive_validation_a_episode")
     collect_rng = np.random.default_rng(collect_seed)
+    irrelevant_rng = np.random.default_rng(irrelevant_seed)
     validation_rng = np.random.default_rng(validation_seed)
     collect_actions = [float(collect_rng.uniform(-2.0, 2.0)) for _ in collect_ids]
+    irrelevant_actions = [float(irrelevant_rng.uniform(-2.0, 2.0)) for _ in irrelevant_ids]
     validation_actions = [float(validation_rng.uniform(-2.0, 2.0)) for _ in validation_ids]
 
     def chained_transitions(
@@ -316,6 +976,63 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         collect_actions,
         collect_reset_seed,
     )
+    oscillator_source = "prospect:IndependentPhaseOscillator-v1"
+    oscillator_digest = hashlib.sha256(f"{oscillator_source}:{irrelevant_reset_seed}".encode("ascii")).digest()
+    phase_unit = int.from_bytes(oscillator_digest[:8], "big") / float(1 << 64)
+    velocity_unit = int.from_bytes(oscillator_digest[8:16], "big") / float(1 << 64)
+    oscillator_phase = (2.0 * phase_unit - 1.0) * math.pi
+    oscillator_velocity = 0.5 + velocity_unit
+    oscillator_before = [
+        math.cos(oscillator_phase),
+        math.sin(oscillator_phase),
+        oscillator_velocity,
+    ]
+    irrelevant_transitions: list[dict[str, object]] = []
+    for index, (identity, action) in enumerate(zip(irrelevant_ids, irrelevant_actions, strict=True)):
+        oscillator_phase = math.remainder(
+            oscillator_phase + 0.05 * oscillator_velocity,
+            2.0 * math.pi,
+        )
+        oscillator_after = [
+            math.cos(oscillator_phase),
+            math.sin(oscillator_phase),
+            oscillator_velocity,
+        ]
+        reward = math.cos(oscillator_phase)
+        scaled_target = [
+            (oscillator_after[0] - oscillator_before[0]) / 2.0,
+            (oscillator_after[1] - oscillator_before[1]) / 2.0,
+            0.0,
+            reward / 16.2736044,
+        ]
+        irrelevant_transitions.append(
+            {
+                "transition_id": identity,
+                "run_id": "run:collect_irrelevant",
+                "episode_id": "episode:irrelevant",
+                "task_id": TASK_IRRELEVANT,
+                "task_context": 2.0,
+                "split": "collect_irrelevant",
+                "step_index": index,
+                "real_or_imagined": "real",
+                "pre_observation_id": f"{identity}:pre",
+                "decision_id": f"{identity}:decision",
+                "executed_action_id": f"{identity}:action",
+                "next_observation_id": f"{identity}:next",
+                "model_version_at_action": model_version,
+                "parameter_sha256_at_action": parameter_sha256,
+                "pre_observation": oscillator_before,
+                "intended_action": action,
+                "applied_action": 0.0,
+                "next_observation": oscillator_after,
+                "reward": reward,
+                "terminated": False,
+                "truncated": index == 199,
+                "scaled_target": scaled_target,
+                "target_sha256": hashlib.sha256(struct.pack("<4d", *scaled_target)).hexdigest(),
+            }
+        )
+        oscillator_before = oscillator_after
     validation_transitions = chained_transitions(
         validation_ids,
         "episode:validation",
@@ -323,7 +1040,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         validation_actions,
         validation_reset_seed,
     )
-    transitions = [*collect_transitions, *validation_transitions]
+    transitions = [*collect_transitions, *irrelevant_transitions, *validation_transitions]
     episodes = [
         _episode(
             "episode:collect",
@@ -334,6 +1051,18 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
             parameter_sha256=parameter_sha256,
             model_version=model_version,
             reset_seed=collect_reset_seed,
+        ),
+        _episode(
+            "episode:irrelevant",
+            split="collect_irrelevant",
+            transition_ids=irrelevant_ids,
+            actions=irrelevant_actions,
+            applied_actions=[0.0] * len(irrelevant_actions),
+            rewards=[float(row["reward"]) for row in irrelevant_transitions],
+            parameter_sha256=parameter_sha256,
+            model_version=model_version,
+            reset_seed=irrelevant_reset_seed,
+            task_id=TASK_IRRELEVANT,
         ),
         _episode(
             "episode:validation",
@@ -378,6 +1107,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         "cold",
         "frozen",
         "corrupted",
+        "irrelevant",
         "after_a",
         "after_b_replay",
         "after_b_naive",
@@ -420,6 +1150,9 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     manifest_file.write_bytes(manifest_payload)
     corrupted_manifest_file = root / "train-a-corrupted.bin"
     corrupted_manifest_file.write_bytes(manifest_payload)
+    irrelevant_manifest_payload = _sampling_payload(indices, irrelevant_ids)
+    irrelevant_manifest_file = root / "train-a-irrelevant.bin"
+    irrelevant_manifest_file.write_bytes(irrelevant_manifest_payload)
     permutation_generator = torch.Generator(device="cpu")
     permutation_generator.manual_seed(seed("corrupted_target_permutation"))
     permutation_payload = (
@@ -485,6 +1218,20 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
             "filename": permutation_file.name,
         },
     }
+    irrelevant_consumed = hashlib.sha256()
+    encoded_irrelevant_ids = [identity.encode() + b"\n" for identity in irrelevant_ids]
+    for index in indices.reshape(-1):
+        irrelevant_consumed.update(encoded_irrelevant_ids[int(index)])
+    irrelevant_update = {
+        **update,
+        "receipt_id": "receipt:train-a-irrelevant",
+        "phase": "train_a_irrelevant",
+        "eligible_splits": ["collect_irrelevant"],
+        "eligible_transition_count": len(irrelevant_ids),
+        "eligible_transition_ids": irrelevant_ids,
+        "consumed_multiset_sha256": irrelevant_consumed.hexdigest(),
+        "sampling_manifest_sha256": hashlib.sha256(irrelevant_manifest_payload).hexdigest(),
+    }
 
     def policy_run(
         *,
@@ -494,22 +1241,25 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         episode_id: str,
         actions: list[float],
         reset_seed: int,
+        task_id: str = TASK_A,
+        applied_actions: list[float] | None = None,
     ) -> dict[str, object]:
         rng = np.random.default_rng(controller_seed)
         start = hashlib.sha256(_canonical(rng.bit_generator.state)).hexdigest()
         reproduced = [float(rng.uniform(-2.0, 2.0)) for _ in actions]
         assert reproduced == actions
         end = hashlib.sha256(_canonical(rng.bit_generator.state)).hexdigest()
+        realized = actions if applied_actions is None else applied_actions
         trace = {
             "episode_ids": [episode_id],
             "intended": actions,
-            "applied": actions,
+            "applied": realized,
         }
         return {
             "run_id": f"run:{split}",
-            "task_id": TASK_A,
+            "task_id": task_id,
             "split": split,
-            "condition": "collection_random" if split == "collect_a" else "validation_random",
+            "condition": "collection_random" if split.startswith("collect_") else "validation_random",
             "checkpoint_id": "cold",
             "controller_kind": "uniform_random",
             "controller_version": "wm001-uniform-random-v1",
@@ -529,6 +1279,8 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         "model_initialization": 1,
         "torch_runtime": 1,
         "collection_action": 2,
+        "irrelevant_collection_action": 1,
+        "predictive_validation_irrelevant_action": 1,
         "predictive_validation_action": 2,
         "random_policy_action": 2,
         "ensemble_bootstrap_a": 5,
@@ -537,6 +1289,8 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         "minibatch_order_b": 1,
         "corrupted_target_permutation": 1,
         "collect_a_episode": 8,
+        "collect_irrelevant_episode": 8,
+        "predictive_validation_irrelevant_episode": 8,
         "predictive_validation_a_episode": 8,
         "behavior_evaluation_a_episode": 32,
         "collect_b_episode": 8,
@@ -545,7 +1299,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         "planner": 1,
     }
     replicate = {
-        "replicate_id": "dev-101",
+        "replicate_id": f"wm001-development-{master_seed}",
         "master_seed": master_seed,
         "derived_seeds": [
             {
@@ -556,7 +1310,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         ],
         "episodes": episodes,
         "transitions": transitions,
-        "updates": [update, corrupted_update],
+        "updates": [update, corrupted_update, irrelevant_update],
         "optimizer_batch_manifests": [
             {
                 "phase": "train_a",
@@ -571,6 +1325,13 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
                 "bytes": len(manifest_payload),
                 "sha256": hashlib.sha256(manifest_payload).hexdigest(),
                 "filename": corrupted_manifest_file.name,
+            },
+            {
+                "phase": "train_a_irrelevant",
+                "media_type": "application/octet-stream",
+                "bytes": len(irrelevant_manifest_payload),
+                "sha256": hashlib.sha256(irrelevant_manifest_payload).hexdigest(),
+                "filename": irrelevant_manifest_file.name,
             },
         ],
         "predictive_metrics": [
@@ -601,6 +1362,16 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
                 reset_seed=collect_reset_seed,
             ),
             policy_run(
+                namespace="irrelevant_collection_action",
+                controller_seed=irrelevant_seed,
+                split="collect_irrelevant",
+                episode_id="episode:irrelevant",
+                actions=irrelevant_actions,
+                applied_actions=[0.0] * len(irrelevant_actions),
+                reset_seed=irrelevant_reset_seed,
+                task_id=TASK_IRRELEVANT,
+            ),
+            policy_run(
                 namespace="predictive_validation_action",
                 controller_seed=validation_seed,
                 split="predictive_validation_a",
@@ -622,9 +1393,9 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         },
     }
     result: dict[str, Any] = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v2",
+        "schema": "prospect.world-model-lifecycle.raw-result.v3",
         "experiment_id": "WM-001",
-        "protocol_version": "1.1.1",
+        "protocol_version": "1.3.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),
@@ -655,9 +1426,12 @@ def test_artifact_audit_recomputes_current_evidence_and_detects_metric_tampering
     assert {gap["code"] for gap in report["coverage_gaps"]} == {
         "cem_action_trace_replay_absent",
         "checkpoint_domain_graph_semantics_unverified",
+        "checkpoint_replay_semantics_unverified",
         "formal_execution_not_present",
+        "irrelevant_prediction_manipulation_absent",
         "producer_custody_not_verified",
         "rejected_probe_full_state_unavailable",
+        "restart_original_and_restored_trace_unavailable",
     }
 
     result = json.loads(result_path.read_text())
@@ -673,6 +1447,152 @@ def test_artifact_audit_recomputes_current_evidence_and_detects_metric_tampering
 
     assert tampered["integrity_passed"] is False
     assert "prediction_nll_mismatch" in {finding["code"] for finding in tampered["findings"]}
+
+
+def test_restart_audit_reopens_both_traces_and_rejects_derived_tampering(
+    tmp_path: Path,
+) -> None:
+    master_seed = 70_359_369
+    checkpoint_manifest_sha256 = hashlib.sha256(b"checkpoint").hexdigest()
+    component_hashes = {
+        component_id: hashlib.sha256(component_id.encode()).hexdigest() for component_id in CANONICAL_COMPONENT_IDS
+    }
+    parameter_sha256 = component_hashes["world_model"]
+    model_version = f"wm001-state-sha256:{hashlib.sha256(b'live-state').hexdigest()}"
+    receipt_id = "receipt:train-b-replay"
+    custody = {
+        "experiences": 3200,
+        "transitions": 3200,
+        "updates": 2,
+        "replay_events": 3200,
+    }
+    post_custody = {
+        "experiences": 3600,
+        "transitions": 3600,
+        "updates": 2,
+        "replay_events": 3200,
+    }
+    prediction = {
+        "member_means": [[0.0, 0.0, 0.0] for _ in range(5)],
+        "member_variances": [[1.0, 1.0, 1.0] for _ in range(5)],
+    }
+
+    def evaluation(process_id: int) -> dict[str, object]:
+        tasks = []
+        for task_id, namespace in (
+            ("pendulum_normal_torque", "behavior_evaluation_a_episode"),
+            ("pendulum_reversed_torque", "behavior_evaluation_b_episode"),
+        ):
+            tasks.append(
+                {
+                    "task_id": task_id,
+                    "reset_seed": _derive_seed(namespace, master_seed, 0),
+                    "return": -10.0,
+                    "actions": [0.0] * 200,
+                    "predictions": [prediction] * 200,
+                    "identities": [
+                        [
+                            f"decision:{task_id}:{index}",
+                            f"prediction:{task_id}:{index}",
+                            f"experience:{task_id}:{index}",
+                            f"transition:{task_id}:{index}",
+                        ]
+                        for index in range(200)
+                    ],
+                }
+            )
+        return {
+            "schema": "prospect.wm001.restart-evaluation.v1",
+            "process_id": process_id,
+            "checkpoint_manifest_sha256": checkpoint_manifest_sha256,
+            "component_hashes": component_hashes,
+            "model_version": model_version,
+            "parameter_sha256": parameter_sha256,
+            "boundary_state": {
+                "snapshot_id": "snapshot:retained",
+                "agent_id": "prospect-wm001-agent",
+                "captured_at": ["interaction", 9604],
+                "belief_id": "belief:retained",
+                "latest_update_id": receipt_id,
+                "configuration_version": "configuration:retained",
+                "memory_version": "memory:retained",
+                "knowledge_version": "knowledge:retained",
+                "model_version": model_version,
+                "representation_version": "representation:physical",
+                "policy_version": "policy:cem",
+                "custody": custody,
+            },
+            "post_evaluation_custody": post_custody,
+            "tasks": tasks,
+        }
+
+    def write_evaluation(name: str, value: object) -> dict[str, object]:
+        payload = _canonical(value) + b"\n"
+        path = tmp_path / name
+        path.write_bytes(payload)
+        return {
+            "media_type": "application/vnd.prospect.wm001.restart-evaluation+json",
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "filename": name,
+        }
+
+    live_reference = write_evaluation("live.json", evaluation(101))
+    restored_reference = write_evaluation("restored.json", evaluation(202))
+    parity = {
+        "checkpoint_manifest_sha256": checkpoint_manifest_sha256,
+        "original_process_id": 101,
+        "restored_process_id": 202,
+        "fresh_process": True,
+        "component_hash_mismatches": [],
+        "identity_or_lineage_mismatches": 0,
+        "prediction_max_abs_difference": 0.0,
+        "action_max_abs_difference": 0.0,
+        "episode_return_max_abs_difference": 0.0,
+        "live_evaluation": live_reference,
+        "restored_evaluation": restored_reference,
+    }
+    replicate = {
+        "master_seed": master_seed,
+        "updates": [
+            {
+                "phase": "train_b_replay",
+                "status": "committed",
+                "receipt_id": receipt_id,
+                "committed_parameter_sha256": parameter_sha256,
+                "committed_model_version": model_version,
+            }
+        ],
+        "checkpoint_components": [
+            {
+                "component_id": component_id,
+                "sha256": component_hashes[component_id],
+            }
+            for component_id in CANONICAL_COMPONENT_IDS
+        ],
+        "restart_parity": parity,
+    }
+    audit = _Audit()
+    _audit_restart_parity_evidence(
+        audit,
+        tmp_path,
+        replicate,
+        replicate_id=f"wm001-formal-{master_seed}",
+        launcher_process_id=101,
+    )
+    assert audit.failed_checks == 0
+    assert audit.coverage_gaps == []
+
+    parity["action_max_abs_difference"] = 0.5
+    tampered = _Audit()
+    _audit_restart_parity_evidence(
+        tampered,
+        tmp_path,
+        replicate,
+        replicate_id=f"wm001-formal-{master_seed}",
+        launcher_process_id=101,
+    )
+    assert "restart_parity_recomputation_mismatch" in {finding["code"] for finding in tampered.findings}
 
 
 def _add_independent_analysis_rows(result_path: Path) -> None:
@@ -695,6 +1615,7 @@ def _two_replicate_analysis_result() -> dict[str, Any]:
             "after_a": after_a_return,
             "frozen": 0.0,
             "corrupted": 0.0,
+            "irrelevant": 0.0,
             "after_b_replay": after_a_return,
             "after_b_naive": 0.0,
             "random": 0.0,
@@ -725,6 +1646,21 @@ def _two_replicate_analysis_result() -> dict[str, Any]:
                         ("after_a", 0.0),
                         ("frozen", 1.0),
                         ("corrupted", 1.0),
+                        ("irrelevant", 1.0),
+                    )
+                ]
+                + [
+                    {
+                        "task_id": TASK_IRRELEVANT,
+                        "split": "predictive_validation_irrelevant",
+                        "condition": condition,
+                        "checkpoint_id": condition,
+                        "mixture_nll_nats_per_target_dimension": nll,
+                        "interval_90_coverage": 0.9,
+                    }
+                    for condition, nll in (
+                        ("cold", 1.0),
+                        ("irrelevant", 0.0),
                     )
                 ],
                 "updates": [],
@@ -748,6 +1684,28 @@ def test_two_replicate_ci_preserves_sealed_operation_order() -> None:
     assert metric["ci_95_lower"] == mean - margin
     assert metric["ci_95_upper"] == mean + margin
     assert metric["ci_95_lower"] == -1562.5183333581233
+
+
+def test_v130_analysis_recomputes_oscillator_manipulation_metric_and_k3() -> None:
+    result = _two_replicate_analysis_result()
+    metrics, replicate_values = _independent_recompute_aggregate_metrics(result)
+    manipulation = next(
+        row
+        for row in metrics
+        if row["name"]
+        == "irrelevant_source_nll_improvement_after_irrelevant_vs_cold"
+    )
+    assert manipulation["replicate_values"] == [1.0, 1.0]
+    assert manipulation["mean"] == 1.0
+    assert manipulation["ci_95_lower"] == 1.0
+
+    gates = _independent_recompute_gate_results(metrics, replicate_values)
+    k3 = next(row for row in gates if row["gate"] == "K3")
+    assert [check["name"] for check in k3["checks"][:2]] == [
+        "irrelevant_source_vs_cold_mean_nll_improvement",
+        "irrelevant_source_vs_cold_nll_improvement_ci_lower",
+    ]
+    assert all(check["passed"] for check in k3["checks"][:2])
 
 
 def test_two_replicate_rehashed_aggregate_and_gate_tampering_is_rejected() -> None:
@@ -842,18 +1800,17 @@ def test_artifact_audit_rejects_fabricated_gate_values(
     assert "gate_results_recomputation_mismatch" in {finding["code"] for finding in report["findings"]}
 
 
-def test_artifact_audit_reopens_finalized_producer_manifest(tmp_path: Path) -> None:
-    _write_minimal_auditable_artifact(tmp_path)
+def _write_test_producer_manifest(root: Path) -> dict[str, object]:
     files = [
         {
-            "path": path.relative_to(tmp_path).as_posix(),
+            "path": path.relative_to(root).as_posix(),
             "bytes": path.stat().st_size,
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         }
-        for path in sorted(tmp_path.rglob("*"))
+        for path in sorted(root.rglob("*"))
         if path.is_file() and path.name != "producer-manifest.json"
     ]
-    manifest = {
+    manifest: dict[str, object] = {
         "schema": "prospect.wm001.producer-manifest.v1",
         "experiment_id": "WM-001",
         "lane": "development",
@@ -865,7 +1822,13 @@ def test_artifact_audit_reopens_finalized_producer_manifest(tmp_path: Path) -> N
         "file_count": len(files),
         "files": files,
     }
-    (tmp_path / "producer-manifest.json").write_bytes(_canonical(manifest) + b"\n")
+    (root / "producer-manifest.json").write_bytes(_canonical(manifest) + b"\n")
+    return manifest
+
+
+def test_artifact_audit_reopens_finalized_producer_manifest(tmp_path: Path) -> None:
+    _write_minimal_auditable_artifact(tmp_path)
+    _write_test_producer_manifest(tmp_path)
 
     report = audit_artifact(
         tmp_path,
@@ -876,6 +1839,142 @@ def test_artifact_audit_reopens_finalized_producer_manifest(tmp_path: Path) -> N
     assert report["integrity_passed"] is True
     assert report["custody"]["producer_manifest_checked"] is True
     assert report["custody"]["producer_manifest_status"] == "completed"
+
+
+def test_local_producer_manifest_rejects_duplicate_keys_and_noncanonical_bytes(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_auditable_artifact(tmp_path)
+    manifest = _write_test_producer_manifest(tmp_path)
+    manifest_path = tmp_path / "producer-manifest.json"
+    canonical = _canonical(manifest)
+    duplicate = canonical.replace(
+        b'"experiment_id":"WM-001",',
+        b'"experiment_id":"WM-001","experiment_id":"WM-001",',
+        1,
+    )
+    manifest_path.write_bytes(duplicate + b"\n")
+    with pytest.raises(ArtifactAuditError, match="duplicate object key"):
+        _verify_producer_manifest_locally(tmp_path)
+
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    with pytest.raises(ArtifactAuditError, match="canonical JSON"):
+        _verify_producer_manifest_locally(tmp_path)
+
+    manifest_path.write_bytes(canonical)
+    with pytest.raises(ArtifactAuditError, match="trailing newline"):
+        _verify_producer_manifest_locally(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("schema", "prospect.wm001.producer-manifest.v0", "schema identity"),
+        ("experiment_id", "WM-999", "experiment identity"),
+        ("lane", "unknown", "lane identity"),
+        ("status", "running", "status"),
+        ("file_count", -1, "file_count"),
+    ],
+)
+def test_local_producer_manifest_validates_top_level_identity(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    _write_minimal_auditable_artifact(tmp_path)
+    manifest = _write_test_producer_manifest(tmp_path)
+    manifest[field] = value
+    (tmp_path / "producer-manifest.json").write_bytes(_canonical(manifest) + b"\n")
+
+    with pytest.raises(ArtifactAuditError, match=message):
+        _verify_producer_manifest_locally(tmp_path)
+
+
+def test_local_producer_manifest_validates_file_identity_and_exact_set(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_auditable_artifact(tmp_path)
+    manifest = _write_test_producer_manifest(tmp_path)
+    manifest_path = tmp_path / "producer-manifest.json"
+    rows = manifest["files"]
+    assert isinstance(rows, list)
+    first = rows[0]
+    assert isinstance(first, dict)
+    original_bytes = first["bytes"]
+    first["bytes"] = int(original_bytes) + 1
+    manifest_path.write_bytes(_canonical(manifest) + b"\n")
+    with pytest.raises(ArtifactAuditError, match="size changed"):
+        _verify_producer_manifest_locally(tmp_path)
+
+    first["bytes"] = original_bytes
+    original_digest = first["sha256"]
+    first["sha256"] = "0" * 64
+    manifest_path.write_bytes(_canonical(manifest) + b"\n")
+    with pytest.raises(ArtifactAuditError, match="digest changed"):
+        _verify_producer_manifest_locally(tmp_path)
+
+    first["sha256"] = original_digest
+    manifest_path.write_bytes(_canonical(manifest) + b"\n")
+    (tmp_path / "unmanifested.txt").write_text("not in custody\n")
+    with pytest.raises(ArtifactAuditError, match="file set changed"):
+        _verify_producer_manifest_locally(tmp_path)
+
+
+def test_local_producer_manifest_rejects_escapes_and_symlinks(tmp_path: Path) -> None:
+    _write_minimal_auditable_artifact(tmp_path)
+    manifest = _write_test_producer_manifest(tmp_path)
+    manifest_path = tmp_path / "producer-manifest.json"
+    rows = manifest["files"]
+    assert isinstance(rows, list)
+    first = rows[0]
+    assert isinstance(first, dict)
+    original_path = first["path"]
+    first["path"] = "../outside"
+    manifest_path.write_bytes(_canonical(manifest) + b"\n")
+    with pytest.raises(ArtifactAuditError, match="unsafe producer manifest path"):
+        _verify_producer_manifest_locally(tmp_path)
+
+    first["path"] = original_path
+    manifest_path.write_bytes(_canonical(manifest) + b"\n")
+    (tmp_path / "alias").symlink_to(tmp_path / str(original_path))
+    with pytest.raises(ArtifactAuditError, match="symbolic link"):
+        _verify_producer_manifest_locally(tmp_path)
+
+
+def test_stable_regular_read_is_bounded_and_detects_in_read_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "evidence.bin"
+    target.write_bytes(b"abc")
+    with pytest.raises(ArtifactAuditError, match="byte audit limit"):
+        _read_stable_regular_file(
+            target,
+            2,
+            label="test evidence",
+            capture_payload=False,
+        )
+
+    original_read = artifact_audit_module.os.read
+    mutated = False
+
+    def mutate_after_first_read(descriptor: int, length: int) -> bytes:
+        nonlocal mutated
+        chunk = original_read(descriptor, length)
+        if chunk and not mutated:
+            mutated = True
+            target.write_bytes(b"xyz")
+        return chunk
+
+    monkeypatch.setattr(artifact_audit_module.os, "read", mutate_after_first_read)
+    with pytest.raises(ArtifactAuditError, match="changed while it was being read"):
+        _read_stable_regular_file(
+            target,
+            16,
+            label="test evidence",
+            capture_payload=False,
+        )
 
 
 def test_artifact_audit_rejects_reset_state_not_generated_by_episode_seed(
