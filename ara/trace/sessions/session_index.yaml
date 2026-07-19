@@ -13,3 +13,10 @@ sessions:
     events_count: 15
     claims_touched: [C01]
     open_threads: 2
+  - id: "2026-07-19_001"
+    date: "2026-07-19"
+    summary: "Completed v1.4; direct evidence passed, but isolated adjudication reproduction failed and retired the attempt."
+    turn_count: 1
+    events_count: 7
+    claims_touched: [C02]
+    open_threads: 2

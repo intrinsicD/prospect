@@ -18,28 +18,41 @@ that Prospect passes them.
 
 ## Current status
 
-The WM-001 implementation and evidence pipeline exist. Protocol 1.3.0 completed
-one eight-seed formal attempt. Its immutable producer evidence passed
-K0–K7, but the mandatory pre-bound independent auditor returned two failures.
-Both were reproduced as auditor defects rather than producer-data corruption:
-one duplicated seed constant disagreed with the sealed protocol, and one
-corrupted-control coverage coordinate fell on numerically underspecified PIT
-endpoint semantics. The attempt has an explicit rejected adjudication and is not
-an accepted demonstration. See the
-[formal results review](../../docs/wm001-v130-formal-results.md).
+Protocol 1.4.0 completed its sole eight-seed formal attempt. The immutable
+producer evidence passed K0–K7, exact pooled coverage was
+`49,949/51,200`, and a direct run of the corrected pre-bound auditor passed
+6,393,031 checks with zero failures or gaps. One content-addressed semantic
+review incorporating three adversarial referee passes accepted the narrow
+two-regime Pendulum claim.
 
-Protocol 1.4.0 is the active fresh-seed confirmation contract. It changes no
-formal model, learning, controller, budget, control, threshold, or killing
-gate. It replaces underspecified coverage arithmetic with an exact count
-contract over persisted float32 tensors, corrects schedule parity, binds a
-coverage conformance corpus, and permits exactly one new formal attempt. Its
-design and execution policy are recorded in the
+The attempt is nevertheless not formally accepted. Mandatory adjudication
+executes the captured auditor through a private descriptor under `python -I`.
+The bound runtime used transitive distributions from the Python user site;
+isolated execution removed that search root and could not reproduce the passing
+audit byte-for-byte. The accepted package was refused. A preserved diagnostic
+replay reports one bound-input-package failure, 288 dependent prediction/CEM
+failures, and one coverage gap. The harness then also refused to package that
+failing audit as rejected. Protocol 1.4 is retired, and no accepted or official
+rejected adjudication package exists. See the
+[v1.4 formal results review](../../docs/wm001-v140-formal-results.md).
+
+Protocol 1.3.0 remains an earlier rejected eight-seed attempt. Its producer
+evidence passed K0–K7, but its pre-bound independent auditor contained a
+duplicated seed constant and underspecified endpoint arithmetic. See the
+[v1.3 formal results review](../../docs/wm001-v130-formal-results.md).
+
+Version 1.4 changed no formal model, learning, controller, budget, control,
+threshold, or killing gate. It replaced underspecified coverage arithmetic with
+an exact count contract over persisted float32 tensors, corrected schedule
+parity, and bound a coverage conformance corpus. Its prospective design and
+execution policy remain in the
 [v1.4 confirmation plan](../../docs/wm001-v140-confirmation-plan.md).
 
 A development run remains diagnostic. A formal producer result is only
-claim-eligible; it is not self-certifying. The lifecycle claim remains unproven
-until a finalized formal artifact passes the independent artifact audit and a
-separate semantic results review accepts every killing gate K0 through K7.
+claim-eligible; it is not self-certifying. The lifecycle claim remains
+unestablished until a finalized formal artifact passes the independent artifact
+audit, a separate semantic results review accepts every killing gate K0 through
+K7, and adjudication reproduces and packages those exact bytes.
 
 Protocol 1.3.0 supersedes two non-accepted predecessors. The first v1.1.1
 formal artifact supports bounded K0–K6 pilot evidence, but adversarial review
@@ -60,7 +73,7 @@ and transparently derived master seeds. The manipulation threshold reuses the
 existing predictive minimum-effect floor and was fixed before any v1.3.0
 development or formal outcome.
 
-The active producer and independent auditor now recompute the same prospectively
+The v1.4 producer and independent auditor recompute the same prospectively
 specified scalar-binary64 mixture PIT from persisted float32 evidence and
 require exact covered-target counts with no tolerance. K3 applies the unchanged
 inclusive `[0.70, 0.99]` bounds by integer cross-products. These repairs cannot
@@ -201,11 +214,11 @@ execution, exact arithmetic, audit coverage, restart, and custody validation.
 Its K3–K6 performance values are descriptive, cannot decide whether formal may
 launch, are never claim-eligible, and cannot be relabeled.
 
-Formal execution uses the eight sealed master seeds and exact declared budgets.
-The first formal environment reset starts v1.4.0's sole attempt. No resume,
+Formal execution used the eight sealed master seeds and exact declared budgets.
+The first formal environment reset started v1.4.0's sole attempt. No resume,
 retry, corrected-audit upgrade, early stopping, extra training, exclusion, or
-analysis change is allowed. A crash, incomplete evidence, gate failure, audit
-failure, or semantic-review failure retires v1.4.0.
+analysis change is allowed. The adjudication reproduction failure retired
+v1.4.0.
 
 There are two pre-outcome bindings:
 

@@ -1,0 +1,96 @@
+session:
+  id: "2026-07-19_001"
+  date: "2026-07-19"
+  started: "2026-07-19T02:42+02:00"
+  last_turn: "2026-07-19T02:42+02:00"
+  turn_count: 1
+  summary: "Completed WM-001 v1.4; direct evidence passed, but isolated adjudication reproduction failed and retired the attempt."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: N07
+    routing: direct
+    provenance: ai-executed
+    summary: "Qualified the corrected v1.4 protocol and sealed a fresh eight-seed formal binding."
+  - turn: 1
+    type: experiment
+    id: N08
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed the sole formal confirmation; producer K0-K7 and 6,393,031 direct audit checks passed."
+  - turn: 1
+    type: dead_end
+    id: N09
+    routing: direct
+    provenance: ai-executed
+    summary: "Isolated adjudication hid two bound user-site distributions, preventing accepted and rejected packaging."
+  - turn: 1
+    type: decision
+    id: N10
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired v1.4 without retry while preserving bounded mechanism evidence."
+  - turn: 1
+    type: claim
+    id: O10
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized bounded v1.4 lifecycle mechanism evidence as C02."
+  - turn: 1
+    type: constraint
+    id: O11
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized exact adjudication-mode dependency visibility as R05."
+  - turn: 1
+    type: constraint
+    id: O12
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized rejected custody for conformance failures as R06."
+
+ai_actions:
+  - turn: 1
+    action: >-
+      Repaired the sealed comparator vocabulary, completed a fresh qualifying
+      development attempt, created and verified the formal binding, ran the sole
+      eight-seed formal confirmation, independently audited raw evidence,
+      synthesized three adversarial referee passes, attempted accepted and
+      rejected adjudication, diagnosed isolated dependency visibility, ran the
+      full runtime checks, and wrote the tracked results review.
+    provenance: ai-executed
+    files_changed:
+      - "README.md"
+      - "bench/world_model_lifecycle/"
+      - "docs/architecture.md"
+      - "docs/wm001-v140-confirmation-plan.md"
+      - "docs/wm001-v140-formal-results.md"
+      - "artifacts/wm001-audits/"
+      - "artifacts/wm001-binding-20260718-v140-confirmation/"
+      - "ara/"
+
+claims_touched:
+  - id: C02
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: >-
+      The user requested WM-001 v1.4 with exact coverage arithmetic, the
+      corrected auditor, fresh seeds, formal binding, one new confirmation, and
+      a results report.
+  - turn: 1
+    excerpt: >-
+      Strong fixture-specific scientific evidence survived direct independent
+      audit, but formal acceptance failed because the adjudicator changed
+      dependency visibility relative to binding and direct-audit time.
+
+open_threads:
+  - "Decide whether to design WM-001 v1.5 with exact descriptor-bound prebinding conformance, a self-contained dependency closure, and packageable rejection."
+  - "After one accepted fixture confirmation, choose broader environments, published baselines, and external benchmark arenas."
+
+ai_suggestions_pending:
+  - "If another fixture confirmation is chosen, design v1.5 with a fresh seed domain and exact adjudication preflight."
+  - "Keep external benchmarking and broader maturity experiments separate from the fixture-confirmation repair."

@@ -155,3 +155,56 @@ observations:
     promoted_to: "logic/solution/constraints.md:R04"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O10
+    timestamp: "2026-07-19T02:42+02:00"
+    provenance: ai-suggested
+    content: >-
+      Within the exact WM-001 v1.4 fixture and bound runtime, immutable producer
+      evidence plus the direct corrected audit support the continuous
+      experience-to-update-to-behavior-to-retention-to-restart chain. Formal
+      acceptance remains unestablished because the mandatory isolated
+      adjudication replay did not reproduce the audit and published no package.
+    context: >-
+      Eight fresh formal replicates passed producer K0-K7 and 6,393,031 direct
+      audit checks, while the descriptor-bound replay failed through changed
+      dependency visibility.
+    potential_type: claim
+    bound_to: [N08, N09, N10]
+    promoted: true
+    promoted_to: "logic/claims.md:C02"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O11
+    timestamp: "2026-07-19T02:42+02:00"
+    provenance: ai-suggested
+    content: >-
+      A formal binding must seal not only dependency identities but their
+      visibility under the exact adjudication execution mode. Prebinding must
+      compare direct and descriptor-bound isolated canonical audit bytes on a
+      no-outcome conformance fixture.
+    context: >-
+      The v1.4 direct auditor resolved two transitive distributions from user
+      site, while the adjudicator's python -I replay could not see them.
+    potential_type: constraint
+    bound_to: [N09, N10]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R05"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O12
+    timestamp: "2026-07-19T02:42+02:00"
+    provenance: ai-suggested
+    content: >-
+      Rejected-evidence custody must permit publication of a source- and
+      binding-identified failing audit when the fatal finding is runtime or
+      coverage conformance itself; otherwise the same condition that causes
+      rejection prevents preservation of the official rejected package.
+    context: >-
+      The v1.4 rejected adjudication exited 2 because identity verification
+      required coverage_conformance_verified=true for every disposition.
+    potential_type: constraint
+    bound_to: [N09, N10]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R06"
+    crystallized_via: artifact-commitment
+    stale: false

@@ -21,3 +21,10 @@ entries:
       - "Routed the post-run engineering verification directly as experiment N06; it is a completed attempt-specific result, not a general claim."
       - "Did not stage or crystallize a broader capability claim because no new behavioral outcome was inspected and attempt 2 has not run."
       - "Recorded GO for a fresh development attempt only as a pending AI suggestion; the user has not yet committed to that disposition."
+  - turn: "2026-07-19_001#1"
+    notes:
+      - "Routed qualification, the sole formal run, the adjudication dead end, and protocol retirement directly as N07-N10."
+      - "Staged and crystallized O10 as C02 through artifact commitment; kept it explicitly fixture-bound and separate from formal acceptance."
+      - "Crystallized O11-O12 as R05-R06 because the results report and next-protocol requirements now depend on exact isolated dependency visibility and packageable negative evidence."
+      - "Did not mark O03 stale: only two session-day transitions have elapsed, below the three-session-day threshold."
+      - "Did not weaken C01; v1.4 supplies a separate evidence claim rather than retroactively changing the immutable v1.3 result."

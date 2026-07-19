@@ -30,18 +30,23 @@ The repository contains:
   independent-evidence program in
   [WM-001](bench/world_model_lifecycle/README.md).
 
-WM-001 protocol 1.3.0 has completed one eight-seed formal attempt. Its immutable
-producer evidence passed K0–K7 with strong fixture-specific effects and exact
-fresh-process parity, but the attempt is formally rejected because its mandatory
-pre-bound independent auditor contained two false-negative defects and returned
-`passed: false`. The [formal results review](docs/wm001-v130-formal-results.md)
-preserves both the mechanism evidence and the failed-acceptance boundary.
-Therefore the repository still has no accepted demonstration of the complete
-claim. Protocol 1.4.0 is the active fresh-seed confirmation: it keeps the
-scientific system and thresholds unchanged, makes predictive coverage an exact
-integer-count contract over persisted float32 evidence, binds endpoint
-conformance and corrected auditor identity, and permits one formal attempt
-after a claim-ineligible full-budget rehearsal.
+WM-001 protocols 1.3.0 and 1.4.0 have each completed one eight-seed formal
+attempt. Both producer results passed K0–K7 with strong fixture-specific effects
+and exact fresh-process parity. Version 1.4 also passed a direct run of its
+corrected pre-bound auditor: 6,393,031 checks, zero failures, and zero coverage
+gaps.
+
+Version 1.4 still did not receive formal acceptance. Mandatory adjudication runs
+the captured auditor under `python -I`; on the bound machine that hid the
+user-site locations from which two bound distributions had been resolved, so
+the adjudication-time audit could not reproduce the passing report. The
+accepted package was refused, and the harness also refused to package the
+failing audit as rejected. The repository therefore still has no accepted
+demonstration of the complete claim. The
+[v1.4 formal results review](docs/wm001-v140-formal-results.md) preserves the
+strong bounded evidence, the exact failure, and the requirements for a new
+protocol version. The earlier
+[v1.3 review](docs/wm001-v130-formal-results.md) remains immutable history.
 
 ## Layout
 

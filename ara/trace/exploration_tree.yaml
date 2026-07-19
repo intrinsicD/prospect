@@ -115,3 +115,98 @@ tree:
     also_depends_on: [N05]
     status: resolved
     children: []
+  - id: N07
+    type: experiment
+    title: "Qualify and bind WM-001 v1.4"
+    provenance: ai-executed
+    timestamp: "2026-07-19T02:42+02:00"
+    result: >-
+      The fresh qualifying development attempt completed on seeds 2439054559
+      and 3246851043. The corrected auditor passed 1,598,247 checks with zero
+      failures and zero gaps. A fresh prebinding check passed ruff, 33 normal
+      mypy targets, two scoped mypy targets, 85 epistemic tests, and 198
+      world-model tests. Binding
+      96628f7d551f14f50108a51ee454fe725e7e439501ca5ffe081cf891c0f17857
+      then fixed the corrected auditor, exact coverage conformance corpus,
+      runtime, and eight fresh formal seeds before outcomes.
+    evidence:
+      - "bench/world_model_lifecycle/results/development/20260718-v140-rehearsal-attempt2"
+      - "artifacts/wm001-audits/20260718-v140-rehearsal-attempt2.json"
+      - "artifacts/wm001-binding-20260718-v140-confirmation/formal-binding.json"
+      - "docs/wm001-v140-confirmation-plan.md"
+    also_depends_on: [N05, N06]
+    status: resolved
+    children: []
+  - id: N08
+    type: experiment
+    title: "Run sole WM-001 v1.4 formal confirmation"
+    provenance: ai-executed
+    timestamp: "2026-07-19T02:42+02:00"
+    result: >-
+      All eight prospectively fixed formal replicates completed under the sole
+      claimed launch. Producer K0-K7 passed. Exact pooled after-A coverage was
+      49,949/51,200; task-A NLL gain versus frozen was 3.5388
+      [3.4511, 3.6266], executed return gain was 893.60
+      [667.17, 1120.03], retained A-gain fraction was 1.3501
+      [0.8362, 1.8640], and every K7 restart difference was zero. The direct
+      corrected bound-runtime audit passed 6,393,031 checks with zero failures
+      or gaps. One content-addressed semantic review incorporating three
+      adversarial referee passes accepted the bounded fixture claim.
+    evidence:
+      - "docs/wm001-v140-formal-results.md"
+      - "bench/world_model_lifecycle/results/formal/96628f7d551f14f50108a51ee454fe725e7e439501ca5ffe081cf891c0f17857/20260718-v140-confirmation"
+      - "artifacts/wm001-audits/20260718-v140-formal-confirmation.json"
+      - "artifacts/wm001-audits/20260718-v140-formal-semantic-review.json"
+    also_depends_on: [N07]
+    status: resolved
+    children: []
+  - id: N09
+    type: dead_end
+    title: "Reproduce the passing audit inside adjudication"
+    provenance: ai-executed
+    timestamp: "2026-07-19T02:42+02:00"
+    hypothesis: >-
+      The corrected pre-bound audit report would reproduce byte-for-byte when
+      the adjudicator executed the captured auditor under python -I, permitting
+      publication of an accepted package.
+    failure_mode: >-
+      Isolated Python hid the user-site locations from which bound
+      farama-notifications 0.0.6 and gymnasium 0.29.1 had been resolved. The
+      descriptor-bound replay returned 289 failures and one coverage gap, so
+      accepted packaging exited 2. Rejected packaging of the preserved failing
+      replay also exited 2 because audit-identity verification requires
+      successful coverage conformance for every disposition.
+    lesson: >-
+      Package identities alone do not seal dependency visibility under the
+      exact execution mode. Future confirmation must byte-compare the direct
+      and descriptor-bound isolated auditor on a no-outcome fixture before
+      binding, and its rejection path must preserve an identity-valid audit
+      whose fatal finding is environment conformance itself.
+    evidence:
+      - "artifacts/wm001-audits/20260719-v140-adjudication-replay-diagnostic-1.json"
+      - "artifacts/wm001-audits/20260719-v140-formal-semantic-review-rejected.json"
+      - "docs/wm001-v140-formal-results.md"
+    also_depends_on: [N07, N08]
+    status: resolved
+    children: []
+  - id: N10
+    type: decision
+    title: "Retire v1.4 without formal acceptance"
+    provenance: ai-executed
+    timestamp: "2026-07-19T02:42+02:00"
+    choice: >-
+      Preserve the producer, direct audit, semantic review, and failing
+      adjudication replay as bounded evidence; publish neither an accepted nor
+      a nonexistent rejected package; do not retry v1.4; require a fresh
+      protocol and seed domain for any v1.5 confirmation.
+    alternatives:
+      - "Accept the fixture claim despite canonical audit-reproduction failure."
+      - "Modify or retry the sole v1.4 formal attempt after observing outcomes."
+      - "Discard all bounded mechanism evidence because adjudication failed."
+    evidence:
+      - N08
+      - N09
+      - "docs/wm001-v140-formal-results.md"
+    also_depends_on: [N08, N09]
+    status: resolved
+    children: []

@@ -25,3 +25,33 @@
 - **Tags**: world-model, causal-learning, behavior, retention, persistence,
   bounded-evidence
 - **From staging**: O07
+
+## C02: Bounded WM-001 v1.4 lifecycle mechanism evidence
+
+- **Statement**: Within the exact WM-001 protocol-1.4.0 Pendulum and independent-
+  oscillator fixture and the runtime observed at binding and direct-audit time,
+  immutable producer evidence and the corrected direct audit support a
+  continuous causal chain from self-collected experience through a persistent
+  shared-model update to improved held-out prediction and executed behavior,
+  retained after shared-state interference and reproduced after fresh-process
+  restart. This does not constitute formal acceptance because the mandatory
+  descriptor-bound isolated audit did not reproduce and no adjudication package
+  was published.
+- **Status**: supported
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Independent raw-evidence reopening breaks
+  experience/update ancestry, reverses a prespecified K3-K6 effect or interval,
+  changes exact pooled coverage arithmetic, finds checkpoint/behavior mismatch,
+  or invalidates producer custody.
+- **Proof**:
+  [`docs/wm001-v140-formal-results.md`,
+  `bench/world_model_lifecycle/results/formal/96628f7d551f14f50108a51ee454fe725e7e439501ca5ffe081cf891c0f17857/20260718-v140-confirmation`,
+  `artifacts/wm001-audits/20260718-v140-formal-confirmation.json`,
+  `artifacts/wm001-audits/20260718-v140-formal-semantic-review.json`,
+  `artifacts/wm001-audits/20260719-v140-adjudication-replay-diagnostic-1.json`]
+- **Dependencies**: []
+- **Architecture/constraint refs**: [A01, A02, R02, R03, R05]
+- **Tags**: world-model, causal-learning, behavior, retention, persistence,
+  exact-coverage, bounded-evidence, unaccepted
+- **From staging**: O10

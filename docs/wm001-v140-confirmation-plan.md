@@ -1,6 +1,8 @@
 # WM-001 protocol 1.4.0 confirmation plan
 
-Status: prospective, before any v1.4.0 development or formal outcome.
+Status: historical prospective plan, sealed before any v1.4.0 development or
+formal outcome. The completed execution and adjudication failure are recorded
+in the [v1.4 formal results review](wm001-v140-formal-results.md).
 
 ## Purpose
 

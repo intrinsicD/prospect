@@ -44,3 +44,37 @@
   `tests/test_world_model_adjudication.py`]
 - **Evidence**: [N04, N05]
 - **From staging**: O09
+
+## R05: Seal dependency visibility under exact adjudication execution
+
+- **Statement**: A formal binding must establish dependency visibility under
+  the exact adjudication execution mode, not only record distribution
+  identities. Before outcomes, a no-outcome conformance fixture must produce
+  byte-identical canonical audit reports under direct execution and the actual
+  descriptor-bound isolated execution path.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Code refs**:
+  [`bench/world_model_lifecycle/adjudication.py`,
+  `bench/world_model_lifecycle/artifact_audit.py`]
+- **Evidence**:
+  [N09, N10, `docs/wm001-v140-formal-results.md`,
+  `artifacts/wm001-audits/20260719-v140-adjudication-replay-diagnostic-1.json`]
+- **From staging**: O11
+
+## R06: Rejection custody must admit conformance failures
+
+- **Statement**: A rejected adjudication path must be able to publish a
+  source- and binding-identified failing audit when the fatal finding is
+  runtime or coverage conformance itself. Acceptance still requires complete
+  passing conformance; only the rejected evidence envelope may carry the
+  failure.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Code refs**:
+  [`bench/world_model_lifecycle/adjudication.py`,
+  `tests/test_world_model_adjudication.py`]
+- **Evidence**:
+  [N09, N10, `docs/wm001-v140-formal-results.md`,
+  `artifacts/wm001-audits/20260719-v140-formal-semantic-review-rejected.json`]
+- **From staging**: O12

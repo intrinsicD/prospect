@@ -180,10 +180,10 @@ continuous causal chain.
 
 ## First end-to-end evidence program
 
-WM-001 protocol 1.3.0 is the first confirmatory implementation of this
-architecture. It is deliberately narrow: a five-member probabilistic ensemble
-learns two observed-context Pendulum actuator regimes, supplies a fixed-budget
-CEM controller, and uses balanced replay for continual-learning retention.
+WM-001 is the first confirmatory implementation of this architecture. It is
+deliberately narrow: a five-member probabilistic ensemble learns two
+observed-context Pendulum actuator regimes, supplies a fixed-budget CEM
+controller, and uses balanced replay for continual-learning retention.
 
 Its causal controls separate several explanations that a simple before/after
 score would conflate:
@@ -247,12 +247,31 @@ formula-derived and collision-checked. Development is evidence/custody-only,
 and the first formal reset begins the sole permitted v1.4.0 attempt. See the
 [v1.4 confirmation plan](wm001-v140-confirmation-plan.md).
 
+The v1.4 formal producer completed all eight fresh seeds and passed K0–K7. A
+direct run of the corrected bound auditor also passed 6,393,031 checks with zero
+failures or gaps, and one content-addressed semantic review incorporating three
+adversarial referee passes accepted the narrow fixture claim. Formal acceptance
+still failed at the final custody boundary: the adjudicator's `python -I`
+execution hid the user-site locations from which bound distributions had been
+resolved, so its private audit replay did not match the passing report. It
+returned 289 dependent failures and one replay gap; no accepted package was
+published. The harness also refused to package that conformance-failing replay
+as rejected. Protocol 1.4 is therefore retired without an accepted
+demonstration. The
+[v1.4 formal results review](wm001-v140-formal-results.md) records the exact
+effects and failure.
+
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget
   control backend without changing lifecycle semantics, but its collect → learn
-  → improve → retain claim remains unestablished until a formal artifact passes
-  independent audit.
+  → improve → retain claim remains unestablished until one formal artifact
+  passes independent audit, semantic review, descriptor-bound reproduction, and
+  external adjudication packaging.
+- A future confirmation must execute the exact descriptor-bound adjudication
+  audit as a pre-outcome conformance gate and preserve the sealed dependency
+  closure's visibility under isolation. The rejection path must also be able to
+  package an audit that fails environment conformance.
 - Value-of-information estimates require their own calibration and adversarial
   controls.
 - The current in-memory lifecycle journal exposes partial completion but cannot
