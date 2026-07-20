@@ -32,7 +32,7 @@ epistemic-gate:
 > PYTHONPATH=src python -m bench.epistemic.run_maturity
 
 wm001-development:
-> @echo "Direct WM-001 entry is disabled; use docs/wm001-v170-operator-runbook.md" >&2
+> @echo "Direct WM-001 entry is disabled; use docs/wm001-v180-operator-runbook.md" >&2
 > @exit 2
 
 check: lint typecheck test epistemic-diagnostics

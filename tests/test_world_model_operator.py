@@ -72,21 +72,19 @@ def operator_space(
     repo = tmp_path / "repo"
     lifecycle = repo / "bench" / "world_model_lifecycle"
     lifecycle.mkdir(parents=True)
-    _write(lifecycle / "protocol.json", {"version": "1.7.0"})
-    operator_root = lifecycle / "results" / "operator-v1.7"
+    _write(lifecycle / "protocol.json", {"version": "1.8.0"})
+    operator_root = lifecycle / "results" / "operator-v1.8"
     binding_root = operator_root / "bindings"
     audit_root = operator_root / "audits"
     closure_root = operator_root / "closures"
-    completion_root = lifecycle / "results" / "outer-completions" / "v1.7"
-    formal_binding = binding_root / "formal-binding-v1.7.0"
-    development_audit = audit_root / "development-audit-v1.7.0"
-    formal_audit = audit_root / "formal-audit-v1.7.0"
-    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.7.0.json"
-    development_qualification = (
-        lifecycle / "results" / "development" / "qualification-v1.7.0"
-    )
-    development_closure = lifecycle / "results" / "development" / "development-closure-v1.7.0.json"
-    closure = closure_root / "development-closure-v1.7.0"
+    completion_root = lifecycle / "results" / "outer-completions" / "v1.8"
+    formal_binding = binding_root / "formal-binding-v1.8.0"
+    development_audit = audit_root / "development-audit-v1.8.0"
+    formal_audit = audit_root / "formal-audit-v1.8.0"
+    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.8.0.json"
+    development_qualification = lifecycle / "results" / "development" / "qualification-v1.8.0"
+    development_closure = lifecycle / "results" / "development" / "development-closure-v1.8.0.json"
+    closure = closure_root / "development-closure-v1.8.0"
     registrations: list[tuple[Path, int]] = []
 
     for name, value in {
@@ -223,11 +221,7 @@ def _patch_finalized_producer(
 ) -> tuple[Path, dict[str, object]]:
     from bench.world_model_lifecycle import artifact, verify
 
-    producer = (
-        space.development_qualification
-        if lane == "development"
-        else space.repo / "producers" / lane
-    )
+    producer = space.development_qualification if lane == "development" else space.repo / "producers" / lane
     execution_identity: dict[str, object] = {
         "process_environment": {
             "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
@@ -254,7 +248,7 @@ def _patch_finalized_producer(
         _write(
             producer / "formal-binding.json",
             {
-                "schema": "prospect.world-model-lifecycle.formal-binding.v7",
+                "schema": "prospect.world-model-lifecycle.formal-binding.v8",
                 "assurance": dict(ASSURANCE),
             },
         )
@@ -302,7 +296,7 @@ def _write_reproduction_receipt(
     receipt: dict[str, object] = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "supplied_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
         "byte_identical": True,
@@ -343,7 +337,7 @@ def _make_failure_attempt(
     record = operator_module._failure_record(  # noqa: SLF001
         kind="binding",
         lane=None,
-        phase="test",
+        phase="binding",
         error=error,
     )
     operator_module._write_json(  # noqa: SLF001
@@ -360,6 +354,101 @@ def _make_failure_attempt(
         final_check=lambda: None,
     )
     return final
+
+
+def test_failure_record_binds_bounded_message_diagnostic() -> None:
+    message = (
+        "development result exceeds its byte limit " * (operator_module._FAILURE_MESSAGE_CHUNK_CHARACTERS // 8)
+        + "\udcff"
+    )
+    record = operator_module._failure_record(  # noqa: SLF001
+        kind="closure",
+        lane="development",
+        phase="development_closure",
+        error=RuntimeError(message),
+    )
+
+    assert record["schema"] == "prospect.wm001.operator-execution-failure.v2"
+    message_payload = message.encode(
+        "utf-8",
+        errors="backslashreplace",
+    )
+    assert record["error_message_bytes"] == len(message_payload)
+    assert record["error_message_sha256"] == hashlib.sha256(message_payload).hexdigest()
+    assert "error_message" not in record
+
+
+def test_failure_record_rejects_noncanonical_phase() -> None:
+    with pytest.raises(OperatorError, match="canonical kind, phase"):
+        operator_module._failure_record(  # noqa: SLF001
+            kind="closure",
+            lane="development",
+            phase="binding",
+            error=RuntimeError("controlled failure"),
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"error_message": "raw diagnostic leakage"},
+        {"phase": "test"},
+        {
+            "error_type": "",
+            "failure_code": "",
+        },
+        {
+            "error_type": "Bad Type",
+            "failure_code": "bad_type",
+        },
+        {
+            "error_type": "DifferentError",
+            "failure_code": "runtime_error",
+        },
+        {"failure_code": "other_error"},
+        {"error_message_bytes": False},
+        {"error_message_bytes": 18.0},
+        {"error_message_sha256": "g" * 64},
+    ],
+    ids=[
+        "raw-message",
+        "wrong-phase",
+        "empty-type-code",
+        "invalid-identifier-shape",
+        "type-code-mismatch",
+        "code-mismatch",
+        "boolean-message-bytes",
+        "float-message-bytes",
+        "malformed-message-digest",
+    ],
+)
+def test_public_failure_verifier_rejects_diagnostic_mutations(
+    operator_space: OperatorSpace,
+    mutation: dict[str, object],
+) -> None:
+    attempt = _make_failure_attempt(operator_space)
+    failure_path = attempt / "execution-failure.json"
+    failure = _load(failure_path)
+    failure.update(mutation)
+    failure_path.write_bytes(_canonical(failure))
+    terminal = attempt / "operator-attempt.json"
+    manifest = _load(terminal)
+    manifest["error"] = {
+        "failure_code": failure.get("failure_code"),
+        "error_type": failure.get("error_type"),
+    }
+    manifest["files"] = operator_module._file_rows(  # noqa: SLF001
+        attempt,
+        exclude={"operator-attempt.json"},
+    )
+    manifest["file_count"] = len(manifest["files"])
+    terminal.write_bytes(_canonical(manifest))
+
+    with pytest.raises(
+        OperatorError,
+        match="failure record is malformed",
+    ):
+        _finalize(attempt)
 
 
 def _run_development_audit(
@@ -427,7 +516,7 @@ def _install_closure_fakes(
     list[tuple[Path, Path, Path]],
 ]:
     marker = space.development_closure
-    archive = marker.with_name("development-qualification-v1.7.0.tar")
+    archive = marker.with_name("development-qualification-v1.8.0.tar")
     calls: list[tuple[Path, Path, Path]] = []
     monkeypatch.setattr(binding, "DEVELOPMENT_CLOSURE_PATH", marker)
 
@@ -548,7 +637,7 @@ def test_sibling_binding_or_closure_attempt_is_never_canonical(
         record = operator_module._failure_record(  # noqa: SLF001
             kind="closure",
             lane="development",
-            phase="test",
+            phase="development_closure",
             error=error,
         )
         operator_module._write_json(  # noqa: SLF001
@@ -557,9 +646,7 @@ def test_sibling_binding_or_closure_attempt_is_never_canonical(
         )
         attempt.finish(
             status="failure",
-            primary={
-                "execution_failure_file": "execution-failure.json"
-            },
+            primary={"execution_failure_file": "execution-failure.json"},
             error={
                 "failure_code": record["failure_code"],
                 "error_type": record["error_type"],
@@ -569,16 +656,14 @@ def test_sibling_binding_or_closure_attempt_is_never_canonical(
         sibling = operator_space.closure_root / "sibling-closure"
     shutil.copytree(canonical, sibling)
 
-    with pytest.raises(OperatorError, match="canonical protocol-1.7"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.8"):
         operator_module.inspect_unfinalized_operator_attempt(sibling)
 
     sibling_terminal = sibling / "operator-attempt.json"
-    sibling_completion = operator_module.outer_completion_marker(
-        sibling_terminal
-    )
+    sibling_completion = operator_module.outer_completion_marker(sibling_terminal)
     sibling_completion.parent.mkdir(parents=True, exist_ok=True)
     os.link(sibling_terminal, sibling_completion)
-    with pytest.raises(OperatorError, match="canonical protocol-1.7"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.8"):
         operator_module.verify_operator_attempt(sibling)
 
 
@@ -597,7 +682,7 @@ def test_staged_output_mutation_prevents_attempt_publication(
     record = operator_module._failure_record(  # noqa: SLF001
         kind="binding",
         lane=None,
-        phase="test",
+        phase="binding",
         error=error,
     )
     operator_module._write_json(  # noqa: SLF001
@@ -764,7 +849,7 @@ def test_development_audit_is_retired_by_closure_marker(
 def test_closure_rejects_noncanonical_development_audit(
     operator_space: OperatorSpace,
 ) -> None:
-    with pytest.raises(OperatorError, match="canonical protocol-1.7 audit"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.8 audit"):
         operator_module.closure_main(
             [
                 "--producer",
@@ -783,10 +868,7 @@ def test_development_authority_rejects_sibling_qualification_producer(
     operator_space: OperatorSpace,
     entry: str,
 ) -> None:
-    sibling = (
-        operator_space.development_qualification.parent
-        / "qualification-v1.7.0-copy"
-    )
+    sibling = operator_space.development_qualification.parent / "qualification-v1.8.0-copy"
     if entry == "audit":
         arguments = [
             "development",
@@ -1227,9 +1309,7 @@ def test_development_closure_then_binding_end_to_end(
     closure_manifest = operator_module.inspect_unfinalized_operator_attempt(operator_space.closure)["manifest"]
     assert closure_manifest["status"] == "accepted"
     _finalize(operator_space.closure)
-    closure_terminal = (
-        operator_space.closure / "operator-attempt.json"
-    )
+    closure_terminal = operator_space.closure / "operator-attempt.json"
     original_closure_terminal = closure_terminal.read_bytes()
     substituted_closure = json.loads(original_closure_terminal)
     substituted_closure["inputs"][0]["sha256"] = "0" * 64
@@ -1240,12 +1320,9 @@ def test_development_closure_then_binding_end_to_end(
     ):
         operator_module.verify_operator_attempt(operator_space.closure)
     closure_terminal.write_bytes(original_closure_terminal)
-    assert (
-        operator_module.verify_operator_attempt(operator_space.closure)
-        == closure_manifest
-    )
+    assert operator_module.verify_operator_attempt(operator_space.closure) == closure_manifest
 
-    report = marker.with_name("preformal-test-report-v1.7.0.json")
+    report = marker.with_name("preformal-test-report-v1.8.0.json")
     _write(report, {"passed": True})
     monkeypatch.setattr(
         binding,
@@ -1258,7 +1335,7 @@ def test_development_closure_then_binding_end_to_end(
         lambda _path, _report: [],
     )
     expected_binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v7",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v8",
         "assurance": dict(ASSURANCE),
         "source": {
             "test_report_file": report.name,

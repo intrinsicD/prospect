@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import subprocess
@@ -45,7 +44,7 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_QUALIFICATION_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.7.0"
+    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.8.0"
 )
 
 
@@ -121,6 +120,11 @@ def main() -> int:
             parser.error("formal lane cannot override the eight sealed master seeds")
         if arguments.binding is None:
             parser.error("formal lane requires --binding")
+        if arguments.output is None:
+            parser.error(
+                "formal lane requires --output at the exact "
+                "results/formal/<binding-sha256>/confirmation-v1.8.0 path"
+            )
         expected_binding = FORMAL_BINDING_ATTEMPT_PATH / "formal-binding.json"
         if (
             not arguments.binding.is_absolute()
@@ -140,31 +144,32 @@ def main() -> int:
         ):
             parser.error("formal lane requires one accepted outer-finalized binding attempt")
         config = ExperimentConfig.formal(device=arguments.device)
-        binding_digest = hashlib.sha256(arguments.binding.read_bytes()).hexdigest()
-        output = arguments.output or (
-            FORMAL_RESULTS_ROOT / binding_digest / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}-{os.getpid()}"
-        )
-        existing_launch_marker, _ = formal_launch_marker_path(
-            arguments.binding,
-            output,
-        )
+        output = arguments.output
+        try:
+            existing_launch_marker, _ = formal_launch_marker_path(
+                arguments.binding,
+                output,
+                formal_results_root=FORMAL_RESULTS_ROOT,
+            )
+        except ValueError as error:
+            parser.error(str(error))
         if os.path.lexists(existing_launch_marker):
             print(
-                "WM-001 protocol 1.7 formal launch already consumed; same-version retry is forbidden",
+                "WM-001 protocol 1.8 formal launch already consumed; same-version retry is forbidden",
                 file=sys.stderr,
             )
             return 1
     else:
         if os.path.lexists(DEVELOPMENT_QUALIFICATION_PATH):
             print(
-                "WM-001 protocol 1.7 development qualification already consumed; "
+                "WM-001 protocol 1.8 development qualification already consumed; "
                 "resume and sibling attempts are forbidden",
                 file=sys.stderr,
             )
             return 1
         if os.path.lexists(DEVELOPMENT_CLOSURE_PATH):
             print(
-                "WM-001 protocol 1.7 development is closed; additional same-version rehearsals are forbidden",
+                "WM-001 protocol 1.8 development is closed; additional same-version rehearsals are forbidden",
                 file=sys.stderr,
             )
             return 1

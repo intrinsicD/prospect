@@ -208,3 +208,21 @@ observations:
     promoted_to: "logic/solution/constraints.md:R06"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O13
+    timestamp: "2026-07-20T16:18+02:00"
+    provenance: ai-suggested
+    content: >-
+      Manifest-bound terminal custody for a potentially large producer member
+      must stream exact size and digest verification through a no-follow
+      descriptor while retaining regular-file, exact-link-count, stable
+      before/after inode, mutation, and pathname-namespace checks.
+    context: >-
+      The sole v1.7 development closure failed when its final producer recheck
+      materialized a 320,556,697-byte result under a generic 64 MiB helper
+      limit; v1.8 commits the streamed repair and adversarial regressions.
+    potential_type: constraint
+    bound_to: [N11, N12, N13]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R07"
+    crystallized_via: artifact-commitment
+    stale: false

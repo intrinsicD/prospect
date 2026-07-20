@@ -118,7 +118,7 @@ def _review() -> dict[str, object]:
     return {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "implementation_files": [],
         "implementation_manifest_sha256": hashlib.sha256(b"[]").hexdigest(),
         "reviewer": {
@@ -136,7 +136,7 @@ def _runtime_seal(runtime_executable: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
             "tamper_resistant": False,
@@ -664,7 +664,7 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     review = {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)

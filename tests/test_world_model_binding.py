@@ -92,9 +92,7 @@ def test_package_ownership_identity_matches_standard_library_bootstrap(
         encoding="utf-8",
     )
     (metadata / "RECORD").write_text(
-        "fixture/__init__.py,,\n"
-        "fixture-1.0.dist-info/METADATA,,\n"
-        "fixture-1.0.dist-info/RECORD,,\n",
+        "fixture/__init__.py,,\nfixture-1.0.dist-info/METADATA,,\nfixture-1.0.dist-info/RECORD,,\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(binding_module, "package_roots", lambda: (root,))
@@ -113,9 +111,10 @@ def test_package_ownership_identity_matches_standard_library_bootstrap(
     }
 
     assert bootstrap_identity == imported_identity
-    assert bootstrap_identity["identity_sha256"] == hashlib.sha256(
-        binding_module.canonical_json_bytes(identity_value)
-    ).hexdigest()
+    assert (
+        bootstrap_identity["identity_sha256"]
+        == hashlib.sha256(binding_module.canonical_json_bytes(identity_value)).hexdigest()
+    )
 
 
 @pytest.mark.parametrize(
@@ -155,12 +154,8 @@ def test_formal_binding_schema_requires_exact_gymnasium_defaults() -> None:
     schema = json.loads(verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"))
     environment = schema["properties"]["runtime"]["properties"]["process_environment"]
 
-    assert {"PYGAME_HIDE_SUPPORT_PROMPT", "SDL_AUDIODRIVER"} <= set(
-        environment["required"]
-    )
-    assert environment["properties"]["PYGAME_HIDE_SUPPORT_PROMPT"] == {
-        "const": "hide"
-    }
+    assert {"PYGAME_HIDE_SUPPORT_PROMPT", "SDL_AUDIODRIVER"} <= set(environment["required"])
+    assert environment["properties"]["PYGAME_HIDE_SUPPORT_PROMPT"] == {"const": "hide"}
     assert environment["properties"]["SDL_AUDIODRIVER"] == {"const": "dsp"}
 
 
@@ -191,42 +186,42 @@ def test_record_hash_decoder_requires_exact_sha256() -> None:
             decode(("sha256", "not+a+valid+digest"))
 
 
-def test_protocol_170_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (3920043614, 3703229797)
+def test_protocol_180_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (1196068124, 758859051)
     assert verify_module.FORMAL_SEEDS == (
-        2080036362,
-        865871218,
-        3636713390,
-        2195564811,
-        2000167339,
-        329754669,
-        4064290468,
-        1911057116,
+        3362668913,
+        1230840469,
+        428983069,
+        1629522391,
+        1347202040,
+        1247885121,
+        3968594484,
+        3609284286,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            3920043614,
+            1196068124,
             index,
         )
         for index in range(8)
     ] == [
-        1276766050,
-        1493755138,
-        3784940138,
-        2079012506,
-        262630724,
-        2559766663,
-        2864433982,
-        2819167670,
+        3973552827,
+        580164319,
+        3176853231,
+        2566368015,
+        501691005,
+        1721661637,
+        1635075274,
+        3392100018,
     ]
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            3703229797,
+            758859051,
             0,
         )
-        == 637127139
+        == 1476413930
     )
     assert (
         tuple(verify_module.derive_master_seed("development", index) for index in range(2))
@@ -235,7 +230,7 @@ def test_protocol_170_seed_domain_and_master_seeds_are_exact() -> None:
     assert tuple(verify_module.derive_master_seed("formal", index) for index in range(8)) == verify_module.FORMAL_SEEDS
 
 
-def test_protocol_170_states_the_negative_assurance_boundary() -> None:
+def test_protocol_180_states_the_negative_assurance_boundary() -> None:
     protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
 
     assert protocol["trust_model"] == {
@@ -250,14 +245,10 @@ def test_protocol_170_states_the_negative_assurance_boundary() -> None:
 def test_implementation_manifest_binds_prospective_harness_review() -> None:
     rows = binding_module.implementation_files()
 
-    assert [
-        row
-        for row in rows
-        if row["path"] == "docs/wm001-v170-prospective-harness-review.json"
-    ]
+    assert [row for row in rows if row["path"] == "docs/wm001-v180-prospective-harness-review.json"]
 
 
-def test_protocol_170_irrelevant_control_contract_is_bound() -> None:
+def test_protocol_180_irrelevant_control_contract_is_bound() -> None:
     assert (
         "collect_irrelevant",
         verify_module.TASK_IRRELEVANT,
@@ -324,13 +315,13 @@ def test_result_runtime_must_equal_formal_binding_runtime() -> None:
         )
 
 
-def test_formal_binding_schema_binds_protocol_170_and_fresh_seeds() -> None:
+def test_formal_binding_schema_binds_protocol_180_and_fresh_seeds() -> None:
     schema = json.loads(
         verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
 
-    assert schema["$id"].endswith("wm-001-formal-binding-v7.json")
-    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v7"
+    assert schema["$id"].endswith("wm-001-formal-binding-v8.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v8"
     assert "assurance" in schema["required"]
     assert schema["properties"]["assurance"]["properties"] == {
         "trust_model_id": {
@@ -340,7 +331,7 @@ def test_formal_binding_schema_binds_protocol_170_and_fresh_seeds() -> None:
         "external_attestation": {"const": False},
         "exclusive_path_use_required": {"const": True},
     }
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.7.0"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.8.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
@@ -370,9 +361,7 @@ def test_formal_binding_schema_binds_protocol_170_and_fresh_seeds() -> None:
     }
     assert restart_fields <= set(audit_execution["required"])
     assert restart_fields <= set(audit_execution["properties"])
-    assert audit_execution["properties"][
-        "restart_runtime_support_files"
-    ]["const"] == [
+    assert audit_execution["properties"]["restart_runtime_support_files"]["const"] == [
         "producer_bootstrap.py",
         "protocol.json",
         "schemas/raw-result.schema.json",
@@ -399,7 +388,7 @@ def test_restart_json_comparison_rejects_python_numeric_aliases(
     assert not verify_module._strict_json_equal(observed, expected)
 
 
-def test_raw_result_schema_binds_v170_heldout_split_and_formal_counts() -> None:
+def test_raw_result_schema_binds_v180_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -408,9 +397,9 @@ def test_raw_result_schema_binds_v170_heldout_split_and_formal_counts() -> None:
     predictive_properties = predictive_schema["properties"]
     gate_comparators = schema["$defs"]["gateCheck"]["properties"]["comparator"]["enum"]
 
-    assert schema["$id"].endswith("wm-001-raw-result-v7.json")
-    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v7"
-    assert schema["properties"]["protocol_version"]["const"] == "1.7.0"
+    assert schema["$id"].endswith("wm-001-raw-result-v8.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v8"
+    assert schema["properties"]["protocol_version"]["const"] == "1.8.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
@@ -451,7 +440,7 @@ def test_raw_result_schema_binds_v170_heldout_split_and_formal_counts() -> None:
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v170_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v180_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -794,7 +783,7 @@ def test_formal_binding_file_requires_single_link_custody(
 ) -> None:
     binding_path = tmp_path / "formal-binding.json"
     binding_path.write_bytes(_canonical_payload({"fixture": "binding"}))
-    verified = {"schema": "prospect.world-model-lifecycle.formal-binding.v7"}
+    verified = {"schema": "prospect.world-model-lifecycle.formal-binding.v8"}
     monkeypatch.setattr(
         verify_module,
         "verify_binding",
@@ -816,34 +805,26 @@ def _producer_custody_fixture(
         "package_root_ownership",
         lambda: ownership,
     )
-    producer_bootstrap = Path(binding_module.__file__).with_name(
-        "producer_bootstrap.py"
-    ).read_bytes()
-    launch_bootstrap = Path(binding_module.__file__).with_name(
-        "launch_bootstrap.py"
-    ).read_bytes()
+    producer_bootstrap = Path(binding_module.__file__).with_name("producer_bootstrap.py").read_bytes()
+    launch_bootstrap = Path(binding_module.__file__).with_name("launch_bootstrap.py").read_bytes()
     executable = str(Path(sys.executable).resolve(strict=True))
     python_version = ".".join(str(part) for part in sys.version_info[:3])
     execution: dict[str, object] = {
         "git_commit": "a" * 40,
         "git_tree": "b" * 40,
         "python_executable": sys.executable,
-        "python_executable_sha256": hashlib.sha256(
-            Path(sys.executable).read_bytes()
-        ).hexdigest(),
+        "python_executable_sha256": hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest(),
         "python_version": python_version,
         "python_flags": {"isolated": 1},
         "process_environment": {"LC_ALL": "C.UTF-8"},
         "package_roots": [{"identity": "package-root"}],
         "standard_library": {"identity": "standard-library"},
-        "producer_bootstrap_sha256": hashlib.sha256(
-            producer_bootstrap
-        ).hexdigest(),
+        "producer_bootstrap_sha256": hashlib.sha256(producer_bootstrap).hexdigest(),
     }
     seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "assurance": dict(binding_module.ASSURANCE),
         "git_commit": execution["git_commit"],
         "git_tree": execution["git_tree"],
@@ -856,26 +837,20 @@ def _producer_custody_fixture(
         },
         "required_flags": execution["python_flags"],
         "process_environment": execution["process_environment"],
-        "bootstrap_source_sha256": execution[
-            "producer_bootstrap_sha256"
-        ],
+        "bootstrap_source_sha256": execution["producer_bootstrap_sha256"],
         "standard_library": execution["standard_library"],
         "package_roots": execution["package_roots"],
         "package_ownership": ownership,
     }
     runtime_seal_payload = _canonical_payload(seal)
-    execution["runtime_seal_sha256"] = hashlib.sha256(
-        runtime_seal_payload
-    ).hexdigest()
+    execution["runtime_seal_sha256"] = hashlib.sha256(runtime_seal_payload).hexdigest()
     return execution, seal, producer_bootstrap, launch_bootstrap
 
 
 def test_archived_producer_runtime_seal_requires_exact_assurance_and_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    execution, seal, producer_bootstrap, launch_bootstrap = (
-        _producer_custody_fixture(monkeypatch)
-    )
+    execution, seal, producer_bootstrap, launch_bootstrap = _producer_custody_fixture(monkeypatch)
     runtime_seal_payload = _canonical_payload(seal)
 
     observed = binding_module._validate_producer_custody(
@@ -886,15 +861,9 @@ def test_archived_producer_runtime_seal_requires_exact_assurance_and_fields(
     )
 
     assert observed == {
-        "runtime_seal_sha256": hashlib.sha256(
-            runtime_seal_payload
-        ).hexdigest(),
-        "producer_bootstrap_sha256": hashlib.sha256(
-            producer_bootstrap
-        ).hexdigest(),
-        "launch_bootstrap_sha256": hashlib.sha256(
-            launch_bootstrap
-        ).hexdigest(),
+        "runtime_seal_sha256": hashlib.sha256(runtime_seal_payload).hexdigest(),
+        "producer_bootstrap_sha256": hashlib.sha256(producer_bootstrap).hexdigest(),
+        "launch_bootstrap_sha256": hashlib.sha256(launch_bootstrap).hexdigest(),
         "package_ownership": {"identity": "package-ownership"},
     }
 
@@ -907,9 +876,7 @@ def test_archived_producer_runtime_seal_rejects_schema_or_assurance_drift(
     monkeypatch: pytest.MonkeyPatch,
     mutation: str,
 ) -> None:
-    execution, seal, producer_bootstrap, launch_bootstrap = (
-        _producer_custody_fixture(monkeypatch)
-    )
+    execution, seal, producer_bootstrap, launch_bootstrap = _producer_custody_fixture(monkeypatch)
     if mutation == "missing-assurance":
         del seal["assurance"]
     elif mutation == "overstated-assurance":
@@ -919,9 +886,7 @@ def test_archived_producer_runtime_seal_rejects_schema_or_assurance_drift(
     else:
         seal["unbound"] = True
     runtime_seal_payload = _canonical_payload(seal)
-    execution["runtime_seal_sha256"] = hashlib.sha256(
-        runtime_seal_payload
-    ).hexdigest()
+    execution["runtime_seal_sha256"] = hashlib.sha256(runtime_seal_payload).hexdigest()
 
     with pytest.raises(RuntimeError, match="runtime seal/bootstrap custody"):
         binding_module._validate_producer_custody(
@@ -1105,6 +1070,185 @@ def test_development_qualification_archive_is_deterministic_and_stream_verified(
     assert second_path.read_bytes() == first_payload
 
 
+def test_development_archive_rejects_recomputed_identity_with_nonzero_tail(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer = tmp_path / "producer"
+    producer.mkdir()
+    (producer / "result.json").write_bytes(b"{}\n")
+    destination = tmp_path / "results" / "development"
+    destination.mkdir(parents=True)
+    monkeypatch.setattr(binding_module, "REPO", tmp_path)
+    monkeypatch.setattr(
+        binding_module,
+        "DEVELOPMENT_RESULTS_ROOT",
+        destination,
+    )
+    archive_path, identity = binding_module._write_qualification_archive(
+        destination_directory=destination,
+        producer_root=producer,
+        evidence_payloads={"evidence/audit.json": b"{}\n"},
+    )
+    payload = bytearray(archive_path.read_bytes())
+    assert payload[-1] == 0
+    payload[-1] = 1
+    digest = hashlib.sha256(payload).hexdigest()
+    mutated_path = destination / (f"development-qualification-{digest[:16]}.tar")
+    mutated_path.write_bytes(payload)
+    mutated_identity = copy.deepcopy(identity)
+    mutated_identity.update(
+        {
+            "file": mutated_path.name,
+            "canonical_path": mutated_path.relative_to(tmp_path).as_posix(),
+            "sha256": digest,
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="terminal records"):
+        binding_module._stream_qualification_archive(
+            mutated_path,
+            mutated_identity,
+            retained_members={"evidence/audit.json"},
+        )
+
+
+def test_development_archive_rejects_recomputed_identity_with_nonzero_member_padding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer = tmp_path / "producer"
+    producer.mkdir()
+    (producer / "result.json").write_bytes(b"{}\n")
+    destination = tmp_path / "results" / "development"
+    destination.mkdir(parents=True)
+    monkeypatch.setattr(binding_module, "REPO", tmp_path)
+    monkeypatch.setattr(
+        binding_module,
+        "DEVELOPMENT_RESULTS_ROOT",
+        destination,
+    )
+    audit_payload = b"{}\n"
+    archive_path, identity = binding_module._write_qualification_archive(
+        destination_directory=destination,
+        producer_root=producer,
+        evidence_payloads={"evidence/audit.json": audit_payload},
+    )
+    payload = bytearray(archive_path.read_bytes())
+    padding_offset = tarfile.BLOCKSIZE + len(audit_payload)
+    assert payload[padding_offset] == 0
+    payload[padding_offset] = 1
+    digest = hashlib.sha256(payload).hexdigest()
+    mutated_path = destination / (f"development-qualification-{digest[:16]}.tar")
+    mutated_path.write_bytes(payload)
+    mutated_identity = copy.deepcopy(identity)
+    mutated_identity.update(
+        {
+            "file": mutated_path.name,
+            "canonical_path": mutated_path.relative_to(tmp_path).as_posix(),
+            "sha256": digest,
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="member padding"):
+        binding_module._stream_qualification_archive(
+            mutated_path,
+            mutated_identity,
+            retained_members={"evidence/audit.json"},
+        )
+
+
+def test_development_archive_rejects_recomputed_identity_with_noncanonical_header_field(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer = tmp_path / "producer"
+    producer.mkdir()
+    (producer / "result.json").write_bytes(b"{}\n")
+    destination = tmp_path / "results" / "development"
+    destination.mkdir(parents=True)
+    monkeypatch.setattr(binding_module, "REPO", tmp_path)
+    monkeypatch.setattr(
+        binding_module,
+        "DEVELOPMENT_RESULTS_ROOT",
+        destination,
+    )
+    archive_path, identity = binding_module._write_qualification_archive(
+        destination_directory=destination,
+        producer_root=producer,
+        evidence_payloads={"evidence/audit.json": b"{}\n"},
+    )
+    payload = bytearray(archive_path.read_bytes())
+    payload[329:337] = b"0000001\0"
+    payload[148:156] = b" " * 8
+    checksum = sum(payload[: tarfile.BLOCKSIZE])
+    payload[148:156] = f"{checksum:06o}\0 ".encode("ascii")
+    digest = hashlib.sha256(payload).hexdigest()
+    mutated_path = destination / (f"development-qualification-{digest[:16]}.tar")
+    mutated_path.write_bytes(payload)
+    mutated_identity = copy.deepcopy(identity)
+    mutated_identity.update(
+        {
+            "file": mutated_path.name,
+            "canonical_path": mutated_path.relative_to(tmp_path).as_posix(),
+            "sha256": digest,
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="noncanonical or hidden header"):
+        binding_module._stream_qualification_archive(
+            mutated_path,
+            mutated_identity,
+            retained_members={"evidence/audit.json"},
+        )
+
+
+@pytest.mark.parametrize(
+    ("member", "replacement"),
+    [
+        ("evidence/empty.log", False),
+        ("evidence/one.log", True),
+        ("evidence/empty.log", 0.0),
+        ("evidence/one.log", 1.0),
+    ],
+)
+def test_development_archive_rejects_member_size_numeric_aliases(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    member: str,
+    replacement: object,
+) -> None:
+    producer = tmp_path / "producer"
+    producer.mkdir()
+    (producer / "result.json").write_bytes(b"{}\n")
+    destination = tmp_path / "results" / "development"
+    destination.mkdir(parents=True)
+    monkeypatch.setattr(binding_module, "REPO", tmp_path)
+    monkeypatch.setattr(
+        binding_module,
+        "DEVELOPMENT_RESULTS_ROOT",
+        destination,
+    )
+    archive_path, identity = binding_module._write_qualification_archive(
+        destination_directory=destination,
+        producer_root=producer,
+        evidence_payloads={
+            "evidence/empty.log": b"",
+            "evidence/one.log": b"x",
+        },
+    )
+    mutated = copy.deepcopy(identity)
+    row = next(row for row in mutated["members"] if row["path"] == member)
+    row["bytes"] = replacement
+
+    with pytest.raises(RuntimeError, match="identity is malformed"):
+        binding_module._stream_qualification_archive(
+            archive_path,
+            mutated,
+            retained_members=set(),
+        )
+
+
 def test_development_closure_archive_and_recheck_accept_outer_finalized_manifest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1132,19 +1276,176 @@ def test_development_closure_archive_and_recheck_accept_outer_finalized_manifest
         },
     )
 
-    assert binding_module._validate_archived_producer(
-        retained,
-        identity["members"],
-    ) == manifest
+    assert (
+        binding_module._validate_archived_producer(
+            retained,
+            identity["members"],
+        )
+        == manifest
+    )
     binding_module._reverify_live_development_producer(
         producer,
         expected_manifest=manifest,
-        expected_result_sha256=hashlib.sha256(
-            (producer / "result.json").read_bytes()
-        ).hexdigest(),
+        expected_result_sha256=hashlib.sha256((producer / "result.json").read_bytes()).hexdigest(),
     )
     assert (producer / "producer-manifest.json").stat().st_nlink == 2
     assert (producer / "result.json").stat().st_nlink == 1
+
+
+def test_terminal_producer_recheck_streams_result_larger_than_64_mib(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from bench.world_model_lifecycle import artifact
+
+    producer = tmp_path / "producer"
+    producer.mkdir()
+    result = producer / "result.json"
+    result_bytes = (64 << 20) + 1
+    with result.open("wb") as stream:
+        stream.truncate(result_bytes)
+    digest = hashlib.sha256()
+    zero_chunk = b"\0" * (1 << 20)
+    for _ in range(64):
+        digest.update(zero_chunk)
+    digest.update(b"\0")
+    result_sha256 = digest.hexdigest()
+    manifest = {
+        "files": [
+            {
+                "path": "result.json",
+                "bytes": result_bytes,
+                "sha256": result_sha256,
+            }
+        ]
+    }
+    monkeypatch.setattr(
+        artifact,
+        "verify_producer_manifest",
+        lambda _root: manifest,
+    )
+    monkeypatch.setattr(
+        artifact,
+        "_regular_producer_files",
+        lambda _root: (result,),
+    )
+    original_read = binding_module.os.read
+    requested_bytes: list[int] = []
+
+    def bounded_read(descriptor: int, length: int) -> bytes:
+        requested_bytes.append(length)
+        return original_read(descriptor, length)
+
+    monkeypatch.setattr(binding_module.os, "read", bounded_read)
+
+    binding_module._reverify_live_development_producer(
+        producer,
+        expected_manifest=manifest,
+        expected_result_sha256=result_sha256,
+    )
+
+    assert requested_bytes
+    assert max(requested_bytes) <= 1 << 20
+
+
+def test_streamed_regular_digest_rejects_in_read_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "result.json"
+    target.write_bytes(b"a" * ((1 << 20) + 1))
+    original_read = binding_module.os.read
+    mutated = False
+
+    def mutate_after_first_read(descriptor: int, length: int) -> bytes:
+        nonlocal mutated
+        chunk = original_read(descriptor, length)
+        if chunk and not mutated:
+            mutated = True
+            with target.open("r+b") as stream:
+                stream.write(b"b")
+                stream.flush()
+                os.fsync(stream.fileno())
+        return chunk
+
+    monkeypatch.setattr(
+        binding_module.os,
+        "read",
+        mutate_after_first_read,
+    )
+
+    with pytest.raises(RuntimeError, match="changed while read"):
+        binding_module._stable_regular_digest(
+            target,
+            label="development result",
+            maximum_bytes=target.stat().st_size,
+        )
+
+
+def test_streamed_regular_digest_rejects_path_namespace_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = tmp_path / "live"
+    replacement = tmp_path / "replacement"
+    displaced = tmp_path / "displaced"
+    live.mkdir()
+    replacement.mkdir()
+    payload = b"a" * ((1 << 20) + 1)
+    target = live / "result.json"
+    target.write_bytes(payload)
+    (replacement / "result.json").write_bytes(payload)
+    original_read = binding_module.os.read
+    replaced = False
+
+    def replace_namespace_after_first_read(
+        descriptor: int,
+        length: int,
+    ) -> bytes:
+        nonlocal replaced
+        chunk = original_read(descriptor, length)
+        if chunk and not replaced:
+            replaced = True
+            live.rename(displaced)
+            replacement.rename(live)
+        return chunk
+
+    monkeypatch.setattr(
+        binding_module.os,
+        "read",
+        replace_namespace_after_first_read,
+    )
+
+    with pytest.raises(RuntimeError, match="changed while read"):
+        binding_module._stable_regular_digest(
+            target,
+            label="development result",
+            maximum_bytes=len(payload),
+        )
+
+
+def test_streamed_regular_digest_rejects_aliases_and_nonregular_files(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "result.json"
+    target.write_bytes(b"result")
+    alias = tmp_path / "result-alias.json"
+    alias.symlink_to(target)
+    with pytest.raises(RuntimeError, match="aliased"):
+        binding_module._stable_regular_digest(
+            alias,
+            label="development result",
+            maximum_bytes=target.stat().st_size,
+        )
+
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    with pytest.raises(RuntimeError, match="link custody"):
+        binding_module._stable_regular_digest(
+            directory,
+            label="development result",
+            maximum_bytes=0,
+        )
 
 
 def test_development_archive_rejects_extra_manifest_alias(
@@ -1230,6 +1531,141 @@ def test_archive_writer_rejects_hardlinked_producer_source(
         )
 
 
+@pytest.mark.parametrize(
+    ("payload", "replacement"),
+    [
+        (b"", False),
+        (b"x", True),
+        (b"", 0.0),
+        (b"x", 1.0),
+    ],
+)
+def test_receipt_sidecar_rejects_size_numeric_aliases(
+    tmp_path: Path,
+    payload: bytes,
+    replacement: object,
+) -> None:
+    filename = binding_module._content_addressed_filename(
+        "development-audit-stderr",
+        payload,
+        ".log",
+    )
+    (tmp_path / filename).write_bytes(payload)
+    receipt = {
+        "stderr_file": filename,
+        "stderr_bytes": replacement,
+        "stderr_sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+    with pytest.raises(RuntimeError, match="reference is malformed"):
+        binding_module._receipt_sidecar(
+            tmp_path / "audit-reproduction.json",
+            receipt,
+            prefix="stderr",
+            label="development audit stderr",
+        )
+
+
+@pytest.mark.parametrize(
+    ("payload", "replacement"),
+    [
+        (b"", False),
+        (b"x", True),
+        (b"", 0.0),
+        (b"x", 1.0),
+    ],
+)
+def test_archived_producer_rejects_member_size_numeric_aliases(
+    payload: bytes,
+    replacement: object,
+) -> None:
+    payload_sha256 = hashlib.sha256(payload).hexdigest()
+    manifest = {
+        "schema": "prospect.wm001.producer-manifest.v1",
+        "experiment_id": "WM-001",
+        "lane": "development",
+        "status": "completed",
+        "error": None,
+        "manifest_excludes": ["producer-manifest.json"],
+        "file_count": 1,
+        "files": [
+            {
+                "path": "payload.bin",
+                "bytes": replacement,
+                "sha256": payload_sha256,
+            }
+        ],
+    }
+    manifest_payload = _canonical_payload(manifest)
+    retained = {
+        "producer/producer-manifest.json": manifest_payload,
+    }
+    member_rows = [
+        {
+            "path": "producer/payload.bin",
+            "bytes": len(payload),
+            "sha256": payload_sha256,
+        },
+        {
+            "path": "producer/producer-manifest.json",
+            "bytes": len(manifest_payload),
+            "sha256": hashlib.sha256(manifest_payload).hexdigest(),
+        },
+    ]
+
+    with pytest.raises(RuntimeError, match="manifest row is malformed"):
+        binding_module._validate_archived_producer(
+            retained,
+            member_rows,
+        )
+
+
+@pytest.mark.parametrize("replacement", [True, 1.0])
+def test_archived_producer_rejects_file_count_numeric_alias(
+    replacement: object,
+) -> None:
+    payload = b"x"
+    payload_sha256 = hashlib.sha256(payload).hexdigest()
+    manifest = {
+        "schema": "prospect.wm001.producer-manifest.v1",
+        "experiment_id": "WM-001",
+        "lane": "development",
+        "status": "completed",
+        "error": None,
+        "manifest_excludes": ["producer-manifest.json"],
+        "file_count": replacement,
+        "files": [
+            {
+                "path": "payload.bin",
+                "bytes": len(payload),
+                "sha256": payload_sha256,
+            }
+        ],
+    }
+    manifest_payload = _canonical_payload(manifest)
+    retained = {
+        "producer/producer-manifest.json": manifest_payload,
+    }
+    member_rows = [
+        {
+            "path": "producer/payload.bin",
+            "bytes": len(payload),
+            "sha256": payload_sha256,
+        },
+        {
+            "path": "producer/producer-manifest.json",
+            "bytes": len(manifest_payload),
+            "sha256": hashlib.sha256(manifest_payload).hexdigest(),
+        },
+    ]
+
+    with pytest.raises(RuntimeError, match="manifest is incomplete"):
+        binding_module._validate_archived_producer(
+            retained,
+            member_rows,
+        )
+
+
 def test_terminal_producer_recheck_rejects_hardlink(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1241,7 +1677,16 @@ def test_terminal_producer_recheck_rejects_hardlink(
     result = producer / "result.json"
     result.write_bytes(b"result")
     os.link(result, tmp_path / "result-alias.json")
-    manifest = {"status": "completed"}
+    result_sha256 = hashlib.sha256(b"result").hexdigest()
+    manifest = {
+        "files": [
+            {
+                "path": "result.json",
+                "bytes": len(b"result"),
+                "sha256": result_sha256,
+            }
+        ]
+    }
     monkeypatch.setattr(
         artifact,
         "verify_producer_manifest",
@@ -1257,7 +1702,7 @@ def test_terminal_producer_recheck_rejects_hardlink(
         binding_module._reverify_live_development_producer(
             producer,
             expected_manifest=manifest,
-            expected_result_sha256=hashlib.sha256(b"result").hexdigest(),
+            expected_result_sha256=result_sha256,
         )
 
 
@@ -1310,7 +1755,7 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -1342,7 +1787,15 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
 
     for mutation in (
         lambda row: row["replicates"][0].__setitem__("master_seed", 7),
+        lambda row: row["replicates"][0].__setitem__(
+            "master_seed",
+            float(verify_module.DEVELOPMENT_SEEDS[0]),
+        ),
         lambda row: row["replicates"][0].__setitem__("transitions", 99_199),
+        lambda row: row["replicates"][0].__setitem__(
+            "transitions",
+            99_200.0,
+        ),
         lambda row: row.__setitem__("matrix_contract_sha256", "0" * 64),
     ):
         adversarial = copy.deepcopy(value)
@@ -1393,7 +1846,10 @@ def test_development_qualification_archive_rejects_link_members(
         ],
     }
 
-    with pytest.raises(RuntimeError, match="tar metadata"):
+    with pytest.raises(
+        RuntimeError,
+        match="noncanonical|tar metadata",
+    ):
         binding_module._stream_qualification_archive(
             archive_path,
             identity,
@@ -1405,7 +1861,7 @@ def test_development_closure_creator_rejects_any_alternate_marker_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    canonical = tmp_path / "development-closure-v1.7.0.json"
+    canonical = tmp_path / "development-closure-v1.8.0.json"
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
 
     with pytest.raises(RuntimeError, match="only be published"):
@@ -1423,7 +1879,7 @@ def test_preserved_development_closure_name_must_be_content_addressed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _canonical_payload({"schema": "fixture"})
-    canonical = tmp_path / "development-closure-v1.7.0.json"
+    canonical = tmp_path / "development-closure-v1.8.0.json"
     canonical.write_bytes(payload)
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
     assert binding_module._closure_path_mode(canonical, payload) == "canonical"

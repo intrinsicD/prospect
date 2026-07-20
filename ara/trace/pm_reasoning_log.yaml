@@ -28,3 +28,28 @@ entries:
       - "Crystallized O11-O12 as R05-R06 because the results report and next-protocol requirements now depend on exact isolated dependency visibility and packageable negative evidence."
       - "Did not mark O03 stale: only two session-day transitions have elapsed, below the three-session-day threshold."
       - "Did not weaken C01; v1.4 supplies a separate evidence claim rather than retroactively changing the immutable v1.3 result."
+  - turn: "2026-07-20_001#1"
+    notes:
+      - "Routed the v1.7 terminal materialization failure as dead end N11 and the fresh-version choice as decision N12."
+      - "Routed the completed invariant and focused-test audit as experiment N13; no behavioral outcome was opened or claimed."
+      - "Staged O13 as a custody constraint and crystallized it as R07 through artifact commitment because protocol v1.8 and the implemented regression suite now depend on it."
+      - "Left O03 unstale because WM-001 remains the active research topic and false abandonment would be worse than delayed promotion."
+      - "Found no contradiction with C01 or C02: v1.7 supplied closure-failure metadata only, and v1.8 has not produced a new behavioral outcome."
+  - turn: "2026-07-20_001#2"
+    notes:
+      - "Routed the completed canonical-USTAR negative-test run directly as experiment N14."
+      - "Did not stage a new constraint because the tests supply additional evidence for existing streamed-custody constraint R07."
+      - "Found no production defect and no contradiction with existing claims or constraints."
+      - "Left O03 unstale because the WM-001 protocol remains active."
+  - turn: "2026-07-20_001#3"
+    notes:
+      - "Routed the completed formal-namespace and semantic-review custody validation directly as experiment N15."
+      - "Did not stage a new knowledge object because this work tightens the already committed prospective-custody boundary without changing the scientific hypothesis."
+      - "Recorded the two binding-suite failures as an unfulfilled prospective-review artifact dependency, not evidence against the implemented path or review guards."
+      - "Found no contradiction with C01 or C02 and left O03 unstale because no new behavioral outcome was consumed."
+  - turn: "2026-07-20_001#4"
+    notes:
+      - "Routed the completed result-free acceptance battery and prospective review directly as experiment N16."
+      - "Did not stage a capability claim because no v1.8 outcome or performance value was produced or inspected."
+      - "Did not add a new constraint: the large-file, archive, path, and review checks supply closure evidence for the already committed v1.8 custody design."
+      - "Found no contradiction with C01 or C02 and left O03 unstale because WM-001 remains the active research topic."

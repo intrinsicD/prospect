@@ -1,4 +1,4 @@
-"""Trusted, immutable preformal test evidence for WM-001 protocol 1.7."""
+"""Trusted, immutable preformal test evidence for WM-001 protocol 1.8."""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ from .assurance import ASSURANCE
 
 SCHEMA = "prospect.wm001.preformal-test-report.v2"
 EXPERIMENT_ID = "WM-001"
-PROTOCOL_VERSION = "1.7.0"
-REPORT_NAME = "preformal-test-report-v1.7.0.json"
+PROTOCOL_VERSION = "1.8.0"
+REPORT_NAME = "preformal-test-report-v1.8.0.json"
 PREFORMAL_REPORT_NAME = REPORT_NAME
-LOG_PREFIX = "preformal-v1.7.0-command-"
+LOG_PREFIX = "preformal-v1.8.0-command-"
 _EVIDENCE_PREFIX = "preformal-"
 SOURCE_RELATIVE_PATH = "bench/world_model_lifecycle/preformal.py"
-REVIEW_RELATIVE_PATH = "docs/wm001-v170-prospective-harness-review.json"
+REVIEW_RELATIVE_PATH = "docs/wm001-v180-prospective-harness-review.json"
 REVIEW_SCHEMA = "prospect.wm001.prospective-harness-review.v1"
 
 
@@ -60,7 +60,7 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_CLOSURE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.7.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.8.0.json"
 )
 PREFORMAL_REPORT_PATH = DEVELOPMENT_RESULTS_ROOT / REPORT_NAME
 LAUNCH_BOOTSTRAP_PATH = REPO / "bench/world_model_lifecycle/launch_bootstrap.py"
@@ -871,7 +871,7 @@ def required_commands(
     prospective_review_path: Path = REVIEW_PATH,
     device: str = "cpu",
 ) -> tuple[CommandSpec, ...]:
-    """Return the fixed, ordered v1.7 preformal command contract."""
+    """Return the fixed, ordered v1.8 preformal command contract."""
 
     if device not in {"cpu", "cuda"}:
         raise PreformalEvidenceError("preformal device must be cpu or cuda")
@@ -885,7 +885,7 @@ def required_commands(
     )
     runtime_seal = (
         REPO
-        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.7.0.json"
+        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.8.0.json"
         if runtime_seal_path is None
         else _canonical_existing_file(runtime_seal_path, label="runtime seal")
     )
@@ -1134,7 +1134,7 @@ def generate_preformal_report(
         raise PreformalEvidenceError("preformal report path must not contain aliases")
     if output != PREFORMAL_REPORT_PATH:
         raise PreformalEvidenceError(
-            "preformal report must use the sole canonical protocol-1.7 "
+            "preformal report must use the sole canonical protocol-1.8 "
             f"path {PREFORMAL_REPORT_PATH}"
         )
     directory = _canonical_existing_directory(output.parent, label="evidence directory")
@@ -1454,7 +1454,7 @@ def _runtime_bootstrap_conformance_from_report(
 
 
 def verify_preformal_report(report_path: Path) -> dict[str, Any]:
-    """Strictly reopen and independently validate a passing v1.7 report."""
+    """Strictly reopen and independently validate a passing v1.8 report."""
 
     lexical = report_path if report_path.is_absolute() else Path.cwd() / report_path
     absolute = Path(os.path.abspath(report_path))

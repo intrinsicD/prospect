@@ -77,7 +77,7 @@ def _repository_root() -> Path:
 REPO = _repository_root()
 LOCKFILE = REPO / "requirements-wm001.lock"
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.7.0.json"
+DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.8.0.json"
 ROOT_DISTRIBUTIONS = (
     "gymnasium",
     "jsonschema",
@@ -214,8 +214,7 @@ def preformal_log_rows(
             if (
                 path.parent != report_path.parent
                 or len(payload) != reference.get("bytes")
-                or hashlib.sha256(payload).hexdigest()
-                != reference.get("sha256")
+                or hashlib.sha256(payload).hexdigest() != reference.get("sha256")
             ):
                 raise RuntimeError("preformal report log bytes differ from their reference")
             rows.append(
@@ -358,26 +357,16 @@ def build_bound_audit_execution(
         environment=safe_environment,
         repeat_count=repeat_count,
     )
-    restart_runtime_report = (
-        restart_runtime_conformance.path_execution.stdout
-    )
-    restart_runtime_receipt = conformance_receipt_bytes(
-        restart_runtime_conformance
-    )
-    restart_runtime_report_value = dict(
-        restart_runtime_conformance.path_execution.report
-    )
+    restart_runtime_report = restart_runtime_conformance.path_execution.stdout
+    restart_runtime_receipt = conformance_receipt_bytes(restart_runtime_conformance)
+    restart_runtime_report_value = dict(restart_runtime_conformance.path_execution.report)
     if (
-        restart_runtime_report_value.get("schema")
-        != "prospect.wm001.restart-runtime-conformance.v1"
-        or restart_runtime_report_value.get("protocol_version") != "1.7.0"
+        restart_runtime_report_value.get("schema") != "prospect.wm001.restart-runtime-conformance.v1"
+        or restart_runtime_report_value.get("protocol_version") != "1.8.0"
         or restart_runtime_report_value.get("passed") is not True
-        or restart_runtime_conformance.path_execution.stdout
-        != restart_runtime_conformance.descriptor_execution.stdout
+        or restart_runtime_conformance.path_execution.stdout != restart_runtime_conformance.descriptor_execution.stdout
     ):
-        raise RuntimeError(
-            "restart-runtime captured-runner conformance did not pass"
-        )
+        raise RuntimeError("restart-runtime captured-runner conformance did not pass")
     bootstrap = bootstrap_source_bytes()
     payloads = {
         _content_addressed_filename("audit-bootstrap", bootstrap, ".py"): bootstrap,
@@ -450,12 +439,8 @@ def build_bound_audit_execution(
     conformance_name, _ = locate("audit-prebinding-conformance-")
     conformance_receipt_name, _ = locate("audit-prebinding-execution-receipt-")
     outcome_runtime_name, _ = locate("audit-outcome-runtime-")
-    restart_runtime_report_name, _ = locate(
-        "audit-restart-runtime-conformance-"
-    )
-    restart_runtime_receipt_name, _ = locate(
-        "audit-restart-runtime-execution-receipt-"
-    )
+    restart_runtime_report_name, _ = locate("audit-restart-runtime-conformance-")
+    restart_runtime_receipt_name, _ = locate("audit-restart-runtime-execution-receipt-")
     request_identity = report.get("request_sha256")
     if not isinstance(request_identity, str) or len(request_identity) != 64:
         raise RuntimeError("prebinding report has no semantic request identity")
@@ -491,24 +476,12 @@ def build_bound_audit_execution(
         "outcome_runtime_manifest_file": outcome_runtime_name,
         "outcome_runtime_manifest_bytes": len(outcome_runtime),
         "outcome_runtime_manifest_sha256": hashlib.sha256(outcome_runtime).hexdigest(),
-        "restart_runtime_conformance_report_file": (
-            restart_runtime_report_name
-        ),
-        "restart_runtime_conformance_report_bytes": len(
-            restart_runtime_report
-        ),
-        "restart_runtime_conformance_report_sha256": hashlib.sha256(
-            restart_runtime_report
-        ).hexdigest(),
-        "restart_runtime_execution_receipt_file": (
-            restart_runtime_receipt_name
-        ),
-        "restart_runtime_execution_receipt_bytes": len(
-            restart_runtime_receipt
-        ),
-        "restart_runtime_execution_receipt_sha256": hashlib.sha256(
-            restart_runtime_receipt
-        ).hexdigest(),
+        "restart_runtime_conformance_report_file": (restart_runtime_report_name),
+        "restart_runtime_conformance_report_bytes": len(restart_runtime_report),
+        "restart_runtime_conformance_report_sha256": hashlib.sha256(restart_runtime_report).hexdigest(),
+        "restart_runtime_execution_receipt_file": (restart_runtime_receipt_name),
+        "restart_runtime_execution_receipt_bytes": len(restart_runtime_receipt),
+        "restart_runtime_execution_receipt_sha256": hashlib.sha256(restart_runtime_receipt).hexdigest(),
         "restart_runtime_support_files": [
             "producer_bootstrap.py",
             "protocol.json",
@@ -657,7 +630,7 @@ def implementation_files() -> list[dict[str, object]]:
         REPO / "bench" / "world_model_lifecycle" / "protocol.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "raw-result.schema.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "formal-binding.schema.json",
-        REPO / "docs" / "wm001-v170-prospective-harness-review.json",
+        REPO / "docs" / "wm001-v180-prospective-harness-review.json",
     ]
     unique = sorted(set(candidates))
     return [
@@ -1372,7 +1345,7 @@ def create_audit_reproduction_receipt(
     receipt = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "supplied_audit_sha256": hashlib.sha256(supplied).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(execution.stdout).hexdigest(),
         "byte_identical": True,
@@ -1520,9 +1493,7 @@ def _development_producer_source(
     try:
         relative = path.relative_to(producer_root).as_posix()
     except ValueError as error:
-        raise RuntimeError(
-            "development qualification source is outside the producer"
-        ) from error
+        raise RuntimeError("development qualification source is outside the producer") from error
     if relative == "producer-manifest.json":
         return _QualificationFileSource(
             path=path,
@@ -1544,6 +1515,33 @@ def _canonical_json_object(payload: bytes, *, label: str) -> dict[str, object]:
     if not isinstance(value, dict) or payload != canonical_json_bytes(value) + b"\n":
         raise RuntimeError(f"{label} is not one canonical JSON object followed by LF")
     return cast(dict[str, object], value)
+
+
+def _strict_json_equal(observed: object, expected: object) -> bool:
+    """Compare decoded JSON without Python bool/int/float aliases."""
+
+    if type(observed) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return (
+            isinstance(observed, dict)
+            and set(observed) == set(expected)
+            and all(_strict_json_equal(observed[key], value) for key, value in expected.items())
+        )
+    if isinstance(expected, list):
+        return (
+            isinstance(observed, list)
+            and len(observed) == len(expected)
+            and all(
+                _strict_json_equal(observed_item, expected_item)
+                for observed_item, expected_item in zip(
+                    observed,
+                    expected,
+                    strict=True,
+                )
+            )
+        )
+    return observed == expected
 
 
 def _stable_stat_identity(row: os.stat_result) -> tuple[int, ...]:
@@ -1581,9 +1579,7 @@ def _stable_regular_payload(
     try:
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode) or before.st_nlink != expected_nlink:
-            raise RuntimeError(
-                f"{label} violates its {expected_nlink}-link custody contract"
-            )
+            raise RuntimeError(f"{label} violates its {expected_nlink}-link custody contract")
         if before.st_size > limit:
             raise RuntimeError(f"{label} exceeds its byte limit")
         payload = os.pread(descriptor, before.st_size + 1, 0)
@@ -1593,6 +1589,72 @@ def _stable_regular_payload(
     if len(payload) != before.st_size or _stable_stat_identity(before) != _stable_stat_identity(after):
         raise RuntimeError(f"{label} changed while read")
     return payload
+
+
+def _stable_regular_digest(
+    path: Path,
+    *,
+    label: str,
+    maximum_bytes: int,
+    expected_nlink: int = 1,
+) -> tuple[int, str]:
+    """Stream one canonical regular file while binding its path and inode."""
+
+    if type(expected_nlink) is not int or expected_nlink not in {1, 2}:
+        raise ValueError(f"{label} has an unsupported link-count contract")
+    if type(maximum_bytes) is not int or maximum_bytes < 0:
+        raise ValueError(f"{label} has an invalid byte limit")
+    candidate = path if path.is_absolute() else Path.cwd() / path
+    try:
+        if candidate.resolve(strict=True) != candidate:
+            raise RuntimeError(f"{label} is missing, aliased, or non-canonical")
+    except OSError as error:
+        raise RuntimeError(f"{label} is missing, aliased, or non-canonical") from error
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(candidate, flags)
+    except OSError as error:
+        raise RuntimeError(f"{label} cannot be opened safely") from error
+    try:
+        before = os.fstat(descriptor)
+        namespace_before = candidate.lstat()
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != expected_nlink
+            or _stable_stat_identity(namespace_before) != _stable_stat_identity(before)
+        ):
+            raise RuntimeError(f"{label} violates its {expected_nlink}-link custody contract")
+        if before.st_size > maximum_bytes:
+            raise RuntimeError(f"{label} exceeds its byte limit")
+        digest = hashlib.sha256()
+        observed_bytes = 0
+        remaining = before.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(1 << 20, remaining))
+            if not chunk:
+                break
+            digest.update(chunk)
+            observed_bytes += len(chunk)
+            remaining -= len(chunk)
+        trailing = os.read(descriptor, 1)
+        after = os.fstat(descriptor)
+        namespace_after = candidate.lstat()
+        resolved_after = candidate.resolve(strict=True)
+    except OSError as error:
+        raise RuntimeError(f"{label} cannot be read safely") from error
+    finally:
+        os.close(descriptor)
+    identity = _stable_stat_identity(before)
+    if (
+        observed_bytes != before.st_size
+        or trailing
+        or identity != _stable_stat_identity(after)
+        or identity != _stable_stat_identity(namespace_before)
+        or identity != _stable_stat_identity(namespace_after)
+        or resolved_after != candidate
+    ):
+        raise RuntimeError(f"{label} changed while read")
+    return observed_bytes, digest.hexdigest()
 
 
 def _expected_development_audit_support_rows() -> list[dict[str, object]]:
@@ -1641,7 +1703,7 @@ def _receipt_sidecar(
         not isinstance(filename, str)
         or not filename
         or Path(filename).name != filename
-        or not isinstance(expected_bytes, int)
+        or type(expected_bytes) is not int
         or expected_bytes < 0
         or not isinstance(expected_sha256, str)
         or len(expected_sha256) != 64
@@ -1732,7 +1794,7 @@ def _validate_execution_identity(
             "package_roots": current_roots,
             "standard_library": standard_library_inventory(),
         }
-        if any(selected.get(field) != value for field, value in expected.items()):
+        if any(not _strict_json_equal(selected.get(field), value) for field, value in expected.items()):
             raise RuntimeError("development result runtime/source differs from the live sealed closure")
     return selected
 
@@ -1763,18 +1825,33 @@ def _validate_producer_custody(
         set(runtime_seal) != _DEVELOPMENT_RUNTIME_SEAL_FIELDS
         or runtime_seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or runtime_seal.get("experiment_id") != "WM-001"
-        or runtime_seal.get("protocol_version") != "1.7.0"
-        or runtime_seal.get("assurance") != ASSURANCE
+        or runtime_seal.get("protocol_version") != "1.8.0"
+        or not _strict_json_equal(runtime_seal.get("assurance"), ASSURANCE)
         or runtime_seal.get("git_commit") != execution["git_commit"]
         or runtime_seal.get("git_tree") != execution["git_tree"]
         or runtime_seal.get("worktree_clean") is not True
-        or runtime_seal.get("python") != expected_python
-        or runtime_seal.get("required_flags") != execution["python_flags"]
-        or runtime_seal.get("process_environment") != execution["process_environment"]
+        or not _strict_json_equal(runtime_seal.get("python"), expected_python)
+        or not _strict_json_equal(
+            runtime_seal.get("required_flags"),
+            execution["python_flags"],
+        )
+        or not _strict_json_equal(
+            runtime_seal.get("process_environment"),
+            execution["process_environment"],
+        )
         or runtime_seal.get("bootstrap_source_sha256") != bootstrap_sha256
-        or runtime_seal.get("package_roots") != execution["package_roots"]
-        or runtime_seal.get("standard_library") != execution["standard_library"]
-        or runtime_seal.get("package_ownership") != ownership
+        or not _strict_json_equal(
+            runtime_seal.get("package_roots"),
+            execution["package_roots"],
+        )
+        or not _strict_json_equal(
+            runtime_seal.get("standard_library"),
+            execution["standard_library"],
+        )
+        or not _strict_json_equal(
+            runtime_seal.get("package_ownership"),
+            ownership,
+        )
         or hashlib.sha256(runtime_seal_payload).hexdigest() != execution["runtime_seal_sha256"]
         or bootstrap_sha256 != execution["producer_bootstrap_sha256"]
         or bootstrap_payload != Path(__file__).with_name("producer_bootstrap.py").read_bytes()
@@ -1827,10 +1904,20 @@ def _validate_development_audit_evidence(
         set(receipt) != _AUDIT_RECEIPT_FIELDS
         or receipt.get("schema") != "prospect.wm001.audit-reproduction.v2"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.7.0"
+        or receipt.get("protocol_version") != "1.8.0"
         or receipt.get("supplied_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("reproduced_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("byte_identical") is not True
+        or any(
+            type(receipt.get(field)) is not int
+            for field in (
+                "returncode",
+                "stdout_bytes",
+                "stderr_bytes",
+                "runtime_manifest_bytes",
+                "invocation_manifest_bytes",
+            )
+        )
         or receipt.get("returncode") != 0
         or receipt.get("source_mode") != "descriptor"
         or receipt.get("stdout_bytes") != len(audit_payload)
@@ -1861,7 +1948,7 @@ def _validate_development_audit_evidence(
         or receipt.get("bootstrap_sha256") != bootstrap_source_sha256()
         or receipt.get("runner_source_sha256") != runner_sha256
         or receipt.get("auditor_source_sha256") != auditor_sha256
-        or receipt.get("support_files") != support_rows
+        or not _strict_json_equal(receipt.get("support_files"), support_rows)
         or receipt.get("passed") is not True
     ):
         raise RuntimeError("development audit reproduction receipt is invalid")
@@ -1877,7 +1964,14 @@ def _validate_development_audit_evidence(
         or audit.get("complete_for_claim") is not False
         or audit.get("passed") is not True
         or not isinstance(audit.get("check_counts"), dict)
+        or type(cast(dict[str, object], audit["check_counts"]).get("failed")) is not int
         or cast(dict[str, object], audit["check_counts"]).get("failed") != 0
+        or type(
+            cast(dict[str, object], audit["check_counts"]).get(
+                "coverage_gaps",
+            )
+        )
+        is not int
         or cast(dict[str, object], audit["check_counts"]).get("coverage_gaps") != 0
         or audit.get("coverage_gaps") != []
         or not isinstance(audit_implementation, dict)
@@ -1898,7 +1992,7 @@ def _validate_development_audit_evidence(
     runtime_version = runtime_python.get("version") if isinstance(runtime_python, dict) else None
     if (
         runtime.get("schema") != RUNTIME_MANIFEST_SCHEMA
-        or runtime.get("assurance") != ASSURANCE
+        or not _strict_json_equal(runtime.get("assurance"), ASSURANCE)
         or runtime.get("bootstrap_sha256") != bootstrap_source_sha256()
         or not isinstance(runtime_python, dict)
         or runtime_python.get("executable") != execution["python_executable"]
@@ -1906,28 +2000,39 @@ def _validate_development_audit_evidence(
         != str(Path(str(execution["python_executable"])).resolve(strict=True))
         or runtime_python.get("sha256") != execution["python_executable_sha256"]
         or not isinstance(runtime_version, list)
+        or any(type(part) is not int for part in runtime_version)
         or tuple(runtime_version) != version_parts
-        or runtime.get("required_flags") != expected_flags
-        or execution["python_flags"] != expected_flags
-        or source
-        != {
-            "mode": "descriptor",
-            "path": "artifact_audit.py",
-            "bytes": Path(__file__).with_name("artifact_audit.py").stat().st_size,
-            "sha256": auditor_sha256,
-        }
-        or runtime.get("support_files") != support_rows
-        or runtime.get("closure_import_roots") != execution["package_roots"]
-        or runtime.get("standard_library") != execution["standard_library"]
-        or runtime.get("environment") != safe_environment
+        or not _strict_json_equal(
+            runtime.get("required_flags"),
+            expected_flags,
+        )
+        or not _strict_json_equal(execution["python_flags"], expected_flags)
+        or not _strict_json_equal(
+            source,
+            {
+                "mode": "descriptor",
+                "path": "artifact_audit.py",
+                "bytes": Path(__file__).with_name("artifact_audit.py").stat().st_size,
+                "sha256": auditor_sha256,
+            },
+        )
+        or not _strict_json_equal(runtime.get("support_files"), support_rows)
+        or not _strict_json_equal(
+            runtime.get("closure_import_roots"),
+            execution["package_roots"],
+        )
+        or not _strict_json_equal(
+            runtime.get("standard_library"),
+            execution["standard_library"],
+        )
+        or not _strict_json_equal(runtime.get("environment"), safe_environment)
     ):
         raise RuntimeError("development audit runtime differs from the producer closure")
     if (
         invocation.get("schema") != INVOCATION_MANIFEST_SCHEMA
         or invocation.get("runtime_manifest_sha256") != hashlib.sha256(runtime_payload).hexdigest()
         or invocation.get("working_directory") != str(REPO)
-        or invocation.get("auditor_argv")
-        != list(_development_audit_argv(producer_root))
+        or invocation.get("auditor_argv") != list(_development_audit_argv(producer_root))
     ):
         raise RuntimeError("development audit invocation does not target the producer")
     return audit, receipt
@@ -1971,7 +2076,7 @@ def _result_qualification_payload(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "protocol_sha256": sha256_file(PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -2036,7 +2141,7 @@ def _validate_result_qualification(
         }
         or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.7.0"
+        or value.get("protocol_version") != "1.8.0"
         or value.get("protocol_sha256") != sha256_file(PROTOCOL_PATH)
         or value.get("raw_result_sha256") != archived_result_sha256
         or value.get("lane") != "development"
@@ -2054,6 +2159,8 @@ def _validate_result_qualification(
                 *expected_replicate_counts,
             }
             or not isinstance(row.get("replicate_id"), str)
+            or type(row.get("master_seed")) is not int
+            or any(type(row.get(field)) is not int for field in expected_replicate_counts)
             or any(row.get(field) != expected for field, expected in expected_replicate_counts.items())
             for row in replicates
         )
@@ -2080,6 +2187,60 @@ def _tar_member_info(name: str, size: int) -> tarfile.TarInfo:
     return info
 
 
+def _verify_canonical_qualification_ustar(
+    descriptor: int,
+    *,
+    archive_bytes: int,
+    members: list[object],
+) -> None:
+    """Require exact USTAR headers, padding, and terminal zero records."""
+
+    offset = 0
+    for index, raw_member in enumerate(members):
+        if not isinstance(raw_member, dict):
+            raise RuntimeError(f"development qualification archive member {index} is malformed")
+        name = raw_member.get("path")
+        size = raw_member.get("bytes")
+        if not isinstance(name, str) or type(size) is not int:
+            raise RuntimeError(f"development qualification archive member {index} has no exact layout")
+        header = os.pread(descriptor, tarfile.BLOCKSIZE, offset)
+        if len(header) != tarfile.BLOCKSIZE:
+            raise RuntimeError("development qualification archive ended before a canonical USTAR header")
+        expected = _tar_member_info(name, size)
+        expected.linkname = ""
+        try:
+            expected_header = expected.tobuf(
+                format=tarfile.USTAR_FORMAT,
+                encoding="utf-8",
+                errors="strict",
+            )
+        except (UnicodeError, ValueError) as error:
+            raise RuntimeError("development qualification archive member cannot use canonical USTAR") from error
+        if header != expected_header:
+            raise RuntimeError("development qualification archive contains a noncanonical or hidden header")
+        offset += tarfile.BLOCKSIZE + size
+        padding = (-size) % tarfile.BLOCKSIZE
+        if padding:
+            padding_payload = os.pread(descriptor, padding, offset)
+            if len(padding_payload) != padding or padding_payload != bytes(padding):
+                raise RuntimeError("development qualification archive member padding is not canonical zero fill")
+            offset += padding
+
+    minimum_terminal = offset + 2 * tarfile.BLOCKSIZE
+    expected_archive_bytes = (minimum_terminal + tarfile.RECORDSIZE - 1) // tarfile.RECORDSIZE * tarfile.RECORDSIZE
+    if archive_bytes != expected_archive_bytes:
+        raise RuntimeError("development qualification archive length is not the canonical USTAR record length")
+    while offset < archive_bytes:
+        chunk = os.pread(
+            descriptor,
+            min(1 << 20, archive_bytes - offset),
+            offset,
+        )
+        if not chunk or chunk != bytes(len(chunk)):
+            raise RuntimeError("development qualification archive terminal records are not all zero")
+        offset += len(chunk)
+
+
 def _write_qualification_archive(
     *,
     destination_directory: Path,
@@ -2091,9 +2252,7 @@ def _write_qualification_archive(
     from .artifact import _regular_producer_files
 
     sources: dict[str, _QualificationFileSource | bytes] = {
-        f"producer/{path.relative_to(producer_root).as_posix()}": (
-            _development_producer_source(producer_root, path)
-        )
+        f"producer/{path.relative_to(producer_root).as_posix()}": (_development_producer_source(producer_root, path))
         for path in _regular_producer_files(producer_root)
     }
     sources.update(evidence_payloads)
@@ -2121,10 +2280,7 @@ def _write_qualification_archive(
                         source_descriptor = os.open(source.path, flags)
                         try:
                             before = os.fstat(source_descriptor)
-                            if (
-                                not stat.S_ISREG(before.st_mode)
-                                or before.st_nlink != source.expected_nlink
-                            ):
+                            if not stat.S_ISREG(before.st_mode) or before.st_nlink != source.expected_nlink:
                                 raise RuntimeError(
                                     "development qualification "
                                     f"{source.role} violates its "
@@ -2279,7 +2435,7 @@ def _stream_qualification_archive(
                 not isinstance(raw_row, dict)
                 or set(raw_row) != {"path", "bytes", "sha256"}
                 or not isinstance(raw_row.get("path"), str)
-                or not isinstance(raw_row.get("bytes"), int)
+                or type(raw_row.get("bytes")) is not int
                 or not 0 <= raw_row["bytes"] <= _MAX_QUALIFICATION_MEMBER_BYTES
                 or not isinstance(raw_row.get("sha256"), str)
                 or len(raw_row["sha256"]) != 64
@@ -2295,11 +2451,10 @@ def _stream_qualification_archive(
         for row in rows:
             assert isinstance(row, dict)
             member_bytes = row["bytes"]
-            assert isinstance(member_bytes, int)
-            expected_archive_bytes += tarfile.BLOCKSIZE + (
-                (member_bytes + tarfile.BLOCKSIZE - 1)
-                // tarfile.BLOCKSIZE
-            ) * tarfile.BLOCKSIZE
+            assert type(member_bytes) is int
+            expected_archive_bytes += (
+                tarfile.BLOCKSIZE + ((member_bytes + tarfile.BLOCKSIZE - 1) // tarfile.BLOCKSIZE) * tarfile.BLOCKSIZE
+            )
         expected_archive_bytes = (
             (expected_archive_bytes + tarfile.RECORDSIZE - 1) // tarfile.RECORDSIZE
         ) * tarfile.RECORDSIZE
@@ -2307,6 +2462,7 @@ def _stream_qualification_archive(
         archive_identity.get("format") != "ustar-uncompressed-v1"
         or archive_identity.get("file") != archive_path.name
         or archive_identity.get("canonical_path") != archive_path.relative_to(REPO).as_posix()
+        or type(archive_identity.get("bytes")) is not int
         or archive_identity.get("bytes") != archive_bytes
         or archive_identity.get("sha256") != archive_sha256
         or archive_path.name != f"development-qualification-{archive_sha256[:16]}.tar"
@@ -2327,6 +2483,11 @@ def _stream_qualification_archive(
             after_digest
         ):
             raise RuntimeError("development qualification archive changed while hashed")
+        _verify_canonical_qualification_ustar(
+            archive_descriptor,
+            archive_bytes=archive_bytes,
+            members=cast(list[object], rows),
+        )
         os.lseek(archive_descriptor, 0, os.SEEK_SET)
         with os.fdopen(os.dup(archive_descriptor), "rb") as stream:
             with tarfile.open(fileobj=stream, mode="r|") as archive:
@@ -2408,6 +2569,7 @@ def _validate_archived_producer(
         or manifest.get("error") is not None
         or manifest.get("manifest_excludes") != ["producer-manifest.json"]
         or not isinstance(rows, list)
+        or type(manifest.get("file_count")) is not int
         or manifest.get("file_count") != len(rows)
         or any(not isinstance(row, dict) or set(row) != {"path", "bytes", "sha256"} for row in rows)
     ):
@@ -2424,7 +2586,7 @@ def _validate_archived_producer(
             or "." in Path(relative).parts
             or ".." in Path(relative).parts
             or Path(relative).as_posix() != relative
-            or not isinstance(row.get("bytes"), int)
+            or type(row.get("bytes")) is not int
             or not 0 <= cast(int, row["bytes"]) <= _MAX_QUALIFICATION_MEMBER_BYTES
             or not isinstance(row.get("sha256"), str)
             or len(cast(str, row["sha256"])) != 64
@@ -2471,24 +2633,44 @@ def _reverify_live_development_producer(
         dict[str, object],
         verify_producer_manifest(producer_root),
     )
+    expected_rows = expected_manifest.get("files")
+    expected_result_rows = (
+        [row for row in expected_rows if isinstance(row, dict) and row.get("path") == "result.json"]
+        if isinstance(expected_rows, list)
+        else []
+    )
+    if len(expected_result_rows) != 1:
+        raise RuntimeError("development manifest lacks one exact result row")
+    expected_result_row = expected_result_rows[0]
+    expected_result_bytes = expected_result_row.get("bytes")
+    expected_manifest_result_sha256 = expected_result_row.get("sha256")
+    if (
+        type(expected_result_bytes) is not int
+        or cast(int, expected_result_bytes) < 0
+        or not isinstance(expected_manifest_result_sha256, str)
+        or len(expected_manifest_result_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in expected_manifest_result_sha256)
+    ):
+        raise RuntimeError("development manifest result row is malformed")
     files = _regular_producer_files(producer_root)
     wrong_custody: list[_QualificationFileSource] = []
     for path in files:
         source = _development_producer_source(producer_root, path)
         if source.path.stat().st_nlink != source.expected_nlink:
             wrong_custody.append(source)
-    result_payload = _stable_regular_payload(
+    result_bytes, result_sha256 = _stable_regular_digest(
         producer_root / "result.json",
         label="development result",
+        maximum_bytes=cast(int, expected_result_bytes),
     )
     if (
         current_manifest != expected_manifest
-        or hashlib.sha256(result_payload).hexdigest() != expected_result_sha256
+        or result_bytes != expected_result_bytes
+        or result_sha256 != expected_manifest_result_sha256
+        or result_sha256 != expected_result_sha256
         or wrong_custody
     ):
-        raise RuntimeError(
-            "development producer changed or violates typed link custody before closure"
-        )
+        raise RuntimeError("development producer changed or violates typed link custody before closure")
 
 
 def _closure_path_mode(path: Path, payload: bytes) -> str:
@@ -2537,7 +2719,7 @@ def verify_development_closure(path: Path) -> dict[str, object]:
         set(closure) != _DEVELOPMENT_CLOSURE_FIELDS
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.7.0"
+        or closure.get("protocol_version") != "1.8.0"
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
         or closure.get("performance_values_bound") is not False
@@ -2730,11 +2912,17 @@ def verify_development_closure(path: Path) -> dict[str, object]:
         "source_mode": "descriptor",
     }
     if (
-        source != expected_source
-        or producer_execution != execution
-        or qualification.get("producer_execution") != execution
-        or producer_custody != expected_producer_custody
-        or audit_execution != expected_audit_execution
+        not _strict_json_equal(source, expected_source)
+        or not _strict_json_equal(producer_execution, execution)
+        or not _strict_json_equal(
+            qualification.get("producer_execution"),
+            execution,
+        )
+        or not _strict_json_equal(
+            producer_custody,
+            expected_producer_custody,
+        )
+        or not _strict_json_equal(audit_execution, expected_audit_execution)
     ):
         raise RuntimeError("development closure identity differs from archived evidence")
     return closure
@@ -2810,7 +2998,7 @@ def create_development_closure(
     runtime_manifest_path: Path,
     output_path: Path = DEVELOPMENT_CLOSURE_PATH,
 ) -> dict[str, object]:
-    """Close the sole v1.7 qualification into one self-contained evidence archive."""
+    """Close the sole v1.8 qualification into one self-contained evidence archive."""
 
     from .artifact import verify_producer_manifest
     from .verify import DEVELOPMENT_SEEDS, _verify_formal_matrix, verify_result
@@ -2851,7 +3039,7 @@ def create_development_closure(
         not isinstance(replicates, list)
         or tuple(row.get("master_seed") if isinstance(row, dict) else None for row in replicates) != DEVELOPMENT_SEEDS
     ):
-        raise RuntimeError("development qualification requires exactly both fresh v1.7 seeds")
+        raise RuntimeError("development qualification requires exactly both fresh v1.8 seeds")
     for replicate in replicates:
         assert isinstance(replicate, dict)
         _verify_formal_matrix(
@@ -2974,7 +3162,7 @@ def create_development_closure(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "source": {
             "git_commit": execution["git_commit"],
             "git_tree": execution["git_tree"],
@@ -3138,7 +3326,7 @@ def create_formal_binding(
     if conformance_cases != FORMAL_CONFORMANCE_CASES:
         raise ValueError("formal Pendulum conformance is fixed at exactly 1,024 cases (512 per task)")
     if development_closure_path is None or not development_closure_path.is_file():
-        raise RuntimeError("formal binding requires the immutable v1.7 development closure")
+        raise RuntimeError("formal binding requires the immutable v1.8 development closure")
     if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
         raise RuntimeError("CUDA formal binding requires CUBLAS_WORKSPACE_CONFIG=:4096:8")
     if output_path.exists():
@@ -3233,58 +3421,36 @@ def create_formal_binding(
     )
     from .preformal import _runtime_bootstrap_conformance_from_report
 
-    rehearsed_audit_execution = (
-        _runtime_bootstrap_conformance_from_report(
-            test_report_path.parent,
-            test_report,
-        )
+    rehearsed_audit_execution = _runtime_bootstrap_conformance_from_report(
+        test_report_path.parent,
+        test_report,
     )
     if (
         rehearsed_audit_execution.get("conformance_sha256")
-        != hashlib.sha256(
-            canonical_json_bytes(audit_execution)
-        ).hexdigest()
-        or rehearsed_audit_execution.get(
-            "restart_runtime_conformance_report_sha256"
-        )
-        != audit_execution.get(
-            "restart_runtime_conformance_report_sha256"
-        )
-        or rehearsed_audit_execution.get(
-            "restart_runtime_execution_receipt_sha256"
-        )
-        != audit_execution.get(
-            "restart_runtime_execution_receipt_sha256"
-        )
-        or rehearsed_audit_execution.get(
-            "restart_runtime_support_files"
-        )
+        != hashlib.sha256(canonical_json_bytes(audit_execution)).hexdigest()
+        or rehearsed_audit_execution.get("restart_runtime_conformance_report_sha256")
+        != audit_execution.get("restart_runtime_conformance_report_sha256")
+        or rehearsed_audit_execution.get("restart_runtime_execution_receipt_sha256")
+        != audit_execution.get("restart_runtime_execution_receipt_sha256")
+        or rehearsed_audit_execution.get("restart_runtime_support_files")
         != audit_execution.get("restart_runtime_support_files")
-        or rehearsed_audit_execution.get(
-            "restart_runtime_repeat_count"
-        )
+        or rehearsed_audit_execution.get("restart_runtime_repeat_count")
         != audit_execution.get("restart_runtime_repeat_count")
-        or rehearsed_audit_execution.get(
-            "restart_runtime_path_descriptor_equal"
-        )
-        != audit_execution.get(
-            "restart_runtime_path_descriptor_equal"
-        )
+        or rehearsed_audit_execution.get("restart_runtime_path_descriptor_equal")
+        != audit_execution.get("restart_runtime_path_descriptor_equal")
     ):
-        raise RuntimeError(
-            "formal audit execution differs from the sealed preformal rehearsal"
-        )
+        raise RuntimeError("formal audit execution differs from the sealed preformal rehearsal")
     for filename in audit_execution_payloads:
         candidate = output_path.with_name(filename)
         if candidate.exists():
             raise FileExistsError(f"refusing to replace formal audit-execution evidence: {candidate}")
     accelerator = torch.cuda.get_device_name(0) if device == "cuda" else None
     binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v7",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v8",
         "experiment_id": "WM-001",
         "assurance": assurance_record(),
         "protocol": {
-            "version": "1.7.0",
+            "version": "1.8.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),
@@ -3614,7 +3780,7 @@ def run_bound_preflight_conformance(
     )
     if (
         not isinstance(descriptor_rows, list)
-        or not isinstance(repeat_count, int)
+        or type(repeat_count) is not int
         or len(descriptor_rows) != repeat_count
         or not descriptor_rows
         or any(not isinstance(row, dict) for row in descriptor_rows)
@@ -3711,13 +3877,7 @@ def run_bound_outcome_audit(producer_root: Path) -> object:
         prefix="outcome_runtime_manifest",
     )
     source = root / "source" / "bench" / "world_model_lifecycle" / "artifact_audit.py"
-    producer_bootstrap = (
-        root
-        / "source"
-        / "bench"
-        / "world_model_lifecycle"
-        / "producer_bootstrap.py"
-    )
+    producer_bootstrap = root / "source" / "bench" / "world_model_lifecycle" / "producer_bootstrap.py"
     return run_captured_auditor(
         source,
         auditor_arguments=(

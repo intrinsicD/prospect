@@ -21,6 +21,7 @@ from bench.world_model_lifecycle import verify as verify_module
 from bench.world_model_lifecycle.artifact import (
     FORMAL_BINDING_ATTEMPT_MANIFEST_NAME,
     FORMAL_BINDING_OUTER_COMPLETION_NAME,
+    FORMAL_CONFIRMATION_NAME,
     FORMAL_LAUNCH_MARKER_NAME,
     FORMAL_LAUNCH_NAME,
     MANIFEST_NAME,
@@ -127,7 +128,7 @@ def _write_preservable_binding(
 
 def _write_minimal_formal_binding(path: Path, *, git_commit: str) -> str:
     value = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v7",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v8",
         "experiment_id": "WM-001",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
@@ -135,7 +136,7 @@ def _write_minimal_formal_binding(path: Path, *, git_commit: str) -> str:
             "external_attestation": False,
             "exclusive_path_use_required": True,
         },
-        "protocol": {"version": "1.7.0"},
+        "protocol": {"version": "1.8.0"},
         "source": {
             "git_commit": git_commit,
             "git_tree": "2" * 40,
@@ -271,11 +272,16 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     results_root = tmp_path / "results" / "formal"
+    monkeypatch.setattr(
+        artifact_module,
+        "FORMAL_RESULTS_ROOT",
+        results_root,
+    )
     first_binding = tmp_path / "binding-attempt" / "formal-binding.json"
     first_binding.parent.mkdir()
     first_digest = _write_minimal_formal_binding(first_binding, git_commit="1" * 40)
     attempt_payload = _install_binding_attempt_stub(monkeypatch, first_binding)
-    first_output = results_root / first_digest / "attempt-a"
+    first_output = results_root / first_digest / FORMAL_CONFIRMATION_NAME
     first_output.mkdir(parents=True)
     _preserve_stubbed_binding_attempt(first_output, attempt_payload)
     retired_v14_marker = results_root / FORMAL_LAUNCH_NAME
@@ -291,9 +297,9 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
     producer_record = first_output / FORMAL_LAUNCH_NAME
     copied = _read_json(producer_record)
     assert copied["formal_binding_sha256"] == first_digest
-    assert copied["attempt_directory"] == "attempt-a"
+    assert copied["attempt_directory"] == FORMAL_CONFIRMATION_NAME
     assert copied["schema"] == "prospect.wm001.formal-launch.v2"
-    assert copied["protocol_version"] == "1.7.0"
+    assert copied["protocol_version"] == "1.8.0"
     assert copied["global_marker_file"] == FORMAL_LAUNCH_MARKER_NAME
     assert marker.read_bytes() == producer_record.read_bytes()
     assert os.path.samefile(marker, producer_record)
@@ -308,6 +314,44 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
             "git_tree": "2" * 40,
         },
     )
+    wrong_output = results_root / first_digest / "wrong-child"
+    wrong_output.mkdir()
+    _preserve_stubbed_binding_attempt(wrong_output, attempt_payload)
+    wrong_record = dict(copied)
+    wrong_record["attempt_directory"] = wrong_output.name
+    wrong_body = dict(wrong_record)
+    wrong_body.pop("record_sha256")
+    wrong_record["record_sha256"] = hashlib.sha256(
+        json.dumps(
+            wrong_body,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    (wrong_output / FORMAL_LAUNCH_NAME).write_bytes(
+        json.dumps(
+            wrong_record,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        + b"\n"
+    )
+    with pytest.raises(
+        verify_module.Violation,
+        match="formal launch record identity",
+    ):
+        verify_module._verify_formal_launch_record(
+            wrong_output / FORMAL_LAUNCH_NAME,
+            binding_sha256=first_digest,
+            execution={
+                "git_commit": "1" * 40,
+                "git_tree": "2" * 40,
+            },
+        )
     copied_completion = first_output / FORMAL_BINDING_OUTER_COMPLETION_NAME
     copied_completion.write_bytes(b"tampered\n")
     with pytest.raises(
@@ -324,9 +368,7 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
         )
     copied_completion.write_bytes(attempt_payload)
 
-    retry_output = results_root / first_digest / "attempt-b"
-    retry_output.mkdir()
-    _preserve_stubbed_binding_attempt(retry_output, attempt_payload)
+    retry_output = first_output
     with _formal_claim_authorization(first_binding):
         with pytest.raises(RuntimeError, match="already has a formal launch claim"):
             claim_formal_launch(
@@ -338,7 +380,7 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
     second_binding = tmp_path / "binding-b" / "formal-binding.json"
     second_binding.parent.mkdir()
     second_digest = _write_minimal_formal_binding(second_binding, git_commit="3" * 40)
-    second_output = results_root / second_digest / "attempt-c"
+    second_output = results_root / second_digest / FORMAL_CONFIRMATION_NAME
     second_output.mkdir(parents=True)
     second_payload = _install_binding_attempt_stub(monkeypatch, second_binding)
     _preserve_stubbed_binding_attempt(second_output, second_payload)
@@ -353,21 +395,35 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
 
 def test_formal_launch_claim_rejects_noncanonical_output(tmp_path: Path) -> None:
     binding = tmp_path / "binding.json"
-    _write_minimal_formal_binding(binding, git_commit="1" * 40)
+    binding_digest = _write_minimal_formal_binding(
+        binding,
+        git_commit="1" * 40,
+    )
+    results_root = tmp_path / "results" / "formal"
 
-    with pytest.raises(ValueError, match="results/formal"):
-        formal_launch_marker_path(
-            binding,
-            tmp_path / "arbitrary-output",
-            formal_results_root=tmp_path / "results" / "formal",
-        )
+    invalid_outputs = (
+        tmp_path / "arbitrary-output",
+        results_root / binding_digest / "attempt-a",
+        results_root / ("0" * 64) / FORMAL_CONFIRMATION_NAME,
+    )
+    for output in invalid_outputs:
+        with pytest.raises(
+            ValueError,
+            match="results/formal/<binding-sha256>/confirmation-v1.8.0",
+        ):
+            formal_launch_marker_path(
+                binding,
+                output,
+                formal_results_root=results_root,
+            )
+    assert not results_root.exists()
 
 
 def test_formal_launch_path_validation_creates_no_directories(tmp_path: Path) -> None:
     binding = tmp_path / "binding.json"
     binding_digest = _write_minimal_formal_binding(binding, git_commit="1" * 40)
     results_root = tmp_path / "not-created" / "results" / "formal"
-    output = results_root / binding_digest / "attempt"
+    output = results_root / binding_digest / FORMAL_CONFIRMATION_NAME
 
     marker, actual_digest = formal_launch_marker_path(
         binding,
@@ -382,7 +438,11 @@ def test_formal_launch_path_validation_creates_no_directories(tmp_path: Path) ->
     with pytest.raises(ValueError, match="aliased"):
         formal_launch_marker_path(
             binding,
-            results_root / binding_digest / "unused" / ".." / "attempt",
+            results_root
+            / binding_digest
+            / "unused"
+            / ".."
+            / FORMAL_CONFIRMATION_NAME,
             formal_results_root=results_root,
         )
 
@@ -404,13 +464,13 @@ def test_formal_launch_path_validation_rejects_binding_and_output_aliases(
     with pytest.raises(ValueError, match="non-symbolic-link"):
         formal_launch_marker_path(
             binding_alias,
-            results_root / binding_digest / "attempt",
+            results_root / binding_digest / FORMAL_CONFIRMATION_NAME,
             formal_results_root=results_root,
         )
     with pytest.raises(ValueError, match="aliased"):
         formal_launch_marker_path(
             binding,
-            results_root / binding_digest / "attempt",
+            results_root / binding_digest / FORMAL_CONFIRMATION_NAME,
             formal_results_root=results_root,
         )
 
@@ -424,7 +484,7 @@ def test_formal_launch_prepublication_failure_leaves_marker_absent(
     binding_digest = _write_minimal_formal_binding(binding, git_commit="1" * 40)
     attempt_payload = _install_binding_attempt_stub(monkeypatch, binding)
     results_root = tmp_path / "results" / "formal"
-    output = results_root / binding_digest / "attempt"
+    output = results_root / binding_digest / FORMAL_CONFIRMATION_NAME
     output.mkdir(parents=True)
     _preserve_stubbed_binding_attempt(output, attempt_payload)
     marker = results_root / FORMAL_LAUNCH_MARKER_NAME
@@ -461,7 +521,7 @@ def test_formal_launch_link_failure_preserves_unclaimed_producer_record(
     binding_digest = _write_minimal_formal_binding(binding, git_commit="1" * 40)
     attempt_payload = _install_binding_attempt_stub(monkeypatch, binding)
     results_root = tmp_path / "results" / "formal"
-    output = results_root / binding_digest / "attempt"
+    output = results_root / binding_digest / FORMAL_CONFIRMATION_NAME
     output.mkdir(parents=True)
     _preserve_stubbed_binding_attempt(output, attempt_payload)
     marker = results_root / FORMAL_LAUNCH_MARKER_NAME
@@ -650,7 +710,10 @@ def test_formal_cli_verifies_live_copied_binding_before_outcomes(
     monkeypatch.setattr(
         artifact_module,
         "formal_launch_marker_path",
-        lambda _binding, _output: (launch_marker, "0" * 64),
+        lambda _binding, _output, *, formal_results_root: (
+            launch_marker,
+            "0" * 64,
+        ),
     )
     monkeypatch.setattr(artifact_module, "claim_formal_launch", claim_launch)
     monkeypatch.setattr(run_module, "_ensure_deterministic_cuda_environment", lambda: None)
@@ -704,6 +767,69 @@ def test_formal_cli_verifies_live_copied_binding_before_outcomes(
     assert registered == [(output / MANIFEST_NAME, 0)]
 
 
+@pytest.mark.parametrize("output_kind", ("omitted", "wrong-child"))
+def test_formal_cli_refuses_noncanonical_or_omitted_output_before_custody(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    output_kind: str,
+) -> None:
+    binding_path = (
+        tmp_path
+        / "binding-attempt"
+        / "formal-binding.json"
+    )
+    binding_path.parent.mkdir()
+    binding_digest = _write_minimal_formal_binding(
+        binding_path,
+        git_commit="1" * 40,
+    )
+    _install_binding_attempt_stub(monkeypatch, binding_path)
+    results_root = tmp_path / "results" / "formal"
+    wrong_output = results_root / binding_digest / "wrong-child"
+
+    monkeypatch.setattr(
+        artifact_module,
+        "FORMAL_RESULTS_ROOT",
+        results_root,
+    )
+    monkeypatch.setattr(
+        run_module,
+        "_ensure_deterministic_cuda_environment",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        experiment_module,
+        "_verify_live_bootstrap_custody",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("formal output refusal must precede runtime custody")
+        ),
+    )
+    monkeypatch.setattr(
+        artifact_module,
+        "ProducerAttempt",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("formal output refusal must precede producer custody")
+        ),
+    )
+    argv = [
+        "wm001",
+        "formal",
+        "--binding",
+        str(binding_path),
+        "--device",
+        "cpu",
+    ]
+    if output_kind == "wrong-child":
+        argv.extend(("--output", str(wrong_output)))
+    monkeypatch.setattr("sys.argv", argv)
+
+    with pytest.raises(SystemExit) as raised:
+        run_module.main()
+
+    assert raised.value.code == 2
+    assert not results_root.exists()
+
+
 @pytest.mark.parametrize(
     "failure_stage",
     (
@@ -711,7 +837,7 @@ def test_formal_cli_verifies_live_copied_binding_before_outcomes(
         "formal_preflight",
     ),
 )
-def test_formal_cli_preclaim_failures_leave_v17_marker_absent(
+def test_formal_cli_preclaim_failures_leave_v18_marker_absent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     failure_stage: str,
@@ -741,7 +867,10 @@ def test_formal_cli_preclaim_failures_leave_v17_marker_absent(
     monkeypatch.setattr(
         artifact_module,
         "formal_launch_marker_path",
-        lambda _binding, _output: (launch_marker, "0" * 64),
+        lambda _binding, _output, *, formal_results_root: (
+            launch_marker,
+            "0" * 64,
+        ),
     )
     monkeypatch.setattr(artifact_module, "claim_formal_launch", claim_launch)
     monkeypatch.setattr(ProducerAttempt, "preserve_formal_inputs", preserve_inputs)
@@ -829,7 +958,7 @@ def test_formal_experiment_requires_launch_claim_before_any_replicate(
         experiment_module,
         "_verify_live_bootstrap_custody",
         lambda: {
-            "runtime_seal": {"schema": "prospect.world-model-lifecycle.formal-binding.v7"},
+            "runtime_seal": {"schema": "prospect.world-model-lifecycle.formal-binding.v8"},
             "runtime_seal_payload": binding_path.read_bytes(),
         },
     )
@@ -893,7 +1022,7 @@ def test_formal_experiment_consumes_preclaim_reports_without_rerunning_checks(
         experiment_module,
         "_verify_live_bootstrap_custody",
         lambda: {
-            "runtime_seal": {"schema": "prospect.world-model-lifecycle.formal-binding.v7"},
+            "runtime_seal": {"schema": "prospect.world-model-lifecycle.formal-binding.v8"},
             "runtime_seal_payload": binding_path.read_bytes(),
         },
     )
@@ -969,7 +1098,7 @@ def test_experiment_entrypoint_refuses_unowned_or_existing_output(
         )
 
     development = experiment_module.ExperimentConfig.development(
-        master_seeds=(3920043614,),
+        master_seeds=(1196068124,),
         device="cpu",
     )
     assert (

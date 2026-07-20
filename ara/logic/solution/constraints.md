@@ -78,3 +78,20 @@
   [N09, N10, `docs/wm001-v140-formal-results.md`,
   `artifacts/wm001-audits/20260719-v140-formal-semantic-review-rejected.json`]
 - **From staging**: O12
+
+## R07: Stream large terminal members under full custody
+
+- **Statement**: Manifest-bound terminal verification of a potentially large
+  producer member must stream its exact byte count and SHA-256 through a
+  no-follow descriptor while preserving regular-file, exact-link-count, stable
+  before/after inode, mutation, and pathname-namespace checks.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Code refs**:
+  [`bench/world_model_lifecycle/binding.py`,
+  `tests/test_world_model_binding.py`,
+  `tests/test_world_model_runtime_custody.py`]
+- **Evidence**:
+  [N11, N12, N13,
+  `bench/world_model_lifecycle/results/operator-v1.7/closures/development-closure-v1.7.0`]
+- **From staging**: O13

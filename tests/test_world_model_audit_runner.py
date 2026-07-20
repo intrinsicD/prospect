@@ -106,7 +106,7 @@ def test_restart_runtime_conformance_is_result_free_repeated_and_adversarial(
     receipt = json.loads(conformance_receipt_bytes(conformance))
     assert report == {
         "schema": "prospect.wm001.restart-runtime-conformance.v1",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "support_files": [
             {
                 "path": path,

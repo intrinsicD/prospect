@@ -123,7 +123,7 @@ def test_installed_runner_derives_qualification_from_canonical_git_worktree(
         lifecycle
         / "results"
         / "development"
-        / "qualification-v1.7.0"
+        / "qualification-v1.8.0"
     )
 
 
@@ -132,7 +132,7 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.7.0"
+    qualification = root / "qualification-v1.8.0"
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
     monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
 
@@ -177,7 +177,7 @@ def test_existing_qualification_consumes_all_development_entrypoints(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.7.0"
+    qualification = root / "qualification-v1.8.0"
     qualification.mkdir(parents=True)
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
     monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
@@ -194,7 +194,7 @@ def test_runtime_custody_refusal_precedes_producer_root_creation(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.7.0"
+    qualification = root / "qualification-v1.8.0"
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
     monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
     monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")

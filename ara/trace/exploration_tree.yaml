@@ -210,3 +210,144 @@ tree:
     also_depends_on: [N08, N09]
     status: resolved
     children: []
+  - id: N11
+    type: dead_end
+    title: "Materialize the terminal development result during closure"
+    provenance: ai-executed
+    timestamp: "2026-07-20T16:18+02:00"
+    hypothesis: >-
+      The generic bounded-payload helper could perform the final authenticated
+      development-result recheck before closure publication.
+    failure_mode: >-
+      The v1.7 producer and independent development audit completed, but the
+      sole closure attempt passed the 320,556,697-byte result.json to
+      _stable_regular_payload with its default 64 MiB limit. The helper raised
+      RuntimeError before publishing a closure marker or qualification archive.
+    lesson: >-
+      Terminal custody for a manifest-bound large regular file must stream its
+      digest and size through a no-follow descriptor while preserving link,
+      inode, mutation, and pathname-namespace checks; raising the materializing
+      limit merely postpones the same scaling defect.
+    evidence:
+      - "bench/world_model_lifecycle/results/development/qualification-v1.7.0"
+      - "bench/world_model_lifecycle/results/operator-v1.7/audits/development-audit-v1.7.0"
+      - "bench/world_model_lifecycle/results/operator-v1.7/closures/development-closure-v1.7.0"
+      - "bench/world_model_lifecycle/results/outer-completions/v1.7"
+    status: resolved
+    children: []
+  - id: N12
+    type: decision
+    title: "Retire v1.7 and seal the custody repair as v1.8"
+    provenance: ai-executed
+    timestamp: "2026-07-20T16:18+02:00"
+    choice: >-
+      Preserve v1.7 as immutable failure evidence and create protocol v1.8 with
+      descriptor-streamed closure custody, fresh versioned paths and seeds, and
+      unchanged scientific blocks, kernels, budgets, controls, metrics,
+      thresholds, and gates.
+    alternatives:
+      - "Retry or complete the consumed v1.7 qualification."
+      - "Only raise the 64 MiB materialization limit."
+      - "Change scientific values while repairing the custody defect."
+    evidence:
+      - N11
+      - "bench/world_model_lifecycle/protocol.json"
+      - "bench/world_model_lifecycle/binding.py"
+    also_depends_on: [N11]
+    status: resolved
+    children: []
+  - id: N13
+    type: experiment
+    title: "Validate the WM-001 v1.8 core migration"
+    provenance: ai-executed
+    timestamp: "2026-07-20T16:18+02:00"
+    result: >-
+      The v1.8 protocol retained the exact 17-block scientific digest and all
+      four kernel digests, directly bound the sealed v1.7 protocol digest, and
+      derived 10 fresh masters plus 1,360 unique current streams disjoint from
+      70 historical masters and 9,520 historical streams. Assigned Ruff,
+      project and auditor mypy, 12 analysis tests, 54 artifact-auditor tests,
+      and five cross-module v1.8 seed/schema/supersession tests passed.
+    evidence:
+      - "bench/world_model_lifecycle/protocol.json"
+      - "bench/world_model_lifecycle/verify.py"
+      - "bench/world_model_lifecycle/artifact_audit.py"
+      - "tests/test_world_model_analysis.py"
+      - "tests/test_world_model_artifact_audit.py"
+    also_depends_on: [N11, N12]
+    status: resolved
+    children: []
+  - id: N14
+    type: experiment
+    title: "Exercise canonical USTAR archive-custody negatives"
+    provenance: ai-executed
+    timestamp: "2026-07-20T16:53+02:00"
+    result: >-
+      Two prospective regressions recomputed the qualification archive digest,
+      content-addressed name, and canonical identity after introducing either
+      nonzero per-member padding or a checksummed noncanonical devmajor header
+      field. The verifier rejected both at the exact canonical USTAR boundary;
+      the neighboring terminal-padding negative also passed, and Ruff accepted
+      the test file. No production hole was exposed.
+    evidence:
+      - "tests/test_world_model_binding.py"
+    also_depends_on: [N12, N13]
+    status: resolved
+    children: []
+  - id: N15
+    type: experiment
+    title: "Validate canonical v1.8 launch and semantic-review custody"
+    provenance: ai-executed
+    timestamp: "2026-07-20T17:01+02:00"
+    result: >-
+      Formal execution now requires the exact
+      results/formal/<binding-sha256>/confirmation-v1.8.0 namespace before
+      producer custody, and every independent reader rejects a matching,
+      rehashed launch placed in a sibling directory. A new read-only
+      adjudication preflight applies the exact 17-field semantic-review
+      verifier without publishing a claim, replay, or package; it rejects
+      helper-only inspector fields. Focused launch/operator tests passed 102,
+      full adjudication tests passed 39, full artifact-auditor tests passed 55,
+      the sealed 12-file mypy scope and Ruff passed, and diff hygiene was clean.
+      An additional binding/authorization run passed 82 tests and stopped only
+      at two tests whose prospectively required v1.8 harness-review artifact
+      had not yet been authored.
+    evidence:
+      - "bench/world_model_lifecycle/artifact.py"
+      - "bench/world_model_lifecycle/verify.py"
+      - "bench/world_model_lifecycle/artifact_audit.py"
+      - "bench/world_model_lifecycle/adjudication.py"
+      - "docs/wm001-v180-operator-runbook.md"
+      - "tests/test_world_model_artifact.py"
+      - "tests/test_world_model_artifact_audit.py"
+      - "tests/test_world_model_adjudication.py"
+    also_depends_on: [N12, N13]
+    status: resolved
+    children: []
+  - id: N16
+    type: experiment
+    title: "Accept the frozen WM-001 v1.8 prospective harness"
+    provenance: ai-executed
+    timestamp: "2026-07-20T17:36+02:00"
+    result: >-
+      The final wheel matched all 55 packaged members in source, QA, and
+      runtime installations; the 45-row runtime dependency lock verified; the
+      scientific-block and four kernel digests remained exact; and every v1.8
+      outcome namespace remained absent. A 67,108,865-byte result fixture
+      passed bounded streamed digest and canonical USTAR reopening. The sealed
+      result-free runner completed six prebinding and six restart-runtime
+      path/descriptor executions, both provenance branches, and five negative
+      substitutions. The canonical independent review bound 84 implementation
+      rows with no unresolved blockers. Protocol verification, Ruff, mypy, and
+      the complete review-aware suite passed 541 tests. No performance result
+      was opened or produced.
+    evidence:
+      - "docs/wm001-v180-prospective-harness-review.json"
+      - "docs/wm001-v180-confirmation-plan.md"
+      - "bench/world_model_lifecycle/SEALED_PROTOCOL.sha256"
+      - "requirements-wm001.lock"
+      - "tests/test_world_model_binding.py"
+      - "tests/test_world_model_prebinding_audit.py"
+    also_depends_on: [N12, N13, N14, N15]
+    status: resolved
+    children: []

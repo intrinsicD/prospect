@@ -61,7 +61,7 @@ def main() -> int:
     closure_block = (
         runtime_seal.get("dependencies", {})
         if runtime_seal.get("schema")
-        == "prospect.world-model-lifecycle.formal-binding.v7"
+        == "prospect.world-model-lifecycle.formal-binding.v8"
         else runtime_seal
     )
     if not isinstance(closure_block, dict):

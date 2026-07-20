@@ -109,7 +109,7 @@ def test_active_protocol_seed_universe_has_no_declared_collision() -> None:
     assert audit.passed_checks == 1
 
 
-def test_prebinding_protocol_requires_exact_v17_supersession_lineage(
+def test_prebinding_protocol_requires_exact_v18_supersession_lineage(
     tmp_path: Path,
 ) -> None:
     protocol = json.loads(PROTOCOL.read_text(encoding="utf-8"))
@@ -561,7 +561,7 @@ def _preformal_v2_fixture(
     review: dict[str, object] = {
         "schema": "prospect.wm001.prospective-harness-review.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "implementation_files": reviewed_files,
         "implementation_manifest_sha256": hashlib.sha256(
             artifact_audit._canonical_json_bytes(reviewed_files)
@@ -642,7 +642,7 @@ def _preformal_v2_fixture(
     runtime_seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -809,7 +809,7 @@ def _preformal_v2_fixture(
     report: dict[str, Any] = {
         "schema": "prospect.wm001.preformal-test-report.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "repository_cwd": repository_cwd,
         "device": "cpu",
         "qa_environment": qa_environment_identity,
@@ -1464,7 +1464,7 @@ def test_development_qualification_is_linked_field_for_field(
     preformal_runtime_seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -1619,7 +1619,7 @@ def test_development_qualification_is_linked_field_for_field(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.7.0",
+        "protocol_version": "1.8.0",
         "source": closure_source,
         "producer_root": ("/repo/bench/world_model_lifecycle/results/development/run"),
         **role_members,
@@ -2055,7 +2055,7 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
                 "schema": (
                     "prospect.wm001.restart-runtime-conformance.v1"
                 ),
-                "protocol_version": "1.7.0",
+                "protocol_version": "1.8.0",
                 "support_files": support_rows(outcome_supports),
                 "branches": {
                     "development": {

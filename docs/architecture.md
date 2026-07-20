@@ -296,7 +296,7 @@ has no development closure, binding, or formal authority. Its K3–K6 values
 remain unopened and unused. The exact disposition is recorded in the
 [v1.6 development-audit failure review](wm001-v160-development-audit-failure.md).
 
-Protocol 1.7.0 preserves the same scientific system and repairs only this
+Protocol 1.7.0 preserved the same scientific system and repaired only this
 auditor input boundary. Full outcome audits now require
 `producer_bootstrap.py`, `protocol.json`, and
 `schemas/raw-result.schema.json` as exact captured support files. Development
@@ -310,9 +310,22 @@ three path and three descriptor execution identities are retained and
 cross-checked from preformal rehearsal through formal verification. Version
 1.7 also drops nonexistent startup search entries, rejects extant ambient
 import roots, and restricts every retained child search directory to the bound
-standard-library or explicit package-root inventory. It uses fresh seeds, environments,
-schemas, result namespaces, seal, review, and binding. See the
-[v1.7 confirmation plan](wm001-v170-confirmation-plan.md).
+standard-library or explicit package-root inventory. Its sole development
+producer completed and its independent audit passed. Its sole closure then
+failed because the terminal live recheck tried to materialize the
+320,556,697-byte authenticated result through a helper capped at 64 MiB. The
+failure is recorded in the
+[v1.7 closure review](wm001-v170-development-closure-failure.md).
+
+Protocol 1.8.0 keeps the v1.7 support and runtime repairs, replaces that
+whole-file read with bounded descriptor-streamed hashing plus before/after
+namespace identity, requires byte-canonical qualification archives and strict
+JSON scalar types, adds bounded digest-bound failure diagnostics, and requires
+the exact `confirmation-v1.8.0` formal child across every producer and
+independent reader. It uses fresh seeds, environments, schemas, result
+namespaces, seal, review, and binding.
+See the
+[v1.8 confirmation plan](wm001-v180-confirmation-plan.md).
 
 ## Open engineering boundaries
 
@@ -321,10 +334,10 @@ schemas, result namespaces, seal, review, and binding. See the
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocol 1.7 remains prospective until its one development qualification,
+- Protocol 1.8 remains prospective until its one development qualification,
   one formal confirmation, official audit, semantic review, and terminal
   adjudication complete.
-- The v1.7 custody layer is deliberately not hardened against the repository or
+- The v1.8 custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External
   attestation, read-only media, or an independently operated transparency log

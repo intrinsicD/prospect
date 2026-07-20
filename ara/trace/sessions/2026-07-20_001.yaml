@@ -1,0 +1,141 @@
+session:
+  id: "2026-07-20_001"
+  date: "2026-07-20"
+  started: "2026-07-20T16:18+02:00"
+  last_turn: "2026-07-20T17:36+02:00"
+  turn_count: 4
+  summary: "Retired v1.7, hardened v1.8 custody, and accepted the frozen prospective harness."
+
+events_logged:
+  - turn: 1
+    type: dead_end
+    id: N11
+    routing: direct
+    provenance: ai-executed
+    summary: "The v1.7 closure materialized a 320,556,697-byte result through a 64 MiB helper and failed before publication."
+  - turn: 1
+    type: decision
+    id: N12
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired v1.7 and fixed the custody defect in a fresh v1.8 protocol without scientific changes."
+  - turn: 1
+    type: experiment
+    id: N13
+    routing: direct
+    provenance: ai-executed
+    summary: "Validated scientific continuity, seed disjointness, schemas, auditor migration, lint, typing, and focused tests."
+  - turn: 1
+    type: constraint
+    id: O13
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized streamed large-member terminal custody as R07 through artifact commitment."
+  - turn: 2
+    type: experiment
+    id: N14
+    routing: direct
+    provenance: ai-executed
+    summary: "Verified recomputed-identity USTAR archives with nonzero member padding or a checksummed noncanonical header are rejected."
+  - turn: 3
+    type: experiment
+    id: N15
+    routing: direct
+    provenance: ai-executed
+    summary: "Verified exact formal-attempt namespace enforcement and a non-mutating strict semantic-review preflight."
+  - turn: 4
+    type: experiment
+    id: N16
+    routing: direct
+    provenance: ai-executed
+    summary: "Accepted the exact frozen v1.8 harness after wheel/runtime parity, large-file custody, repeated result-free conformance, and 541 tests."
+
+ai_actions:
+  - turn: 1
+    action: >-
+      Migrated the core protocol, schemas, analysis, verifier, and independent
+      auditor to v1.8; added v1.7 historical seed lineage; derived and audited
+      fresh seeds; preserved exact scientific and kernel digests; and ran
+      focused static and dynamic validation.
+    provenance: ai-executed
+    files_changed:
+      - "bench/world_model_lifecycle/protocol.json"
+      - "bench/world_model_lifecycle/schemas/raw-result.schema.json"
+      - "bench/world_model_lifecycle/schemas/formal-binding.schema.json"
+      - "bench/world_model_lifecycle/analysis.py"
+      - "bench/world_model_lifecycle/verify.py"
+      - "bench/world_model_lifecycle/artifact_audit.py"
+      - "tests/test_world_model_analysis.py"
+      - "tests/test_world_model_artifact_audit.py"
+      - "ara/"
+  - turn: 2
+    action: >-
+      Added two prospective qualification-archive custody negatives, ran them
+      with the neighboring terminal-record negative, and linted the complete
+      binding test file.
+    provenance: ai-executed
+    files_changed:
+      - "tests/test_world_model_binding.py"
+      - "ara/"
+  - turn: 3
+    action: >-
+      Enforced the exact v1.8 formal output namespace in the producer and every
+      independent reader, added adversarial wrong-sibling regressions, exposed
+      the strict semantic-review verifier as a read-only adjudication preflight,
+      and aligned the operator runbook with the exact human-authored review
+      shape and whole-root absence gates.
+    provenance: ai-executed
+    files_changed:
+      - "bench/world_model_lifecycle/artifact.py"
+      - "bench/world_model_lifecycle/run.py"
+      - "bench/world_model_lifecycle/verify.py"
+      - "bench/world_model_lifecycle/artifact_audit.py"
+      - "bench/world_model_lifecycle/adjudication.py"
+      - "tests/test_world_model_artifact.py"
+      - "tests/test_world_model_artifact_audit.py"
+      - "tests/test_world_model_adjudication.py"
+      - "docs/wm001-v180-operator-runbook.md"
+      - "ara/"
+  - turn: 4
+    action: >-
+      Independently verified the final wheel, two fresh installations, runtime
+      lock, protocol and scientific freeze, schemas, large-file and archive
+      custody, repeated path/descriptor conformance, and complete regression
+      suite; authored and verified the canonical accepted prospective review.
+    provenance: ai-executed
+    files_changed:
+      - "docs/wm001-v180-prospective-harness-review.json"
+      - "ara/"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: >-
+      The user required the closure defect to be fixed, then thoroughly checked
+      before consuming the next immutable attempt.
+  - turn: 1
+    excerpt: >-
+      Version 1.8 changes terminal custody and fresh identity only; all 17
+      scientific blocks and four kernel source hashes remain exact.
+  - turn: 2
+    excerpt: >-
+      The user required recomputed content addresses and identities so each
+      negative isolates canonical per-member padding or raw-header custody.
+  - turn: 3
+    excerpt: >-
+      The user required the repository to be checked thoroughly before the next
+      immutable move; formal namespace and semantic-review errors therefore
+      must fail before any claim, replay, or package mutation.
+  - turn: 4
+    excerpt: >-
+      The user required a thorough final check before the next immutable move;
+      the accepted review was produced without opening or creating any v1.8
+      performance outcome.
+
+open_threads:
+  - "Commit the accepted v1.8 candidate and review, merge to main, and push."
+  - "Only from that clean committed state, consume the sole v1.8 development qualification and report its result."
+
+ai_suggestions_pending:
+  - "Keep v1.7 performance evidence opaque and use only its authenticated closure-failure metadata."
