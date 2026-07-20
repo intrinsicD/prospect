@@ -97,8 +97,8 @@ adds the single verified package root without running `site.py`, `.pth` files,
 or customization modules, and the formal process runs the non-editable Prospect
 wheel under CPython `-I -S -B`. Its environment begins from
 `env -i` and contains only the fixed locale, timezone, executable search path,
-cuBLAS determinism setting, and explicitly bound accelerator/thread visibility
-variables.
+cuBLAS determinism setting, the fixed TorchRL `LAZY_LEGACY_OP=False` mode, and
+explicitly bound accelerator/thread visibility variables.
 
 The binding records and launch recomputes:
 
@@ -124,6 +124,24 @@ marker are the same inode with two links. Formal execution instead uses
 accepted binding attempt; its sibling terminal `operator-attempt.json` and
 deterministic outer-completion marker establish the attempt's publication.
 Copied, direct, failed, or unfinalized binding files are not runtime seals.
+
+## Outcome-free preflight repair
+
+The first development invocation stopped at the initial live-bootstrap custody
+check, before any task reset, experience collection, training, evaluation, or
+result write. The failed producer directory
+`results/development/qualification-v1.5.0` and its original outer-finalized
+`runtime-seal-v1.5.0.json` remain preserved as rejected evidence. No formal
+marker was created.
+
+The failure exposed one omitted environment input: importing the frozen
+TorchRL dependency materialized its default `LAZY_LEGACY_OP=False` setting
+after the pre-import seal, so the exact pre/post environment comparison
+correctly rejected the process. The repair explicitly fixes and binds that
+same default value, adds a fresh-process no-environment-mutation regression,
+and moves the only outcome-producing development qualification and its runtime
+seal to the non-overwriting `*-attempt-2` paths. No scientific component,
+seed, budget, controller, metric, or threshold changed.
 
 ## One audit runner everywhere
 

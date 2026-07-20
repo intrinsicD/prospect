@@ -145,6 +145,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
         },
         "process_environment": {
             "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+            "LAZY_LEGACY_OP": "False",
             "LC_ALL": "C.UTF-8",
             "PATH": "/usr/bin:/bin",
             "TZ": "UTC",
@@ -859,6 +860,7 @@ def test_formal_runtime_binding_selects_only_bound_device(
     }
     process_environment = {
         "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
         "TZ": "UTC",

@@ -83,7 +83,7 @@ def operator_space(
     formal_audit = audit_root / "formal-audit-v1.5.0"
     formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.5.0.json"
     development_qualification = (
-        lifecycle / "results" / "development" / "qualification-v1.5.0"
+        lifecycle / "results" / "development" / "qualification-v1.5.0-attempt-2"
     )
     development_closure = lifecycle / "results" / "development" / "development-closure-v1.5.0.json"
     closure = closure_root / "development-closure-v1.5.0"
@@ -231,6 +231,7 @@ def _patch_finalized_producer(
     execution_identity: dict[str, object] = {
         "process_environment": {
             "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+            "LAZY_LEGACY_OP": "False",
             "LC_ALL": "C.UTF-8",
             "PATH": "/usr/bin:/bin",
             "TZ": "UTC",
@@ -626,6 +627,7 @@ def test_outer_finalized_producer_enters_real_audit_custody(
     execution_identity: dict[str, object] = {
         "process_environment": {
             "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+            "LAZY_LEGACY_OP": "False",
             "LC_ALL": "C.UTF-8",
             "PATH": "/usr/bin:/bin",
             "TZ": "UTC",

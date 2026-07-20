@@ -6727,12 +6727,14 @@ def _audit_formal_runtime_binding(
         and isinstance(producer_environment, Mapping)
         and {
             "CUBLAS_WORKSPACE_CONFIG",
+            "LAZY_LEGACY_OP",
             "LC_ALL",
             "PATH",
             "TZ",
         }.issubset(producer_environment)
         and set(producer_environment).issubset(_PREBINDING_PROCESS_ENVIRONMENT_KEYS)
         and producer_environment.get("CUBLAS_WORKSPACE_CONFIG") == ":4096:8"
+        and producer_environment.get("LAZY_LEGACY_OP") == "False"
         and producer_environment.get("LC_ALL") == "C.UTF-8"
         and producer_environment.get("PATH") == "/usr/bin:/bin"
         and producer_environment.get("TZ") == "UTC"
@@ -6877,6 +6879,7 @@ _PREFORMAL_FIXED_ENVIRONMENT: Mapping[str, str] = {
     "COLUMNS": "120",
     "LANG": "C.UTF-8",
     "LC_ALL": "C.UTF-8",
+    "LAZY_LEGACY_OP": "False",
     "NO_COLOR": "1",
     "PYTHONDONTWRITEBYTECODE": "1",
     "PYTHONHASHSEED": "0",
@@ -6903,6 +6906,7 @@ _PREFORMAL_RUNTIME_ENVIRONMENT = frozenset(
         "CUBLAS_WORKSPACE_CONFIG",
         "CUDA_VISIBLE_DEVICES",
         "HIP_VISIBLE_DEVICES",
+        "LAZY_LEGACY_OP",
         "LC_ALL",
         "MKL_NUM_THREADS",
         "NVIDIA_DRIVER_CAPABILITIES",
@@ -6977,6 +6981,7 @@ def _preformal_environment(
             and environment == dict(process_environment)
             and not set(environment) - _PREFORMAL_RUNTIME_ENVIRONMENT
             and environment.get("CUBLAS_WORKSPACE_CONFIG") == ":4096:8"
+            and environment.get("LAZY_LEGACY_OP") == "False"
             and environment.get("LC_ALL") == "C.UTF-8"
             and environment.get("PATH") == "/usr/bin:/bin"
             and environment.get("TZ") == "UTC"
@@ -9408,7 +9413,7 @@ def _authorization_development_producer(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.5.0"
+        / "qualification-v1.5.0-attempt-2"
     )
     _authorization_directory(
         producer,
@@ -12229,6 +12234,7 @@ _PREBINDING_PROCESS_ENVIRONMENT_KEYS = frozenset(
         "CUBLAS_WORKSPACE_CONFIG",
         "CUDA_VISIBLE_DEVICES",
         "HIP_VISIBLE_DEVICES",
+        "LAZY_LEGACY_OP",
         "LC_ALL",
         "MKL_NUM_THREADS",
         "NVIDIA_DRIVER_CAPABILITIES",
@@ -12754,12 +12760,14 @@ def _prebinding_runtime_component(expected: object) -> dict[str, object]:
     if (
         not {
             "CUBLAS_WORKSPACE_CONFIG",
+            "LAZY_LEGACY_OP",
             "LC_ALL",
             "PATH",
             "TZ",
         }.issubset(producer_environment)
         or not set(producer_environment).issubset(_PREBINDING_PROCESS_ENVIRONMENT_KEYS)
         or producer_environment.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8"
+        or producer_environment.get("LAZY_LEGACY_OP") != "False"
         or producer_environment.get("LC_ALL") != "C.UTF-8"
         or producer_environment.get("PATH") != "/usr/bin:/bin"
         or producer_environment.get("TZ") != "UTC"
@@ -13368,6 +13376,7 @@ def build_prebinding_conformance_request(
     else:
         producer_environment = {
             "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+            "LAZY_LEGACY_OP": "False",
             "LC_ALL": "C.UTF-8",
             "PATH": "/usr/bin:/bin",
             "TZ": "UTC",

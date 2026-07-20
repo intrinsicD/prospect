@@ -80,6 +80,7 @@ _FIXED_ENVIRONMENT = {
     "COLUMNS": "120",
     "LANG": "C.UTF-8",
     "LC_ALL": "C.UTF-8",
+    "LAZY_LEGACY_OP": "False",
     "NO_COLOR": "1",
     "PYTHONDONTWRITEBYTECODE": "1",
     "PYTHONHASHSEED": "0",
@@ -92,6 +93,7 @@ _RUNTIME_ENVIRONMENT_KEYS = frozenset(
         "CUBLAS_WORKSPACE_CONFIG",
         "CUDA_VISIBLE_DEVICES",
         "HIP_VISIBLE_DEVICES",
+        "LAZY_LEGACY_OP",
         "LC_ALL",
         "MKL_NUM_THREADS",
         "NVIDIA_DRIVER_CAPABILITIES",
@@ -455,6 +457,7 @@ def _environment_from_identity(
         valid = (
             not set(environment) - _RUNTIME_ENVIRONMENT_KEYS
             and environment.get("CUBLAS_WORKSPACE_CONFIG") == ":4096:8"
+            and environment.get("LAZY_LEGACY_OP") == "False"
             and environment.get("LC_ALL") == "C.UTF-8"
             and environment.get("PATH") == "/usr/bin:/bin"
             and environment.get("TZ") == "UTC"
@@ -874,7 +877,8 @@ def required_commands(
         ]
     )
     runtime_seal = (
-        REPO / "bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0.json"
+        REPO
+        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-2.json"
         if runtime_seal_path is None
         else _canonical_existing_file(runtime_seal_path, label="runtime seal")
     )

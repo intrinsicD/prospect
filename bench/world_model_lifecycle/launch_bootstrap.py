@@ -50,6 +50,7 @@ _SAFE_ENVIRONMENT_KEYS = frozenset(
         "CUBLAS_WORKSPACE_CONFIG",
         "CUDA_VISIBLE_DEVICES",
         "HIP_VISIBLE_DEVICES",
+        "LAZY_LEGACY_OP",
         "LC_ALL",
         "MKL_NUM_THREADS",
         "NVIDIA_DRIVER_CAPABILITIES",
@@ -257,6 +258,7 @@ def _environment() -> dict[str, str]:
     if (
         set(environment) - _SAFE_ENVIRONMENT_KEYS
         or environment.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8"
+        or environment.get("LAZY_LEGACY_OP") != "False"
         or environment.get("LC_ALL") != "C.UTF-8"
         or environment.get("PATH") != "/usr/bin:/bin"
         or environment.get("TZ") != "UTC"
@@ -354,7 +356,7 @@ def _prospective_runtime_seal(repository: Path) -> Path:
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "runtime-seal-v1.5.0.json"
+        / "runtime-seal-v1.5.0-attempt-2.json"
     )
 
 
@@ -421,7 +423,7 @@ def _verify_development_producer(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.5.0"
+        / "qualification-v1.5.0-attempt-2"
     )
     _reject_symlink_components(root, label="canonical development qualification")
     if not root.is_dir():
@@ -585,7 +587,7 @@ def _verify_development_audit(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.5.0"
+        / "qualification-v1.5.0-attempt-2"
     )
     if (
         set(manifest) != expected_fields
@@ -781,7 +783,7 @@ def _verify_closure_authorization(
     expected_producer = (
         results
         / "development"
-        / "qualification-v1.5.0"
+        / "qualification-v1.5.0-attempt-2"
     )
     if (
         set(reference) != expected_reference_fields

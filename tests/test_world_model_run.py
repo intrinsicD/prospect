@@ -3,11 +3,64 @@ from __future__ import annotations
 import importlib.util
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from bench.world_model_lifecycle import run
+
+
+def test_fresh_runtime_imports_preserve_sealed_environment() -> None:
+    repository = Path(__file__).resolve().parents[1]
+    environment = {
+        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LAZY_LEGACY_OP": "False",
+        "LC_ALL": "C.UTF-8",
+        "PATH": "/usr/bin:/bin",
+        "TZ": "UTC",
+    }
+    script = """
+import os
+import sys
+
+before = dict(os.environ)
+sys.path.insert(0, sys.argv[1])
+import torch
+from bench.world_model_lifecycle.artifact import ProducerAttempt
+from bench.world_model_lifecycle.binding import DEVELOPMENT_CLOSURE_PATH
+from bench.world_model_lifecycle.experiment import ExperimentConfig
+from bench.world_model_lifecycle.operator import FORMAL_BINDING_ATTEMPT_PATH
+from bench.world_model_lifecycle.producer_bootstrap import register_outer_terminal
+
+assert torch is not None
+assert ProducerAttempt is not None
+assert DEVELOPMENT_CLOSURE_PATH is not None
+assert ExperimentConfig is not None
+assert FORMAL_BINDING_ATTEMPT_PATH is not None
+assert register_outer_terminal is not None
+assert os.environ == before
+"""
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-B",
+            "-c",
+            script,
+            str(repository),
+        ],
+        cwd=repository,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout == ""
+    assert completed.stderr == ""
 
 
 def _checked(arguments: list[str], *, cwd: Path) -> None:
@@ -61,7 +114,7 @@ def test_installed_runner_derives_qualification_from_canonical_git_worktree(
         lifecycle
         / "results"
         / "development"
-        / "qualification-v1.5.0"
+        / "qualification-v1.5.0-attempt-2"
     )
 
 
@@ -70,7 +123,7 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.5.0"
+    qualification = root / "qualification-v1.5.0-attempt-2"
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
     monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
 

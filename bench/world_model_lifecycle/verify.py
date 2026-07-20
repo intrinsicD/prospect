@@ -1231,6 +1231,7 @@ def verify_binding(path: Path) -> dict[str, Any]:
     _require(
         isinstance(process_environment, dict)
         and process_environment.get("CUBLAS_WORKSPACE_CONFIG") == ":4096:8"
+        and process_environment.get("LAZY_LEGACY_OP") == "False"
         and process_environment.get("LC_ALL") == "C.UTF-8"
         and process_environment.get("PATH") == "/usr/bin:/bin"
         and process_environment.get("TZ") == "UTC"
@@ -1239,6 +1240,7 @@ def verify_binding(path: Path) -> dict[str, Any]:
             "CUBLAS_WORKSPACE_CONFIG",
             "CUDA_VISIBLE_DEVICES",
             "HIP_VISIBLE_DEVICES",
+            "LAZY_LEGACY_OP",
             "LC_ALL",
             "MKL_NUM_THREADS",
             "NVIDIA_DRIVER_CAPABILITIES",

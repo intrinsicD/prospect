@@ -93,7 +93,7 @@ def _formal_binding_attempt(
     )
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_bytes(_canonical({"passed": True}))
-    producer = results / "development" / "qualification-v1.5.0"
+    producer = results / "development" / "qualification-v1.5.0-attempt-2"
     producer.mkdir()
     result = producer / "result.json"
     result.write_bytes(
@@ -453,6 +453,27 @@ def _overstate_external_attestation(receipt: dict[str, object]) -> None:
     assurance["external_attestation"] = True
 
 
+@pytest.mark.parametrize("legacy_mode", [None, "True"])
+def test_both_bootstraps_require_exact_bound_torchrl_legacy_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    legacy_mode: str | None,
+) -> None:
+    environment = {
+        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LC_ALL": "C.UTF-8",
+        "PATH": "/usr/bin:/bin",
+        "TZ": "UTC",
+    }
+    if legacy_mode is not None:
+        environment["LAZY_LEGACY_OP"] = legacy_mode
+    monkeypatch.setattr(launch_bootstrap.os, "environ", environment)
+
+    with pytest.raises(launch_bootstrap.LaunchError, match="exact safe runtime"):
+        launch_bootstrap._environment()
+    with pytest.raises(producer_bootstrap.BootstrapError, match="exact safe runtime"):
+        producer_bootstrap._environment()
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
@@ -586,7 +607,7 @@ def test_completed_runtime_seal_rejects_missing_or_forged_marker(
     runtime_seal = (
         results
         / "development"
-        / "runtime-seal-v1.5.0.json"
+        / "runtime-seal-v1.5.0-attempt-2.json"
     )
     runtime_seal.parent.mkdir()
     runtime_seal.write_bytes(_canonical(_prospective_runtime_seal_value()))
@@ -1236,11 +1257,12 @@ def test_real_outer_launcher_dispatches_actual_producer_bootstrap(
         lifecycle
         / "results"
         / "development"
-        / "runtime-seal-v1.5.0.json"
+        / "runtime-seal-v1.5.0-attempt-2.json"
     )
     runtime_seal.parent.mkdir(parents=True, exist_ok=True)
     environment = {
         "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
         "TZ": "UTC",

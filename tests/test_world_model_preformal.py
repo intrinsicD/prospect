@@ -19,6 +19,7 @@ _GIT_IDENTITY = {
 }
 _RUNTIME_ENVIRONMENT = {
     "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+    "LAZY_LEGACY_OP": "False",
     "LC_ALL": "C.UTF-8",
     "PATH": "/usr/bin:/bin",
     "TZ": "UTC",

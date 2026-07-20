@@ -64,6 +64,7 @@ SAFE_RUNTIME_ENVIRONMENT_KEYS = frozenset(
         "CUBLAS_WORKSPACE_CONFIG",
         "CUDA_VISIBLE_DEVICES",
         "HIP_VISIBLE_DEVICES",
+        "LAZY_LEGACY_OP",
         "LANG",
         "LC_ALL",
         "MKL_NUM_THREADS",

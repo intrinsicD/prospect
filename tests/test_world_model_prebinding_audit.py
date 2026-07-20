@@ -533,6 +533,7 @@ def _preformal_v2_fixture(
     }
     process_environment = {
         "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
         "TZ": "UTC",
@@ -985,6 +986,7 @@ def test_full_result_runtime_is_bound_field_for_field(
 ) -> None:
     process_environment = {
         "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
         "TZ": "UTC",
@@ -1153,6 +1155,7 @@ def test_restart_restore_runtime_is_reopened_and_bound_to_parent(
     executable_digest = artifact_audit._sha256_file(Path(artifact_audit.sys.executable).resolve())
     process_environment = {
         "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
         "TZ": "UTC",

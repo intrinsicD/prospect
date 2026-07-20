@@ -65,7 +65,7 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_QUALIFICATION_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.5.0"
+    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.5.0-attempt-2"
 )
 OPERATOR_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "operator-v1.5"
 BINDING_ATTEMPTS_ROOT = OPERATOR_RESULTS_ROOT / "bindings"

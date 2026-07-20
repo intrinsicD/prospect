@@ -13,6 +13,12 @@ bench/world_model_lifecycle/results/formal/formal-launch-v1.5.0.json
 
 If it exists, do not run a formal command again.
 
+The outcome-free failed development preflight at
+`results/development/qualification-v1.5.0` and its finalized
+`runtime-seal-v1.5.0.json` are retained and must not be changed. The commands
+below use fresh `*-attempt-2` paths after binding TorchRL's
+`LAZY_LEGACY_OP=False` default.
+
 ## Fixed paths and safe launcher
 
 The QA and runtime environments must be separate, dedicated, non-editable
@@ -28,7 +34,7 @@ QA_PY="/home/alex/.venvs/prospect-wm001-v15/bin/python"
 RUNTIME_PY="/home/alex/.venvs/prospect-wm001-v15-runtime/bin/python"
 LAUNCH="$REPO/bench/world_model_lifecycle/launch_bootstrap.py"
 BOOTSTRAP="$REPO/bench/world_model_lifecycle/producer_bootstrap.py"
-RUNTIME_SEAL="$REPO/bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0.json"
+RUNTIME_SEAL="$REPO/bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-2.json"
 DEV_ROOT="$REPO/bench/world_model_lifecycle/results/development"
 OPERATOR_ROOT="$REPO/bench/world_model_lifecycle/results/operator-v1.5"
 OUTER_ROOT="$REPO/bench/world_model_lifecycle/results/outer-completions/v1.5"
@@ -36,6 +42,7 @@ OUTER_ROOT="$REPO/bench/world_model_lifecycle/results/outer-completions/v1.5"
 SAFE_ENV=(
   env -i
   CUBLAS_WORKSPACE_CONFIG=:4096:8
+  LAZY_LEGACY_OP=False
   LC_ALL=C.UTF-8
   PATH=/usr/bin:/bin
   TZ=UTC
@@ -167,7 +174,7 @@ Choose one new direct child of the development root and run the fixed two
 development seeds without overrides:
 
 ```bash
-DEV="$DEV_ROOT/qualification-v1.5.0"
+DEV="$DEV_ROOT/qualification-v1.5.0-attempt-2"
 
 "${SAFE_ENV[@]}" "$RUNTIME_PY" -I -S -B "$LAUNCH" \
   --bootstrap "$BOOTSTRAP" \

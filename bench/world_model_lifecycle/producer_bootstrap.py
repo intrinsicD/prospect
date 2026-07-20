@@ -33,6 +33,7 @@ _ENVIRONMENT_KEYS = frozenset(
         "CUBLAS_WORKSPACE_CONFIG",
         "CUDA_VISIBLE_DEVICES",
         "HIP_VISIBLE_DEVICES",
+        "LAZY_LEGACY_OP",
         "LC_ALL",
         "MKL_NUM_THREADS",
         "NVIDIA_DRIVER_CAPABILITIES",
@@ -239,6 +240,7 @@ def _environment() -> dict[str, str]:
     if (
         set(environment) - _ENVIRONMENT_KEYS
         or environment.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8"
+        or environment.get("LAZY_LEGACY_OP") != "False"
         or environment.get("LC_ALL") != "C.UTF-8"
         or environment.get("PATH") != "/usr/bin:/bin"
         or environment.get("TZ") != "UTC"

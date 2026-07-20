@@ -433,6 +433,7 @@
           "additionalProperties": false,
           "required": [
             "CUBLAS_WORKSPACE_CONFIG",
+            "LAZY_LEGACY_OP",
             "LC_ALL",
             "PATH",
             "TZ"
@@ -440,6 +441,9 @@
           "properties": {
             "CUBLAS_WORKSPACE_CONFIG": {
               "const": ":4096:8"
+            },
+            "LAZY_LEGACY_OP": {
+              "const": "False"
             },
             "LC_ALL": {
               "const": "C.UTF-8"
