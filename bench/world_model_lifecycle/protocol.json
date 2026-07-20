@@ -1,17 +1,52 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "schema": "prospect.world-model-lifecycle.protocol.v4",
+  "schema": "prospect.world-model-lifecycle.protocol.v5",
+  "trust_model": {
+    "id": "prospect.wm001.trust-model.v1",
+    "tamper_resistant": false,
+    "external_attestation": false,
+    "exclusive_path_use_required": true,
+    "statement": "The kernel, filesystem implementation, base interpreter and standard library, invoking account, and every process able to write the repository, isolated environment, or results roots are trusted. A WM-001 run has exclusive use of those paths; no cooperating or malicious same-principal writer may run concurrently. Every conforming sealed-runtime invocation acquires one repository-global nonblocking advisory lock for its complete child lifetime; QA-only preformal commands remain covered by the exclusive-use assumption. The lock coordinates trusted harness processes but is not a security boundary against noncooperating same-principal writers. Hashes, descriptor checks, pre/post inventories, and no-replace publication detect accidental or persistent drift and application-level overwrite; they do not provide tamper resistance against the account or environment owner, transient mutate-and-restore attacks, privileged actors, or a compromised kernel. Immutable means protocol-level append-only/no-replace evidence under this trust boundary, not fs-verity, read-only media, a TPM, an external signer, or external attestation."
+  },
   "experiment": {
     "id": "WM-001",
     "title": "Causal world-model learning, behavioral improvement, retention, and restart",
-    "protocol_version": "1.4.0",
+    "protocol_version": "1.5.0",
     "status": "sealed_before_formal_outcomes",
     "thresholds_sealed_before_outcomes": true,
     "revision": {
-      "supersedes": "1.3.0",
-      "superseded_protocol_sha256": "c15ec673be44caf2a2b30dc4b3ea9ee0e0e8108210cd6772567cd0cd1d9ff080",
-      "reason": "The v1.3.0 formal producer artifact passed producer K0-K7, but its mandatory pre-bound independent audit failed because the auditor duplicated one formal seed incorrectly and because producer CUDA float32 and auditor scalar float64 classified one corrupted-control PIT value on opposite sides of the inclusive 0.05 endpoint. Version 1.4.0 sources schedule parity from the sealed protocol in tests, makes coverage a canonical scalar binary64 computation over the exact stored float32 prediction tensors, records integer covered and total target counts, requires exact independent count agreement, and uses a fresh derivation domain and master seeds. Model, training, controller, budgets, controls, thresholds, and killing gates are unchanged.",
-      "outcome_use": "The rejected v1.3.0 outcome is used only to repair evidence semantics and audit custody; it is not used to change a performance threshold, model, optimizer, controller, budget, exclusion, control, or gate. A corrected or rerun v1.3.0 audit remains diagnostic and cannot upgrade that attempt. Version 1.4.0 master seeds were selected before any v1.4.0 development or formal outcome by the first four bytes of SHA-256('WM-001|1.4.0|' + lane + '-master|' + decimal(index)). The v1.4.0 derivation domain has no master or derived-stream collision with v1.3.0."
+      "supersedes": "1.4.0",
+      "superseded_protocol_sha256": "17d67ea4a73f2c8d6e902cbaceadd315bf04b0addefa80e731a5eecfdd46c5e5",
+      "reason": "The v1.4.0 formal producer and direct corrected audit passed, but mandatory adjudication executed the auditor under a different dependency-visibility mode, could not reproduce the report, and then could not preserve the conformance-failing report in an official rejected package. Version 1.5.0 uses one captured isolated runner for prebinding conformance, official audit generation, launch-time conformance, and adjudication replay; binds a closure-only non-editable environment and runner/bootstrap/adjudicator identities; separates immutable audit identity from claim cleanliness; makes package publication atomic and verifiable; namespaces the sole formal marker by protocol version; binds the qualifying development rehearsal without using its performance values; and uses a fresh derivation domain and master seeds. Model, training, controller, budgets, controls, metrics, thresholds, and killing gates are unchanged.",
+      "outcome_use": "The retired v1.4.0 outcome is used only to repair dependency isolation, audit execution equivalence, launch custody, rejection custody, and package publication. It is not used to change a performance threshold, model, optimizer, controller, budget, exclusion, control, metric, or gate. No v1.4.0 audit or package may be upgraded and no v1.4.0 formal attempt may be retried. Version 1.5.0 master seeds were selected before any v1.5.0 development or formal outcome by the first four bytes of SHA-256('WM-001|1.5.0|' + lane + '-master|' + decimal(index)). The complete v1.5.0 master and derived-stream universe has no collision with any exposed v1.0.0, v1.2.0, v1.3.0, or v1.4.0 master or derived stream.",
+      "scientific_continuity": {
+        "v1_4_scientific_blocks_sha256": "fa44fd93a672db3905d45a0e99c568985e7e2e5d02d32043c830db413005a5c3",
+        "unchanged_top_level_blocks": [
+          "claim",
+          "null_hypothesis",
+          "scope",
+          "causal_chain",
+          "environment",
+          "tasks",
+          "splits",
+          "representation_and_model",
+          "experience_and_learning",
+          "budgets",
+          "controls",
+          "metrics",
+          "thresholds",
+          "evaluation_scheduling_rule",
+          "execution_sequence",
+          "killing_order",
+          "sources"
+        ],
+        "kernel_source_sha256": {
+          "model.py": "51e61c719dcdd0ebe2f993f16d06eeec03adf6c0fa82b7476356f4b51b3634f1",
+          "learning.py": "ed53fcaac32d77e7ed8d9d1af2a91df66682f590de3d60cb6db198670948eaa4",
+          "planning.py": "5ebbc3083ff2b49dbee287bf7efbeaec488419bfbbde033a064ad23c356b1d51",
+          "runtime_lane.py": "265e65dfd11af62a96d8ea6471f18c664e0e0860febff1a10945642d246b3fdb"
+        }
+      }
     },
     "supersession_rule": "Any semantic, seed, budget, metric, threshold, control, or gate change creates a new protocol version and invalidates all formal outcomes collected under an earlier or unbound version."
   },
@@ -365,10 +400,10 @@
     }
   },
   "seed_schedule": {
-    "derivation_domain_version": "1.4.0",
-    "algorithm": "seed(namespace, replicate_master_seed, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.4.0|' + namespace + '|' + decimal(replicate_master_seed) + '|' + decimal(index))",
+    "derivation_domain_version": "1.5.0",
+    "algorithm": "seed(namespace, replicate_master_seed, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.5.0|' + namespace + '|' + decimal(replicate_master_seed) + '|' + decimal(index))",
     "master_seed_derivation": {
-      "algorithm": "master_seed(lane, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.4.0|' + lane + '-master|' + decimal(index))",
+      "algorithm": "master_seed(lane, index) = unsigned big-endian integer encoded by the first 4 bytes of SHA-256('WM-001|1.5.0|' + lane + '-master|' + decimal(index))",
       "lane_index_domains": {
         "development": [
           0,
@@ -384,24 +419,29 @@
         "current_derived_stream_count": 1360,
         "unique_current_derived_stream_count": 1360,
         "current_internal_collision_count": 0,
-        "master_overlap_with_v1_3_count": 0,
-        "derived_stream_overlap_with_v1_3_count": 0,
-        "rule": "Verifier and independent auditor must derive every current master and all namespace streams from the formulas, require the declared counts and zero internal collision, and compare them with the v1.3.0 masters and derivation-domain streams."
+        "current_master_stream_overlap_count": 0,
+        "prior_master_seed_count": 40,
+        "unique_prior_derived_stream_count": 5440,
+        "current_prior_master_master_overlap_count": 0,
+        "current_prior_stream_stream_overlap_count": 0,
+        "current_master_prior_stream_overlap_count": 0,
+        "prior_master_current_stream_overlap_count": 0,
+        "rule": "Verifier and independent auditor must derive every current master and all namespace streams from the formulas, require the declared counts and zero internal master/master, stream/stream, and master/stream collisions, and compare all four master/stream cross classes against the exposed v1.0.0, v1.2.0, v1.3.0, and v1.4.0 domains."
       }
     },
     "formal_replicate_master_seeds": [
-      339970590,
-      474769515,
-      550273937,
-      438984650,
-      2732731971,
-      2253809848,
-      2206960337,
-      3506881479
+      1800791691,
+      1963228177,
+      2416009491,
+      3925214220,
+      1508934628,
+      2118526007,
+      4212585034,
+      530094003
     ],
     "development_replicate_master_seeds": [
-      2439054559,
-      3246851043
+      4085517670,
+      2227535912
     ],
     "namespaces": {
       "model_initialization": {
@@ -859,7 +899,7 @@
     }
   ],
   "bindings": {
-    "two_stage_seal": "This scientific protocol and its outcome thresholds are sealed now. A separate formal-binding manifest must bind the completed implementation before any formal outcome is generated. Binding implementation later may not alter this protocol.",
+    "two_stage_seal": "This scientific protocol and its outcome thresholds are sealed now. A separate formal-binding manifest may be created only after one qualifying full-budget development rehearsal, its independent audit attempt, and its canonical development-closure attempt are outer-finalized. The binding operator must consume that exact accepted closure attempt and publish exactly one canonical accepted binding attempt; a copied, directly created, failed, or unfinalized binding file cannot authorize formal execution. The binding must freeze that qualification, the completed implementation, the isolated execution mechanism, and the complete runtime inventory before any formal outcome is generated. Binding implementation later may not alter this protocol.",
     "protocol": {
       "required": [
         "protocol_sha256",
@@ -874,6 +914,8 @@
         "clean worktree assertion",
         "Git tree SHA",
         "implementation manifest mapping every executed source file to SHA-256",
+        "captured independent-auditor, audit-runner, descriptor-bootstrap, experiment-runner, binding-verifier, and adjudicator source SHA-256 values",
+        "machine-readable adversarial test report SHA-256",
         "environment-wrapper source SHA-256",
         "Pendulum conformance-test report SHA-256",
         "independent oscillator source SHA-256 and deterministic conformance-test report SHA-256"
@@ -889,7 +931,7 @@
         "producer-reference and independent-auditor agreement",
         "auditor-source and formal-test-report SHA-256"
       ],
-      "launch_rule": "Formal launch requires every bound coverage conformance case to pass under the exact runtime and the independently implemented auditor classifier."
+      "launch_rule": "Formal launch requires every bound coverage conformance case to pass under the captured audit runner and exact runtime. The runtime and invocation manifests are always supplied through inherited already-open descriptors. The runner must produce byte-identical canonical reports when the captured auditor source is executed from its exclusive private path and from an inherited already-open descriptor."
     },
     "dependencies": {
       "required_root_packages": [
@@ -902,15 +944,46 @@
         "tensordict",
         "prospect"
       ],
-      "closure_rule": "The formal binding must resolve and record the complete installed transitive dependency closure of every non-Python root under the live marker environment. Each distribution digest covers the bytes of every RECORD-addressed installed file. Launch recomputes every version and digest.",
+      "closure_rule": "The formal binding must use a dedicated non-editable virtual environment with user-site disabled and no system-site inheritance. It must resolve the complete marker-selected transitive dependency closure of every non-Python root, reject duplicate canonical distribution names and editable installs, and require the installed canonical distribution-name set to equal that exact closure. Canonical names use PEP 503 normalization. Each distribution digest covers every stable file declared by RECORD, including unhashed declarations, while rejecting a missing declared file. The binding also records a complete regular-file and symlink inventory of each authorized package root so an unowned importable file or undeclared distribution cannot enter execution. Both producer and auditor run under -I -S -B, insert only the explicitly bound root, and therefore do not execute site.py, .pth files, sitecustomize, or usercustomize. Launch and adjudication recompute the exact closure and complete root inventory.",
       "required": [
+        "absolute CPython executable and executable SHA-256",
+        "complete stable standard-library root inventory SHA-256",
+        "explicit ordered package-root manifest",
         "platform and accelerator identity",
         "determinism flags",
         "exact package versions",
-        "distribution or wheel SHA-256 values",
+        "complete stable declared-file distribution SHA-256 values",
+        "complete package-root inventory SHA-256 values",
         "complete transitive lockfile SHA-256"
       ],
       "version_policy": "The protocol does not retrospectively choose package versions. The formal binding selects one exact compatible environment after implementation and freezes it before formal execution."
+    },
+    "audit_execution": {
+      "required": [
+        "one captured descriptor-bound runner shared by prebinding conformance, launch-time conformance, official audit generation, and adjudication replay",
+        "CPython flags -I -S -B",
+        "sanitized environment with PYTHONPATH, PYTHONHOME, PYTHONUSERBASE, PYTHONSTARTUP, and PYTHONINSPECT removed and user-site disabled",
+        "manifest accepted from an inherited already-open descriptor",
+        "auditor source accepted from an exclusive already-open descriptor",
+        "path-mode and descriptor-mode canonical report byte equality",
+        "at least three repeated byte-identical prebinding executions",
+        "launch-time rerun immediately before launch-marker publication",
+        "no outcome artifact, result path, process identifier, wall-clock timestamp, or mutable absolute source path in the canonical conformance report",
+        "canonical audit-execution-failure record if the isolated process cannot emit its ordinary report"
+      ],
+      "failure_rule": "Any manifest mismatch, executable mismatch, package-root or distribution mismatch, environment leak, source-descriptor mismatch, captured-stdout descriptor failure, noncanonical output, report-versus-return-code disagreement, or repeated-byte disagreement forbids binding or formal launch. The runner exposes no caller-selected or mutable output-path mode: every report is captured through an exclusive private regular-file stdout descriptor with a fixed OS-enforced byte ceiling, reopened under stable custody, and parsed before it can enter evidence. After a formal launch exists, the same failures retire the version and remain packageable only with a rejected disposition."
+    },
+    "development_qualification": {
+      "required": [
+        "one fresh two-seed full-budget v1.5 development producer root",
+        "complete passing producer verification with a same-inode outer-completion marker",
+        "one accepted canonical outer-finalized isolated independent engineering-audit attempt",
+        "byte-identical supplied and adjudication-mode audit reproduction",
+        "content-addressed development closure marker binding producer-manifest, result, audit, runner, runtime-manifest, Git commit, and Git tree digests",
+        "one accepted canonical outer-finalized development-closure attempt"
+      ],
+      "performance_blinding_rule": "The formal binding records development qualification identity and pass/fail engineering status only. It must not copy, compare, threshold, summarize, or select on K3-K6 development performance values.",
+      "closure_rule": "The development closure marker is exclusive and immutable. The closure operator must consume the accepted outer-finalized development audit attempt, publish the canonical closure attempt, and register its terminal manifest with the outer launcher. No development producer or audit may run after the closure marker is created for v1.5.0. Any subsequent source, dependency, runner, protocol, schema, or qualification change requires a new protocol version."
     },
     "checkpoint": {
       "boundary": "after a completed episode, with no pending action, environment side effect, candidate update, or partially consumed replay batch",
@@ -949,32 +1022,32 @@
     "development": {
       "purpose": "claim-ineligible implementation, evidence, and custody rehearsal only",
       "master_seeds": [
-        2439054559,
-        3246851043
+        4085517670,
+        2227535912
       ],
       "budgets": "the complete pre-binding candidate rehearsal uses exactly the formal budgets; any smaller engineering diagnostic must be labeled and cannot satisfy the rehearsal gate",
       "tuning_allowed": false,
       "claim_eligible": false,
       "result_location": "bench/world_model_lifecycle/results/development/",
-      "rule": "Preserve every numbered development attempt. Before binding, exactly one complete two-seed candidate rehearsal must satisfy only engineering, evidence, and custody criteria: schema and matrix completeness, deterministic execution, seed parity, exact coverage counts and conformance, zero independent-audit failures or gaps, restart parity, and custody integrity. K3-K6 development performance values are descriptive, permanently claim-ineligible, and neither a binding nor formal-launch criterion. Development may repair only the v1.4 evidence implementation named in the revision (coverage canonicalization and count fields, seed parity, schemas, verifier, auditor, adjudication, conformance, and custody); it may not tune or change the model, training, optimizer, planner, controller, budget, controls, threshold, exclusion, metric, or gate. No development run may create a formal environment reset. After binding, no development run is permitted for this version. Any scientific change creates a new protocol version."
+      "rule": "Preserve every numbered development attempt. Before binding, exactly one fresh complete two-seed candidate rehearsal must satisfy only engineering, evidence, and custody criteria: schema and matrix completeness, deterministic execution, seed parity, exact coverage counts and conformance, zero independent-audit failures or gaps, restart parity, isolated runner equivalence, reproducible adjudication-mode audit bytes, package-verifier tests, and custody integrity. K3-K6 development performance values are descriptive, permanently claim-ineligible, and neither a binding nor formal-launch criterion. Development may repair only the v1.5 evidence implementation named in the revision (dependency isolation and inventory, runner/bootstrap equivalence, launch ordering and identity, schemas, verifier, auditor, adjudication, rejection custody, and atomic package publication); it may not tune or change the model, training, optimizer, planner, controller, budget, controls, threshold, exclusion, metric, or gate. No development run may create a formal environment reset. After the exclusive development closure marker is created, no development run is permitted for this version. Any scientific change creates a new protocol version."
     },
     "formal": {
       "purpose": "single confirmatory evidence program",
       "master_seeds": [
-        339970590,
-        474769515,
-        550273937,
-        438984650,
-        2732731971,
-        2253809848,
-        2206960337,
-        3506881479
+        1800791691,
+        1963228177,
+        2416009491,
+        3925214220,
+        1508934628,
+        2118526007,
+        4212585034,
+        530094003
       ],
       "budgets": "exactly those declared in this protocol",
       "tuning_allowed": false,
       "claim_eligible": true,
       "result_location": "bench/world_model_lifecycle/results/formal/<formal-binding-sha256>/",
-      "launch_rule": "Formal execution is disabled until a complete formal binding validates. Immediately before the first possible formal environment reset, the launcher must atomically create the protocol-wide results/formal/formal-launch.json with exclusive-create semantics, binding the formal-binding digest, attempt directory, Git commit, and Git tree, then copy those exact bytes into the producer root. Any existing protocol-wide marker forbids launch under every same-version binding. The first v1.4 formal environment reset begins the sole permitted producer attempt. It may never be resumed or retried in place or in a new directory. A crash, missing evidence, producer-gate failure, independent-audit failure, or semantic-review failure retires v1.4.0; no corrected audit may upgrade it and no same-version formal rerun is permitted. Once that reset occurs, no code, dependency, seed, budget, metric, threshold, exclusion, or analysis change is allowed for the binding."
+      "launch_rule": "Formal execution is disabled until the canonical results/operator-v1.5/bindings/formal-binding-v1.5.0 attempt is accepted, its operator-attempt.json has a deterministic same-inode outer-completion marker, and its formal-binding.json exactly validates. A copied, directly created, failed, or unfinalized binding is rejected before producer-directory creation or formal-marker publication. Before marker publication, the launcher must finish every fallible no-outcome operation: preserve and verify the exact formal inputs plus copied binding-attempt terminal and completion bytes, verify the live binding and canonical attempt again, replay the bound prebinding conformance exactly once through the captured runner in descriptor mode, require its complete execution identity and canonical output bytes to match the bound repeated prebinding evidence, and precreate, fsync, and close the canonical producer-root formal-launch.json. That launch record binds the canonical binding-attempt path, terminal-manifest digest, and outer-completion path and digest. Immediately before the first possible formal environment reset, it must atomically hard-link those exact launch bytes as the version-scoped protocol-wide results/formal/formal-launch-v1.5.0.json with no-replace semantics and fsync both directories. The two launch paths must be the same inode and have the same SHA-256. An existing v1.5.0 marker forbids launch under every v1.5.0 binding; markers for retired protocol versions remain immutable history and neither block nor authorize v1.5.0. The first v1.5 formal environment reset begins the sole permitted formal attempt. It may never be resumed or rerun in place or in a new directory. On success or failure, the child finalizes producer-manifest.json; only after the child returns its logical status zero, one, or two, all captured inputs are rechecked, and the terminal receipt is verified does the outer launcher hard-link that exact manifest to its deterministic completion marker. The hard-link is the final logical commit; evidence lacking it is unfinalized and not citeable. A crash, missing evidence, producer-gate failure, audit-execution failure, independent-audit failure, package-verification failure, or semantic-review failure retires v1.5.0; no corrected audit may upgrade it and no same-version formal rerun is permitted. Once that reset occurs, no code, dependency, seed, budget, metric, threshold, exclusion, or analysis change is allowed for the binding."
     }
   },
   "raw_evidence": {
@@ -995,10 +1068,10 @@
     "target_hash_rule": "A transition target hash covers the fixed-scaled [delta_cos_theta, delta_sin_theta, delta_angular_velocity, reward] vector serialized as four little-endian IEEE-754 float64 values.",
     "prediction_target_binding_rule": "The independent auditor must first require the result platform, device, and deterministic-algorithm setting to equal the pre-outcome runtime binding, require its live platform, machine, accelerator, thread settings, CUDA runtime and driver, cuBLAS setting, and installed dependency bytes to equal that binding, and select the formal arithmetic device only from that binding. It must then reconstruct every persisted prediction-sidecar target from the corresponding raw pre-observation, next-observation, and reward using the producer's exact operation sequence: binary64 delta=next-pre; binary64 reconstructed_next=pre+delta; round pre, reconstructed_next, and reward separately to binary32 on CPU; transfer those binary32 values to the binding's exact execution device; on that device perform binary32 subtraction and division by binary32 [2.0,2.0,16.0], and binary32 reward division by binary32 16.2736044. The resulting four little-endian binary32 values must be byte-identical to the sidecar target; no numeric tolerance, result-selected device, or cross-device substitution is permitted.",
     "aggregation_rule": "The report must be mechanically derivable from raw evidence. A hand-entered aggregate without raw members is a K0 failure.",
-    "producer_artifact_rule": "Create a new exclusive producer-attempt directory before the first reset. For formal execution, atomically claim the sole protocol-wide formal-launch.json immediately before any outcome-producing operation and preserve an exact copied formal-launch.json in the producer root. Preserve raw JSON, protocol and schema copies, binding, test and conformance reports, the exact bound implementation-source bytes, main and child process stdout/stderr, resource telemetry, checkpoint manifests, all content-addressed sidecars, and a complete producer manifest. Finalize this root before independent audit. Never resume, retry in place, repair, or overwrite it; failed attempts remain immutable evidence.",
+    "producer_artifact_rule": "Create a new exclusive producer-attempt directory before the first reset. For formal execution, finish and verify every fallible no-outcome preparation first, precreate and fsync the canonical producer-root formal-launch.json, and publish it by same-inode hard link as the version-scoped protocol-wide formal-launch-v1.5.0.json immediately before any outcome-producing operation. Preserve raw JSON, protocol and schema copies, binding, development-qualification closure marker, test and conformance reports, runtime manifest, captured runner/bootstrap/auditor/adjudicator bytes, the exact bound implementation-source bytes, main and child process stdout/stderr, resource telemetry, checkpoint manifests, all content-addressed sidecars, and a complete producer manifest. Finalize this root before independent audit. Never resume, retry in place, repair, or overwrite it; failed attempts remain immutable evidence.",
     "restart_trace_rule": "The producer must persist the original live evaluation and restored evaluation separately before computing a parity summary. The independent audit reopens both bounded canonical payloads and recomputes every comparison; producer summary zeros are never sufficient evidence.",
-    "adjudication_package_rule": "The independent audit must remain outside the immutable producer root. Before any adjudication package is created, adjudication must capture and verify the current pre-bound auditor bytes, execute those captured bytes from an exclusive descriptor-bound private copy rather than reopening the live source pathname, rerun them against the finalized producer root, and require the resulting canonical report bytes to equal the supplied external audit report exactly. After that reproduced audit and a separate semantic review, create a second exclusive package whose canonical manifest binds the finalized producer-manifest digest, raw-result digest, independent-audit digest, auditor-source digest, semantic-review digest, formal-binding digest, and explicit review disposition. The producer root, external audit report, semantic review, and adjudication manifest together form the formal evidence package; none may be overwritten in place.",
-    "formal_artifact_rule": "Formal evidence uses two custody levels: an immutable pre-outcome producer root followed by an external independently generated adjudication package. No producer output may claim support, and no accepted disposition is valid unless the external audit is complete, passes, and independently recomputes K0 through K7."
+    "adjudication_package_rule": "The independent audit must remain outside the outer-finalized producer root. Exactly one version-scoped formal-audit claim may be consumed. Its operator attempt must always reach accepted, rejected, or failure evidence and be outer-finalized; a report-generation failure consumes the claim and cannot be retried. Adjudication consumes only that exact canonical audit attempt. If it contains an ordinary report, adjudication executes exactly one bound replay and requires canonical byte equality; if it contains a canonical audit-execution failure, lacks outer completion, or otherwise has no ordinary report, adjudication executes zero replays and can publish only a rejected terminal package. Audit identity fields establish which evidence and implementation were examined; status fields separately record whether conformance, integrity, engineering completeness, and claim completeness passed. Therefore a coherent conformance-failing audit, or a canonical audit-execution-failure record when no ordinary report can be emitted, must remain publishable only as rejected evidence. After audit reproduction or canonical execution-failure capture and a separate version-2 semantic review, publish the one version-scoped adjudication claim and staged package by atomic no-replace operations. Its canonical manifest binds the finalized producer-manifest digest and completion identity, raw-result digest, formal-audit claim and attempt terminal identity, independent-audit or audit-execution-failure digest, runner/bootstrap/auditor/adjudicator source digests, runtime-manifest digest, semantic-review digest, formal-binding digest, binding-attempt identity, launch-record digest, assurance record, and explicit review disposition. A strict package verifier must reopen the final directory, reject missing, extra, symlinked, noncanonical, digest-mismatched, nonterminal, or disposition-inconsistent members, recompute the replay-count and disposition rules, and pass before any package is cited. The producer root, outer completion, formal audit attempt, semantic review, and verified adjudication package form the formal evidence; none may be overwritten in place.",
+    "formal_artifact_rule": "Formal evidence uses outer-finalized protocol-level append-only custody: one pre-outcome producer root, one version-scoped formal audit attempt, and one version-scoped external adjudication package. No producer output may claim support, and no accepted disposition is valid unless every terminal has its deterministic same-inode outer-completion marker, the external audit is complete and passing, and it independently recomputes K0 through K7."
   },
   "independent_audit": {
     "required_before_claim": true,
@@ -1013,7 +1086,7 @@
       "fresh-process identity and parity by reopening both raw traces",
       "oscillator-control environment dynamics, action independence, cold ancestry, optimizer-schedule matching, custody isolation, held-out own-process predictive learning, and task-A comparisons"
     ],
-    "claim_rule": "README, roadmap, publication, or capability claims may cite WM-001 only after the pre-bound auditor's supplied report is reproduced byte-for-byte by a fresh adjudication-time run, that independent artifact audit and a separate adversarial semantic review accept all K0-K7 gates, and the external adjudication package binds every evidence digest. An automated or self-reported zero-failure count alone is insufficient."
+    "claim_rule": "README, roadmap, publication, or capability claims may cite WM-001 only after the pre-bound isolated runner's supplied audit report is reproduced byte-for-byte by a fresh adjudication-time run, that independent artifact audit and a separate adversarial semantic review accept all K0-K7 gates, and the atomic external accepted adjudication package passes strict post-publication verification while binding every evidence digest. A rejected package, audit-execution-failure record, automated zero-failure count, or self-reported producer pass is insufficient."
   },
   "sources": [
     {

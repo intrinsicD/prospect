@@ -18,67 +18,51 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.4.0 completed its sole eight-seed formal attempt. The immutable
-producer evidence passed K0–K7, exact pooled coverage was
-`49,949/51,200`, and a direct run of the corrected pre-bound auditor passed
-6,393,031 checks with zero failures or gaps. One content-addressed semantic
-review incorporating three adversarial referee passes accepted the narrow
-two-regime Pendulum claim.
+Protocol 1.5.0 is the active prospective confirmation. It preserves the exact
+v1.4 model, learning algorithm, optimizer, planner, controller, budgets,
+controls, metrics, thresholds, and K0–K7 order. Its scientific-block digest is
+`fa44fd93a672db3905d45a0e99c568985e7e2e5d02d32043c830db413005a5c3`.
+Only the execution and evidence boundary changes.
 
-The attempt is nevertheless not formally accepted. Mandatory adjudication
-executes the captured auditor through a private descriptor under `python -I`.
-The bound runtime used transitive distributions from the Python user site;
-isolated execution removed that search root and could not reproduce the passing
-audit byte-for-byte. The accepted package was refused. A preserved diagnostic
-replay reports one bound-input-package failure, 288 dependent prediction/CEM
-failures, and one coverage gap. The harness then also refused to package that
-failing audit as rejected. Protocol 1.4 is retired, and no accepted or official
-rejected adjudication package exists. See the
-[v1.4 formal results review](../../docs/wm001-v140-formal-results.md).
+The v1.5 harness uses a non-editable isolated wheel, complete dependency and
+package-root inventories, one captured descriptor runner, a repository-global
+cooperative outer-launch lock, deterministic same-inode terminal completion,
+canonical development audit/closure/binding attempts, and single-use formal
+audit and adjudication claims. Formal execution accepts only
+`results/operator-v1.5/bindings/formal-binding-v1.5.0/formal-binding.json`
+after that attempt is accepted and outer-finalized. A copy or directly created
+binding is not valid authorization.
 
-Protocol 1.3.0 remains an earlier rejected eight-seed attempt. Its producer
-evidence passed K0–K7, but its pre-bound independent auditor contained a
-duplicated seed constant and underspecified endpoint arithmetic. See the
-[v1.3 formal results review](../../docs/wm001-v130-formal-results.md).
+The trust boundary is explicit:
+`prospect.wm001.trust-model.v1` has `tamper_resistant: false`. The kernel,
+filesystem, base interpreter/standard library, account, and all writers to the
+repository, environment, and results roots are trusted. The cooperative lock,
+hashes, descriptors, inventories, and no-replace publication detect accidental
+or persistent drift; they do not resist an owner, noncooperating same-account
+writer, privileged actor, compromised kernel, or transient
+mutate-and-restore attack.
 
-Version 1.4 changed no formal model, learning, controller, budget, control,
-threshold, or killing gate. It replaced underspecified coverage arithmetic with
-an exact count contract over persisted float32 tensors, corrected schedule
-parity, and bound a coverage conformance corpus. Its prospective design and
-execution policy remain in the
-[v1.4 confirmation plan](../../docs/wm001-v140-confirmation-plan.md).
+Before formal launch, exactly one fresh full-budget two-seed development
+qualification must complete, followed by its canonical independent audit,
+closure attempt, exact ten-row/20-log preformal report, independent prospective
+harness review, and canonical binding attempt. Development performance remains
+descriptive and permanently claim-ineligible. The complete lifecycle claim
+remains unestablished until the one new eight-seed formal producer is
+outer-finalized, the official independent audit and semantic review accept
+K0–K7, and the terminal adjudication package is accepted and independently
+verified.
 
-A development run remains diagnostic. A formal producer result is only
-claim-eligible; it is not self-certifying. The lifecycle claim remains
-unestablished until a finalized formal artifact passes the independent artifact
-audit, a separate semantic results review accepts every killing gate K0 through
-K7, and adjudication reproduces and packages those exact bytes.
-
-Protocol 1.3.0 supersedes two non-accepted predecessors. The first v1.1.1
-formal artifact supports bounded K0–K6 pilot evidence, but adversarial review
-rejected the complete claim because the original live K7 trace was not retained
-and no learned independent-source control existed. Protocol 1.2.0 repaired
-those defects, but pre-formal review then found that it never verified that the
-new oscillator control had learned its own process. No v1.2.0 formal seed was
-opened; its two development replicates remain diagnostic only. Neither
-predecessor is repaired or relabeled.
-
-Version 1.3.0 preserves separate content-addressed live and restored K7 traces
-and uses an isolated independent phase-oscillator learner that forks the exact
-cold compound state, uses the same data count and optimizer index schedule as
-task A, and is evaluated on the same held-out task-A prediction and control
-budgets. A new disjoint oscillator validation split must first prove that this
-control learned its source process. The protocol uses a fresh derivation domain
-and transparently derived master seeds. The manipulation threshold reuses the
-existing predictive minimum-effect floor and was fixed before any v1.3.0
-development or formal outcome.
-
-The v1.4 producer and independent auditor recompute the same prospectively
-specified scalar-binary64 mixture PIT from persisted float32 evidence and
-require exact covered-target counts with no tolerance. K3 applies the unchanged
-inclusive `[0.70, 0.99]` bounds by integer cross-products. These repairs cannot
-upgrade the immutable v1.3.0 attempt, whose failed audit and auditor bytes
-remain preserved in its rejected package.
+Protocol 1.4.0 is immutable and retired. Its eight-seed producer and direct
+corrected audit passed, but isolated adjudication could not reproduce the
+report because the bound closure depended on user-site visibility, and the
+rejection path then failed to preserve an official rejected package. Protocol
+1.3.0 is also rejected because its pre-bound auditor had a duplicated seed
+constant and underspecified endpoint arithmetic. Their exact evidence and
+dispositions remain in the
+[v1.4 results review](../../docs/wm001-v140-formal-results.md) and
+[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.5 does not
+repair or relabel either attempt. The active design is the
+[v1.5 confirmation plan](../../docs/wm001-v150-confirmation-plan.md).
 
 ## What the experiment must establish
 
@@ -208,22 +192,31 @@ resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
 
-The final development rehearsal uses only seeds `2439054559` and `3246851043`
+The v1.5 development rehearsal uses only seeds `4085517670` and `2227535912`
 and the complete formal budgets. It is useful only for schema, deterministic
 execution, exact arithmetic, audit coverage, restart, and custody validation.
 Its K3–K6 performance values are descriptive, cannot decide whether formal may
-launch, are never claim-eligible, and cannot be relabeled.
+launch, are never claim-eligible, and cannot be relabeled. After the exclusive
+development closure is published, every further v1.5 development run is
+forbidden.
 
-Formal execution used the eight sealed master seeds and exact declared budgets.
-The first formal environment reset started v1.4.0's sole attempt. No resume,
+The one v1.5 formal execution uses:
+
+```text
+1800791691, 1963228177, 2416009491, 3925214220,
+1508934628, 2118526007, 4212585034, 530094003
+```
+
+The first formal environment reset after
+`results/formal/formal-launch-v1.5.0.json` begins the sole attempt. No resume,
 retry, corrected-audit upgrade, early stopping, extra training, exclusion, or
-analysis change is allowed. The adjudication reproduction failure retired
-v1.4.0.
+analysis change is allowed.
 
 There are two pre-outcome bindings:
 
 1. The scientific seal fixes the protocol and result/binding schemas.
-2. A formal implementation binding fixes a clean Git commit and tree, all
+2. The one canonical formal implementation-binding attempt fixes a clean Git
+   commit and tree, all
    executed source and test digests, dependency closure, runtime, deterministic
    settings, environment conformance, exact coverage conformance, auditor/test
    digests, and checkpoint implementation.
@@ -233,10 +226,19 @@ source, dependencies, or runtime before the first formal reset requires a new
 implementation binding. After that reset, any such change requires a new
 protocol version; previous failed attempts remain evidence.
 
-## Executable runbook
+## Active v1.5 runbook
 
-Run these commands from the repository root. CUDA is the intended formal device;
-replace `cuda` with `cpu` only if the binding and subsequent run both use CPU.
+Use the
+[WM-001 v1.5 operator runbook](../../docs/wm001-v150-operator-runbook.md).
+It defines the typed runtime seals, canonical operator paths, outer-completion
+checks, exact development/preformal/binding order, and the one formal,
+official-audit, and adjudication sequence.
+
+## Retired v1.4 command sketch — do not execute
+
+The commands below document the retired v1.4 workflow and are retained only to
+explain its evidence history. They do not satisfy v1.5 custody and must not be
+used to launch an experiment.
 
 ### 1. Install and verify the pre-outcome contract
 

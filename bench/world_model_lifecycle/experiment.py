@@ -1,7 +1,7 @@
 """End-to-end WM-001 experiment harness.
 
 This module executes the sealed causal sequence.  Formal configuration is
-accepted only at the exact protocol budgets; the v1.4 development rehearsal
+accepted only at the exact protocol budgets; the v1.5 development rehearsal
 uses the same budgets but remains permanently claim-ineligible.
 """
 
@@ -14,6 +14,7 @@ import json
 import os
 import platform
 import random
+import stat
 import subprocess
 import sys
 import time
@@ -21,14 +22,15 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 import torch
 
 from prospect.domain import AgentSnapshot, EpistemicTransition, TimePoint, UpdateReceipt
 
-from .artifact import atomic_write_exclusive, formal_launch_marker_path
+from .artifact import atomic_write_exclusive
+from .assurance import ASSURANCE
 from .checkpoint import (
     CANONICAL_COMPONENT_IDS,
     ComponentPayload,
@@ -98,6 +100,184 @@ TASK_A = "pendulum_normal_torque"
 TASK_B = "pendulum_reversed_torque"
 PROTOCOL_SHA256 = hashlib.sha256(PROTOCOL_PATH.read_bytes()).hexdigest()
 T_CRITICAL_DF7 = 2.364624251
+_RESTART_TIMEOUT_SECONDS = 600
+_RESTART_LOG_LIMIT_BYTES = 16 << 20
+
+
+def _stat_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+        metadata.st_gid,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _runtime_custody_value(payload: bytes) -> tuple[dict[str, object], int]:
+    try:
+        value = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            "captured runtime seal is no longer valid JSON"
+        ) from error
+    if (
+        not isinstance(value, dict)
+        or payload != canonical_json_bytes(value) + b"\n"
+        or value.get("experiment_id") != "WM-001"
+        or value.get("assurance") != ASSURANCE
+    ):
+        raise RuntimeError(
+            "captured runtime seal is not one canonical assured object"
+        )
+    schema = value.get("schema")
+    if schema == "prospect.wm001.runtime-seal.v1":
+        return cast(dict[str, object], value), 2
+    if schema == "prospect.world-model-lifecycle.formal-binding.v5":
+        return cast(dict[str, object], value), 1
+    raise RuntimeError("captured runtime seal has an unsupported schema")
+
+
+def _captured_bootstrap_custody() -> dict[str, object]:
+    """Reopen the pre-import bootstrap and seal descriptors without path lookup."""
+
+    fields = {
+        "runtime_seal": (
+            "_prospect_wm001_runtime_seal_fd",
+            "_prospect_wm001_runtime_seal_payload",
+            "_prospect_wm001_runtime_seal_identity",
+            "_prospect_wm001_runtime_seal_sha256",
+        ),
+        "bootstrap": (
+            "_prospect_wm001_bootstrap_fd",
+            "_prospect_wm001_bootstrap_payload",
+            "_prospect_wm001_bootstrap_identity",
+            "_prospect_wm001_bootstrap_sha256",
+        ),
+    }
+    result: dict[str, object] = {}
+    runtime_seal: dict[str, object] | None = None
+    for label, (fd_name, payload_name, identity_name, digest_name) in fields.items():
+        descriptor = getattr(sys, fd_name, None)
+        expected_payload = getattr(sys, payload_name, None)
+        expected_identity = getattr(sys, identity_name, None)
+        expected_digest = getattr(sys, digest_name, None)
+        if (
+            type(descriptor) is not int
+            or not isinstance(expected_payload, bytes)
+            or not isinstance(expected_identity, tuple)
+            or len(expected_identity) != 9
+            or not isinstance(expected_digest, str)
+            or len(expected_digest) != 64
+        ):
+            raise RuntimeError("WM-001 must be entered through the sealed producer bootstrap")
+        expected_nlink = 1
+        if label == "runtime_seal":
+            runtime_seal, expected_nlink = _runtime_custody_value(
+                expected_payload
+            )
+        try:
+            before = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_nlink != expected_nlink
+            ):
+                raise RuntimeError(
+                    f"captured {label} does not have its typed link count"
+                )
+            payload = os.pread(descriptor, before.st_size + 1, 0)
+            after = os.fstat(descriptor)
+        except OSError as error:
+            raise RuntimeError(f"captured {label} descriptor cannot be read") from error
+        if (
+            len(payload) != before.st_size
+            or _stat_identity(before) != _stat_identity(after)
+            or _stat_identity(before) != expected_identity
+            or payload != expected_payload
+            or hashlib.sha256(payload).hexdigest() != expected_digest
+        ):
+            raise RuntimeError(f"captured {label} changed after bootstrap verification")
+        result[f"{label}_fd"] = descriptor
+        result[f"{label}_payload"] = payload
+        result[f"{label}_sha256"] = expected_digest
+    assert runtime_seal is not None
+    result["runtime_seal"] = runtime_seal
+    return result
+
+
+def _descriptor_path(descriptor: int) -> str:
+    for prefix in ("/proc/self/fd/", "/dev/fd/"):
+        candidate = f"{prefix}{descriptor}"
+        if os.path.exists(candidate):
+            return candidate
+    raise RuntimeError("platform has no inherited-descriptor execution path")
+
+
+def _verify_live_bootstrap_custody() -> dict[str, object]:
+    """Recompute the sealed closure before producer completion is finalized."""
+
+    from .binding import (
+        package_root_inventory,
+        package_root_ownership,
+        package_roots,
+        python_flag_identity,
+        standard_library_inventory,
+    )
+
+    custody = _captured_bootstrap_custody()
+    seal = cast(dict[str, object], custody["runtime_seal"])
+    if seal.get("schema") == "prospect.wm001.runtime-seal.v1":
+        source = seal
+        dependencies = {
+            "python_executable": cast(dict[str, object], seal.get("python", {})).get("executable"),
+            "python_executable_sha256": cast(
+                dict[str, object],
+                seal.get("python", {}),
+            ).get("sha256"),
+            "package_roots": seal.get("package_roots"),
+            "package_ownership": seal.get("package_ownership"),
+            "standard_library": seal.get("standard_library"),
+        }
+        runtime = {
+            "python_flags": seal.get("required_flags"),
+            "process_environment": seal.get("process_environment"),
+        }
+        expected_bootstrap = seal.get("bootstrap_source_sha256")
+    elif seal.get("schema") == "prospect.world-model-lifecycle.formal-binding.v5":
+        source = cast(dict[str, object], seal.get("source", {}))
+        dependencies = cast(dict[str, object], seal.get("dependencies", {}))
+        runtime = cast(dict[str, object], seal.get("runtime", {}))
+        execution_sources = cast(
+            dict[str, object],
+            source.get("execution_source_sha256", {}),
+        )
+        expected_bootstrap = execution_sources.get("producer_bootstrap.py")
+    else:
+        raise RuntimeError("captured runtime seal has an unsupported schema")
+    roots = package_roots()
+    current_root_inventories = [package_root_inventory(root) for root in roots]
+    current_standard_library = standard_library_inventory()
+    executable = Path(sys.executable).resolve(strict=True)
+    if (
+        source.get("git_commit") != _git_value("rev-parse", "HEAD")
+        or source.get("git_tree") != _git_value("rev-parse", "HEAD^{tree}")
+        or source.get("worktree_clean") is not True
+        or _git_value("status", "--short", "--untracked-files=all")
+        or dependencies.get("python_executable") != sys.executable
+        or dependencies.get("python_executable_sha256") != hashlib.sha256(executable.read_bytes()).hexdigest()
+        or dependencies.get("package_roots") != current_root_inventories
+        or dependencies.get("package_ownership") != package_root_ownership()
+        or dependencies.get("standard_library") != current_standard_library
+        or runtime.get("python_flags") != python_flag_identity()
+        or runtime.get("process_environment") != dict(sorted(os.environ.items()))
+        or expected_bootstrap != custody["bootstrap_sha256"]
+    ):
+        raise RuntimeError("live runtime closure differs from its pre-import bootstrap seal")
+    return custody
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +346,81 @@ class ExperimentConfig:
                 raise ValueError("formal WM-001 budgets or seeds differ from the sealed protocol")
         elif not set(self.master_seeds) <= set(DEVELOPMENT_SEEDS):
             raise ValueError("development uses an undeclared master seed")
+
+
+@dataclass(frozen=True, slots=True)
+class IsolatedConformanceReports:
+    """Reports reproduced by the bound path/descriptor audit-runner modes."""
+
+    pendulum_conformance: dict[str, Any]
+    oscillator_conformance: dict[str, Any]
+    coverage_conformance: dict[str, Any]
+    runner_verification: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class _FormalPreflightReports:
+    """Fully verified outcome-free checks completed before the formal claim."""
+
+    binding_sha256: str
+    live_binding: dict[str, object]
+    isolated_conformance: IsolatedConformanceReports
+
+
+def _run_formal_preflight(
+    binding_path: Path,
+    *,
+    device: str,
+) -> _FormalPreflightReports:
+    """Run and validate every outcome-free check before launch custody is consumed."""
+
+    from .binding import run_bound_preflight_conformance, verify_live_binding
+
+    live_binding = verify_live_binding(binding_path, device=device)
+    isolated_conformance = cast(
+        IsolatedConformanceReports,
+        run_bound_preflight_conformance(binding_path, device),
+    )
+    reports = _FormalPreflightReports(
+        binding_sha256=hashlib.sha256(binding_path.read_bytes()).hexdigest(),
+        live_binding=dict(live_binding),
+        isolated_conformance=isolated_conformance,
+    )
+    _validate_formal_preflight_reports(reports, binding_path=binding_path)
+    return reports
+
+
+def _validate_formal_preflight_reports(
+    reports: _FormalPreflightReports,
+    *,
+    binding_path: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Validate report identity without repeating any live or environment check."""
+
+    try:
+        copied_binding = json.loads(binding_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("formal preflight binding is unreadable") from error
+    if not isinstance(copied_binding, dict) or reports.live_binding != copied_binding:
+        raise ValueError("formal preflight live-binding report differs from the copied binding")
+    if reports.binding_sha256 != hashlib.sha256(binding_path.read_bytes()).hexdigest():
+        raise ValueError("formal preflight binding digest differs from the copied binding")
+    isolated = reports.isolated_conformance
+    if isolated.pendulum_conformance.get("passed") is not True:
+        raise ValueError("formal preflight Pendulum report did not pass")
+    if isolated.oscillator_conformance.get("passed") is not True:
+        raise ValueError("formal preflight oscillator report did not pass")
+    if isolated.coverage_conformance.get("passed") is not True:
+        raise ValueError("formal preflight coverage report did not pass")
+    verification = isolated.runner_verification
+    if (
+        verification.get("passed") is not True
+        or verification.get("source_mode") != "descriptor"
+        or verification.get("single_launch_replay") is not True
+        or verification.get("matches_bound_prebinding_reports") is not True
+    ):
+        raise ValueError("formal preflight isolated runner verification did not pass")
+    return isolated.pendulum_conformance, isolated.oscillator_conformance
 
 
 class OraclePredictiveBackend(PredictiveBackend):
@@ -582,6 +837,9 @@ def _scaled_transition_target(
     target = _transition_target(transition)
     before = np.asarray(target["before"], dtype=np.float64)
     after = np.asarray(target["next"], dtype=np.float64)
+    reward = target["reward"]
+    if not isinstance(reward, (int, float)):
+        raise TypeError("transition reward must be numeric")
     return cast(
         tuple[float, float, float, float],
         tuple(
@@ -589,7 +847,7 @@ def _scaled_transition_target(
                 (after[0] - before[0]) / 2.0,
                 (after[1] - before[1]) / 2.0,
                 (after[2] - before[2]) / 16.0,
-                float(target["reward"]) / 16.2736044,
+                float(reward) / 16.2736044,
             ]
         ),
     )
@@ -784,48 +1042,53 @@ def capture_rejected_probe_state(
     )
     model_state = runtime.owner.snapshot_state()
     evidence = retained_learning_evidence
-    return canonical_json_bytes(
-        {
-            "schema": "prospect.wm001.rejected-probe-full-state.v1",
-            "captured_at": [at.clock_id, at.tick],
-            "model_state": {
-                "version": model_state.version,
-                "digest": model_state.digest,
-                "payload_base64": base64.b64encode(model_state.payload).decode("ascii"),
-            },
-            "domain_graph": graph,
-            "source_replay_rows": source_custody.replay.rows(),
-            "probe_replay_rows": probe_custody.replay.rows(),
-            "source_identity_base64": base64.b64encode(source_custody.identities.checkpoint_bytes()).decode("ascii"),
-            "probe_identity_base64": base64.b64encode(probe_custody.identities.checkpoint_bytes()).decode("ascii"),
-            "collection_rng_state": collection_controller.state(),
-            "process_rng": {
-                "python_base64": base64.b64encode(snapshot_python_rng()).decode("ascii"),
-                "numpy_base64": base64.b64encode(snapshot_numpy_rng()).decode("ascii"),
-                "torch_cpu_base64": base64.b64encode(snapshot_torch_cpu_rng()).decode("ascii"),
-                "torch_accelerator_base64": base64.b64encode(snapshot_torch_accelerator_rng()).decode("ascii"),
-            },
-            "retained_learning_evidence": {
-                "phase": evidence.phase,
-                "consumed_transition_ids": list(evidence.consumed_transition_ids),
-                "consumed_multiset_sha256": (evidence.consumed_multiset_sha256),
-                "predecessor_parameter_sha256": (evidence.predecessor_parameter_sha256),
-                "candidate_parameter_sha256": (evidence.candidate_parameter_sha256),
-                "predecessor_live_state_sha256": (evidence.predecessor_live_state_sha256),
-                "candidate_live_state_sha256": (evidence.candidate_live_state_sha256),
-                "optimizer_steps": evidence.optimizer_steps,
-                "sampling_manifest_base64": base64.b64encode(evidence.sampling_manifest).decode("ascii"),
-                "sampling_manifest_sha256": (evidence.sampling_manifest_sha256),
-                "sampled_id_counts": [[identity, count] for identity, count in evidence.sampled_id_counts],
-                "target_permutation_sha256": (evidence.target_permutation_sha256),
-                "target_permutation_base64": (
-                    None
-                    if evidence.target_permutation_payload is None
-                    else base64.b64encode(evidence.target_permutation_payload).decode("ascii")
+    return cast(
+        bytes,
+        canonical_json_bytes(
+            {
+                "schema": "prospect.wm001.rejected-probe-full-state.v1",
+                "captured_at": [at.clock_id, at.tick],
+                "model_state": {
+                    "version": model_state.version,
+                    "digest": model_state.digest,
+                    "payload_base64": base64.b64encode(model_state.payload).decode("ascii"),
+                },
+                "domain_graph": graph,
+                "source_replay_rows": source_custody.replay.rows(),
+                "probe_replay_rows": probe_custody.replay.rows(),
+                "source_identity_base64": base64.b64encode(source_custody.identities.checkpoint_bytes()).decode(
+                    "ascii"
                 ),
-                "loss_history": list(evidence.loss_history),
+                "probe_identity_base64": base64.b64encode(probe_custody.identities.checkpoint_bytes()).decode("ascii"),
+                "collection_rng_state": collection_controller.state(),
+                "process_rng": {
+                    "python_base64": base64.b64encode(snapshot_python_rng()).decode("ascii"),
+                    "numpy_base64": base64.b64encode(snapshot_numpy_rng()).decode("ascii"),
+                    "torch_cpu_base64": base64.b64encode(snapshot_torch_cpu_rng()).decode("ascii"),
+                    "torch_accelerator_base64": base64.b64encode(snapshot_torch_accelerator_rng()).decode("ascii"),
+                },
+                "retained_learning_evidence": {
+                    "phase": evidence.phase,
+                    "consumed_transition_ids": list(evidence.consumed_transition_ids),
+                    "consumed_multiset_sha256": (evidence.consumed_multiset_sha256),
+                    "predecessor_parameter_sha256": (evidence.predecessor_parameter_sha256),
+                    "candidate_parameter_sha256": (evidence.candidate_parameter_sha256),
+                    "predecessor_live_state_sha256": (evidence.predecessor_live_state_sha256),
+                    "candidate_live_state_sha256": (evidence.candidate_live_state_sha256),
+                    "optimizer_steps": evidence.optimizer_steps,
+                    "sampling_manifest_base64": base64.b64encode(evidence.sampling_manifest).decode("ascii"),
+                    "sampling_manifest_sha256": (evidence.sampling_manifest_sha256),
+                    "sampled_id_counts": [[identity, count] for identity, count in evidence.sampled_id_counts],
+                    "target_permutation_sha256": (evidence.target_permutation_sha256),
+                    "target_permutation_base64": (
+                        None
+                        if evidence.target_permutation_payload is None
+                        else base64.b64encode(evidence.target_permutation_payload).decode("ascii")
+                    ),
+                    "loss_history": list(evidence.loss_history),
+                },
             },
-        }
+        ),
     )
 
 
@@ -1281,6 +1544,7 @@ def run_restart_parity(
     spec_path = output_directory / f"{rows.replicate_id}-restart-spec.json"
     original_path = output_directory / f"{rows.replicate_id}-live-evaluation.json"
     restored_path = output_directory / f"{rows.replicate_id}-restored-evaluation.json"
+    restore_runtime_path = output_directory / f"{rows.replicate_id}-restore-runtime.json"
     atomic_write_exclusive(spec_path, canonical_json_bytes(specification) + b"\n")
     original = evaluate_live_state(
         runtime=runtime,
@@ -1296,38 +1560,114 @@ def run_restart_parity(
         original_path,
         canonical_json_bytes(original) + b"\n",
     )
+    bootstrap_custody = _verify_live_bootstrap_custody()
+    bootstrap_descriptor = cast(int, bootstrap_custody["bootstrap_fd"])
+    runtime_seal_descriptor = cast(int, bootstrap_custody["runtime_seal_fd"])
+    bootstrap_path = _descriptor_path(bootstrap_descriptor)
     environment = dict(os.environ)
-    environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    completed = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "bench.world_model_lifecycle.restore_eval",
-            "--checkpoint",
-            str(checkpoint_path),
-            "--spec",
-            str(spec_path),
-            "--output",
-            str(restored_path),
-        ],
-        cwd=Path(__file__).resolve().parents[2],
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    atomic_write_exclusive(
-        output_directory / f"{rows.replicate_id}-restore.stdout",
-        completed.stdout.encode("utf-8"),
-    )
-    atomic_write_exclusive(
-        output_directory / f"{rows.replicate_id}-restore.stderr",
-        completed.stderr.encode("utf-8"),
-    )
+    stdout_path = output_directory / f"{rows.replicate_id}-restore.stdout"
+    stderr_path = output_directory / f"{rows.replicate_id}-restore.stderr"
+    with stdout_path.open("xb") as stdout_stream, stderr_path.open("xb") as stderr_stream:
+        try:
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    "-S",
+                    "-B",
+                    bootstrap_path,
+                    "--bootstrap-fd",
+                    str(bootstrap_descriptor),
+                    "--runtime-seal-fd",
+                    str(runtime_seal_descriptor),
+                    "--restore-eval-entry",
+                    "--checkpoint",
+                    str(checkpoint_path),
+                    "--spec",
+                    str(spec_path),
+                    "--output",
+                    str(restored_path),
+                    "--runtime-identity-output",
+                    str(restore_runtime_path),
+                ],
+                cwd=Path.cwd().resolve(strict=True),
+                env=environment,
+                check=False,
+                stdout=stdout_stream,
+                stderr=stderr_stream,
+                pass_fds=(bootstrap_descriptor, runtime_seal_descriptor),
+                timeout=_RESTART_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError("fresh-process restore exceeded its sealed timeout") from error
+        stdout_stream.flush()
+        stderr_stream.flush()
+        os.fsync(stdout_stream.fileno())
+        os.fsync(stderr_stream.fileno())
+    if stdout_path.stat().st_size > _RESTART_LOG_LIMIT_BYTES or stderr_path.stat().st_size > _RESTART_LOG_LIMIT_BYTES:
+        raise RuntimeError("fresh-process restore exceeded its sealed log limit")
+    _captured_bootstrap_custody()
     if completed.returncode != 0:
-        raise RuntimeError(f"fresh-process restore failed with exit {completed.returncode}: {completed.stderr}")
+        stderr_excerpt = stderr_path.read_bytes()[:4096].decode("utf-8", errors="replace")
+        raise RuntimeError(f"fresh-process restore failed with exit {completed.returncode}: {stderr_excerpt}")
     restored = load_evaluation(restored_path)
     parity = compare_parity(original, restored)
+    restore_runtime_payload = restore_runtime_path.read_bytes()
+    restore_runtime = json.loads(restore_runtime_payload)
+    from .binding import (
+        FORMAL_PROCESS_ENVIRONMENT_KEYS,
+        package_roots,
+        python_flag_identity,
+    )
+
+    runtime_seal = cast(dict[str, object], bootstrap_custody["runtime_seal"])
+    closure_block = (
+        cast(dict[str, object], runtime_seal.get("dependencies", {}))
+        if runtime_seal.get("schema") == "prospect.world-model-lifecycle.formal-binding.v5"
+        else runtime_seal
+    )
+    package_rows = closure_block.get("package_roots")
+    package_ownership = closure_block.get("package_ownership")
+    standard_library = closure_block.get("standard_library")
+    if (
+        not isinstance(package_rows, list)
+        or len(package_rows) != 1
+        or not isinstance(package_rows[0], dict)
+        or not isinstance(package_ownership, dict)
+        or not isinstance(standard_library, dict)
+    ):
+        raise RuntimeError("captured runtime seal has malformed root inventories")
+    expected_restore_runtime = {
+        "schema": "prospect.wm001.restart-runtime.v2",
+        "python_executable": sys.executable,
+        "python_executable_sha256": hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest(),
+        "python_version": platform.python_version(),
+        "python_flags": python_flag_identity(),
+        "process_environment": {
+            key: value for key, value in sorted(os.environ.items()) if key in FORMAL_PROCESS_ENVIRONMENT_KEYS
+        },
+        "package_root": str(package_roots()[0]),
+        "package_root_inventory": package_rows[0],
+        "package_ownership": package_ownership,
+        "standard_library": standard_library,
+        "runtime_seal_sha256": bootstrap_custody["runtime_seal_sha256"],
+        "runtime_seal_descriptor_custody": True,
+        "bootstrap_source_sha256": bootstrap_custody["bootstrap_sha256"],
+        "bootstrap_descriptor_custody": True,
+        "deterministic_algorithms": True,
+    }
+    if (
+        not isinstance(restore_runtime, dict)
+        or restore_runtime != expected_restore_runtime
+        or restore_runtime_payload != canonical_json_bytes(expected_restore_runtime) + b"\n"
+    ):
+        raise RuntimeError("fresh-process restore runtime differs from the parent closure")
+    parity["restore_runtime"] = {
+        **restore_runtime,
+        "bytes": len(restore_runtime_payload),
+        "sha256": hashlib.sha256(restore_runtime_payload).hexdigest(),
+        "filename": restore_runtime_path.name,
+    }
 
     def evaluation_reference(path: Path) -> dict[str, object]:
         payload = path.read_bytes()
@@ -1340,7 +1680,7 @@ def run_restart_parity(
 
     parity["live_evaluation"] = evaluation_reference(original_path)
     parity["restored_evaluation"] = evaluation_reference(restored_path)
-    return parity
+    return cast(dict[str, object], parity)
 
 
 def run_replicate(
@@ -2189,18 +2529,25 @@ def run_experiment(
     """Execute all configured replicates and write one schema-valid raw result."""
 
     from .analysis import analyze_result
-    from .binding import verify_live_binding
-    from .verify import _verify_formal_launch_record, verify_result
+    from .verify import verify_result
 
     config.validate()
+    bootstrap_custody = _verify_live_bootstrap_custody()
     if config.lane == "formal" and not output_prepared:
         raise ValueError("formal execution requires an exclusive ProducerAttempt directory")
     if config.lane == "formal":
         if formal_binding_path is None:
             raise ValueError("formal execution requires its pre-run implementation binding")
-        verify_live_binding(formal_binding_path, device=config.device)
+        if (
+            cast(dict[str, object], bootstrap_custody["runtime_seal"]).get("schema")
+            != "prospect.world-model-lifecycle.formal-binding.v5"
+            or formal_binding_path.read_bytes() != bootstrap_custody["runtime_seal_payload"]
+        ):
+            raise ValueError("formal binding differs from the pre-import runtime seal")
     elif formal_binding_path is not None:
         raise ValueError("development execution must not claim a formal binding")
+    elif cast(dict[str, object], bootstrap_custody["runtime_seal"]).get("schema") != "prospect.wm001.runtime-seal.v1":
+        raise ValueError("development execution requires a prospective runtime seal")
     if output_prepared:
         if not output_directory.is_dir():
             raise ValueError("prepared output directory does not exist")
@@ -2216,47 +2563,43 @@ def run_experiment(
             raise ValueError("prepared output directory custody metadata differs from the lane")
         if (output_directory / "producer-manifest.json").exists():
             raise ValueError("prepared output directory was already finalized")
-    else:
+    elif not output_prepared:
         output_directory.mkdir(parents=True, exist_ok=False)
-    formal_launch_path = output_directory / "formal-launch.json"
     formal_launch_sha256: str | None = None
     if config.lane == "formal":
         assert formal_binding_path is not None
-        protocol_wide_launch_path, binding_sha256 = formal_launch_marker_path(
+        from .artifact import claim_formal_launch_with_digest
+
+        formal_preflight_reports = _run_formal_preflight(
+            formal_binding_path,
+            device=config.device,
+        )
+        conformance, oscillator_conformance = _validate_formal_preflight_reports(
+            formal_preflight_reports,
+            binding_path=formal_binding_path,
+        )
+        _, formal_launch_sha256 = claim_formal_launch_with_digest(
             formal_binding_path,
             output_directory,
         )
-        if (
-            not protocol_wide_launch_path.is_file()
-            or protocol_wide_launch_path.is_symlink()
-            or not formal_launch_path.is_file()
-            or formal_launch_path.is_symlink()
-            or protocol_wide_launch_path.read_bytes() != formal_launch_path.read_bytes()
-        ):
-            raise RuntimeError(
-                "formal execution has no unique protocol-wide launch claim"
-            )
-        launch_execution = {
-            "git_commit": _git_value("rev-parse", "HEAD"),
-            "git_tree": _git_value("rev-parse", "HEAD^{tree}"),
-        }
-        _verify_formal_launch_record(
-            formal_launch_path,
-            binding_sha256=binding_sha256,
-            execution=launch_execution,
-        )
-        formal_launch_sha256 = hashlib.sha256(formal_launch_path.read_bytes()).hexdigest()
     started_at = utc_now()
     monotonic_start = time.monotonic()
-    conformance = run_pendulum_conformance(samples_per_task=128, seed=20260717)
-    if not conformance["passed"]:
-        raise RuntimeError("Pendulum semantic conformance preflight failed")
-    oscillator_conformance = run_independent_phase_oscillator_conformance(
-        cases=32,
-        seed=20260718,
-    )
-    if oscillator_conformance["passed"] is not True:
-        raise RuntimeError("independent oscillator conformance preflight failed")
+    if config.lane == "development":
+        conformance = cast(
+            dict[str, Any],
+            run_pendulum_conformance(samples_per_task=128, seed=20260717),
+        )
+        if conformance.get("passed") is not True:
+            raise RuntimeError("Pendulum semantic conformance preflight failed")
+        oscillator_conformance = cast(
+            dict[str, Any],
+            run_independent_phase_oscillator_conformance(
+                cases=32,
+                seed=20260718,
+            ),
+        )
+        if oscillator_conformance.get("passed") is not True:
+            raise RuntimeError("independent oscillator conformance preflight failed")
     replicate_results: list[dict[str, object]] = []
     for master_seed in config.master_seeds:
         replicate = run_replicate(
@@ -2265,30 +2608,62 @@ def run_experiment(
             output_directory=output_directory,
         )
         replicate_results.append(replicate)
+        completed_master_seeds: list[int] = []
+        for row in replicate_results:
+            completed_seed = row.get("master_seed")
+            if type(completed_seed) is not int:
+                raise RuntimeError("replicate result has no integer master seed")
+            completed_master_seeds.append(completed_seed)
+        replicate_seed = replicate.get("master_seed")
+        if type(replicate_seed) is not int:
+            raise RuntimeError("replicate result has no integer master seed")
         progress = {
             "schema": "prospect.wm001.progress.v1",
             "lane": config.lane,
-            "completed_master_seeds": [int(row["master_seed"]) for row in replicate_results],
+            "completed_master_seeds": completed_master_seeds,
             "updated_at_utc": utc_now(),
         }
-        progress_path = output_directory / (
-            f"progress-{len(replicate_results):02d}-{int(replicate['master_seed'])}.json"
-        )
+        progress_path = output_directory / (f"progress-{len(replicate_results):02d}-{replicate_seed}.json")
         atomic_write_exclusive(progress_path, canonical_json_bytes(progress) + b"\n")
 
     git_commit = _git_value("rev-parse", "HEAD")
     git_tree = _git_value("rev-parse", "HEAD^{tree}")
     worktree_clean = not _git_value("status", "--short", "--untracked-files=all")
-    lockfile = Path(__file__).resolve().parents[2] / "requirements-wm001.lock"
+    from .binding import (
+        FORMAL_PROCESS_ENVIRONMENT_KEYS,
+        LOCKFILE,
+        _cuda_driver_version,
+        python_flag_identity,
+    )
+
+    lockfile = LOCKFILE
     binding_sha256 = (
         None if formal_binding_path is None else hashlib.sha256(formal_binding_path.read_bytes()).hexdigest()
     )
     wall_seconds = time.monotonic() - monotonic_start
     max_cuda_memory = int(torch.cuda.max_memory_allocated()) if config.device == "cuda" else 0
+    bootstrap_custody = _verify_live_bootstrap_custody()
+    runtime_seal = cast(dict[str, object], bootstrap_custody["runtime_seal"])
+    closure_block = (
+        cast(dict[str, object], runtime_seal.get("dependencies", {}))
+        if runtime_seal.get("schema") == "prospect.world-model-lifecycle.formal-binding.v5"
+        else runtime_seal
+    )
+    package_root_inventories = closure_block.get("package_roots")
+    package_ownership_identity = closure_block.get("package_ownership")
+    standard_library_inventory = closure_block.get("standard_library")
+    if (
+        not isinstance(package_root_inventories, list)
+        or len(package_root_inventories) != 1
+        or not isinstance(package_root_inventories[0], dict)
+        or not isinstance(package_ownership_identity, dict)
+        or not isinstance(standard_library_inventory, dict)
+    ):
+        raise RuntimeError("captured runtime seal has malformed closure inventories")
     result: dict[str, object] = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v4",
+        "schema": "prospect.world-model-lifecycle.raw-result.v5",
         "experiment_id": "WM-001",
-        "protocol_version": "1.4.0",
+        "protocol_version": "1.5.0",
         "protocol_sha256": PROTOCOL_SHA256,
         "lane": config.lane,
         "claim_eligible": config.lane == "formal",
@@ -2300,9 +2675,32 @@ def run_experiment(
             "git_tree": git_tree,
             "worktree_clean": worktree_clean,
             "dependency_lock_sha256": hashlib.sha256(lockfile.read_bytes()).hexdigest(),
+            "python_executable": sys.executable,
+            "python_executable_sha256": hashlib.sha256(
+                Path(sys.executable).resolve(strict=True).read_bytes()
+            ).hexdigest(),
+            "python_version": platform.python_version(),
             "platform": platform.platform(),
+            "machine": platform.machine(),
             "device": config.device,
+            "python_flags": python_flag_identity(),
+            "process_environment": {
+                key: value for key, value in sorted(os.environ.items()) if key in FORMAL_PROCESS_ENVIRONMENT_KEYS
+            },
+            "accelerator": (torch.cuda.get_device_name(0) if config.device == "cuda" else None),
+            "thread_count": torch.get_num_threads(),
+            "interop_thread_count": torch.get_num_interop_threads(),
+            "cuda_runtime": torch.version.cuda,
+            "cuda_driver": (_cuda_driver_version() if config.device == "cuda" else None),
+            "cublas_workspace_config": (os.environ.get("CUBLAS_WORKSPACE_CONFIG") if config.device == "cuda" else None),
             "deterministic_algorithms": bool(torch.are_deterministic_algorithms_enabled()),
+            "runtime_seal_sha256": bootstrap_custody["runtime_seal_sha256"],
+            "runtime_seal_descriptor_custody": True,
+            "producer_bootstrap_sha256": bootstrap_custody["bootstrap_sha256"],
+            "bootstrap_descriptor_custody": True,
+            "package_roots": package_root_inventories,
+            "package_ownership": package_ownership_identity,
+            "standard_library": standard_library_inventory,
             "launcher_process_id": os.getpid(),
             "formal_launch_file": ("formal-launch.json" if config.lane == "formal" else None),
             "formal_launch_sha256": formal_launch_sha256,
@@ -2358,7 +2756,7 @@ def run_experiment(
 def _git_value(*arguments: str) -> str:
     completed = subprocess.run(
         ["git", *arguments],
-        cwd=Path(__file__).resolve().parents[2],
+        cwd=Path.cwd().resolve(strict=True),
         check=True,
         capture_output=True,
         text=True,
@@ -2368,6 +2766,7 @@ def _git_value(*arguments: str) -> str:
 
 __all__ = (
     "ExperimentConfig",
+    "IsolatedConformanceReports",
     "OraclePredictiveBackend",
     "ReplicateRows",
     "append_collection_rows",

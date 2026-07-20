@@ -32,7 +32,8 @@ epistemic-gate:
 > PYTHONPATH=src python -m bench.epistemic.run_maturity
 
 wm001-development:
-> python -m bench.world_model_lifecycle.run development
+> @echo "Direct WM-001 entry is disabled; use docs/wm001-v150-operator-runbook.md" >&2
+> @exit 2
 
 check: lint typecheck test epistemic-diagnostics
 

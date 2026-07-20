@@ -84,6 +84,20 @@ TASK_A = "pendulum_normal_torque"
 TASK_IRRELEVANT = "independent_phase_oscillator"
 
 
+@pytest.fixture(autouse=True)
+def _isolated_outer_completion_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path.parent / f".outer-completions-{tmp_path.name}"
+    root.mkdir()
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_OUTER_COMPLETIONS_ROOT",
+        root,
+    )
+
+
 def test_complete_development_audit_passes_without_becoming_claim_complete(
     tmp_path: Path,
 ) -> None:
@@ -103,6 +117,99 @@ def test_complete_development_audit_passes_without_becoming_claim_complete(
     assert report["engineering_complete"] is True
     assert report["complete_for_claim"] is False
     assert report["passed"] is True
+
+
+def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
+    source = {
+        "git_commit": "a" * 40,
+        "git_tree": "b" * 40,
+        "execution_source_sha256": {
+            "producer_bootstrap.py": "c" * 64,
+        },
+    }
+    dependencies = {
+        "python_executable": "/isolated/bin/python",
+        "python_executable_sha256": "d" * 64,
+        "standard_library": {"inventory_sha256": "e" * 64},
+        "package_roots": [{"inventory_sha256": "f" * 64}],
+        "package_ownership": {"inventory_sha256": "0" * 64},
+    }
+    runtime = {
+        "python_flags": {
+            "isolated": 1,
+            "no_site": 1,
+            "no_user_site": 1,
+            "dont_write_bytecode": 1,
+            "ignore_environment": 1,
+            "safe_path": True,
+        },
+        "process_environment": {
+            "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+            "LC_ALL": "C.UTF-8",
+            "PATH": "/usr/bin:/bin",
+            "TZ": "UTC",
+        },
+    }
+    seal = {
+        "schema": "prospect.wm001.runtime-seal.v1",
+        "experiment_id": "WM-001",
+        "protocol_version": "1.5.0",
+        "assurance": dict(artifact_audit_module._ASSURANCE),
+        "git_commit": source["git_commit"],
+        "git_tree": source["git_tree"],
+        "worktree_clean": True,
+        "python": {
+            "executable": dependencies["python_executable"],
+            "resolved_executable": "/isolated/bin/python3.12",
+            "sha256": dependencies["python_executable_sha256"],
+            "version": [
+                artifact_audit_module.sys.version_info.major,
+                artifact_audit_module.sys.version_info.minor,
+                artifact_audit_module.sys.version_info.micro,
+            ],
+        },
+        "required_flags": runtime["python_flags"],
+        "process_environment": runtime["process_environment"],
+        "bootstrap_source_sha256": source["execution_source_sha256"][
+            "producer_bootstrap.py"
+        ],
+        "standard_library": dependencies["standard_library"],
+        "package_roots": dependencies["package_roots"],
+        "package_ownership": dependencies["package_ownership"],
+    }
+
+    assert (
+        artifact_audit_module._preformal_runtime_seal(
+            seal,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+        )
+        == seal
+    )
+
+    missing = dict(seal)
+    del missing["assurance"]
+    with pytest.raises(ArtifactAuditError, match="runtime seal differs"):
+        artifact_audit_module._preformal_runtime_seal(
+            missing,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+        )
+
+    overstated = dict(seal)
+    overstated["assurance"] = {
+        **artifact_audit_module._ASSURANCE,
+        "tamper_resistant": True,
+    }
+    with pytest.raises(ArtifactAuditError, match="runtime seal differs"):
+        artifact_audit_module._preformal_runtime_seal(
+            overstated,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+        )
 
 
 def _canonical(value: object) -> bytes:
@@ -738,7 +845,7 @@ def test_auditor_formal_seed_constant_matches_sealed_protocol() -> None:
 def test_formal_runtime_binding_selects_only_bound_device(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime: dict[str, object] = {
+    shared_runtime: dict[str, object] = {
         "platform": "bound-platform",
         "machine": "bound-machine",
         "device": "cuda",
@@ -750,6 +857,20 @@ def test_formal_runtime_binding_selects_only_bound_device(
         "cuda_driver": "570.00",
         "cublas_workspace_config": ":4096:8",
     }
+    process_environment = {
+        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LC_ALL": "C.UTF-8",
+        "PATH": "/usr/bin:/bin",
+        "TZ": "UTC",
+    }
+    for name, value in process_environment.items():
+        if name != "PATH":
+            monkeypatch.setenv(name, value)
+    runtime = {
+        **shared_runtime,
+        "python_flags": dict(artifact_audit_module._PREBINDING_PRODUCER_FLAGS),
+        "process_environment": process_environment,
+    }
     packages = [
         {
             "name": "python",
@@ -757,26 +878,85 @@ def test_formal_runtime_binding_selects_only_bound_device(
             "distribution_sha256": "a" * 64,
         }
     ]
+    package_root = {
+        "path": "/bound/site-packages",
+        "semantics_id": "prospect.wm001.package-root.v2",
+        "file_count": 7,
+        "directory_count": 3,
+        "total_bytes": 70,
+        "inventory_sha256": "1" * 64,
+    }
+    standard_library = {
+        "path": "/bound/stdlib",
+        "semantics_id": "prospect.wm001.standard-library.v2",
+        "file_count": 5,
+        "directory_count": 2,
+        "total_bytes": 50,
+        "inventory_sha256": "2" * 64,
+    }
+    ownership = {
+        "semantics_id": "prospect.wm001.package-ownership.v1",
+        "root": package_root["path"],
+        "file_count": 7,
+        "directory_count": 3,
+        "shared_file_count": 0,
+        "identity_sha256": "3" * 64,
+    }
+    dependencies = {
+        "packages": packages,
+        "python_executable": artifact_audit_module.sys.executable,
+        "python_executable_sha256": artifact_audit_module._sha256_file(
+            Path(artifact_audit_module.sys.executable).resolve()
+        ),
+        "package_roots": [package_root],
+        "package_ownership": ownership,
+        "standard_library": standard_library,
+    }
     monkeypatch.setattr(
         artifact_audit_module,
         "_live_runtime_identity",
-        lambda device: dict(runtime),
+        lambda device: dict(shared_runtime),
     )
     monkeypatch.setattr(
         artifact_audit_module,
         "_live_bound_package_rows",
         lambda rows: rows,
     )
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_prebinding_live_python_flags",
+        lambda: dict(artifact_audit_module._PREBINDING_AUDITOR_FLAGS),
+    )
+
+    def inventory(
+        identifier: str,
+        _raw_path: object,
+        *,
+        kind: str,
+    ) -> dict[str, object]:
+        expected = standard_library if kind == "standard_library" else package_root
+        return {
+            "id": identifier,
+            "kind": kind,
+            **{key: value for key, value in expected.items() if key != "path"},
+        }
+
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_prebinding_root_inventory",
+        inventory,
+    )
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_live_package_ownership",
+        lambda _root: dict(ownership),
+    )
     valid = _Audit()
     selected = _audit_formal_runtime_binding(
         valid,
         runtime=runtime,
-        dependencies={"packages": packages},
-        execution={
-            "platform": "bound-platform",
-            "device": "cuda",
-            "deterministic_algorithms": True,
-        },
+        dependencies=dependencies,
+        execution=dict(runtime),
     )
     assert selected == "cuda"
     assert valid.failed_checks == 0
@@ -785,11 +965,10 @@ def test_formal_runtime_binding_selects_only_bound_device(
     selected = _audit_formal_runtime_binding(
         mismatched,
         runtime=runtime,
-        dependencies={"packages": packages},
+        dependencies=dependencies,
         execution={
-            "platform": "bound-platform",
+            **runtime,
             "device": "cpu",
-            "deterministic_algorithms": True,
         },
     )
     assert selected == "cuda"
@@ -798,27 +977,24 @@ def test_formal_runtime_binding_selects_only_bound_device(
     monkeypatch.setattr(
         artifact_audit_module,
         "_live_runtime_identity",
-        lambda device: {**runtime, "cuda_driver": "different-driver"},
+        lambda device: {
+            **shared_runtime,
+            "cuda_driver": "different-driver",
+        },
     )
     live_runtime_mismatch = _Audit()
     _audit_formal_runtime_binding(
         live_runtime_mismatch,
         runtime=runtime,
-        dependencies={"packages": packages},
-        execution={
-            "platform": "bound-platform",
-            "device": "cuda",
-            "deterministic_algorithms": True,
-        },
+        dependencies=dependencies,
+        execution=dict(runtime),
     )
-    assert "formal_auditor_runtime_binding_mismatch" in {
-        finding["code"] for finding in live_runtime_mismatch.findings
-    }
+    assert "formal_auditor_runtime_binding_mismatch" in {finding["code"] for finding in live_runtime_mismatch.findings}
 
     monkeypatch.setattr(
         artifact_audit_module,
         "_live_runtime_identity",
-        lambda device: dict(runtime),
+        lambda device: dict(shared_runtime),
     )
     monkeypatch.setattr(
         artifact_audit_module,
@@ -829,12 +1005,8 @@ def test_formal_runtime_binding_selects_only_bound_device(
     _audit_formal_runtime_binding(
         live_dependency_mismatch,
         runtime=runtime,
-        dependencies={"packages": packages},
-        execution={
-            "platform": "bound-platform",
-            "device": "cuda",
-            "deterministic_algorithms": True,
-        },
+        dependencies=dependencies,
+        execution=dict(runtime),
     )
     assert "formal_auditor_dependency_binding_mismatch" in {
         finding["code"] for finding in live_dependency_mismatch.findings
@@ -1340,11 +1512,11 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     owned_state = runtime.owner.snapshot_state()
     parameter_sha256 = runtime.digest
     model_version = runtime.version
-    master_seed = 101
+    master_seed = 4085517670
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.4.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.5.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
@@ -1823,9 +1995,9 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         },
     }
     result: dict[str, Any] = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v4",
+        "schema": "prospect.world-model-lifecycle.raw-result.v5",
         "experiment_id": "WM-001",
-        "protocol_version": "1.4.0",
+        "protocol_version": "1.5.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),
@@ -1882,7 +2054,13 @@ def test_artifact_audit_recomputes_current_evidence_and_detects_metric_tampering
 
 def test_restart_audit_reopens_both_traces_and_rejects_derived_tampering(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(
+        artifact_audit_module,
+        "_validate_restart_restore_runtime",
+        lambda **_kwargs: None,
+    )
     master_seed = 70_359_369
     checkpoint_manifest_sha256 = hashlib.sha256(b"checkpoint").hexdigest()
     component_hashes = {
@@ -2010,6 +2188,10 @@ def test_restart_audit_reopens_both_traces_and_rejects_derived_tampering(
         replicate,
         replicate_id=f"wm001-formal-{master_seed}",
         launcher_process_id=101,
+        execution={},
+        binding_runtime=None,
+        dependencies=None,
+        source=None,
     )
     assert audit.failed_checks == 0
     assert audit.coverage_gaps == []
@@ -2022,6 +2204,10 @@ def test_restart_audit_reopens_both_traces_and_rejects_derived_tampering(
         replicate,
         replicate_id=f"wm001-formal-{master_seed}",
         launcher_process_id=101,
+        execution={},
+        binding_runtime=None,
+        dependencies=None,
+        source=None,
     )
     assert "restart_parity_recomputation_mismatch" in {finding["code"] for finding in tampered.findings}
 
@@ -2256,7 +2442,12 @@ def _write_test_producer_manifest(root: Path) -> dict[str, object]:
         "file_count": len(files),
         "files": files,
     }
-    (root / "producer-manifest.json").write_bytes(_canonical(manifest) + b"\n")
+    manifest_path = root / "producer-manifest.json"
+    manifest_path.write_bytes(_canonical(manifest) + b"\n")
+    completion = artifact_audit_module._OUTER_COMPLETIONS_ROOT / (
+        hashlib.sha256(str(manifest_path).encode("utf-8")).hexdigest() + ".json"
+    )
+    completion.hardlink_to(manifest_path)
     return manifest
 
 

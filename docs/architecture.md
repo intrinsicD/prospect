@@ -261,6 +261,23 @@ demonstration. The
 [v1.4 formal results review](wm001-v140-formal-results.md) records the exact
 effects and failure.
 
+Protocol 1.5.0 keeps the same agent, scientific blocks, budgets, controls,
+metrics, thresholds, and killing order while replacing the failed execution
+boundary. A non-editable isolated wheel and complete transitive package
+inventory are shared by prebinding, producer, auditor, and adjudicator.
+Prospective runtime seals, producer attempts, development audit/closure
+attempts, the formal audit, and adjudication all use an outer launcher that
+holds one repository-global cooperative sealed-runtime lock and commits the
+terminal only
+after child exit and descriptor rechecks by a deterministic same-inode
+hardlink. Formal execution can consume only the accepted, outer-finalized
+canonical binding attempt; copied or direct bindings are rejected. The
+formal-audit and adjudication claims are version-scoped and single-use, and a
+no-report audit failure reaches a terminal rejected package with no replay.
+These are application-level custody properties under an explicit trusted
+same-principal/kernel/filesystem boundary, not external tamper resistance. See
+the [v1.5 confirmation plan](wm001-v150-confirmation-plan.md).
+
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget
@@ -268,10 +285,15 @@ effects and failure.
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- A future confirmation must execute the exact descriptor-bound adjudication
-  audit as a pre-outcome conformance gate and preserve the sealed dependency
-  closure's visibility under isolation. The rejection path must also be able to
-  package an audit that fails environment conformance.
+- Protocol 1.5 implements the descriptor-bound conformance and rejected-package
+  paths, but those mechanisms remain prospective until the new development
+  qualification, one formal confirmation, official audit, semantic review, and
+  terminal adjudication complete.
+- The v1.5 custody layer is deliberately not hardened against the repository or
+  environment owner, noncooperating same-account writers, privileged actors, a
+  compromised kernel, or transient mutate-and-restore attacks. External
+  attestation, read-only media, or an independently operated transparency log
+  would be needed for a stronger trust model.
 - Value-of-information estimates require their own calibration and adversarial
   controls.
 - The current in-memory lifecycle journal exposes partial completion but cannot

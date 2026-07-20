@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-raw-result-v4.json",
+  "$id": "https://prospect.local/schemas/wm-001-raw-result-v5.json",
   "title": "WM-001 raw evidence and derived result",
   "type": "object",
   "additionalProperties": false,
@@ -22,13 +22,13 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.raw-result.v4"
+      "const": "prospect.world-model-lifecycle.raw-result.v5"
     },
     "experiment_id": {
       "const": "WM-001"
     },
     "protocol_version": {
-      "const": "1.4.0"
+      "const": "1.5.0"
     },
     "protocol_sha256": {
       "$ref": "#/$defs/sha256"
@@ -68,9 +68,28 @@
         "git_tree",
         "worktree_clean",
         "dependency_lock_sha256",
+        "python_executable",
+        "python_executable_sha256",
+        "python_version",
         "platform",
+        "machine",
         "device",
+        "python_flags",
+        "process_environment",
+        "accelerator",
+        "thread_count",
+        "interop_thread_count",
+        "cuda_runtime",
+        "cuda_driver",
+        "cublas_workspace_config",
         "deterministic_algorithms",
+        "runtime_seal_sha256",
+        "runtime_seal_descriptor_custody",
+        "producer_bootstrap_sha256",
+        "bootstrap_descriptor_custody",
+        "package_roots",
+        "package_ownership",
+        "standard_library",
         "launcher_process_id",
         "formal_launch_file",
         "formal_launch_sha256",
@@ -91,7 +110,22 @@
         "dependency_lock_sha256": {
           "$ref": "#/$defs/sha256"
         },
+        "python_executable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "python_executable_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
         "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "machine": {
           "type": "string",
           "minLength": 1
         },
@@ -102,8 +136,114 @@
             "mps"
           ]
         },
+        "python_flags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dont_write_bytecode",
+            "ignore_environment",
+            "isolated",
+            "no_site",
+            "no_user_site",
+            "safe_path"
+          ],
+          "properties": {
+            "dont_write_bytecode": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ignore_environment": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "isolated": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "no_site": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "no_user_site": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "safe_path": {
+              "type": "boolean"
+            }
+          }
+        },
+        "process_environment": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "accelerator": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thread_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "interop_thread_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cuda_runtime": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cuda_driver": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cublas_workspace_config": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "deterministic_algorithms": {
           "type": "boolean"
+        },
+        "runtime_seal_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runtime_seal_descriptor_custody": {
+          "const": true
+        },
+        "producer_bootstrap_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bootstrap_descriptor_custody": {
+          "const": true
+        },
+        "package_roots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/rootInventory"
+          }
+        },
+        "package_ownership": {
+          "$ref": "#/$defs/packageOwnership"
+        },
+        "standard_library": {
+          "$ref": "#/$defs/rootInventory"
         },
         "launcher_process_id": {
           "type": "integer",
@@ -267,6 +407,81 @@
     "sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "rootInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "semantics_id",
+        "file_count",
+        "directory_count",
+        "total_bytes",
+        "inventory_sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semantics_id": {
+          "enum": [
+            "prospect.wm001.package-root.v2",
+            "prospect.wm001.standard-library.v2"
+          ]
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "directory_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "inventory_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "packageOwnership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantics_id",
+        "root",
+        "file_count",
+        "directory_count",
+        "shared_file_count",
+        "identity_sha256"
+      ],
+      "properties": {
+        "semantics_id": {
+          "const": "prospect.wm001.package-ownership.v1"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "directory_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "shared_file_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
     },
     "physicalObservation": {
       "type": "array",
@@ -1180,7 +1395,8 @@
         "action_max_abs_difference",
         "episode_return_max_abs_difference",
         "live_evaluation",
-        "restored_evaluation"
+        "restored_evaluation",
+        "restore_runtime"
       ],
       "properties": {
         "checkpoint_manifest_sha256": {
@@ -1225,6 +1441,94 @@
         },
         "restored_evaluation": {
           "$ref": "#/$defs/fileRef"
+        },
+        "restore_runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "python_executable",
+            "python_executable_sha256",
+            "python_version",
+            "python_flags",
+            "process_environment",
+            "package_root",
+            "package_root_inventory",
+            "package_ownership",
+            "standard_library",
+            "runtime_seal_sha256",
+            "runtime_seal_descriptor_custody",
+            "bootstrap_source_sha256",
+            "bootstrap_descriptor_custody",
+            "deterministic_algorithms",
+            "bytes",
+            "sha256",
+            "filename"
+          ],
+          "properties": {
+            "schema": {
+              "const": "prospect.wm001.restart-runtime.v2"
+            },
+            "python_executable": {
+              "type": "string",
+              "minLength": 1
+            },
+            "python_executable_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "python_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "python_flags": {
+              "type": "object"
+            },
+            "process_environment": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "package_root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "package_root_inventory": {
+              "$ref": "#/$defs/rootInventory"
+            },
+            "package_ownership": {
+              "$ref": "#/$defs/packageOwnership"
+            },
+            "standard_library": {
+              "$ref": "#/$defs/rootInventory"
+            },
+            "runtime_seal_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "runtime_seal_descriptor_custody": {
+              "const": true
+            },
+            "bootstrap_source_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "bootstrap_descriptor_custody": {
+              "const": true
+            },
+            "deterministic_algorithms": {
+              "const": true
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "filename": {
+              "type": "string",
+              "pattern": "^[^/\\\\]+-restore-runtime\\.json$"
+            }
+          }
         }
       }
     },

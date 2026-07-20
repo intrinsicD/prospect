@@ -22,7 +22,11 @@ runtime = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/prospect"]
+packages = ["src/prospect", "bench"]
+exclude = [
+    "bench/**/__pycache__/**",
+    "bench/world_model_lifecycle/results/**",
+]
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]

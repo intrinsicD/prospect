@@ -5,18 +5,79 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 
+def _repository_root() -> Path:
+    completed = subprocess.run(
+        ("git", "rev-parse", "--show-toplevel"),
+        cwd=Path.cwd(),
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("WM-001 runner requires an explicit Git worktree")
+    candidate = Path(completed.stdout.strip())
+    if (
+        not candidate.is_absolute()
+        or candidate.resolve(strict=True) != candidate
+        or not (candidate / ".git").exists()
+        or not (
+            candidate
+            / "bench"
+            / "world_model_lifecycle"
+            / "protocol.json"
+        ).is_file()
+    ):
+        raise RuntimeError("WM-001 runner Git worktree is absent or aliased")
+    return candidate
+
+
+REPO = _repository_root()
+DEVELOPMENT_RESULTS_ROOT = (
+    REPO / "bench" / "world_model_lifecycle" / "results" / "development"
+)
+DEVELOPMENT_QUALIFICATION_PATH = (
+    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.5.0"
+)
+
+
 def _ensure_deterministic_cuda_environment() -> None:
-    if os.environ.get("CUBLAS_WORKSPACE_CONFIG") == ":4096:8":
-        return
-    environment = dict(os.environ)
-    environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    os.execve(sys.executable, [sys.executable, "-m", "bench.world_model_lifecycle.run", *sys.argv[1:]], environment)
+    if os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
+        raise RuntimeError("WM-001 requires CUBLAS_WORKSPACE_CONFIG=:4096:8 before Python starts")
+
+
+def _development_output(
+    supplied_output: Path | None,
+    *,
+    seed_override: bool,
+    diagnostic_stamp: str,
+) -> Path:
+    if not seed_override:
+        if (
+            supplied_output is not None
+            and supplied_output != DEVELOPMENT_QUALIFICATION_PATH
+        ):
+            raise ValueError(
+                "the complete no-override development run requires the sole "
+                f"qualification path {DEVELOPMENT_QUALIFICATION_PATH}"
+            )
+        return DEVELOPMENT_QUALIFICATION_PATH
+    if supplied_output == DEVELOPMENT_QUALIFICATION_PATH:
+        raise ValueError(
+            "a seed-override diagnostic cannot occupy the canonical "
+            "development qualification path"
+        )
+    return supplied_output or (
+        DEVELOPMENT_RESULTS_ROOT / f"diagnostic-{diagnostic_stamp}"
+    )
 
 
 def main() -> int:
@@ -24,13 +85,23 @@ def main() -> int:
     import torch
 
     from .artifact import (
+        FORMAL_RESULTS_ROOT,
+        MANIFEST_NAME,
         ProducerAttempt,
-        claim_formal_launch,
-        copy_file_exclusive,
+        _verify_producer_manifest_precommit,
         formal_launch_marker_path,
     )
-    from .binding import verify_live_binding
-    from .experiment import ExperimentConfig, run_experiment
+    from .binding import DEVELOPMENT_CLOSURE_PATH
+    from .experiment import (
+        ExperimentConfig,
+        _verify_live_bootstrap_custody,
+        run_experiment,
+    )
+    from .operator import (
+        FORMAL_BINDING_ATTEMPT_PATH,
+        verify_operator_attempt,
+    )
+    from .producer_bootstrap import register_outer_terminal
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("lane", choices=("development", "formal"))
@@ -50,35 +121,67 @@ def main() -> int:
             parser.error("formal lane cannot override the eight sealed master seeds")
         if arguments.binding is None:
             parser.error("formal lane requires --binding")
+        expected_binding = FORMAL_BINDING_ATTEMPT_PATH / "formal-binding.json"
+        if (
+            not arguments.binding.is_absolute()
+            or Path(os.path.abspath(arguments.binding)) != arguments.binding
+            or arguments.binding.resolve(strict=False) != arguments.binding
+            or arguments.binding != expected_binding
+        ):
+            parser.error(f"formal lane requires the canonical accepted binding-attempt file {expected_binding}")
+        binding_attempt = verify_operator_attempt(FORMAL_BINDING_ATTEMPT_PATH)
+        binding_primary = binding_attempt.get("primary")
+        if (
+            binding_attempt.get("kind") != "binding"
+            or binding_attempt.get("lane") is not None
+            or binding_attempt.get("status") != "accepted"
+            or not isinstance(binding_primary, dict)
+            or binding_primary.get("binding_file") != "formal-binding.json"
+        ):
+            parser.error("formal lane requires one accepted outer-finalized binding attempt")
         config = ExperimentConfig.formal(device=arguments.device)
         binding_digest = hashlib.sha256(arguments.binding.read_bytes()).hexdigest()
         output = arguments.output or (
-            Path(__file__).resolve().parent
-            / "results"
-            / "formal"
-            / binding_digest
-            / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}-{os.getpid()}"
+            FORMAL_RESULTS_ROOT / binding_digest / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}-{os.getpid()}"
         )
         existing_launch_marker, _ = formal_launch_marker_path(
             arguments.binding,
             output,
         )
-        if existing_launch_marker.exists():
+        if os.path.lexists(existing_launch_marker):
             print(
-                "WM-001 protocol 1.4 formal launch already consumed; "
-                "same-version retry is forbidden",
+                "WM-001 protocol 1.5 formal launch already consumed; same-version retry is forbidden",
                 file=sys.stderr,
             )
             return 1
     else:
+        if os.path.lexists(DEVELOPMENT_CLOSURE_PATH):
+            print(
+                "WM-001 protocol 1.5 development is closed; additional same-version rehearsals are forbidden",
+                file=sys.stderr,
+            )
+            return 1
         seeds = arguments.master_seed or None
-        config = ExperimentConfig.development(
-            master_seeds=(seeds if seeds is not None else (2439054559, 3246851043)),
-            device=arguments.device,
+        config = (
+            ExperimentConfig.development(device=arguments.device)
+            if seeds is None
+            else ExperimentConfig.development(
+                master_seeds=seeds,
+                device=arguments.device,
+            )
         )
         stamp = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}-{os.getpid()}"
-        output = arguments.output or (Path(__file__).resolve().parent / "results" / "development" / stamp)
+        try:
+            output = _development_output(
+                arguments.output,
+                seed_override=seeds is not None,
+                diagnostic_stamp=stamp,
+            )
+        except ValueError as error:
+            parser.error(str(error))
     attempt = ProducerAttempt(output, lane=arguments.lane)
+    config.validate()
+    exit_code = 0
     try:
         with attempt:
             binding_for_run: Path | None = None
@@ -87,31 +190,39 @@ def main() -> int:
                     raise RuntimeError("formal binding path disappeared after argument validation")
                 binding_for_run = attempt.preserve_formal_inputs(arguments.binding)
                 torch.use_deterministic_algorithms(True)
-                verify_live_binding(binding_for_run, device=config.device)
-                print("WM-001 live implementation binding verified", flush=True)
-                launch_marker = claim_formal_launch(
-                    arguments.binding,
-                    attempt.output_directory,
-                )
-                copy_file_exclusive(
-                    launch_marker,
-                    attempt.output_directory / launch_marker.name,
-                )
-                print("WM-001 sole formal launch atomically claimed", flush=True)
+                metadata_path = attempt.output_directory / "attempt-metadata.json"
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                if (
+                    not isinstance(metadata, dict)
+                    or metadata.get("schema") != "prospect.wm001.producer-attempt.v1"
+                    or metadata.get("lane") != "formal"
+                    or (attempt.output_directory / "producer-manifest.json").exists()
+                ):
+                    raise RuntimeError("formal producer directory failed final preclaim custody validation")
             _, result_path = run_experiment(
                 config,
                 output_directory=attempt.output_directory,
                 formal_binding_path=binding_for_run,
                 output_prepared=True,
             )
+            _verify_live_bootstrap_custody()
             print(result_path, flush=True)
     except KeyboardInterrupt:
-        return 130
+        exit_code = 1
     except Exception as error:
         if not (attempt.output_directory / "producer-manifest.json").is_file():
             print(f"WM-001 launch failed before attempt custody: {error}", file=sys.stderr)
-        return 1
-    return 0
+        exit_code = 1
+    terminal = attempt.output_directory / MANIFEST_NAME
+    if terminal.is_file():
+        _verify_producer_manifest_precommit(attempt.output_directory)
+        register_outer_terminal(
+            terminal,
+            logical_exit_code=exit_code,
+        )
+    elif exit_code == 0:
+        raise RuntimeError("successful WM-001 invocation emitted no producer manifest")
+    return exit_code
 
 
 if __name__ == "__main__":

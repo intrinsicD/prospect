@@ -15,33 +15,85 @@ import math
 import platform
 import re
 import struct
+import subprocess
 import sys
 from collections import Counter
 from collections.abc import Mapping
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+
+from bench.world_model_lifecycle.assurance import ASSURANCE, TRUST_MODEL_STATEMENT
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[1]
+
+
+def _repository_root() -> Path:
+    completed = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=Path.cwd(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode == 0:
+        candidate = Path(completed.stdout.strip())
+        if (
+            candidate.is_absolute()
+            and candidate.resolve(strict=True) == candidate
+            and (candidate / ".git").exists()
+            and (candidate / "bench" / "world_model_lifecycle" / "protocol.json").is_file()
+        ):
+            return candidate
+    source_candidate = HERE.parents[1]
+    if (source_candidate / ".git").exists():
+        return source_candidate
+    raise RuntimeError("WM-001 verifier requires a canonical Prospect Git worktree")
+
+
+REPO = _repository_root()
 PROTOCOL_PATH = HERE / "protocol.json"
 SEAL_PATH = HERE / "SEALED_PROTOCOL.sha256"
 RESULT_SCHEMA_PATH = HERE / "schemas" / "raw-result.schema.json"
 BINDING_SCHEMA_PATH = HERE / "schemas" / "formal-binding.schema.json"
 
 FORMAL_SEEDS = (
-    339970590,
-    474769515,
-    550273937,
-    438984650,
-    2732731971,
-    2253809848,
-    2206960337,
-    3506881479,
+    1800791691,
+    1963228177,
+    2416009491,
+    3925214220,
+    1508934628,
+    2118526007,
+    4212585034,
+    530094003,
 )
-DEVELOPMENT_SEEDS = (2439054559, 3246851043)
+DEVELOPMENT_SEEDS = (4085517670, 2227535912)
 COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
+_V100_MASTER_SEEDS = (
+    101,
+    211,
+    104729,
+    130363,
+    155921,
+    181081,
+    206369,
+    232003,
+    257371,
+    283009,
+)
+_V120_MASTER_SEEDS = (
+    1905245264,
+    3477142941,
+    70359369,
+    2936962664,
+    976469083,
+    1434863921,
+    714423665,
+    4202129964,
+    2335380198,
+    854314474,
+)
 _V130_MASTER_SEEDS = (
     17123296,
     3280610186,
@@ -54,6 +106,44 @@ _V130_MASTER_SEEDS = (
     3625750835,
     2671781227,
 )
+_V140_MASTER_SEEDS = (
+    2439054559,
+    3246851043,
+    339970590,
+    474769515,
+    550273937,
+    438984650,
+    2732731971,
+    2253809848,
+    2206960337,
+    3506881479,
+)
+_SCIENTIFIC_BLOCKS = (
+    "claim",
+    "null_hypothesis",
+    "scope",
+    "causal_chain",
+    "environment",
+    "tasks",
+    "splits",
+    "representation_and_model",
+    "experience_and_learning",
+    "budgets",
+    "controls",
+    "metrics",
+    "thresholds",
+    "evaluation_scheduling_rule",
+    "execution_sequence",
+    "killing_order",
+    "sources",
+)
+_V140_SCIENTIFIC_BLOCKS_SHA256 = "fa44fd93a672db3905d45a0e99c568985e7e2e5d02d32043c830db413005a5c3"
+_SCIENTIFIC_KERNEL_SHA256 = {
+    "model.py": "51e61c719dcdd0ebe2f993f16d06eeec03adf6c0fa82b7476356f4b51b3634f1",
+    "learning.py": "ed53fcaac32d77e7ed8d9d1af2a91df66682f590de3d60cb6db198670948eaa4",
+    "planning.py": "5ebbc3083ff2b49dbee287bf7efbeaec488419bfbbde033a064ad23c356b1d51",
+    "runtime_lane.py": "265e65dfd11af62a96d8ea6471f18c664e0e0860febff1a10945642d246b3fdb",
+}
 _V130_BOUNDARY_TARGET_F32_HEX = "ac3cdebd"
 _V130_BOUNDARY_MEANS_F32_HEX = (
     "8cd85cbb",
@@ -335,6 +425,53 @@ def _binding_sibling(path: Path, value: object, field: str) -> Path:
     return path.parent / relative
 
 
+def _bound_evidence_payload(
+    binding_path: Path,
+    block: Mapping[str, object],
+    *,
+    prefix: str,
+) -> tuple[Path, bytes]:
+    evidence_path = _binding_sibling(
+        binding_path,
+        block.get(f"{prefix}_file"),
+        f"audit_execution.{prefix}_file",
+    )
+    _require(
+        evidence_path.is_file() and not evidence_path.is_symlink(),
+        f"bound {prefix} is missing or aliased",
+    )
+    payload = evidence_path.read_bytes()
+    _require(
+        block.get(f"{prefix}_bytes") == len(payload),
+        f"bound {prefix} byte size changed",
+    )
+    _require(
+        block.get(f"{prefix}_sha256") == sha256(payload).hexdigest(),
+        f"bound {prefix} digest changed",
+    )
+    return evidence_path, payload
+
+
+def _canonical_object_payload(payload: bytes, *, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise Violation(f"{label} is not valid JSON") from error
+    _require(isinstance(value, dict), f"{label} is not one JSON object")
+    canonical = (
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        + b"\n"
+    )
+    _require(payload == canonical, f"{label} is not canonical JSON followed by LF")
+    return value
+
+
 def _require_sha256(value: object, field: str) -> str:
     _require(isinstance(value, str) and SHA256_PATTERN.fullmatch(value) is not None, f"{field} is not SHA-256")
     return value
@@ -529,18 +666,18 @@ def _verify_coverage_conformance_report(report: object) -> None:
 
 
 def derive_seed(namespace: str, master_seed: int, index: int) -> int:
-    """Derive the exact protocol-1.4.0 uint32 seed."""
+    """Derive the exact protocol-1.5.0 uint32 seed."""
 
-    payload = f"WM-001|1.4.0|{namespace}|{master_seed}|{index}".encode()
+    payload = f"WM-001|1.5.0|{namespace}|{master_seed}|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
 def derive_master_seed(lane: str, index: int) -> int:
-    """Derive one protocol-1.4.0 lane master from its prospective index."""
+    """Derive one protocol-1.5.0 lane master from its prospective index."""
 
     if lane not in {"development", "formal"} or index < 0:
         raise ValueError("invalid WM-001 master-seed lane or index")
-    payload = f"WM-001|1.4.0|{lane}-master|{index}".encode()
+    payload = f"WM-001|1.5.0|{lane}-master|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
@@ -618,12 +755,37 @@ def verify_protocol() -> dict[str, Any]:
         _require(_file_sha256(path) == seals[relative], f"{relative} bytes do not match SEALED_PROTOCOL.sha256")
 
     experiment = protocol.get("experiment", {})
-    _require(protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v4", "wrong protocol schema")
+    trust_model = protocol.get("trust_model", {})
+    _require(protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v5", "wrong protocol schema")
+    _require(
+        trust_model
+        == {
+            "id": ASSURANCE["trust_model_id"],
+            "tamper_resistant": ASSURANCE["tamper_resistant"],
+            "external_attestation": ASSURANCE["external_attestation"],
+            "exclusive_path_use_required": ASSURANCE["exclusive_path_use_required"],
+            "statement": TRUST_MODEL_STATEMENT,
+        },
+        "protocol trust model is missing or overstated",
+    )
     _require(experiment.get("id") == "WM-001", "wrong experiment ID")
-    _require(experiment.get("protocol_version") == "1.4.0", "wrong protocol version")
+    _require(experiment.get("protocol_version") == "1.5.0", "wrong protocol version")
     _require(experiment.get("status") == "sealed_before_formal_outcomes", "protocol is not marked sealed")
     _require(experiment.get("thresholds_sealed_before_outcomes") is True, "experiment thresholds are not sealed")
     _require(protocol.get("thresholds", {}).get("sealed_before_outcomes") is True, "threshold block is not sealed")
+    scientific_continuity = experiment.get("revision", {}).get("scientific_continuity", {})
+    scientific_payload = {name: protocol.get(name) for name in _SCIENTIFIC_BLOCKS}
+    _require(
+        tuple(scientific_continuity.get("unchanged_top_level_blocks", ())) == _SCIENTIFIC_BLOCKS
+        and scientific_continuity.get("v1_4_scientific_blocks_sha256") == _V140_SCIENTIFIC_BLOCKS_SHA256
+        and _canonical_sha256(scientific_payload) == _V140_SCIENTIFIC_BLOCKS_SHA256,
+        "v1.5 scientific blocks differ from the sealed v1.4 system",
+    )
+    _require(
+        scientific_continuity.get("kernel_source_sha256") == _SCIENTIFIC_KERNEL_SHA256
+        and all(_file_sha256(HERE / name) == digest for name, digest in _SCIENTIFIC_KERNEL_SHA256.items()),
+        "v1.5 scientific kernel source differs from the sealed v1.4 system",
+    )
 
     _require(protocol.get("splits", {}).get("unit") == "whole_episode", "splits are not whole-episode")
     formal_splits = protocol.get("splits", {}).get("formal", {})
@@ -653,8 +815,8 @@ def verify_protocol() -> dict[str, Any]:
 
     seed_schedule = protocol.get("seed_schedule", {})
     _require(
-        seed_schedule.get("derivation_domain_version") == "1.4.0",
-        "seed derivation domain differs from protocol 1.4.0",
+        seed_schedule.get("derivation_domain_version") == "1.5.0",
+        "seed derivation domain differs from protocol 1.5.0",
     )
     formal_seeds = tuple(seed_schedule.get("formal_replicate_master_seeds", ()))
     development_seeds = tuple(seed_schedule.get("development_replicate_master_seeds", ()))
@@ -670,7 +832,7 @@ def verify_protocol() -> dict[str, Any]:
     }
     _require(
         actual_seed_counts == EXPECTED_SEED_COUNTS,
-        "seed namespace/count schedule differs from protocol 1.4.0",
+        "seed namespace/count schedule differs from protocol 1.5.0",
     )
     master_derivation = seed_schedule.get("master_seed_derivation", {})
     _require(
@@ -687,22 +849,33 @@ def verify_protocol() -> dict[str, Any]:
         and FORMAL_SEEDS == tuple(derive_master_seed("formal", index) for index in range(8)),
         "master seeds do not match their prospective SHA-256 derivation",
     )
-    current_streams = {
+    current_masters = set((*DEVELOPMENT_SEEDS, *FORMAL_SEEDS))
+    current_stream_values = [
         derive_seed(namespace, master_seed, index)
         for master_seed in (*DEVELOPMENT_SEEDS, *FORMAL_SEEDS)
         for namespace, count in EXPECTED_SEED_COUNTS.items()
         for index in range(count)
-    }
-    old_streams = {
+    ]
+    current_streams = set(current_stream_values)
+    prior_domains = (
+        ("1.0.0", _V100_MASTER_SEEDS),
+        ("1.2.0", _V120_MASTER_SEEDS),
+        ("1.3.0", _V130_MASTER_SEEDS),
+        ("1.4.0", _V140_MASTER_SEEDS),
+    )
+    prior_masters = {master_seed for _, version_masters in prior_domains for master_seed in version_masters}
+    prior_stream_values = [
         int.from_bytes(
-            sha256(f"WM-001|1.3.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            sha256(f"WM-001|{version}|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
             signed=False,
         )
-        for master_seed in _V130_MASTER_SEEDS
+        for version, version_masters in prior_domains
+        for master_seed in version_masters
         for namespace, count in EXPECTED_SEED_COUNTS.items()
         for index in range(count)
-    }
+    ]
+    prior_streams = set(prior_stream_values)
     collision_audit = master_derivation.get("collision_audit", {})
     _require(
         isinstance(collision_audit, dict)
@@ -710,10 +883,19 @@ def verify_protocol() -> dict[str, Any]:
         and collision_audit.get("current_derived_stream_count") == 1360
         and collision_audit.get("unique_current_derived_stream_count") == len(current_streams) == 1360
         and collision_audit.get("current_internal_collision_count") == 0
-        and collision_audit.get("master_overlap_with_v1_3_count") == 0
-        and collision_audit.get("derived_stream_overlap_with_v1_3_count") == 0
-        and set((*DEVELOPMENT_SEEDS, *FORMAL_SEEDS)).isdisjoint(_V130_MASTER_SEEDS)
-        and current_streams.isdisjoint(old_streams),
+        and collision_audit.get("current_master_stream_overlap_count") == 0
+        and current_masters.isdisjoint(current_streams)
+        and collision_audit.get("prior_master_seed_count") == len(prior_masters) == 40
+        and collision_audit.get("unique_prior_derived_stream_count") == len(prior_streams) == 5440
+        and len(prior_stream_values) == 5440
+        and collision_audit.get("current_prior_master_master_overlap_count") == 0
+        and collision_audit.get("current_prior_stream_stream_overlap_count") == 0
+        and collision_audit.get("current_master_prior_stream_overlap_count") == 0
+        and collision_audit.get("prior_master_current_stream_overlap_count") == 0
+        and current_masters.isdisjoint(prior_masters)
+        and current_streams.isdisjoint(prior_streams)
+        and current_masters.isdisjoint(prior_streams)
+        and prior_masters.isdisjoint(current_streams),
         "master or derived seed collision audit failed",
     )
 
@@ -809,7 +991,7 @@ def verify_protocol() -> dict[str, Any]:
     )
     _require(
         tuple(formal_lane.get("master_seeds", ())) == FORMAL_SEEDS
-        and "sole permitted producer attempt" in str(formal_lane.get("launch_rule"))
+        and "sole permitted formal attempt" in str(formal_lane.get("launch_rule"))
         and "no same-version formal rerun" in str(formal_lane.get("launch_rule")),
         "single-attempt formal governance changed",
     )
@@ -824,11 +1006,11 @@ def verify_protocol() -> dict[str, Any]:
         "coverage arithmetic binding contract is incomplete",
     )
     _require(
-        result_schema.get("$id") == "https://prospect.local/schemas/wm-001-raw-result-v4.json",
+        result_schema.get("$id") == "https://prospect.local/schemas/wm-001-raw-result-v5.json",
         "wrong raw-result schema",
     )
     _require(
-        binding_schema.get("$id") == "https://prospect.local/schemas/wm-001-formal-binding-v4.json",
+        binding_schema.get("$id") == "https://prospect.local/schemas/wm-001-formal-binding-v5.json",
         "wrong formal-binding schema",
     )
     return protocol
@@ -840,12 +1022,16 @@ def verify_binding(path: Path) -> dict[str, Any]:
     protocol = verify_protocol()
     binding = _load_json(path)
     _validate_json_schema(binding, _load_json(BINDING_SCHEMA_PATH), label="formal binding")
-    _require(binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v4", "wrong binding schema")
+    _require(binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v5", "wrong binding schema")
     _require(binding.get("experiment_id") == "WM-001", "binding has wrong experiment")
+    _require(
+        binding.get("assurance") == ASSURANCE,
+        "binding assurance boundary is missing or overstated",
+    )
     _parse_timestamp(binding.get("sealed_at_utc"), "sealed_at_utc")
 
     bound_protocol = binding.get("protocol", {})
-    _require(bound_protocol.get("version") == "1.4.0", "binding has wrong protocol version")
+    _require(bound_protocol.get("version") == "1.5.0", "binding has wrong protocol version")
     _require(bound_protocol.get("sha256") == _file_sha256(PROTOCOL_PATH), "binding has wrong protocol digest")
     _require(
         bound_protocol.get("raw_result_schema_sha256") == _file_sha256(RESULT_SCHEMA_PATH),
@@ -885,6 +1071,26 @@ def verify_binding(path: Path) -> dict[str, Any]:
         _require(entry.get("bytes") == actual.stat().st_size, f"bound byte size changed: {relative}")
         _require(entry.get("sha256") == _file_sha256(actual), f"bound file digest changed: {relative}")
     _verify_implementation_manifest(bound_implementation_files)
+    execution_source_sha256 = source.get("execution_source_sha256")
+    expected_execution_sources = {
+        filename: _file_sha256(HERE / filename)
+        for filename in (
+            "audit_runner.py",
+            "artifact_audit.py",
+            "adjudication.py",
+            "binding.py",
+            "launch_bootstrap.py",
+            "operator.py",
+            "preformal.py",
+            "producer_bootstrap.py",
+            "run.py",
+            "verify.py",
+        )
+    }
+    _require(
+        execution_source_sha256 == expected_execution_sources,
+        "binding execution-source identities differ from the exact live sources",
+    )
     test_report_path = _binding_sibling(
         path,
         source.get("test_report_file"),
@@ -899,6 +1105,13 @@ def verify_binding(path: Path) -> dict[str, Any]:
         source.get("test_report_sha256") == _file_sha256(test_report_path),
         "bound test report digest changed",
     )
+    from .binding import preformal_log_rows, verify_machine_test_report
+
+    test_report = verify_machine_test_report(test_report_path)
+    _require(
+        source.get("test_log_files") == preformal_log_rows(test_report_path, test_report),
+        "bound preformal command-log custody differs from report v2",
+    )
 
     dependencies = binding.get("dependencies", {})
     lockfile = dependencies.get("lockfile")
@@ -906,17 +1119,139 @@ def verify_binding(path: Path) -> dict[str, Any]:
     lock_path = REPO / lockfile
     _require(lock_path.is_file(), "bound dependency lockfile is missing")
     _require(dependencies.get("lockfile_sha256") == _file_sha256(lock_path), "dependency lockfile digest changed")
+    python_executable = dependencies.get("python_executable")
+    _require(
+        isinstance(python_executable, str)
+        and Path(python_executable).is_absolute()
+        and Path(python_executable).is_file()
+        and dependencies.get("python_executable_sha256") == _file_sha256(Path(python_executable)),
+        "bound CPython executable is missing or differs",
+    )
+    standard_library = dependencies.get("standard_library")
+    _require(
+        isinstance(standard_library, dict)
+        and standard_library.get("semantics_id") == "prospect.wm001.standard-library.v2"
+        and isinstance(standard_library.get("path"), str)
+        and Path(standard_library["path"]).is_absolute()
+        and isinstance(standard_library.get("file_count"), int)
+        and standard_library["file_count"] > 0
+        and isinstance(standard_library.get("directory_count"), int)
+        and standard_library["directory_count"] >= 0
+        and isinstance(standard_library.get("total_bytes"), int)
+        and standard_library["total_bytes"] > 0,
+        "binding standard-library inventory is malformed",
+    )
+    _require_sha256(
+        standard_library.get("inventory_sha256"),
+        "dependencies.standard_library.inventory_sha256",
+    )
+    package_roots = dependencies.get("package_roots")
+    _require(
+        isinstance(package_roots, list) and package_roots,
+        "binding package-root inventory is missing",
+    )
+    root_paths: list[str] = []
+    for index, root in enumerate(package_roots):
+        _require(isinstance(root, dict), f"package_roots[{index}] is malformed")
+        root_path = root.get("path")
+        _require(
+            isinstance(root_path, str)
+            and root.get("semantics_id") == "prospect.wm001.package-root.v2"
+            and Path(root_path).is_absolute()
+            and isinstance(root.get("file_count"), int)
+            and root["file_count"] > 0
+            and isinstance(root.get("directory_count"), int)
+            and root["directory_count"] >= 0
+            and isinstance(root.get("total_bytes"), int)
+            and root["total_bytes"] > 0,
+            f"package_roots[{index}] identity is malformed",
+        )
+        _require_sha256(root.get("inventory_sha256"), f"package_roots[{index}].inventory_sha256")
+        root_paths.append(root_path)
+    _require(root_paths == sorted(set(root_paths)), "binding package roots are duplicated or unordered")
+    ownership = dependencies.get("package_ownership")
+    _require(
+        isinstance(ownership, dict)
+        and set(ownership)
+        == {
+            "semantics_id",
+            "root",
+            "file_count",
+            "directory_count",
+            "shared_file_count",
+            "identity_sha256",
+        }
+        and ownership.get("semantics_id") == "prospect.wm001.package-ownership.v1"
+        and len(root_paths) == 1
+        and ownership.get("root") == root_paths[0]
+        and ownership.get("file_count") == package_roots[0].get("file_count")
+        and ownership.get("directory_count") == package_roots[0].get("directory_count")
+        and isinstance(ownership.get("shared_file_count"), int)
+        and ownership["shared_file_count"] >= 0,
+        "binding package-root ownership identity is malformed",
+    )
+    _require_sha256(
+        ownership.get("identity_sha256"),
+        "dependencies.package_ownership.identity_sha256",
+    )
     packages = dependencies.get("packages")
     _require(isinstance(packages, list), "binding packages must be an array")
     package_names = {entry.get("name") for entry in packages if isinstance(entry, dict)}
     _require(REQUIRED_PACKAGES <= package_names, "binding is missing a required root package identity")
     _require(len(package_names) == len(packages), "binding package identities are duplicated")
     for package in packages:
+        _require(
+            isinstance(package.get("name"), str) and package["name"] == re.sub(r"[-_.]+", "-", package["name"]).lower(),
+            "package name is not PEP-503 canonical",
+        )
         _require(isinstance(package.get("version"), str) and package["version"], "package version is missing")
         _require_sha256(package.get("distribution_sha256"), f"{package.get('name')} distribution_sha256")
+        _require(
+            isinstance(package.get("declared_file_count"), int)
+            and package["declared_file_count"] > 0
+            and package.get("editable") is False,
+            f"{package.get('name')} package file count or editable status is invalid",
+        )
 
     runtime = binding.get("runtime", {})
     _require(runtime.get("deterministic_algorithms") is True, "formal runtime must enable deterministic algorithms")
+    _require(
+        runtime.get("python_flags")
+        == {
+            "dont_write_bytecode": 1,
+            "ignore_environment": 1,
+            "isolated": 1,
+            "no_site": 1,
+            "no_user_site": 1,
+            "safe_path": True,
+        },
+        "formal producer runtime does not bind exact CPython -I -S -B flags",
+    )
+    process_environment = runtime.get("process_environment")
+    _require(
+        isinstance(process_environment, dict)
+        and process_environment.get("CUBLAS_WORKSPACE_CONFIG") == ":4096:8"
+        and process_environment.get("LC_ALL") == "C.UTF-8"
+        and process_environment.get("PATH") == "/usr/bin:/bin"
+        and process_environment.get("TZ") == "UTC"
+        and set(process_environment)
+        <= {
+            "CUBLAS_WORKSPACE_CONFIG",
+            "CUDA_VISIBLE_DEVICES",
+            "HIP_VISIBLE_DEVICES",
+            "LC_ALL",
+            "MKL_NUM_THREADS",
+            "NVIDIA_DRIVER_CAPABILITIES",
+            "NVIDIA_VISIBLE_DEVICES",
+            "NUMEXPR_NUM_THREADS",
+            "OMP_NUM_THREADS",
+            "OPENBLAS_NUM_THREADS",
+            "PATH",
+            "ROCR_VISIBLE_DEVICES",
+            "TZ",
+        },
+        "formal producer process environment is not the exact safe contract",
+    )
     if runtime.get("device") == "cuda":
         _require(
             runtime.get("cublas_workspace_config") == ":4096:8",
@@ -927,6 +1262,226 @@ def verify_binding(path: Path) -> dict[str, Any]:
             runtime.get("cublas_workspace_config") is None,
             "non-CUDA formal runtime must not bind a cuBLAS workspace",
         )
+
+    audit_execution = binding.get("audit_execution")
+    _require(
+        isinstance(audit_execution, dict),
+        "binding audit_execution block is missing",
+    )
+    _require(
+        audit_execution.get("runner_source_sha256") == expected_execution_sources["audit_runner.py"]
+        and audit_execution.get("auditor_source_sha256") == expected_execution_sources["artifact_audit.py"]
+        and audit_execution.get("adjudicator_source_sha256") == expected_execution_sources["adjudication.py"],
+        "bound audit runner, auditor, or adjudicator source identity changed",
+    )
+    _, bootstrap_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="bootstrap_source",
+    )
+    from .audit_runner import bootstrap_source_bytes
+
+    _require(
+        bootstrap_payload == bootstrap_source_bytes(),
+        "bound audit bootstrap bytes differ from the executable bootstrap",
+    )
+    _, request_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="prebinding_request",
+    )
+    _, path_runtime_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="prebinding_path_runtime_manifest",
+    )
+    _, descriptor_runtime_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="prebinding_descriptor_runtime_manifest",
+    )
+    _, path_invocation_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="prebinding_path_invocation_manifest",
+    )
+    _, descriptor_invocation_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="prebinding_descriptor_invocation_manifest",
+    )
+    _, conformance_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="prebinding_conformance_report",
+    )
+    _, execution_receipt_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="prebinding_execution_receipt",
+    )
+    _, outcome_runtime_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="outcome_runtime_manifest",
+    )
+    request_value = _canonical_object_payload(
+        request_payload,
+        label="prebinding request",
+    )
+    path_runtime_value = _canonical_object_payload(
+        path_runtime_payload,
+        label="prebinding path runtime manifest",
+    )
+    descriptor_runtime_value = _canonical_object_payload(
+        descriptor_runtime_payload,
+        label="prebinding descriptor runtime manifest",
+    )
+    path_invocation_value = _canonical_object_payload(
+        path_invocation_payload,
+        label="prebinding path invocation manifest",
+    )
+    descriptor_invocation_value = _canonical_object_payload(
+        descriptor_invocation_payload,
+        label="prebinding descriptor invocation manifest",
+    )
+    conformance_value = _canonical_object_payload(
+        conformance_payload,
+        label="prebinding conformance report",
+    )
+    execution_receipt_value = _canonical_object_payload(
+        execution_receipt_payload,
+        label="prebinding execution receipt",
+    )
+    outcome_runtime_value = _canonical_object_payload(
+        outcome_runtime_payload,
+        label="outcome audit runtime manifest",
+    )
+    _require(
+        request_value.get("schema") == "prospect.wm001.prebinding-conformance-request.v1"
+        and conformance_value.get("schema") == "prospect.wm001.prebinding-conformance.v1"
+        and conformance_value.get("passed") is True
+        and conformance_value.get("request_sha256") == audit_execution.get("prebinding_request_identity_sha256"),
+        "bound prebinding request or conformance report identity is invalid",
+    )
+    normalized_path_runtime = json.loads(json.dumps(path_runtime_value))
+    normalized_descriptor_runtime = json.loads(json.dumps(descriptor_runtime_value))
+    normalized_path_runtime["source"]["mode"] = "normalized"
+    normalized_descriptor_runtime["source"]["mode"] = "normalized"
+    _require(
+        path_runtime_value.get("source", {}).get("mode") == "path"
+        and descriptor_runtime_value.get("source", {}).get("mode") == "descriptor"
+        and normalized_path_runtime == normalized_descriptor_runtime,
+        "prebinding path and descriptor runtime identities differ beyond source mode",
+    )
+    repeat_count = audit_execution.get("repeat_count")
+    receipt_rows = execution_receipt_value.get("executions")
+    expected_modes = ["path"] * repeat_count + ["descriptor"] * repeat_count if isinstance(repeat_count, int) else []
+    stderr_identity = (
+        receipt_rows[0].get("stderr")
+        if isinstance(receipt_rows, list) and receipt_rows and isinstance(receipt_rows[0], dict)
+        else None
+    )
+    valid_stderr_identity = (
+        isinstance(stderr_identity, dict)
+        and set(stderr_identity) == {"bytes", "sha256"}
+        and type(stderr_identity.get("bytes")) is int
+        and 0 <= cast(int, stderr_identity.get("bytes")) <= (16 << 20)
+        and isinstance(stderr_identity.get("sha256"), str)
+        and SHA256_PATTERN.fullmatch(cast(str, stderr_identity.get("sha256"))) is not None
+        and (cast(int, stderr_identity.get("bytes")) != 0 or stderr_identity.get("sha256") == sha256(b"").hexdigest())
+    )
+    _require(
+        execution_receipt_value.get("schema") == "prospect.wm001.audit-conformance-receipt.v1"
+        and execution_receipt_value.get("repeat_count") == repeat_count
+        and execution_receipt_value.get("execution_count") == len(expected_modes)
+        and execution_receipt_value.get("report_sha256")
+        == _file_sha256(path.parent / str(audit_execution["prebinding_conformance_report_file"]))
+        and execution_receipt_value.get("path_descriptor_byte_identical") is True
+        and execution_receipt_value.get("execution_conformance_passed") is True
+        and isinstance(receipt_rows, list)
+        and len(receipt_rows) == len(expected_modes)
+        and valid_stderr_identity
+        and all(
+            isinstance(row, dict)
+            and set(row)
+            == {
+                "ordinal",
+                "source_mode",
+                "returncode",
+                "stdout",
+                "stderr",
+                "runtime_manifest",
+                "invocation_manifest",
+                "bootstrap_sha256",
+                "auditor_source_sha256",
+                "support_files",
+                "auditor_report_passed",
+            }
+            and row.get("ordinal") == ordinal
+            and row.get("source_mode") == mode
+            and row.get("returncode") == 0
+            and row.get("auditor_report_passed") is True
+            and row.get("stdout")
+            == {
+                "bytes": len(conformance_payload),
+                "sha256": _file_sha256(path.parent / str(audit_execution["prebinding_conformance_report_file"])),
+            }
+            and row.get("stderr") == stderr_identity
+            and row.get("runtime_manifest")
+            == {
+                "bytes": len(path_runtime_payload if mode == "path" else descriptor_runtime_payload),
+                "sha256": sha256(path_runtime_payload if mode == "path" else descriptor_runtime_payload).hexdigest(),
+            }
+            and row.get("invocation_manifest")
+            == {
+                "bytes": len(path_invocation_payload if mode == "path" else descriptor_invocation_payload),
+                "sha256": sha256(
+                    path_invocation_payload if mode == "path" else descriptor_invocation_payload
+                ).hexdigest(),
+            }
+            and row.get("bootstrap_sha256") == audit_execution.get("bootstrap_source_sha256")
+            and row.get("auditor_source_sha256") == audit_execution.get("auditor_source_sha256")
+            and row.get("support_files") == path_runtime_value.get("support_files")
+            for ordinal, (row, mode) in enumerate(
+                zip(receipt_rows, expected_modes, strict=True),
+                start=1,
+            )
+        ),
+        "bound prebinding receipt does not preserve every execution identity",
+    )
+    _require(
+        path_invocation_value.get("runtime_manifest_sha256") == sha256(path_runtime_payload).hexdigest()
+        and descriptor_invocation_value.get("runtime_manifest_sha256")
+        == sha256(descriptor_runtime_payload).hexdigest(),
+        "prebinding invocation manifests identify different runtime manifests",
+    )
+    expected_audit_environment = {key: value for key, value in process_environment.items() if key != "PATH"}
+    expected_outcome_support = [
+        "protocol.json",
+        "schemas/raw-result.schema.json",
+    ]
+    outcome_support_rows = outcome_runtime_value.get("support_files")
+    _require(
+        outcome_runtime_value.get("schema") == "prospect.wm001.audit-runtime-manifest.v1"
+        and outcome_runtime_value.get("source", {}).get("mode") == "descriptor"
+        and outcome_runtime_value.get("closure_import_roots") == package_roots
+        and outcome_runtime_value.get("standard_library") == standard_library
+        and outcome_runtime_value.get("environment") == expected_audit_environment
+        and isinstance(outcome_support_rows, list)
+        and [row.get("path") if isinstance(row, dict) else None for row in outcome_support_rows]
+        == expected_outcome_support
+        and audit_execution.get("outcome_source_mode") == "descriptor"
+        and audit_execution.get("outcome_support_files") == expected_outcome_support
+        and audit_execution.get("outcome_argv_role") == ["<canonical-producer-root>"]
+        and audit_execution.get("outcome_working_directory") == str(REPO)
+        and audit_execution.get("interpreter_flags") == ["-I", "-S", "-B"]
+        and isinstance(audit_execution.get("repeat_count"), int)
+        and audit_execution["repeat_count"] >= 3
+        and audit_execution.get("path_descriptor_equal") is True
+        and audit_execution.get("passed") is True,
+        "bound outcome-audit execution role differs from the exact contract",
+    )
     environment = binding.get("environment", {})
     _require(environment.get("id") == "Pendulum-v1", "binding has wrong environment")
     for field in ("wrapper_source_sha256", "installed_distribution_sha256", "conformance_report_sha256"):
@@ -1054,6 +1609,44 @@ def verify_binding(path: Path) -> dict[str, Any]:
         "bound coverage conformance report is not canonical JSON",
     )
 
+    development = binding.get("development_qualification", {})
+    development_closure_path = _binding_sibling(
+        path,
+        development.get("closure_file"),
+        "development_qualification.closure_file",
+    )
+    _require(
+        development_closure_path.is_file()
+        and development.get("closure_bytes") == development_closure_path.stat().st_size
+        and development.get("closure_sha256") == _file_sha256(development_closure_path),
+        "bound development closure bytes changed",
+    )
+    from .binding import (
+        _formal_development_identity,
+        verify_development_closure,
+    )
+
+    development_closure = verify_development_closure(development_closure_path)
+    expected_development = _formal_development_identity(
+        development_closure,
+        closure_filename=development_closure_path.name,
+        closure_bytes=development_closure_path.stat().st_size,
+        closure_sha256=_file_sha256(development_closure_path),
+    )
+    _require(
+        development == expected_development
+        and development.get("git_commit")
+        == source.get("git_commit")
+        == cast(dict[str, object], development_closure["source"]).get("git_commit")
+        and development.get("git_tree")
+        == source.get("git_tree")
+        == cast(dict[str, object], development_closure["source"]).get("git_tree")
+        and development.get("engineering_verified") is True
+        and development.get("audit_reproduced") is True
+        and development.get("performance_values_bound") is False,
+        "bound development qualification identity or clean status changed",
+    )
+
     checkpoint = binding.get("checkpoint_implementation", {})
     _require(tuple(checkpoint.get("component_ids", ())) == REQUIRED_COMPONENTS, "checkpoint components are incomplete")
     _require(
@@ -1073,19 +1666,78 @@ def _verify_formal_launch_record(
     binding_sha256: str,
     execution: Mapping[str, Any],
 ) -> None:
+    from .artifact import (
+        FORMAL_BINDING_ATTEMPT_MANIFEST_NAME,
+        FORMAL_BINDING_OUTER_COMPLETION_NAME,
+    )
+    from .operator import (
+        FORMAL_BINDING_ATTEMPT_PATH,
+        outer_completion_marker,
+        verify_operator_attempt,
+        verify_outer_completion,
+    )
+
     _require(path.name == "formal-launch.json", "formal launch record has the wrong filename")
     _require(path.is_file() and not path.is_symlink(), "formal launch record is missing or aliased")
     payload = path.read_bytes()
     record = _load_json(path)
+    expected_fields = {
+        "schema",
+        "experiment_id",
+        "protocol_version",
+        "formal_binding_sha256",
+        "formal_binding_attempt_path",
+        "formal_binding_attempt_manifest_file",
+        "formal_binding_attempt_manifest_sha256",
+        "formal_binding_outer_completion_file",
+        "formal_binding_outer_completion_marker",
+        "formal_binding_outer_completion_sha256",
+        "attempt_directory",
+        "global_marker_file",
+        "claimed_at_utc",
+        "git_commit",
+        "git_tree",
+        "record_sha256",
+    }
     body = dict(record)
     record_sha256 = body.pop("record_sha256", None)
     _require_sha256(record_sha256, "formal launch record_sha256")
+    binding_attempt_terminal = FORMAL_BINDING_ATTEMPT_PATH / "operator-attempt.json"
+    binding_attempt_completion = outer_completion_marker(binding_attempt_terminal)
+    copied_attempt = path.parent / FORMAL_BINDING_ATTEMPT_MANIFEST_NAME
+    copied_completion = path.parent / FORMAL_BINDING_OUTER_COMPLETION_NAME
+    attempt_manifest = verify_operator_attempt(FORMAL_BINDING_ATTEMPT_PATH)
+    attempt_primary = attempt_manifest.get("primary")
+    completion = verify_outer_completion(binding_attempt_terminal)
     _require(
-        record.get("schema") == "prospect.wm001.formal-launch.v1"
+        set(record) == expected_fields
+        and record.get("schema") == "prospect.wm001.formal-launch.v2"
         and record.get("experiment_id") == "WM-001"
-        and record.get("protocol_version") == "1.4.0"
+        and record.get("protocol_version") == "1.5.0"
         and record.get("formal_binding_sha256") == binding_sha256
+        and _file_sha256(FORMAL_BINDING_ATTEMPT_PATH / "formal-binding.json") == binding_sha256
+        and record.get("formal_binding_attempt_path") == str(FORMAL_BINDING_ATTEMPT_PATH)
+        and record.get("formal_binding_attempt_manifest_file") == FORMAL_BINDING_ATTEMPT_MANIFEST_NAME
+        and record.get("formal_binding_attempt_manifest_sha256")
+        == _file_sha256(copied_attempt)
+        == _file_sha256(binding_attempt_terminal)
+        and record.get("formal_binding_outer_completion_file") == FORMAL_BINDING_OUTER_COMPLETION_NAME
+        and record.get("formal_binding_outer_completion_marker") == str(binding_attempt_completion)
+        and record.get("formal_binding_outer_completion_sha256")
+        == _file_sha256(copied_completion)
+        == _file_sha256(binding_attempt_completion)
+        and copied_attempt.read_bytes()
+        == copied_completion.read_bytes()
+        == binding_attempt_terminal.read_bytes()
+        == binding_attempt_completion.read_bytes()
+        and attempt_manifest.get("kind") == "binding"
+        and attempt_manifest.get("lane") is None
+        and attempt_manifest.get("status") == "accepted"
+        and isinstance(attempt_primary, dict)
+        and attempt_primary.get("binding_file") == "formal-binding.json"
+        and completion.get("terminal_sha256") == record.get("formal_binding_attempt_manifest_sha256")
         and record.get("attempt_directory") == path.parent.name
+        and record.get("global_marker_file") == "formal-launch-v1.5.0.json"
         and record.get("git_commit") == execution.get("git_commit")
         and record.get("git_tree") == execution.get("git_tree")
         and record_sha256 == _canonical_sha256(body),
@@ -1108,10 +1760,23 @@ def _verify_result_runtime_binding(
     execution: Mapping[str, Any],
     runtime: Mapping[str, Any],
 ) -> None:
+    fields = (
+        "platform",
+        "machine",
+        "device",
+        "python_flags",
+        "process_environment",
+        "accelerator",
+        "thread_count",
+        "interop_thread_count",
+        "cuda_runtime",
+        "cuda_driver",
+        "cublas_workspace_config",
+        "deterministic_algorithms",
+    )
     _require(
-        execution.get("platform") == runtime.get("platform")
-        and execution.get("device") == runtime.get("device")
-        and execution.get("deterministic_algorithms") == runtime.get("deterministic_algorithms") is True,
+        all(execution.get(field) == runtime.get(field) for field in fields)
+        and execution.get("deterministic_algorithms") is True,
         "result runtime differs from binding",
     )
 
@@ -1122,9 +1787,9 @@ def verify_result(path: Path, binding_path: Path | None) -> dict[str, Any]:
     protocol = verify_protocol()
     result = _load_json(path)
     _validate_json_schema(result, _load_json(RESULT_SCHEMA_PATH), label="raw result")
-    _require(result.get("schema") == "prospect.world-model-lifecycle.raw-result.v4", "wrong result schema")
+    _require(result.get("schema") == "prospect.world-model-lifecycle.raw-result.v5", "wrong result schema")
     _require(result.get("experiment_id") == "WM-001", "result has wrong experiment")
-    _require(result.get("protocol_version") == "1.4.0", "result has wrong protocol version")
+    _require(result.get("protocol_version") == "1.5.0", "result has wrong protocol version")
     _require(result.get("protocol_sha256") == _file_sha256(PROTOCOL_PATH), "result protocol digest mismatch")
 
     lane = result.get("lane")
@@ -1159,6 +1824,25 @@ def verify_result(path: Path, binding_path: Path | None) -> dict[str, Any]:
         )
         _verify_result_runtime_binding(execution, runtime)
         _require(execution.get("deterministic_algorithms") is True, "formal result was nondeterministic")
+        dependencies = binding.get("dependencies", {})
+        execution_sources = binding.get("source", {}).get(
+            "execution_source_sha256",
+            {},
+        )
+        _require(
+            isinstance(dependencies, dict)
+            and isinstance(execution_sources, dict)
+            and execution.get("runtime_seal_sha256") == _file_sha256(binding_path)
+            and execution.get("runtime_seal_descriptor_custody") is True
+            and execution.get("producer_bootstrap_sha256") == execution_sources.get("producer_bootstrap.py")
+            and execution.get("bootstrap_descriptor_custody") is True
+            and execution.get("package_roots") == dependencies.get("package_roots")
+            and execution.get("package_ownership") == dependencies.get("package_ownership")
+            and execution.get("standard_library") == dependencies.get("standard_library")
+            and execution.get("python_executable") == dependencies.get("python_executable")
+            and execution.get("python_executable_sha256") == dependencies.get("python_executable_sha256"),
+            "result runtime closure differs from the bound pre-import custody",
+        )
         launch_path = path.parent / "formal-launch.json"
         _require(
             execution.get("formal_launch_file") == "formal-launch.json"
@@ -1237,7 +1921,11 @@ def verify_result(path: Path, binding_path: Path | None) -> dict[str, Any]:
     )
     if "K7" in gate_ids:
         for replicate in replicates:
-            _verify_restart_parity(replicate)
+            _verify_restart_parity(
+                replicate,
+                artifact_root=path.parent,
+                execution=execution,
+            )
     return result
 
 
@@ -1255,7 +1943,7 @@ def _verify_formal_matrix(
     *,
     replicate_id: str,
 ) -> None:
-    """Require the exact sealed v1.4 formal evidence matrix."""
+    """Require the exact sealed v1.5 formal evidence matrix."""
 
     episodes = replicate["episodes"]
     actual_episode_counts = Counter(_row_contract(row) for row in episodes)
@@ -1767,7 +2455,7 @@ def _verify_replicate(
         coverage = metric.get("interval_90_coverage")
         _require(
             metric.get("coverage_semantics") == COVERAGE_SEMANTICS,
-            f"{replicate_id}: predictive coverage semantics differ from v1.4",
+            f"{replicate_id}: predictive coverage semantics differ from v1.5",
         )
         _require(
             isinstance(transition_count, int)
@@ -1914,7 +2602,12 @@ def _verify_replicate(
         )
 
 
-def _verify_restart_parity(replicate: dict[str, Any]) -> None:
+def _verify_restart_parity(
+    replicate: dict[str, Any],
+    *,
+    artifact_root: Path,
+    execution: Mapping[str, Any],
+) -> None:
     replicate_id = replicate.get("replicate_id")
     parity = replicate.get("restart_parity")
     _require(isinstance(parity, dict), f"{replicate_id}: restart parity is missing")
@@ -1922,6 +2615,79 @@ def _verify_restart_parity(replicate: dict[str, Any]) -> None:
     _require(
         parity.get("original_process_id") != parity.get("restored_process_id"),
         f"{replicate_id}: restore reused the original process",
+    )
+    runtime = parity.get("restore_runtime")
+    _require(
+        isinstance(runtime, dict),
+        f"{replicate_id}: restore runtime identity is missing",
+    )
+    expected_filename = f"{replicate_id}-restore-runtime.json"
+    _require(
+        runtime.get("filename") == expected_filename,
+        f"{replicate_id}: restore runtime filename is not exact",
+    )
+    runtime_path = artifact_root / expected_filename
+    _require(
+        runtime_path.is_file() and not runtime_path.is_symlink(),
+        f"{replicate_id}: restore runtime file is missing or aliased",
+    )
+    payload = runtime_path.read_bytes()
+    _require(
+        runtime.get("bytes") == len(payload) and runtime.get("sha256") == sha256(payload).hexdigest(),
+        f"{replicate_id}: restore runtime file identity changed",
+    )
+    recorded = dict(runtime)
+    for field in ("bytes", "sha256", "filename"):
+        recorded.pop(field, None)
+    _require(
+        payload
+        == json.dumps(
+            recorded,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        + b"\n",
+        f"{replicate_id}: restore runtime file is not canonical",
+    )
+    _require(
+        recorded.get("schema") == "prospect.wm001.restart-runtime.v2"
+        and recorded.get("python_executable") == execution.get("python_executable")
+        and recorded.get("python_executable_sha256") == execution.get("python_executable_sha256")
+        and recorded.get("python_version") == execution.get("python_version")
+        and recorded.get("python_flags")
+        == {
+            "dont_write_bytecode": 1,
+            "ignore_environment": 1,
+            "isolated": 1,
+            "no_site": 1,
+            "no_user_site": 1,
+            "safe_path": True,
+        }
+        and recorded.get("process_environment") == execution.get("process_environment")
+        and recorded.get("deterministic_algorithms") is True
+        and recorded.get("bootstrap_source_sha256") == execution.get("producer_bootstrap_sha256")
+        and recorded.get("bootstrap_descriptor_custody") is True
+        and recorded.get("runtime_seal_sha256") == execution.get("runtime_seal_sha256")
+        and recorded.get("runtime_seal_descriptor_custody") is True
+        and recorded.get("package_root_inventory")
+        == (
+            execution.get("package_roots", [None])[0]
+            if isinstance(execution.get("package_roots"), list) and len(execution["package_roots"]) == 1
+            else None
+        )
+        and recorded.get("standard_library") == execution.get("standard_library")
+        and recorded.get("package_ownership") == execution.get("package_ownership")
+        and isinstance(recorded.get("package_root"), str)
+        and Path(recorded["package_root"]).is_absolute()
+        and recorded.get("package_root")
+        == (
+            recorded.get("package_root_inventory", {}).get("path")
+            if isinstance(recorded.get("package_root_inventory"), dict)
+            else None
+        ),
+        f"{replicate_id}: restore child differs from the sealed -I -S -B closure",
     )
 
 

@@ -76,11 +76,11 @@ make check-runtime
 make epistemic-diagnostics
 make epistemic-gate
 python -m bench.world_model_lifecycle.verify protocol
-make wm001-development
 ```
 
 `make check` covers the backend-neutral core. `make check-runtime` adds the
-world-model implementation and adversarial tests. `make wm001-development` runs
-the two declared diagnostic seeds and is never claim-eligible. See the
-[WM-001 executable runbook](bench/world_model_lifecycle/README.md) before
-creating an implementation binding or formal attempt.
+world-model implementation and adversarial tests. Direct WM-001 execution
+through `make wm001-development` is deliberately disabled so it cannot bypass
+the versioned evidence lifecycle. Follow the
+[WM-001 v1.5 operator runbook](docs/wm001-v150-operator-runbook.md) before
+creating any development evidence, implementation binding, or formal attempt.
