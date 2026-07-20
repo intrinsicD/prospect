@@ -380,3 +380,33 @@ tree:
     also_depends_on: [N16]
     status: resolved
     children: []
+  - id: N18
+    type: experiment
+    title: "Accept the final WM-001 v1.9 prospective harness"
+    provenance: ai-executed
+    timestamp: "2026-07-20T20:17+02:00"
+    result: >-
+      The exact reviewed wheel SHA-256 was
+      b0c28c68f92d541f5f1a48372c52d7107b38e182799a0cad0c2820a21d9a8d7f.
+      Separate non-editable QA and runtime installations matched the final
+      source; the 45-row runtime inventory matched lock SHA-256
+      2ad0dc1b47104119c578cdbf34bb51aa181b23ccd789838339f795090f5f17ea,
+      and both installations reproduced Prospect distribution SHA-256
+      fe0fd81afb24b8adaff31c8154fac1c4b8decc4256886f550d1b4bdf8d8a2083.
+      The exact QA suite passed 557 tests, Ruff and both mypy scopes passed,
+      CUDA was available, and the matrix golden was stable across seven
+      explicit/random hash seeds. The accepted independent review SHA-256
+      a0b581995eea28d44dcb89008e1825edf342e1e67ed9a1fc9c9ad6af3e5ba1b6
+      binds 86 implementation rows under manifest SHA-256
+      eae945e19a04328465f687093b47c9eff3e8c1f145b6da7de7185e3b9c73b45c
+      with ordered F001-F010 findings and no unresolved blocker. No v1.9
+      lifecycle result or seal path was created.
+    evidence:
+      - "docs/wm001-v190-prospective-harness-review.json"
+      - "docs/wm001-v190-confirmation-plan.md"
+      - "docs/wm001-v190-operator-runbook.md"
+      - "requirements-wm001.lock"
+      - "bench/world_model_lifecycle/SEALED_PROTOCOL.sha256"
+    also_depends_on: [N17]
+    status: resolved
+    children: []

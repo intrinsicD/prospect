@@ -2,9 +2,9 @@ session:
   id: "2026-07-20_001"
   date: "2026-07-20"
   started: "2026-07-20T16:18+02:00"
-  last_turn: "2026-07-20T20:04+02:00"
-  turn_count: 5
-  summary: "Retired v1.7 and v1.8, then independently audited the prospective v1.9 identity repair before its final rebuild."
+  last_turn: "2026-07-20T20:17+02:00"
+  turn_count: 6
+  summary: "Retired v1.7 and v1.8, then independently accepted the rebuilt, exact-source v1.9 prospective harness."
 
 events_logged:
   - turn: 1
@@ -55,6 +55,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Verified v1.9 seals, schemas, supersession, seeds, scientific continuity, cross-process matrix determinism, and exact prospective-manifest coverage before rebuilding."
+  - turn: 6
+    type: experiment
+    id: N18
+    routing: direct
+    provenance: ai-executed
+    summary: "Accepted the final v1.9 harness after exact wheel, installation, lock, source, test, CUDA, determinism, and 86-row review verification."
 
 ai_actions:
   - turn: 1
@@ -121,6 +127,16 @@ ai_actions:
     provenance: ai-executed
     files_changed:
       - "ara/"
+  - turn: 6
+    action: >-
+      Independently reopened the final reviewed wheel, separate non-editable
+      installations, runtime lock, source and documentation identities,
+      cross-process matrix golden, complete QA result, and canonical accepted
+      86-row prospective review without creating any lifecycle evidence path.
+    provenance: ai-executed
+    files_changed:
+      - "docs/wm001-v190-prospective-harness-review.json"
+      - "ara/"
 
 claims_touched: []
 
@@ -152,9 +168,13 @@ key_context:
       The user required the repaired v1.9 harness to be checked thoroughly
       before consuming the next immutable move; stale first-build lock and
       review bytes are explicitly quarantined from acceptance.
+  - turn: 6
+    excerpt: >-
+      The user required all final changes to be committed, merged to main, and
+      pushed only after the repaired v1.9 harness passed an independent exact-
+      byte audit.
 
 open_threads:
-  - "Build the two fresh v1.9 reviewed environments from final source, regenerate the exact runtime lock and independent prospective review, then rerun all static gates."
   - "Only from that clean committed state, consume the sole v1.9 development qualification and report its result."
 
 ai_suggestions_pending:

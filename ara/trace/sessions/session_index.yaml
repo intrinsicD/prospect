@@ -22,8 +22,8 @@ sessions:
     open_threads: 2
   - id: "2026-07-20_001"
     date: "2026-07-20"
-    summary: "Retired v1.7 and v1.8, then independently audited the prospective v1.9 identity repair before its final rebuild."
-    turn_count: 5
-    events_count: 8
+    summary: "Retired v1.7 and v1.8, then independently accepted the rebuilt, exact-source v1.9 prospective harness."
+    turn_count: 6
+    events_count: 9
     claims_touched: []
-    open_threads: 2
+    open_threads: 1
