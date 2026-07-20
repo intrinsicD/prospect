@@ -1,8 +1,15 @@
 # WM-001 protocol 1.5.0 confirmation plan
 
-Status: prospective plan. This document is sealed before any v1.5.0
-development or formal outcome. Protocol 1.4.0 remains immutable and retired;
-its completed execution and adjudication failure are recorded in the
+Status: retired after an incomplete development qualification. This document
+was sealed before any v1.5.0 development or formal outcome. The fourth
+development attempt later crossed into outcome-producing work and failed at
+the first fresh-process restart-custody check. It emitted no `result.json`,
+received no outer completion, created no development closure, and never
+created the v1.5 formal marker. The exact disposition is recorded in the
+[v1.5 development failure review](wm001-v150-development-failure.md).
+
+Protocol 1.4.0 also remains immutable and retired; its completed execution and
+adjudication failure are recorded in the
 [v1.4 formal results review](wm001-v140-formal-results.md).
 
 ## Purpose and scientific freeze

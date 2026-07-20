@@ -1,9 +1,15 @@
 # WM-001 v1.5.0 operator runbook
 
-This is the executable ordering contract for the one v1.5 confirmation. It
-does not authorize a retry. Run every command from the canonical repository
-root, with no other process writing the repository, environments, or WM-001
-results roots.
+Status: retired. Do not execute any command in this historical runbook.
+Development attempt 4 entered outcome-producing work and then failed its
+fresh-process runtime-custody check. It is preserved without an outer
+completion, and v1.5 established no qualifying development result or formal
+claim. See the
+[v1.5 development failure review](wm001-v150-development-failure.md).
+
+This was the executable ordering contract for the one v1.5 confirmation. It
+did not authorize a retry. Every path and command below is retained only to
+document what was prospectively authorized.
 
 The repository-wide formal marker is:
 
