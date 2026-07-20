@@ -344,6 +344,15 @@ evidence may be created. It uses fresh seeds, environments, schemas, result
 namespaces, seal, review, and binding. See the
 [v1.9 confirmation plan](wm001-v190-confirmation-plan.md).
 
+Its sole development producer, independent audit, closure transaction, and
+post-finalization sealed-runtime reopen completed. The prospective preformal
+gate then failed because a runner test observed the now-existing canonical
+development closure outside its temporary fixture. The pre-evidence suite had
+passed only while that path was absent. Every recorded runtime, source, Git,
+input, and package identity remained stable, and no K3–K6 value was opened.
+The terminal disposition and required fresh-version repair are recorded in the
+[v1.9 preformal-test failure review](wm001-v190-preformal-test-failure.md).
+
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget
