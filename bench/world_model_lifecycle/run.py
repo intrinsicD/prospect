@@ -10,6 +10,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 
 def _repository_root() -> Path:
@@ -44,8 +45,33 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_QUALIFICATION_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.9.0"
+    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.10.0"
 )
+DEVELOPMENT_CLOSURE_PATH = (
+    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.10.0.json"
+)
+DEVELOPMENT_DIAGNOSTICS_ROOT = (
+    DEVELOPMENT_RESULTS_ROOT / "diagnostics-v1.10.0"
+)
+
+
+class _DevelopmentLifecyclePaths(NamedTuple):
+    results_root: Path
+    qualification: Path
+    closure: Path
+    diagnostics: Path
+
+
+def _development_lifecycle_paths() -> _DevelopmentLifecyclePaths:
+    """Derive every coupled development path from one injectable root."""
+
+    root = DEVELOPMENT_RESULTS_ROOT
+    return _DevelopmentLifecyclePaths(
+        results_root=root,
+        qualification=root / "qualification-v1.10.0",
+        closure=root / "development-closure-v1.10.0.json",
+        diagnostics=root / "diagnostics-v1.10.0",
+    )
 
 
 def _ensure_deterministic_cuda_environment() -> None:
@@ -59,23 +85,24 @@ def _development_output(
     seed_override: bool,
     diagnostic_stamp: str,
 ) -> Path:
+    paths = _development_lifecycle_paths()
     if not seed_override:
         if (
             supplied_output is not None
-            and supplied_output != DEVELOPMENT_QUALIFICATION_PATH
+            and supplied_output != paths.qualification
         ):
             raise ValueError(
                 "the complete no-override development run requires the sole "
-                f"qualification path {DEVELOPMENT_QUALIFICATION_PATH}"
+                f"qualification path {paths.qualification}"
             )
-        return DEVELOPMENT_QUALIFICATION_PATH
-    if supplied_output == DEVELOPMENT_QUALIFICATION_PATH:
+        return paths.qualification
+    if supplied_output is not None:
         raise ValueError(
-            "a seed-override diagnostic cannot occupy the canonical "
-            "development qualification path"
+            "a seed-override diagnostic cannot select an output path; "
+            "diagnostics are confined to their version-owned namespace"
         )
-    return supplied_output or (
-        DEVELOPMENT_RESULTS_ROOT / f"diagnostic-{diagnostic_stamp}"
+    return (
+        paths.diagnostics / f"diagnostic-{diagnostic_stamp}"
     )
 
 
@@ -90,7 +117,6 @@ def main() -> int:
         _verify_producer_manifest_precommit,
         formal_launch_marker_path,
     )
-    from .binding import DEVELOPMENT_CLOSURE_PATH
     from .experiment import (
         ExperimentConfig,
         _verify_live_bootstrap_custody,
@@ -123,7 +149,7 @@ def main() -> int:
         if arguments.output is None:
             parser.error(
                 "formal lane requires --output at the exact "
-                "results/formal/<binding-sha256>/confirmation-v1.9.0 path"
+                "results/formal/<binding-sha256>/confirmation-v1.10.0 path"
             )
         expected_binding = FORMAL_BINDING_ATTEMPT_PATH / "formal-binding.json"
         if (
@@ -155,21 +181,22 @@ def main() -> int:
             parser.error(str(error))
         if os.path.lexists(existing_launch_marker):
             print(
-                "WM-001 protocol 1.9 formal launch already consumed; same-version retry is forbidden",
+                "WM-001 protocol 1.10 formal launch already consumed; same-version retry is forbidden",
                 file=sys.stderr,
             )
             return 1
     else:
-        if os.path.lexists(DEVELOPMENT_QUALIFICATION_PATH):
+        development_paths = _development_lifecycle_paths()
+        if os.path.lexists(development_paths.qualification):
             print(
-                "WM-001 protocol 1.9 development qualification already consumed; "
+                "WM-001 protocol 1.10 development qualification already consumed; "
                 "resume and sibling attempts are forbidden",
                 file=sys.stderr,
             )
             return 1
-        if os.path.lexists(DEVELOPMENT_CLOSURE_PATH):
+        if os.path.lexists(development_paths.closure):
             print(
-                "WM-001 protocol 1.9 development is closed; additional same-version rehearsals are forbidden",
+                "WM-001 protocol 1.10 development is closed; additional same-version rehearsals are forbidden",
                 file=sys.stderr,
             )
             return 1
@@ -200,6 +227,16 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+    if (
+        arguments.lane == "development"
+        and arguments.master_seed
+    ):
+        diagnostic_root = _development_lifecycle_paths().diagnostics
+        diagnostic_root.mkdir(parents=True, exist_ok=True)
+        if diagnostic_root.resolve(strict=True) != diagnostic_root:
+            raise RuntimeError(
+                "WM-001 diagnostic namespace is aliased"
+            )
     attempt = ProducerAttempt(output, lane=arguments.lane)
     exit_code = 0
     try:

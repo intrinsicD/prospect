@@ -1,4 +1,4 @@
-"""Trusted, immutable preformal test evidence for WM-001 protocol 1.9."""
+"""Trusted, immutable preformal test evidence for WM-001 protocol 1.10."""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ from .assurance import ASSURANCE
 
 SCHEMA = "prospect.wm001.preformal-test-report.v2"
 EXPERIMENT_ID = "WM-001"
-PROTOCOL_VERSION = "1.9.0"
-REPORT_NAME = "preformal-test-report-v1.9.0.json"
+PROTOCOL_VERSION = "1.10.0"
+REPORT_NAME = "preformal-test-report-v1.10.0.json"
 PREFORMAL_REPORT_NAME = REPORT_NAME
-LOG_PREFIX = "preformal-v1.9.0-command-"
+LOG_PREFIX = "preformal-v1.10.0-command-"
 _EVIDENCE_PREFIX = "preformal-"
 SOURCE_RELATIVE_PATH = "bench/world_model_lifecycle/preformal.py"
-REVIEW_RELATIVE_PATH = "docs/wm001-v190-prospective-harness-review.json"
+REVIEW_RELATIVE_PATH = "docs/wm001-v1100-prospective-harness-review.json"
 REVIEW_SCHEMA = "prospect.wm001.prospective-harness-review.v1"
 
 
@@ -60,18 +60,24 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_CLOSURE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.9.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.10.0.json"
+)
+RUNTIME_SEAL_PATH = (
+    DEVELOPMENT_RESULTS_ROOT / "runtime-seal-v1.10.0.json"
+)
+PREFORMAL_BUNDLE_PATH = (
+    DEVELOPMENT_RESULTS_ROOT / "v1.10.0" / "preformal"
 )
 CLOSURE_ATTEMPT_PATH = (
     REPO
     / "bench"
     / "world_model_lifecycle"
     / "results"
-    / "operator-v1.9"
+    / "operator-v1.10"
     / "closures"
-    / "development-closure-v1.9.0"
+    / "development-closure-v1.10.0"
 )
-PREFORMAL_REPORT_PATH = DEVELOPMENT_RESULTS_ROOT / REPORT_NAME
+PREFORMAL_REPORT_PATH = PREFORMAL_BUNDLE_PATH / REPORT_NAME
 LAUNCH_BOOTSTRAP_PATH = REPO / "bench/world_model_lifecycle/launch_bootstrap.py"
 PRODUCER_BOOTSTRAP_PATH = REPO / "bench/world_model_lifecycle/producer_bootstrap.py"
 _OPTIONAL_ENVIRONMENT_KEYS = (
@@ -200,6 +206,7 @@ _PREFORMAL_INPUT_NLINKS = {
     "prospective_review": _SINGLE_LINK_CUSTODY,
     "runtime_seal": _OUTER_FINALIZED_CUSTODY,
 }
+_PREFORMAL_INPUT_FIELDS = frozenset(_PREFORMAL_INPUT_NLINKS)
 
 
 class PreformalEvidenceError(RuntimeError):
@@ -363,6 +370,58 @@ def _atomic_write_exclusive(path: Path, payload: bytes) -> None:
             os.close(directory_descriptor)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _claim_preformal_staging(final_directory: Path) -> Path:
+    """Irreversibly claim one bundle in a hidden sibling staging directory."""
+
+    parent = final_directory.parent
+    if not os.path.lexists(parent):
+        grandparent = _canonical_existing_directory(
+            parent.parent,
+            label="preformal version parent",
+        )
+        if parent.parent != grandparent:
+            raise PreformalEvidenceError(
+                "preformal version path has a noncanonical parent"
+            )
+        os.mkdir(parent, 0o700)
+        _fsync_directory(grandparent)
+    canonical_parent = _canonical_existing_directory(
+        parent,
+        label="preformal version directory",
+    )
+    if parent != canonical_parent:
+        raise PreformalEvidenceError(
+            "preformal version directory is aliased"
+        )
+    staging = canonical_parent / f".{final_directory.name}.staging"
+    with os.scandir(canonical_parent) as entries:
+        existing_members = sorted(entry.name for entry in entries)
+    if existing_members:
+        raise FileExistsError(
+            "preformal version namespace already contains a bundle, hidden "
+            "one-shot claim, or unbound member"
+        )
+    try:
+        os.mkdir(staging, 0o700)
+    except FileExistsError:
+        raise FileExistsError(
+            "preformal hidden one-shot claim already exists"
+        ) from None
+    _fsync_directory(canonical_parent)
+    return _canonical_existing_directory(
+        staging,
+        label="preformal hidden staging claim",
+    )
 
 
 def _file_identity(
@@ -721,21 +780,15 @@ def _capture_qa_closure(
     return _validate_qa_closure(_load_canonical_object(completed.stdout, label="QA closure subprocess"))
 
 
-def _test_files(pattern: str, *, label: str) -> tuple[str, ...]:
-    matches = tuple(
-        sorted(
-            path.relative_to(REPO).as_posix()
-            for path in (REPO / "tests").glob(pattern)
-            if path.is_file() and not path.is_symlink()
-        )
+def _tracked_implementation_paths(
+    *,
+    environment: dict[str, str] | None = None,
+) -> tuple[str, ...]:
+    selected_environment = (
+        _sanitized_environment()
+        if environment is None
+        else environment
     )
-    if not matches:
-        raise PreformalEvidenceError(f"required {label} test set is empty")
-    return matches
-
-
-def _implementation_files(*, environment: dict[str, str] | None = None) -> list[dict[str, object]]:
-    selected_environment = _sanitized_environment() if environment is None else environment
     completed = subprocess.run(
         ("git", "ls-files", "--", "src/prospect", "bench", "tests"),
         cwd=REPO,
@@ -746,8 +799,62 @@ def _implementation_files(*, environment: dict[str, str] | None = None) -> list[
         text=True,
     )
     if completed.returncode != 0:
-        raise PreformalEvidenceError("prospective review cannot enumerate tracked implementation files")
-    tracked_python = [REPO / relative for relative in completed.stdout.splitlines() if relative.endswith(".py")]
+        raise PreformalEvidenceError(
+            "prospective review cannot enumerate tracked implementation files"
+        )
+    paths = tuple(completed.stdout.splitlines())
+    if (
+        not paths
+        or len(paths) != len(set(paths))
+        or paths != tuple(sorted(paths))
+        or any(
+            not path
+            or Path(path).is_absolute()
+            or Path(path).as_posix() != path
+            or "." in Path(path).parts
+            or ".." in Path(path).parts
+            for path in paths
+        )
+    ):
+        raise PreformalEvidenceError(
+            "tracked implementation manifest is empty, aliased, or unordered"
+        )
+    return paths
+
+
+def _test_files(pattern: str, *, label: str) -> tuple[str, ...]:
+    tracked = tuple(
+        path
+        for path in _tracked_implementation_paths()
+        if Path(path).parent.as_posix() == "tests"
+        and Path(path).match(f"tests/{pattern}")
+    )
+    discovered = tuple(
+        sorted(
+            path.relative_to(REPO).as_posix()
+            for path in (REPO / "tests").glob(pattern)
+            if path.is_file() and not path.is_symlink()
+        )
+    )
+    if not tracked:
+        raise PreformalEvidenceError(f"required {label} test set is empty")
+    if discovered != tracked:
+        raise PreformalEvidenceError(
+            f"required {label} test set contains untracked, ignored, "
+            "missing, or aliased members"
+        )
+    return tracked
+
+
+def _implementation_files(*, environment: dict[str, str] | None = None) -> list[dict[str, object]]:
+    selected_environment = _sanitized_environment() if environment is None else environment
+    tracked_python = [
+        REPO / relative
+        for relative in _tracked_implementation_paths(
+            environment=selected_environment,
+        )
+        if relative.endswith(".py")
+    ]
     candidates = [
         *tracked_python,
         REPO / "Makefile",
@@ -758,8 +865,8 @@ def _implementation_files(*, environment: dict[str, str] | None = None) -> list[
         REPO / "bench/world_model_lifecycle/protocol.json",
         REPO / "bench/world_model_lifecycle/schemas/raw-result.schema.json",
         REPO / "bench/world_model_lifecycle/schemas/formal-binding.schema.json",
-        REPO / "docs/wm001-v190-confirmation-plan.md",
-        REPO / "docs/wm001-v190-operator-runbook.md",
+        REPO / "docs/wm001-v1100-confirmation-plan.md",
+        REPO / "docs/wm001-v1100-operator-runbook.md",
     ]
     rows: list[dict[str, object]] = []
     for path in sorted(set(candidates)):
@@ -893,7 +1000,7 @@ def required_commands(
     prospective_review_path: Path = REVIEW_PATH,
     device: str = "cpu",
 ) -> tuple[CommandSpec, ...]:
-    """Return the fixed, ordered v1.9 preformal command contract."""
+    """Return the fixed, ordered v1.10 preformal command contract."""
 
     if device not in {"cpu", "cuda"}:
         raise PreformalEvidenceError("preformal device must be cpu or cuda")
@@ -906,8 +1013,7 @@ def required_commands(
         ]
     )
     runtime_seal = (
-        REPO
-        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.9.0.json"
+        RUNTIME_SEAL_PATH
         if runtime_seal_path is None
         else _canonical_existing_file(runtime_seal_path, label="runtime seal")
     )
@@ -1176,14 +1282,10 @@ def generate_preformal_report(
         raise PreformalEvidenceError("preformal report path must not contain aliases")
     if output != PREFORMAL_REPORT_PATH:
         raise PreformalEvidenceError(
-            "preformal report must use the sole canonical protocol-1.9 "
+            "preformal report must use the sole canonical protocol-1.10 "
             f"path {PREFORMAL_REPORT_PATH}"
         )
-    directory = _canonical_existing_directory(output.parent, label="evidence directory")
-    if output.parent != directory:
-        raise PreformalEvidenceError("preformal report path is aliased")
-    if os.path.lexists(output) or any(_is_preformal_evidence_name(candidate.name) for candidate in directory.iterdir()):
-        raise FileExistsError("preformal evidence directory already contains this protocol's evidence")
+    final_directory = output.parent
     runtime_executable_path = Path(str(_executable_identity(runtime_executable)["invocation_path"]))
     runtime_seal_path = _canonical_existing_file(runtime_seal, label="runtime seal")
     development_closure_path = _canonical_existing_file(
@@ -1194,6 +1296,14 @@ def generate_preformal_report(
         closure_attempt,
         label="development closure attempt",
     )
+    if runtime_seal_path != RUNTIME_SEAL_PATH:
+        raise PreformalEvidenceError(
+            "runtime seal must use its canonical v1.10 path"
+        )
+    if development_closure_path != DEVELOPMENT_CLOSURE_PATH:
+        raise PreformalEvidenceError(
+            "development closure must use its canonical v1.10 path"
+        )
     if closure_attempt_path != CLOSURE_ATTEMPT_PATH:
         raise PreformalEvidenceError(
             "development closure attempt must use its canonical path"
@@ -1254,13 +1364,23 @@ def generate_preformal_report(
         prospective_review_path=prospective_review_path,
         device=device,
     )
-    rows: list[dict[str, object]] = []
+    directory = _claim_preformal_staging(final_directory)
+    executions: list[tuple[int, CommandSpec, int, bytes, bytes]] = []
     for ordinal, specification in enumerate(specifications, start=1):
         selected_environment = qa_environment if specification.role == "qa" else runtime_environment
-        selected_identity = qa_environment_identity if specification.role == "qa" else runtime_environment_identity
         exit_code, stdout, stderr = _run_command(
             specification,
             environment=selected_environment,
+        )
+        executions.append(
+            (ordinal, specification, exit_code, stdout, stderr)
+        )
+    rows: list[dict[str, object]] = []
+    for ordinal, specification, exit_code, stdout, stderr in executions:
+        selected_identity = (
+            qa_environment_identity
+            if specification.role == "qa"
+            else runtime_environment_identity
         )
         rows.append(
             {
@@ -1322,8 +1442,19 @@ def generate_preformal_report(
         and runtime_environment == runtime_environment_after
         and prospective_review_value == prospective_review_after
     )
+    semantic_failures = _semantic_failure_checks(
+        directory,
+        {
+            "commands": rows,
+            "device": device,
+            "input_files_before": inputs_before,
+        },
+    )
     all_pass = (
-        all(row["passed"] is True for row in rows) and git_after.get("worktree_clean") is True and identities_stable
+        all(row["passed"] is True for row in rows)
+        and git_after.get("worktree_clean") is True
+        and identities_stable
+        and not semantic_failures
     )
     report = {
         "schema": SCHEMA,
@@ -1351,7 +1482,18 @@ def generate_preformal_report(
         "commands": rows,
         "all_pass": all_pass,
     }
-    _atomic_write_exclusive(output, _canonical_json_bytes(report) + b"\n")
+    _atomic_write_exclusive(
+        directory / REPORT_NAME,
+        _canonical_json_bytes(report) + b"\n",
+    )
+    from .operator import _rename_noreplace
+
+    try:
+        _rename_noreplace(directory, final_directory)
+    except Exception as error:
+        raise PreformalEvidenceError(
+            "atomic preformal bundle publication failed"
+        ) from error
     return output
 
 
@@ -1676,8 +1818,51 @@ def _runtime_bootstrap_conformance_from_report(
     return value
 
 
+def _semantic_failure_checks(
+    directory: Path,
+    report: Mapping[str, object],
+) -> list[str]:
+    """Return exact semantic failures for successful runtime command rows."""
+
+    commands = report.get("commands")
+    checks = (
+        (
+            "runtime-accepted-closure-evidence",
+            "accepted_closure_semantics_failed",
+            _accepted_closure_evidence_from_report,
+        ),
+        (
+            "runtime-bootstrap-inventory-conformance",
+            "runtime_conformance_semantics_failed",
+            _runtime_bootstrap_conformance_from_report,
+        ),
+    )
+    failures: list[str] = []
+    for command_name, failure_name, verifier in checks:
+        matches = (
+            [
+                row
+                for row in commands
+                if isinstance(row, Mapping)
+                and row.get("name") == command_name
+            ]
+            if isinstance(commands, list)
+            else []
+        )
+        if len(matches) != 1:
+            failures.append(failure_name)
+            continue
+        if matches[0].get("passed") is not True:
+            continue
+        try:
+            verifier(directory, report)
+        except PreformalEvidenceError:
+            failures.append(failure_name)
+    return failures
+
+
 def verify_preformal_report(report_path: Path) -> dict[str, Any]:
-    """Strictly reopen and independently validate a passing v1.9 report."""
+    """Strictly reopen and independently validate a passing v1.10 report."""
 
     lexical = report_path if report_path.is_absolute() else Path.cwd() / report_path
     absolute = Path(os.path.abspath(report_path))
@@ -1754,16 +1939,7 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
     inputs_after = report.get("input_files_after")
     if (
         not isinstance(inputs_before, dict)
-        or set(inputs_before)
-        != {
-            "closure_attempt_terminal",
-            "closure_outer_completion",
-            "development_closure",
-            "launch_bootstrap",
-            "producer_bootstrap",
-            "prospective_review",
-            "runtime_seal",
-        }
+        or set(inputs_before) != _PREFORMAL_INPUT_FIELDS
         or inputs_before != inputs_after
     ):
         raise PreformalEvidenceError("preformal input file identities are incomplete or changed")
@@ -1787,14 +1963,51 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
     closure_attempt_path = closure_attempt_terminal_path.parent
     from .operator import outer_completion_marker
 
+    runtime_seal_completion_path = outer_completion_marker(
+        runtime_seal_path
+    )
+    runtime_seal_completion_identity = _file_identity(
+        runtime_seal_completion_path,
+        label="runtime seal outer completion",
+        expected_nlink=_OUTER_FINALIZED_CUSTODY,
+    )
+    launch_bootstrap_path = Path(
+        cast(str, inputs_before["launch_bootstrap"]["path"])
+    )
+    producer_bootstrap_path = Path(
+        cast(str, inputs_before["producer_bootstrap"]["path"])
+    )
+    try:
+        runtime_seal_same_inode = os.path.samefile(
+            runtime_seal_path,
+            runtime_seal_completion_path,
+        )
+        closure_attempt_same_inode = os.path.samefile(
+            closure_attempt_terminal_path,
+            closure_outer_completion_path,
+        )
+    except OSError as error:
+        raise PreformalEvidenceError(
+            "preformal outer-completion inputs cannot be compared"
+        ) from error
     if (
-        closure_attempt_terminal_path
+        runtime_seal_path != RUNTIME_SEAL_PATH
+        or development_closure_path != DEVELOPMENT_CLOSURE_PATH
+        or launch_bootstrap_path != LAUNCH_BOOTSTRAP_PATH
+        or producer_bootstrap_path != PRODUCER_BOOTSTRAP_PATH
+        or closure_attempt_terminal_path
         != CLOSURE_ATTEMPT_PATH / "operator-attempt.json"
         or closure_outer_completion_path
         != outer_completion_marker(closure_attempt_terminal_path)
+        or not runtime_seal_same_inode
+        or not closure_attempt_same_inode
+        or runtime_seal_completion_identity["bytes"]
+        != inputs_before["runtime_seal"]["bytes"]
+        or runtime_seal_completion_identity["sha256"]
+        != inputs_before["runtime_seal"]["sha256"]
     ):
         raise PreformalEvidenceError(
-            "preformal closure-attempt inputs are not canonical"
+            "preformal runtime-seal or closure inputs are not canonical"
         )
     review_path = Path(cast(str, inputs_before["prospective_review"]["path"]))
     if review_path != REVIEW_PATH:
@@ -1824,7 +2037,7 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
         or report.get("generator_source_before") != source
         or report.get("generator_source_after") != source
         or report.get("identities_stable") is not True
-        or report.get("all_pass") is not True
+        or type(report.get("all_pass")) is not bool
         or git.get("worktree_clean") is not True
     ):
         raise PreformalEvidenceError("preformal report runtime, source, or Git identity differs")
@@ -1842,6 +2055,7 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
         raise PreformalEvidenceError("preformal report command set is incomplete")
     expected_logs: set[str] = set()
     seen_names: set[str] = set()
+    failed_commands: list[tuple[int, str, int]] = []
     expected_row_fields = {
         "ordinal",
         "name",
@@ -1872,10 +2086,18 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
             or row.get("cwd") != str(repository)
             or row.get("environment_sha256") != environment_digests[specification.role]
             or type(row.get("exit_code")) is not int
-            or row.get("exit_code") != 0
-            or row.get("passed") is not True
+            or type(row.get("passed")) is not bool
+            or row.get("passed") is not (row.get("exit_code") == 0)
         ):
             raise PreformalEvidenceError(f"preformal command {ordinal} differs from its fixed contract")
+        if row["passed"] is False:
+            failed_commands.append(
+                (
+                    ordinal,
+                    specification.name,
+                    cast(int, row["exit_code"]),
+                )
+            )
         seen_names.add(specification.name)
         for stream in ("stdout", "stderr"):
             expected_logs.add(
@@ -1889,17 +2111,30 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
             )
     if tuple(row["name"] for row in rows) != _COMMAND_NAMES:
         raise PreformalEvidenceError("preformal command names are not unique and ordered")
-    _accepted_closure_evidence_from_report(
-        directory,
-        report,
+    semantic_failures = _semantic_failure_checks(directory, report)
+    if semantic_failures:
+        raise PreformalEvidenceError(
+            "preformal report contains semantic failures: "
+            + ", ".join(semantic_failures)
+        )
+    expected_all_pass = (
+        not failed_commands
+        and report.get("identities_stable") is True
+        and git.get("worktree_clean") is True
     )
-    _runtime_bootstrap_conformance_from_report(
-        directory,
-        report,
-    )
-    actual_evidence = {
-        candidate.name for candidate in directory.iterdir() if _is_preformal_evidence_name(candidate.name)
-    }
+    if report.get("all_pass") is not expected_all_pass:
+        raise PreformalEvidenceError(
+            "preformal report all_pass differs from its command outcomes"
+        )
+    if failed_commands:
+        detail = ", ".join(
+            f"{ordinal}:{name}(exit={exit_code})"
+            for ordinal, name, exit_code in failed_commands
+        )
+        raise PreformalEvidenceError(
+            f"preformal report contains failed commands: {detail}"
+        )
+    actual_evidence = {candidate.name for candidate in directory.iterdir()}
     if actual_evidence != {*expected_logs, REPORT_NAME}:
         raise PreformalEvidenceError("preformal evidence file set has missing or extra members")
     return report
@@ -2563,8 +2798,6 @@ def _runtime_bootstrap_inventory_conformance(device: str) -> dict[str, object]:
 def _runtime_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a sealed, result-free WM-001 preformal check")
     modes = parser.add_subparsers(dest="mode", required=True)
-    development = modes.add_parser("development-evidence", allow_abbrev=False)
-    development.add_argument("--development-closure", type=Path, required=True)
     accepted = modes.add_parser(
         "accepted-closure-evidence",
         allow_abbrev=False,
@@ -2610,9 +2843,7 @@ def runtime_main(argv: list[str] | None = None) -> int:
     """Entry point reached only through launch-bootstrap descriptor custody."""
 
     arguments = _runtime_parser().parse_args(argv)
-    if arguments.mode == "development-evidence":
-        report = _runtime_development_evidence(arguments.development_closure)
-    elif arguments.mode == "accepted-closure-evidence":
+    if arguments.mode == "accepted-closure-evidence":
         report = _runtime_accepted_closure_evidence(
             arguments.development_closure,
             arguments.closure_attempt,
@@ -2667,6 +2898,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
+    exit_code = 0
     if arguments.mode == "generate-report":
         path = generate_preformal_report(
             arguments.output,
@@ -2677,16 +2909,60 @@ def main(argv: list[str] | None = None) -> int:
             prospective_review=arguments.prospective_review,
             device=arguments.device,
         )
+        generated = _load_canonical_object(
+            _read_regular(path, label="generated preformal report"),
+            label="generated preformal report",
+        )
+        commands = generated.get("commands")
+        if not isinstance(commands, list):
+            raise PreformalEvidenceError(
+                "generated preformal report has no command rows"
+            )
+        failed_commands = [
+            {
+                "ordinal": row.get("ordinal"),
+                "name": row.get("name"),
+                "exit_code": row.get("exit_code"),
+            }
+            for row in commands
+            if isinstance(row, Mapping) and row.get("passed") is False
+        ]
+        failed_checks: list[str] = []
+        git_after = generated.get("git_after")
+        if (
+            not isinstance(git_after, Mapping)
+            or git_after.get("worktree_clean") is not True
+        ):
+            failed_checks.append("post_run_worktree_not_clean")
+        if generated.get("identities_stable") is not True:
+            failed_checks.append("pre_post_identity_drift")
+        failed_checks.extend(
+            _semantic_failure_checks(path.parent, generated)
+        )
+        passed = (
+            generated.get("all_pass") is True
+            and not failed_checks
+        )
+        if passed:
+            verify_preformal_report(path)
+        elif not failed_commands and not failed_checks:
+            raise PreformalEvidenceError(
+                "generated preformal report failed without an identified "
+                "command, identity, or semantic check"
+            )
         output = {
-            "schema": "prospect.wm001.preformal-test-report-generation.v1",
+            "schema": "prospect.wm001.preformal-test-report-generation.v2",
             "report": str(path),
             "report_sha256": _file_identity(
                 path,
                 label="preformal report",
                 expected_nlink=_SINGLE_LINK_CUSTODY,
             )["sha256"],
-            "passed": True,
+            "failed_commands": failed_commands,
+            "failed_checks": failed_checks,
+            "passed": passed,
         }
+        exit_code = 0 if passed else 1
     elif arguments.mode == "verify-prospective-review":
         review = verify_prospective_review(arguments.review)
         output = {
@@ -2714,7 +2990,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         output = _qa_closure()
     sys.stdout.buffer.write(_canonical_json_bytes(output) + b"\n")
-    return 0
+    return exit_code
 
 
 __all__ = (
@@ -2723,6 +2999,7 @@ __all__ = (
     "LOG_PREFIX",
     "PREFORMAL_REPORT_NAME",
     "PREFORMAL_REPORT_PATH",
+    "PREFORMAL_BUNDLE_PATH",
     "PROTOCOL_VERSION",
     "PreformalEvidenceError",
     "REPORT_NAME",

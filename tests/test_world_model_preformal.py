@@ -144,7 +144,7 @@ def _review() -> dict[str, object]:
     return {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "implementation_files": [],
         "implementation_manifest_sha256": hashlib.sha256(b"[]").hexdigest(),
         "reviewer": {
@@ -162,7 +162,7 @@ def _runtime_seal(runtime_executable: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
             "tamper_resistant": False,
@@ -382,8 +382,7 @@ def _prepare_generation(
     *,
     failed_command: str | None = None,
 ) -> tuple[Path, list[str], dict[str, Path]]:
-    directory = tmp_path / "evidence"
-    directory.mkdir()
+    directory = tmp_path / "v1.10.0" / "preformal"
     monkeypatch.setattr(
         preformal,
         "PREFORMAL_REPORT_PATH",
@@ -410,6 +409,16 @@ def _prepare_generation(
     os.link(closure_terminal, closure_completion)
 
     monkeypatch.setattr(preformal, "REVIEW_PATH", review_path)
+    monkeypatch.setattr(
+        preformal,
+        "RUNTIME_SEAL_PATH",
+        runtime_seal_path,
+    )
+    monkeypatch.setattr(
+        preformal,
+        "DEVELOPMENT_CLOSURE_PATH",
+        development_closure,
+    )
     monkeypatch.setattr(
         preformal,
         "CLOSURE_ATTEMPT_PATH",
@@ -449,6 +458,7 @@ def _prepare_generation(
         *,
         environment: dict[str, str],
     ) -> tuple[int, bytes, bytes]:
+        assert not directory.exists()
         expected_environment = (
             preformal._sanitized_environment()
             if specification.role == "qa"
@@ -509,6 +519,218 @@ def _generate(report_path: Path, inputs: dict[str, Path]) -> Path:
         closure_attempt=inputs["closure_attempt"],
         prospective_review=inputs["prospective_review"],
     )
+
+
+def test_test_discovery_rejects_untracked_or_ignored_matching_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    tracked = tests / "test_world_model_tracked.py"
+    ignored = tests / "test_world_model_ignored.py"
+    tracked.write_text("# tracked\n", encoding="utf-8")
+    ignored.write_text("# ignored\n", encoding="utf-8")
+    monkeypatch.setattr(preformal, "REPO", tmp_path)
+    monkeypatch.setattr(
+        preformal,
+        "_tracked_implementation_paths",
+        lambda **_kwargs: ("tests/test_world_model_tracked.py",),
+    )
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="untracked, ignored, missing, or aliased",
+    ):
+        preformal._test_files(
+            "test_world_model_*.py",
+            label="WM-001",
+        )
+
+
+def test_generation_requires_completely_absent_versioned_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, calls, inputs = _prepare_generation(
+        tmp_path,
+        monkeypatch,
+    )
+    report_path.parent.mkdir(parents=True)
+    (report_path.parent / "unbound.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        FileExistsError,
+        match="version namespace",
+    ):
+        _generate(report_path, inputs)
+    assert calls == []
+
+
+def test_interrupted_preformal_publication_leaves_a_nonretryable_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, calls, inputs = _prepare_generation(
+        tmp_path,
+        monkeypatch,
+    )
+    real_write = preformal._atomic_write_exclusive
+    writes = 0
+
+    def interrupted_write(path: Path, payload: bytes) -> None:
+        nonlocal writes
+        writes += 1
+        if writes == 3:
+            raise OSError("injected publication interruption")
+        real_write(path, payload)
+
+    monkeypatch.setattr(
+        preformal,
+        "_atomic_write_exclusive",
+        interrupted_write,
+    )
+    with pytest.raises(OSError, match="injected publication interruption"):
+        _generate(report_path, inputs)
+
+    staging = report_path.parent.parent / (
+        f".{report_path.parent.name}.staging"
+    )
+    assert calls == list(preformal._COMMAND_NAMES)
+    assert not report_path.parent.exists()
+    assert staging.is_dir()
+    with pytest.raises(
+        FileExistsError,
+        match="hidden one-shot claim",
+    ):
+        _generate(report_path, inputs)
+
+
+def test_preformal_claim_is_fsynced_before_the_first_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, _, inputs = _prepare_generation(
+        tmp_path,
+        monkeypatch,
+    )
+    fsynced: list[Path] = []
+    real_run = preformal._run_command
+
+    monkeypatch.setattr(
+        preformal,
+        "_fsync_directory",
+        lambda path: fsynced.append(path),
+    )
+
+    def checked_run(
+        specification: preformal.CommandSpec,
+        *,
+        environment: dict[str, str],
+    ) -> tuple[int, bytes, bytes]:
+        assert report_path.parent.parent in fsynced
+        return real_run(specification, environment=environment)
+
+    monkeypatch.setattr(preformal, "_run_command", checked_run)
+    _generate(report_path, inputs)
+
+    assert fsynced[:2] == [
+        report_path.parent.parent.parent,
+        report_path.parent.parent,
+    ]
+
+
+def test_live_verifier_rejects_unbound_bundle_member(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    _generate(report_path, inputs)
+    (report_path.parent / "unbound.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="missing or extra members",
+    ):
+        preformal.verify_preformal_report(report_path)
+
+
+def test_live_verifier_rejects_alternate_bootstrap_input_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    _generate(report_path, inputs)
+    report = _read_report(report_path)
+    alternate = tmp_path / "alternate-launch-bootstrap.py"
+    alternate.write_bytes(preformal.LAUNCH_BOOTSTRAP_PATH.read_bytes())
+    identity = preformal._file_identity(
+        alternate,
+        label="alternate launch bootstrap",
+        expected_nlink=1,
+    )
+    report["input_files_before"]["launch_bootstrap"] = identity
+    report["input_files_after"]["launch_bootstrap"] = identity
+    _rewrite_report(report_path, report)
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="not canonical",
+    ):
+        preformal.verify_preformal_report(report_path)
+
+
+def test_live_verifier_rejects_distinct_two_link_closure_inodes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    _generate(report_path, inputs)
+    report = _read_report(report_path)
+    terminal = Path(
+        report["input_files_before"]["closure_attempt_terminal"]["path"]
+    )
+    completion = Path(
+        report["input_files_before"]["closure_outer_completion"]["path"]
+    )
+    payload = terminal.read_bytes()
+    completion.unlink()
+    completion.write_bytes(payload)
+    os.link(terminal, tmp_path / "terminal-extra.json")
+    os.link(completion, tmp_path / "completion-extra.json")
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="not canonical",
+    ):
+        preformal.verify_preformal_report(report_path)
+
+
+def test_live_verifier_rejects_distinct_two_link_runtime_seal_inodes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    _generate(report_path, inputs)
+    seal = inputs["runtime_seal"]
+    completion = operator_module.outer_completion_marker(seal)
+    payload = seal.read_bytes()
+    completion.unlink()
+    completion.write_bytes(payload)
+    os.link(seal, tmp_path / "seal-extra.json")
+    os.link(completion, tmp_path / "seal-completion-extra.json")
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="not canonical",
+    ):
+        preformal.verify_preformal_report(report_path)
 
 
 def test_exact_preformal_contract_has_ten_role_separated_commands() -> None:
@@ -691,7 +913,7 @@ def test_verifier_semantically_rejects_mutated_accepted_closure_stdout(
 
     with pytest.raises(
         preformal.PreformalEvidenceError,
-        match="accepted-closure stdout",
+        match="accepted_closure_semantics_failed",
     ):
         preformal.verify_preformal_report(report_path)
 
@@ -743,8 +965,209 @@ def test_failed_command_is_preserved_but_never_verifies(
         for row in report["commands"]
         if row["passed"] is False
     ] == [("mypy-wm001", 7)]
-    with pytest.raises(preformal.PreformalEvidenceError, match="identity differs"):
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match=r"failed commands: 4:mypy-wm001\(exit=7\)",
+    ):
         preformal.verify_preformal_report(report_path)
+
+
+@pytest.mark.parametrize(
+    ("failed_command", "expected_exit", "expected_passed"),
+    [
+        (None, 0, True),
+        ("pytest-wm001", 1, False),
+    ],
+)
+def test_generate_report_cli_returns_the_report_verdict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    failed_command: str | None,
+    expected_exit: int,
+    expected_passed: bool,
+) -> None:
+    report_path, _, inputs = _prepare_generation(
+        tmp_path,
+        monkeypatch,
+        failed_command=failed_command,
+    )
+
+    exit_code = preformal.main(
+        [
+            "generate-report",
+            "--output",
+            str(report_path),
+            "--runtime-executable",
+            str(inputs["runtime_executable"]),
+            "--runtime-seal",
+            str(inputs["runtime_seal"]),
+            "--development-closure",
+            str(inputs["development_closure"]),
+            "--closure-attempt",
+            str(inputs["closure_attempt"]),
+            "--prospective-review",
+            str(inputs["prospective_review"]),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == expected_exit
+    assert output["schema"] == (
+        "prospect.wm001.preformal-test-report-generation.v2"
+    )
+    assert output["passed"] is expected_passed
+    assert output["failed_checks"] == []
+    if failed_command is None:
+        assert output["failed_commands"] == []
+    else:
+        assert output["failed_commands"] == [
+            {
+                "ordinal": 6,
+                "name": "pytest-wm001",
+                "exit_code": 7,
+            }
+        ]
+
+
+def test_generate_report_cli_truthfully_names_noncommand_identity_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    identities = [
+        dict(_GIT_IDENTITY),
+        {**_GIT_IDENTITY, "worktree_clean": False},
+    ]
+    monkeypatch.setattr(
+        preformal,
+        "_git_identity",
+        lambda *, environment: identities.pop(0),
+    )
+
+    exit_code = preformal.main(
+        [
+            "generate-report",
+            "--output",
+            str(report_path),
+            "--runtime-executable",
+            str(inputs["runtime_executable"]),
+            "--runtime-seal",
+            str(inputs["runtime_seal"]),
+            "--development-closure",
+            str(inputs["development_closure"]),
+            "--closure-attempt",
+            str(inputs["closure_attempt"]),
+            "--prospective-review",
+            str(inputs["prospective_review"]),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert output["passed"] is False
+    assert output["failed_commands"] == []
+    assert output["failed_checks"] == [
+        "post_run_worktree_not_clean",
+        "pre_post_identity_drift",
+    ]
+
+
+def test_generate_report_cli_truthfully_rejects_semantic_runtime_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        preformal,
+        "_verified_closure_member_digests",
+        lambda _path: ({}, "7" * 64, "8" * 64),
+    )
+
+    exit_code = preformal.main(
+        [
+            "generate-report",
+            "--output",
+            str(report_path),
+            "--runtime-executable",
+            str(inputs["runtime_executable"]),
+            "--runtime-seal",
+            str(inputs["runtime_seal"]),
+            "--development-closure",
+            str(inputs["development_closure"]),
+            "--closure-attempt",
+            str(inputs["closure_attempt"]),
+            "--prospective-review",
+            str(inputs["prospective_review"]),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+    report = _read_report(report_path)
+
+    assert exit_code == 1
+    assert output["passed"] is False
+    assert output["failed_commands"] == []
+    assert output["failed_checks"] == [
+        "accepted_closure_semantics_failed",
+    ]
+    assert report["all_pass"] is False
+
+
+def test_public_runtime_parser_excludes_obsolete_development_evidence(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as raised:
+        preformal._runtime_parser().parse_args(
+            [
+                "development-evidence",
+                "--development-closure",
+                "/tmp/closure.json",
+            ]
+        )
+
+    assert raised.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err
+
+
+def test_versioned_preformal_bundle_ignores_retained_prior_version_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    legacy_root = tmp_path / "development"
+    legacy_root.mkdir()
+    (legacy_root / "preformal-test-report-v1.9.0.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+    (legacy_root / "preformal-v1.9.0-command-01.stdout.legacy.log").write_bytes(
+        b"retained failure evidence"
+    )
+    bundle_root = legacy_root / "v1.10.0" / "preformal"
+    bundle_root.parent.mkdir(parents=True)
+    fixture_root = tmp_path / "fixture"
+    fixture_root.mkdir()
+    report_path, _, inputs = _prepare_generation(fixture_root, monkeypatch)
+    monkeypatch.setattr(
+        preformal,
+        "PREFORMAL_REPORT_PATH",
+        bundle_root / preformal.REPORT_NAME,
+    )
+
+    assert (
+        preformal.generate_preformal_report(
+            bundle_root / preformal.REPORT_NAME,
+            runtime_executable=inputs["runtime_executable"],
+            runtime_seal=inputs["runtime_seal"],
+            development_closure=inputs["development_closure"],
+            closure_attempt=inputs["closure_attempt"],
+            prospective_review=inputs["prospective_review"],
+        )
+        == bundle_root / preformal.REPORT_NAME
+    )
+    assert report_path.parent != bundle_root
+    assert (legacy_root / "preformal-test-report-v1.9.0.json").is_file()
 
 
 def test_dirty_worktree_blocks_before_any_command_or_file(
@@ -761,7 +1184,7 @@ def test_dirty_worktree_blocks_before_any_command_or_file(
     with pytest.raises(preformal.PreformalEvidenceError, match="clean worktree"):
         _generate(report_path, inputs)
     assert calls == []
-    assert list(report_path.parent.iterdir()) == []
+    assert not report_path.parent.exists()
 
 
 def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
@@ -780,7 +1203,7 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     review = {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -813,15 +1236,15 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
         preformal.verify_prospective_review(path)
 
 
-def test_prospective_manifest_binds_v190_plan_and_runbook() -> None:
+def test_prospective_manifest_binds_v1100_plan_and_runbook() -> None:
     paths = {
         str(row["path"])
         for row in preformal._implementation_files()
     }
 
     assert {
-        "docs/wm001-v190-confirmation-plan.md",
-        "docs/wm001-v190-operator-runbook.md",
+        "docs/wm001-v1100-confirmation-plan.md",
+        "docs/wm001-v1100-operator-runbook.md",
     } <= paths
 
 
@@ -1002,7 +1425,7 @@ def test_fresh_closure_reopen_executes_inherited_seal_descriptors(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "mode": "fresh-closure-reopen",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -1120,7 +1543,7 @@ def test_fresh_closure_reopen_validator_uses_archive_member_digests(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "mode": "fresh-closure-reopen",
         "challenge": "7" * 64,
         "requesting_process_id": 101,
@@ -1187,7 +1610,7 @@ def test_fresh_identity_conformance_uses_nested_descriptor_child(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "mode": "fresh-identity-conformance",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -1465,7 +1888,7 @@ def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "mode": "fresh-identity-conformance",
         "challenge": "7" * 64,
         "requesting_process_id": 101,

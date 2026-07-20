@@ -18,7 +18,7 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.9.0 is the active prospective confirmation. It preserves the exact
+Protocol 1.10.0 is the active prospective confirmation. It preserves the exact
 v1.4 model, learning algorithm, optimizer, planner, controller, budgets,
 controls, metrics, thresholds, and K0–K7 order. Its scientific-block digest is
 `fa44fd93a672db3905d45a0e99c568985e7e2e5d02d32043c830db413005a5c3`.
@@ -42,17 +42,45 @@ rejected the archived result qualification because its matrix-contract digest
 had serialized two frozensets without sorting them. Version 1.8 is therefore
 retired before preformal or formal authorization. Version 1.9 sorts every
 matrix-contract row, binds a golden digest, and requires an independent fresh
-sealed-runtime closure verification before preformal evidence can exist. It
-uses fresh seeds and namespaces.
+sealed-runtime closure verification before preformal evidence can exist. Its
+sole producer, independent audit, closure transaction, retained reopen receipt,
+and post-finalization sealed-runtime reopen completed. The fixed preformal gate
+then failed because one runner test redirected its producer root but still read
+the real canonical closure path. The same test had passed while that path was
+absent. The failed report retired v1.9 before binding or formal launch; no
+K3–K6 value was opened or used.
 
-The v1.9 harness uses a non-editable isolated wheel, complete dependency and
+Version 1.10 repairs only that evidence boundary and two independently found
+late blockers. Runner lifecycle paths are root-derived and fixture-isolated.
+Preformal evidence is created under the initially absent, version-owned
+`results/development/v1.10.0/preformal/` bundle. A deterministic hidden claim
+makes interruption nonretryable and is made durable by fsyncing its parent
+before the first command; all ten commands finish before its 20 logs and report
+are staged, fsynced, and atomically published as one directory. Operator
+attempt namespaces are likewise created component by component with each new
+directory entry durably committed before the hidden attempt claim. Report
+generation returns a truthful nonzero failure envelope that distinguishes
+exact command failures, identity drift, and semantic runtime-output failures.
+The obsolete public `development-evidence` runtime mode is removed. Producer
+and independent-auditor contracts now agree directly on command 9,
+`runtime-accepted-closure-evidence`, its seven inputs, semantic digest checks,
+and the two-link same-inode closure-attempt custody. Finally, the exact
+independent formal-input consumer must pass during binding creation and again
+during binding-attempt verification; the outer launcher also requires its
+terminal-bound identity and independently reopens command 9 and command 10 to
+cross-check both semantic receipt digests before importing the formal producer.
+Its canonical
+`formal-input-preflight.json` receipt is retained in the accepted attempt and
+later formal artifact.
+
+The v1.10 harness uses a non-editable isolated wheel, complete dependency and
 package-root inventories, a deterministic module-search path restricted to
 explicit package roots and inventoried standard-library directories, one
 captured descriptor runner, a repository-global cooperative outer-launch lock,
 deterministic same-inode terminal completion, canonical development
 audit/closure/binding attempts, and single-use formal audit and adjudication
 claims. Formal execution accepts only
-`results/operator-v1.9/bindings/formal-binding-v1.9.0/formal-binding.json`
+`results/operator-v1.10/bindings/formal-binding-v1.10.0/formal-binding.json`
 after that attempt is accepted and outer-finalized. A copy or directly created
 binding is not valid authorization.
 
@@ -68,16 +96,22 @@ mutate-and-restore attack.
 Before formal launch, exactly one fresh full-budget two-seed development
 qualification must complete, followed by its canonical independent audit,
 closure attempt, exact ten-row/20-log preformal report, independent prospective
-harness review, and canonical binding attempt. Development performance remains
+harness review, independent formal-input preflight, and canonical binding
+attempt. Development performance remains
 descriptive and permanently claim-ineligible. Creation of the canonical
-qualification root consumes the sole v1.9 development attempt; a failure
+qualification root consumes the sole v1.10 development attempt; a failure
 retires the version rather than authorizing a sibling retry. The complete lifecycle claim
 remains unestablished until the one new eight-seed formal producer is
 outer-finalized, the official independent audit and semantic review accept
 K0–K7, and the terminal adjudication package is accepted and independently
 verified.
 
-Protocols 1.8.0, 1.7.0, 1.6.0, 1.5.0, and 1.4.0 are immutable and retired.
+Protocols 1.9.0, 1.8.0, 1.7.0, 1.6.0, 1.5.0, and 1.4.0 are immutable and retired.
+Protocol 1.9.0 completed development, audit, closure, and sealed reopen, but its
+post-closure preformal test failure made every development artifact
+claim-ineligible and authorized no binding or formal launch. Its terminal
+disposition is preserved in the
+[v1.9 preformal failure review](../../docs/wm001-v190-preformal-test-failure.md).
 Protocol 1.8.0's development producer, audit, and closure completed, but its
 closure was not portable across fresh interpreter hash seeds; no preformal
 report, binding, or formal launch was authorized. Protocol 1.7.0's development
@@ -93,9 +127,9 @@ rejection path then failed to preserve an official rejected package. Protocol
 constant and underspecified endpoint arithmetic. Their exact evidence and
 dispositions remain in the
 [v1.4 results review](../../docs/wm001-v140-formal-results.md) and
-[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.9 does not
+[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.10 does not
 repair or relabel either attempt. The active design is the
-[v1.9 confirmation plan](../../docs/wm001-v190-confirmation-plan.md).
+[v1.10 confirmation plan](../../docs/wm001-v1100-confirmation-plan.md).
 
 ## What the experiment must establish
 
@@ -225,25 +259,25 @@ resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
 
-The v1.9 development rehearsal uses only seeds `86535224` and `2906056242`
+The v1.10 development rehearsal uses only seeds `1647437737` and `1156509260`
 and the complete formal budgets. It is useful only for schema, deterministic
 execution, exact arithmetic, audit coverage, restart, and custody validation.
 Its K3–K6 performance values are descriptive, cannot decide whether formal may
 launch, are never claim-eligible, and cannot be relabeled. After the exclusive
-development closure is published, every further v1.9 development run is
+development closure is published, every further v1.10 development run is
 forbidden.
 
-The one v1.9 formal execution uses:
+The one v1.10 formal execution uses:
 
 ```text
-1369779618, 2721934008, 2798280967, 926105433,
-4118470289, 919763803, 2112633694, 2832104894
+3363134750, 2153178322, 2277484641, 572614265,
+3119775486, 3121614244, 3646941950, 827253974
 ```
 
 The launch-time prebinding replay may reset isolated QA-only Pendulum fixtures;
 those resets collect no formal experience, train no model, and do not consume
 the attempt. The first outcome-producing formal replicate/task reset after
-`results/formal/formal-launch-v1.9.0.json` begins the sole attempt. No resume,
+`results/formal/formal-launch-v1.10.0.json` begins the sole attempt. No resume,
 retry, corrected-audit upgrade, early stopping, extra training, exclusion, or
 analysis change is allowed.
 
@@ -256,7 +290,9 @@ There are two pre-outcome bindings:
    settings, environment conformance, exact coverage conformance, auditor/test
    digests, checkpoint implementation, and the content-addressed
    restart-runtime branch report plus complete repeated path/descriptor
-   execution receipt already sealed by the preformal rehearsal.
+   execution receipt already sealed by the preformal rehearsal. The binding
+   attempt also preserves `formal-input-preflight.json`, produced by the exact
+   independent formal consumer and recomputed when the attempt is verified.
 
 Changing scientific semantics requires a new protocol version. Changing bound
 source, dependencies, or runtime before the first outcome-producing formal
@@ -264,10 +300,10 @@ replicate/task reset requires a new implementation binding. After that reset,
 any such change requires a new protocol version; previous failed attempts
 remain evidence.
 
-## Active v1.9 runbook
+## Active v1.10 runbook
 
 Use the
-[WM-001 v1.9 operator runbook](../../docs/wm001-v190-operator-runbook.md).
+[WM-001 v1.10 operator runbook](../../docs/wm001-v1100-operator-runbook.md).
 It defines the typed runtime seals, canonical operator paths, outer-completion
 checks, exact development/preformal/binding order, and the one formal,
 official-audit, and adjudication sequence.
@@ -275,7 +311,7 @@ official-audit, and adjudication sequence.
 ## Retired v1.4 command sketch — do not execute
 
 The commands below document the retired v1.4 workflow and are retained only to
-explain its evidence history. They do not satisfy v1.9 custody and must not be
+explain its evidence history. They do not satisfy v1.10 custody and must not be
 used to launch an experiment.
 
 ### 1. Install and verify the pre-outcome contract

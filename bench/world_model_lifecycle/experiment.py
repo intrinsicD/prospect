@@ -1,7 +1,7 @@
 """End-to-end WM-001 experiment harness.
 
 This module executes the sealed causal sequence.  Formal configuration is
-accepted only at the exact protocol budgets; the v1.9 development rehearsal
+accepted only at the exact protocol budgets; the v1.10 development rehearsal
 uses the same budgets but remains permanently claim-ineligible.
 """
 
@@ -2676,7 +2676,7 @@ def run_experiment(
     result: dict[str, object] = {
         "schema": "prospect.world-model-lifecycle.raw-result.v9",
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "protocol_sha256": PROTOCOL_SHA256,
         "lane": config.lane,
         "claim_eligible": config.lane == "formal",

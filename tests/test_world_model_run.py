@@ -123,7 +123,19 @@ def test_installed_runner_derives_qualification_from_canonical_git_worktree(
         lifecycle
         / "results"
         / "development"
-        / "qualification-v1.9.0"
+        / "qualification-v1.10.0"
+    )
+    assert module.DEVELOPMENT_CLOSURE_PATH == (
+        lifecycle
+        / "results"
+        / "development"
+        / "development-closure-v1.10.0.json"
+    )
+    assert module.DEVELOPMENT_DIAGNOSTICS_ROOT == (
+        lifecycle
+        / "results"
+        / "development"
+        / "diagnostics-v1.10.0"
     )
 
 
@@ -132,9 +144,8 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.9.0"
+    qualification = root / "qualification-v1.10.0"
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
-    monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
 
     assert (
         run._development_output(
@@ -158,17 +169,26 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
             seed_override=False,
             diagnostic_stamp="stamp",
         )
-    with pytest.raises(ValueError, match="cannot occupy"):
-        run._development_output(
-            qualification,
-            seed_override=True,
-            diagnostic_stamp="stamp",
-        )
+    for reserved in (
+        qualification,
+        root / "development-closure-v1.10.0.json",
+        root / "v1.10.0" / "preformal",
+        tmp_path / "operator-v1.10" / "bindings" / "formal-binding-v1.10.0",
+    ):
+        with pytest.raises(
+            ValueError,
+            match="cannot select an output path",
+        ):
+            run._development_output(
+                reserved,
+                seed_override=True,
+                diagnostic_stamp="stamp",
+            )
     assert run._development_output(
         None,
         seed_override=True,
         diagnostic_stamp="stamp",
-    ) == (root / "diagnostic-stamp")
+    ) == (root / "diagnostics-v1.10.0" / "diagnostic-stamp")
 
 
 def test_existing_qualification_consumes_all_development_entrypoints(
@@ -177,10 +197,9 @@ def test_existing_qualification_consumes_all_development_entrypoints(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.9.0"
+    qualification = root / "qualification-v1.10.0"
     qualification.mkdir(parents=True)
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
-    monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
     monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     monkeypatch.setattr(sys, "argv", ["wm001", "development", "--master-seed", "1"])
 
@@ -194,9 +213,8 @@ def test_runtime_custody_refusal_precedes_producer_root_creation(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.9.0"
+    qualification = root / "qualification-v1.10.0"
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
-    monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
     monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     monkeypatch.setattr(
         experiment_module,
@@ -226,3 +244,40 @@ def test_runtime_custody_refusal_precedes_producer_root_creation(
     assert run.main() == 1
     assert not qualification.exists()
     assert "refused before producer-root creation" in capsys.readouterr().err
+
+
+def test_existing_closure_consumes_development_before_runtime_custody(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = tmp_path / "development"
+    qualification = root / "qualification-v1.10.0"
+    closure = root / "development-closure-v1.10.0.json"
+    root.mkdir(parents=True)
+    closure.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
+    monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    monkeypatch.setattr(
+        experiment_module,
+        "_verify_live_bootstrap_custody",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("closed development must not reach runtime custody")
+        ),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "wm001",
+            "development",
+            "--device",
+            "cpu",
+            "--output",
+            str(qualification),
+        ],
+    )
+
+    assert run.main() == 1
+    assert not qualification.exists()
+    assert "development is closed" in capsys.readouterr().err

@@ -33,6 +33,28 @@ def _row(path: Path, payload: bytes) -> dict[str, object]:
     }
 
 
+def _preflight_receipt(binding_payload: bytes) -> bytes:
+    return _canonical(
+        {
+            "schema": "prospect.wm001.formal-input-preflight.v1",
+            "experiment_id": "WM-001",
+            "protocol_version": "1.10.0",
+            "binding_bytes": len(binding_payload),
+            "binding_sha256": hashlib.sha256(
+                binding_payload
+            ).hexdigest(),
+            "preformal_report_sha256": "1" * 64,
+            "development_closure_sha256": "2" * 64,
+            "accepted_closure_evidence_sha256": "3" * 64,
+            "runtime_conformance_sha256": "4" * 64,
+            "auditor_source_sha256": (
+                artifact_audit._AUDITOR_SOURCE_SHA256
+            ),
+            "passed": True,
+        }
+    )
+
+
 def _write_attempt(
     path: Path,
     *,
@@ -58,7 +80,7 @@ def _write_attempt(
     manifest = {
         "schema": "prospect.wm001.operator-attempt.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "kind": kind,
         "lane": lane,
@@ -94,7 +116,7 @@ def authorization_space(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.9"
+        / "v1.10"
     )
     completion_root.mkdir(parents=True)
     monkeypatch.setattr(
@@ -126,10 +148,13 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "preformal-test-report-v1.9.0.json"
+        / "v1.10.0"
+        / "preformal"
+        / "preformal-test-report-v1.10.0.json"
     )
-    closure_path = preformal_path.with_name(
-        "development-closure-v1.9.0.json"
+    closure_path = (
+        preformal_path.parents[2]
+        / "development-closure-v1.10.0.json"
     )
     preformal_payload = b"preformal\n"
     closure_payload = b"closure\n"
@@ -145,9 +170,13 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.9"
+        / "operator-v1.10"
         / "bindings"
-        / "formal-binding-v1.9.0"
+        / "formal-binding-v1.10.0"
+    )
+    preflight_payload = _preflight_receipt(binding_payload)
+    (artifact_root / "formal-input-preflight.json").write_bytes(
+        preflight_payload
     )
     _write_attempt(
         binding_attempt_path,
@@ -155,7 +184,10 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
         lane=None,
         primary={"binding_file": "formal-binding.json"},
         inputs=observed,
-        files={"formal-binding.json": binding_payload},
+        files={
+            "formal-binding.json": binding_payload,
+            "formal-input-preflight.json": preflight_payload,
+        },
     )
     monkeypatch.setattr(
         artifact_audit,
@@ -189,6 +221,81 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
         assert attempt.root == binding_attempt_path
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "malformed", "copied-different"],
+)
+def test_formal_binding_authorization_requires_exact_preflight_receipt(
+    authorization_space: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    repository, _ = authorization_space
+    artifact_root = repository / "formal-artifact"
+    artifact_root.mkdir()
+    binding_payload = _canonical(
+        {
+            "schema": "prospect.world-model-lifecycle.formal-binding.v9",
+            "experiment_id": "WM-001",
+        }
+    )
+    preflight_payload = _preflight_receipt(binding_payload)
+    live_preflight = preflight_payload
+    if mutation == "malformed":
+        value = json.loads(preflight_payload)
+        value["binding_sha256"] = "f" * 64
+        live_preflight = _canonical(value)
+    copied_preflight = (
+        _canonical({"different": True})
+        if mutation == "copied-different"
+        else live_preflight
+    )
+    (artifact_root / "formal-input-preflight.json").write_bytes(
+        copied_preflight
+    )
+    binding_attempt_path = (
+        repository
+        / "bench"
+        / "world_model_lifecycle"
+        / "results"
+        / "operator-v1.10"
+        / "bindings"
+        / "formal-binding-v1.10.0"
+    )
+    files = {"formal-binding.json": binding_payload}
+    if mutation != "missing":
+        files["formal-input-preflight.json"] = live_preflight
+    _write_attempt(
+        binding_attempt_path,
+        kind="binding",
+        lane=None,
+        primary={"binding_file": "formal-binding.json"},
+        inputs=[],
+        files=files,
+    )
+    monkeypatch.setattr(
+        artifact_audit,
+        "_authorization_preformal_rows",
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        artifact_audit,
+        "_authorization_development_closure",
+        lambda *_args, **_kwargs: ([], None),
+    )
+
+    with pytest.raises(
+        ArtifactAuditError,
+        match="preflight",
+    ):
+        artifact_audit._validate_formal_authorization_lineage(
+            repository=repository,
+            artifact_root=artifact_root,
+            binding={},
+            binding_payload=binding_payload,
+        )
+
+
 @pytest.mark.parametrize("substitute", [False, True])
 def test_development_closure_authorization_reconstructs_producer_and_audit(
     authorization_space: tuple[Path, Path],
@@ -202,7 +309,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
         / "world_model_lifecycle"
         / "results"
     )
-    producer = results / "development" / "qualification-v1.9.0"
+    producer = results / "development" / "qualification-v1.10.0"
     producer_manifest = producer / "producer-manifest.json"
     producer_result = producer / "result.json"
     producer_rows = [
@@ -211,9 +318,9 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
     ]
     audit_path = (
         results
-        / "operator-v1.9"
+        / "operator-v1.10"
         / "audits"
-        / "development-audit-v1.9.0"
+        / "development-audit-v1.10.0"
     )
     _write_attempt(
         audit_path,
@@ -244,11 +351,11 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
     closure_path = (
         results
         / "development"
-        / "development-closure-v1.9.0.json"
+        / "development-closure-v1.10.0.json"
     )
     qualification_archive = {
         "format": "ustar-uncompressed-v1",
-        "file": "development-qualification-v1.9.0.tar",
+        "file": "development-qualification-v1.10.0.tar",
         "members": [
             {
                 "path": "producer/producer-manifest.json",
@@ -268,7 +375,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
         {
             "schema": "prospect.wm001.development-closure.v2",
             "experiment_id": "WM-001",
-            "protocol_version": "1.9.0",
+            "protocol_version": "1.10.0",
             "producer_root": str(producer),
             "qualification_archive": qualification_archive,
             "engineering_verified": True,
@@ -283,9 +390,9 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
 
     closure_attempt_path = (
         results
-        / "operator-v1.9"
+        / "operator-v1.10"
         / "closures"
-        / "development-closure-v1.9.0"
+        / "development-closure-v1.10.0"
     )
     audit_terminal_row = next(
         row
@@ -297,7 +404,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "mode": "fresh-closure-reopen",
         "challenge": "1" * 64,
         "requesting_process_id": 100,
@@ -314,7 +421,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
     reference = {
         "schema": "prospect.wm001.closure-reference.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "closure_marker": str(closure_path),
         "closure_sha256": closure_row["sha256"],
         "qualification_archive": qualification_archive,
@@ -383,9 +490,9 @@ def test_authorization_rejects_unfinalized_or_sibling_attempt(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.9"
+        / "operator-v1.10"
         / "bindings"
-        / "formal-binding-v1.9.0"
+        / "formal-binding-v1.10.0"
     )
     sibling = expected.with_name("sibling-binding")
     binding_payload = _canonical({"binding": True})
@@ -462,6 +569,7 @@ def test_independent_preformal_review_command_uses_module_entrypoint() -> None:
         repository_cwd="/repo",
         runtime_seal_path="/repo/runtime-seal.json",
         development_closure_path="/repo/development-closure.json",
+        closure_attempt_path="/repo/development-closure-attempt",
         prospective_review_path="/repo/review.json",
         device="cuda",
     )
@@ -478,5 +586,26 @@ def test_independent_preformal_review_command_uses_module_entrypoint() -> None:
             "verify-prospective-review",
             "--review",
             "/repo/review.json",
+        ),
+    )
+    assert commands[8] == (
+        "runtime-accepted-closure-evidence",
+        "runtime",
+        (
+            "/runtime/python",
+            "-I",
+            "-S",
+            "-B",
+            "/repo/bench/world_model_lifecycle/launch_bootstrap.py",
+            "--bootstrap",
+            "/repo/bench/world_model_lifecycle/producer_bootstrap.py",
+            "--runtime-seal",
+            "/repo/runtime-seal.json",
+            "preformal-runtime",
+            "accepted-closure-evidence",
+            "--development-closure",
+            "/repo/development-closure.json",
+            "--closure-attempt",
+            "/repo/development-closure-attempt",
         ),
     )

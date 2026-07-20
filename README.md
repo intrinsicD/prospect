@@ -91,9 +91,19 @@ closure hit a 64 MiB whole-file limit while rechecking a 320 MB authenticated
 result. Protocol 1.8 repaired that boundary and completed development, audit,
 and closure, but a fresh-process closure recheck exposed nondeterministic
 serialization of unordered matrix-contract sets. It retired before preformal
-or formal authorization. Protocol 1.9 canonicalizes that contract, binds its
-golden digest, and requires a fresh sealed-runtime closure verification before
-preformal evidence may be created. It also uses fresh seeds and namespaces.
-Follow the
-[WM-001 v1.9 operator runbook](docs/wm001-v190-operator-runbook.md) before
+or formal authorization. Protocol 1.9 repaired that defect and completed its
+producer, independent audit, closure, and sealed-runtime reopen, but its fixed
+preformal suite then exposed a runner test whose closure path was not isolated
+from live lifecycle state. The failed report retired v1.9 before binding or
+formal launch; no K3–K6 value was opened or used.
+
+Protocol 1.10 is the active prospective confirmation. It makes runner paths
+root-derived, creates preformal evidence in a fresh nested version-owned
+bundle through a nonretryable hidden claim and atomic directory publication,
+reports command, identity, and semantic runtime-output failures separately and
+truthfully, removes the obsolete public development-evidence runtime mode, and
+independently preflights the exact formal input package before accepting or
+outer-launching a binding. It uses fresh seeds, environments, and namespaces
+while preserving the scientific system. Follow the
+[WM-001 v1.10 operator runbook](docs/wm001-v1100-operator-runbook.md) before
 creating any development evidence, implementation binding, or formal attempt.

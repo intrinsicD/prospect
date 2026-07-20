@@ -187,42 +187,42 @@ def test_record_hash_decoder_requires_exact_sha256() -> None:
             decode(("sha256", "not+a+valid+digest"))
 
 
-def test_protocol_190_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (86535224, 2906056242)
+def test_protocol_1100_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (1647437737, 1156509260)
     assert verify_module.FORMAL_SEEDS == (
-        1369779618,
-        2721934008,
-        2798280967,
-        926105433,
-        4118470289,
-        919763803,
-        2112633694,
-        2832104894,
+        3363134750,
+        2153178322,
+        2277484641,
+        572614265,
+        3119775486,
+        3121614244,
+        3646941950,
+        827253974,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            86535224,
+            1647437737,
             index,
         )
         for index in range(8)
     ] == [
-        3124666548,
-        959379102,
-        1738832631,
-        3456789891,
-        1950392570,
-        1679071053,
-        1098881818,
-        275228784,
+        2992267997,
+        3343129330,
+        1643143937,
+        2256808159,
+        3913917818,
+        1332951778,
+        1670949655,
+        1964726863,
     ]
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            2906056242,
+            1156509260,
             0,
         )
-        == 2191947877
+        == 367275784
     )
     assert (
         tuple(verify_module.derive_master_seed("development", index) for index in range(2))
@@ -231,7 +231,7 @@ def test_protocol_190_seed_domain_and_master_seeds_are_exact() -> None:
     assert tuple(verify_module.derive_master_seed("formal", index) for index in range(8)) == verify_module.FORMAL_SEEDS
 
 
-def test_protocol_190_states_the_negative_assurance_boundary() -> None:
+def test_protocol_1100_states_the_negative_assurance_boundary() -> None:
     protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
 
     assert protocol["trust_model"] == {
@@ -243,20 +243,20 @@ def test_protocol_190_states_the_negative_assurance_boundary() -> None:
     }
 
 
-def test_implementation_manifest_binds_reviewed_v190_documents() -> None:
+def test_implementation_manifest_binds_reviewed_v1100_documents() -> None:
     paths = {
         str(row["path"])
         for row in binding_module.implementation_files()
     }
 
     assert {
-        "docs/wm001-v190-confirmation-plan.md",
-        "docs/wm001-v190-operator-runbook.md",
-        "docs/wm001-v190-prospective-harness-review.json",
+        "docs/wm001-v1100-confirmation-plan.md",
+        "docs/wm001-v1100-operator-runbook.md",
+        "docs/wm001-v1100-prospective-harness-review.json",
     } <= paths
 
 
-def test_protocol_190_irrelevant_control_contract_is_bound() -> None:
+def test_protocol_1100_irrelevant_control_contract_is_bound() -> None:
     assert (
         "collect_irrelevant",
         verify_module.TASK_IRRELEVANT,
@@ -323,7 +323,7 @@ def test_result_runtime_must_equal_formal_binding_runtime() -> None:
         )
 
 
-def test_formal_binding_schema_binds_protocol_190_and_fresh_seeds() -> None:
+def test_formal_binding_schema_binds_protocol_1100_and_fresh_seeds() -> None:
     schema = json.loads(
         verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -339,7 +339,7 @@ def test_formal_binding_schema_binds_protocol_190_and_fresh_seeds() -> None:
         "external_attestation": {"const": False},
         "exclusive_path_use_required": {"const": True},
     }
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.9.0"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.10.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
@@ -396,7 +396,7 @@ def test_restart_json_comparison_rejects_python_numeric_aliases(
     assert not verify_module._strict_json_equal(observed, expected)
 
 
-def test_raw_result_schema_binds_v190_heldout_split_and_formal_counts() -> None:
+def test_raw_result_schema_binds_v1100_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -407,7 +407,7 @@ def test_raw_result_schema_binds_v190_heldout_split_and_formal_counts() -> None:
 
     assert schema["$id"].endswith("wm-001-raw-result-v9.json")
     assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v9"
-    assert schema["properties"]["protocol_version"]["const"] == "1.9.0"
+    assert schema["properties"]["protocol_version"]["const"] == "1.10.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
@@ -448,7 +448,7 @@ def test_raw_result_schema_binds_v190_heldout_split_and_formal_counts() -> None:
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v190_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v1100_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -832,7 +832,7 @@ def _producer_custody_fixture(
     seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "assurance": dict(binding_module.ASSURANCE),
         "git_commit": execution["git_commit"],
         "git_tree": execution["git_tree"],
@@ -1763,7 +1763,7 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -1894,7 +1894,7 @@ def test_result_qualification_created_in_one_process_reopens_in_two_others(
     qualification = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.9.0",
+        "protocol_version": "1.10.0",
         "protocol_sha256": binding_module.sha256_file(
             binding_module.PROTOCOL_PATH
         ),
@@ -2010,7 +2010,7 @@ def test_development_closure_creator_rejects_any_alternate_marker_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    canonical = tmp_path / "development-closure-v1.9.0.json"
+    canonical = tmp_path / "development-closure-v1.10.0.json"
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
 
     with pytest.raises(RuntimeError, match="only be published"):
@@ -2028,7 +2028,7 @@ def test_preserved_development_closure_name_must_be_content_addressed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _canonical_payload({"schema": "fixture"})
-    canonical = tmp_path / "development-closure-v1.9.0.json"
+    canonical = tmp_path / "development-closure-v1.10.0.json"
     canonical.write_bytes(payload)
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
     assert binding_module._closure_path_mode(canonical, payload) == "canonical"

@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 _SCHEMA = "prospect.wm001.runtime-seal.v1"
-_PROTOCOL_VERSION = "1.9.0"
+_PROTOCOL_VERSION = "1.10.0"
 _PACKAGE_DOMAIN = b"prospect.wm001.package-root.v2\0"
 _STDLIB_DOMAIN = b"prospect.wm001.standard-library.v2\0"
 _ENVIRONMENT_KEYS = frozenset(

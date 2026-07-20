@@ -353,6 +353,41 @@ input, and package identity remained stable, and no K3–K6 value was opened.
 The terminal disposition and required fresh-version repair are recorded in the
 [v1.9 preformal-test failure review](wm001-v190-preformal-test-failure.md).
 
+Protocol 1.10.0 preserves the same scientific system and repairs the complete
+preformal-to-formal-input boundary exposed by that failure and its forensic
+review. Runner lifecycle paths are module-level and derived from redirected
+roots, so a test fixture cannot silently retain the live closure path. The
+canonical preformal artifact is an initially absent nested bundle at
+`results/development/v1.10.0/preformal/`. A deterministic hidden sibling claims
+the attempt; all ten subprocesses finish before the 20 stdout/stderr logs and
+report are staged, fsynced, and atomically published as one no-replace
+directory. Its generation envelope reports the exact failing command and exit
+status separately from source, runtime, Git, input drift, or semantic runtime
+output failure, returns nonzero on failure, and cannot claim `passed: true`
+when the report has `all_pass: false`.
+
+The public runtime surface no longer offers the obsolete
+`development-evidence` mode. Command 9 is exactly
+`runtime-accepted-closure-evidence` and carries seven independently declared
+inputs: the canonical closure, the accepted closure-attempt terminal and its
+same-inode outer completion, the runtime seal, both bootstraps, and the
+prospective review. Both the producer-side verifier and the independent formal
+auditor parse its canonical JSON semantically, bind the relevant digests, and
+require the two closure-attempt links to identify the same inode. A direct
+cross-contract test prevents auditor-authored fixtures from concealing command
+or input drift.
+
+Finally, binding creation invokes the exact independent formal-input consumer
+before the binding attempt can be accepted. That consumer reconstructs the
+preformal report, command 9 evidence, runtime conformance, accepted closure,
+development qualification, source, dependencies, and audit-execution identity.
+Its canonical `formal-input-preflight.json` receipt is retained in the accepted
+binding attempt, recomputed during attempt verification, required and
+cross-checked by the standard-library outer launcher, and carried into the
+formal artifact. The v1.10 plan and exact operator sequence are in the
+[v1.10 confirmation plan](wm001-v1100-confirmation-plan.md) and
+[v1.10 operator runbook](wm001-v1100-operator-runbook.md).
+
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget
@@ -360,10 +395,10 @@ The terminal disposition and required fresh-version repair are recorded in the
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocol 1.9 remains prospective until its one development qualification,
+- Protocol 1.10 remains prospective until its one development qualification,
   one formal confirmation, official audit, semantic review, and terminal
   adjudication complete.
-- The v1.9 custody layer is deliberately not hardened against the repository or
+- The v1.10 custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External
   attestation, read-only media, or an independently operated transparency log
