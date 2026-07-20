@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-raw-result-v8.json",
+  "$id": "https://prospect.local/schemas/wm-001-raw-result-v9.json",
   "title": "WM-001 raw evidence and derived result",
   "type": "object",
   "additionalProperties": false,
@@ -22,13 +22,13 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.raw-result.v8"
+      "const": "prospect.world-model-lifecycle.raw-result.v9"
     },
     "experiment_id": {
       "const": "WM-001"
     },
     "protocol_version": {
-      "const": "1.8.0"
+      "const": "1.9.0"
     },
     "protocol_sha256": {
       "$ref": "#/$defs/sha256"

@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 _SCHEMA = "prospect.wm001.runtime-seal.v1"
-_PROTOCOL_VERSION = "1.8.0"
+_PROTOCOL_VERSION = "1.9.0"
 _PACKAGE_DOMAIN = b"prospect.wm001.package-root.v2\0"
 _STDLIB_DOMAIN = b"prospect.wm001.standard-library.v2\0"
 _ENVIRONMENT_KEYS = frozenset(
@@ -732,7 +732,7 @@ def _expected_from_binding(binding: dict[str, Any]) -> dict[str, object]:
     dependencies = binding.get("dependencies")
     runtime = binding.get("runtime")
     if (
-        binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v8"
+        binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v9"
         or binding.get("experiment_id") != "WM-001"
         or not isinstance(source, dict)
         or not isinstance(dependencies, dict)
@@ -777,7 +777,7 @@ def _verify_runtime_seal(
     expected = (
         _expected_from_binding(supplied)
         if supplied.get("schema")
-        == "prospect.world-model-lifecycle.formal-binding.v8"
+        == "prospect.world-model-lifecycle.formal-binding.v9"
         else supplied
     )
     current = _current_runtime_seal(bootstrap_sha256=bootstrap_sha256)
@@ -820,7 +820,7 @@ def _runtime_custody_nlink(value: dict[str, Any]) -> int:
         or schema
         not in {
             _SCHEMA,
-            "prospect.world-model-lifecycle.formal-binding.v8",
+            "prospect.world-model-lifecycle.formal-binding.v9",
         }
     ):
         raise BootstrapError(

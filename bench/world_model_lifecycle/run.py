@@ -44,7 +44,7 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_QUALIFICATION_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.8.0"
+    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.9.0"
 )
 
 
@@ -123,7 +123,7 @@ def main() -> int:
         if arguments.output is None:
             parser.error(
                 "formal lane requires --output at the exact "
-                "results/formal/<binding-sha256>/confirmation-v1.8.0 path"
+                "results/formal/<binding-sha256>/confirmation-v1.9.0 path"
             )
         expected_binding = FORMAL_BINDING_ATTEMPT_PATH / "formal-binding.json"
         if (
@@ -155,21 +155,21 @@ def main() -> int:
             parser.error(str(error))
         if os.path.lexists(existing_launch_marker):
             print(
-                "WM-001 protocol 1.8 formal launch already consumed; same-version retry is forbidden",
+                "WM-001 protocol 1.9 formal launch already consumed; same-version retry is forbidden",
                 file=sys.stderr,
             )
             return 1
     else:
         if os.path.lexists(DEVELOPMENT_QUALIFICATION_PATH):
             print(
-                "WM-001 protocol 1.8 development qualification already consumed; "
+                "WM-001 protocol 1.9 development qualification already consumed; "
                 "resume and sibling attempts are forbidden",
                 file=sys.stderr,
             )
             return 1
         if os.path.lexists(DEVELOPMENT_CLOSURE_PATH):
             print(
-                "WM-001 protocol 1.8 development is closed; additional same-version rehearsals are forbidden",
+                "WM-001 protocol 1.9 development is closed; additional same-version rehearsals are forbidden",
                 file=sys.stderr,
             )
             return 1

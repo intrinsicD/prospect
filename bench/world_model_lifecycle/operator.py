@@ -1,4 +1,4 @@
-"""Atomic custody-preserving operator entry points for WM-001 protocol 1.8.
+"""Atomic custody-preserving operator entry points for WM-001 protocol 1.9.
 
 Every public entry point in this module is reached through
 ``producer_bootstrap.py``.  Outputs are complete attempt directories: work is
@@ -70,17 +70,17 @@ def _repository_root() -> Path:
 
 REPO = _repository_root()
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_QUALIFICATION_PATH = DEVELOPMENT_RESULTS_ROOT / "qualification-v1.8.0"
-OPERATOR_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "operator-v1.8"
+DEVELOPMENT_QUALIFICATION_PATH = DEVELOPMENT_RESULTS_ROOT / "qualification-v1.9.0"
+OPERATOR_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "operator-v1.9"
 BINDING_ATTEMPTS_ROOT = OPERATOR_RESULTS_ROOT / "bindings"
 AUDIT_ATTEMPTS_ROOT = OPERATOR_RESULTS_ROOT / "audits"
 CLOSURE_ATTEMPTS_ROOT = OPERATOR_RESULTS_ROOT / "closures"
-OUTER_COMPLETIONS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.8"
-FORMAL_BINDING_ATTEMPT_PATH = BINDING_ATTEMPTS_ROOT / "formal-binding-v1.8.0"
-DEVELOPMENT_AUDIT_ATTEMPT_PATH = AUDIT_ATTEMPTS_ROOT / "development-audit-v1.8.0"
-FORMAL_AUDIT_ATTEMPT_PATH = AUDIT_ATTEMPTS_ROOT / "formal-audit-v1.8.0"
-FORMAL_AUDIT_CLAIM_MARKER = REPO / "bench" / "world_model_lifecycle" / "results" / "formal" / "formal-audit-v1.8.0.json"
-CLOSURE_ATTEMPT_PATH = CLOSURE_ATTEMPTS_ROOT / "development-closure-v1.8.0"
+OUTER_COMPLETIONS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.9"
+FORMAL_BINDING_ATTEMPT_PATH = BINDING_ATTEMPTS_ROOT / "formal-binding-v1.9.0"
+DEVELOPMENT_AUDIT_ATTEMPT_PATH = AUDIT_ATTEMPTS_ROOT / "development-audit-v1.9.0"
+FORMAL_AUDIT_ATTEMPT_PATH = AUDIT_ATTEMPTS_ROOT / "formal-audit-v1.9.0"
+FORMAL_AUDIT_CLAIM_MARKER = REPO / "bench" / "world_model_lifecycle" / "results" / "formal" / "formal-audit-v1.9.0.json"
+CLOSURE_ATTEMPT_PATH = CLOSURE_ATTEMPTS_ROOT / "development-closure-v1.9.0"
 
 
 class OperatorError(RuntimeError):
@@ -88,7 +88,7 @@ class OperatorError(RuntimeError):
 
 
 class _FormalAuditRetired(OperatorError):
-    """The sole protocol-1.8 formal audit claim has already been consumed."""
+    """The sole protocol-1.9 formal audit claim has already been consumed."""
 
 
 class _StoreOnce(argparse.Action):
@@ -503,7 +503,7 @@ def _failure_record(
     return {
         "schema": _FAILURE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.8.0",
+        "protocol_version": "1.9.0",
         "kind": kind,
         "lane": lane,
         "phase": phase,
@@ -951,7 +951,7 @@ def _verify_reproduction_receipt(
         set(receipt) != expected
         or receipt.get("schema") != "prospect.wm001.audit-reproduction.v2"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.8.0"
+        or receipt.get("protocol_version") != "1.9.0"
         or receipt.get("supplied_audit_sha256") != audit_sha256
         or receipt.get("reproduced_audit_sha256") != audit_sha256
         or receipt.get("byte_identical") is not True
@@ -1393,7 +1393,7 @@ def _verify_attempt_directory(
         set(manifest) != expected_fields
         or manifest.get("schema") != _ATTEMPT_SCHEMA
         or manifest.get("experiment_id") != "WM-001"
-        or manifest.get("protocol_version") != "1.8.0"
+        or manifest.get("protocol_version") != "1.9.0"
         or manifest.get("assurance") != ASSURANCE
         or kind not in {"binding", "audit", "closure"}
         or (
@@ -1485,7 +1485,7 @@ def _verify_attempt_directory(
             }
             or failure.get("schema") != _FAILURE_SCHEMA
             or failure.get("experiment_id") != "WM-001"
-            or failure.get("protocol_version") != "1.8.0"
+            or failure.get("protocol_version") != "1.9.0"
             or failure.get("kind") != kind
             or failure.get("lane") != lane
             or failure.get("phase") != _FAILURE_PHASE[cast(str, kind)]
@@ -1559,12 +1559,17 @@ def _verify_attempt_directory(
                 "producer_root",
                 "audit_attempt",
                 "audit_attempt_manifest_sha256",
+                "fresh_reopen_file",
+                "fresh_reopen_sha256",
             }
             or reference.get("schema") != _CLOSURE_REFERENCE_SCHEMA
             or reference.get("experiment_id") != "WM-001"
-            or reference.get("protocol_version") != "1.8.0"
+            or reference.get("protocol_version") != "1.9.0"
             or not _sha256_string(reference.get("closure_sha256"))
             or not _sha256_string(reference.get("audit_attempt_manifest_sha256"))
+            or reference.get("fresh_reopen_file")
+            != "fresh-runtime-reopen.json"
+            or not _sha256_string(reference.get("fresh_reopen_sha256"))
         ):
             raise OperatorError("closure reference is malformed")
         verify_closure_authorization_inputs(
@@ -1581,6 +1586,21 @@ def _verify_attempt_directory(
             raise OperatorError("closure reference marker path is malformed")
         closure_path = Path(closure_marker)
         closure = verify_development_closure(closure_path)
+        fresh_reopen_payload = _attempt_file_payload(
+            root,
+            "fresh-runtime-reopen.json",
+            label="fresh runtime closure-reopen report",
+        )
+        fresh_reopen = _canonical_object(
+            fresh_reopen_payload,
+            label="fresh runtime closure-reopen report",
+        )
+        from .preformal import validate_fresh_closure_reopen_report
+
+        validate_fresh_closure_reopen_report(
+            fresh_reopen,
+            development_closure=closure_path,
+        )
         marker_payload = _FileCapture.open(
             closure_path,
             label="canonical development closure",
@@ -1611,6 +1631,8 @@ def _verify_attempt_directory(
             audit_terminal_capture.close()
         if (
             closure_sha256 != reference.get("closure_sha256")
+            or hashlib.sha256(fresh_reopen_payload).hexdigest()
+            != reference.get("fresh_reopen_sha256")
             or closure.get("qualification_archive") != reference.get("qualification_archive")
             or closure.get("producer_root") != reference.get("producer_root")
             or audit_manifest.get("lane") != "development"
@@ -1675,7 +1697,7 @@ def verify_operator_attempt(path: Path) -> dict[str, object]:
         "audit": (DEVELOPMENT_AUDIT_ATTEMPT_PATH if manifest["lane"] == "development" else FORMAL_AUDIT_ATTEMPT_PATH),
     }[cast(str, manifest["kind"])]
     if root != expected_attempt:
-        raise OperatorError("published operator attempt is not its canonical protocol-1.8 path")
+        raise OperatorError("published operator attempt is not its canonical protocol-1.9 path")
     verify_outer_completion(root / _TERMINAL_MANIFEST)
     return manifest
 
@@ -1706,7 +1728,7 @@ def inspect_unfinalized_operator_attempt(path: Path) -> dict[str, object]:
         "audit": (DEVELOPMENT_AUDIT_ATTEMPT_PATH if manifest["lane"] == "development" else FORMAL_AUDIT_ATTEMPT_PATH),
     }[cast(str, manifest["kind"])]
     if root != expected_attempt:
-        raise OperatorError("unfinalized operator attempt is not its canonical protocol-1.8 path")
+        raise OperatorError("unfinalized operator attempt is not its canonical protocol-1.9 path")
     terminal = root / _TERMINAL_MANIFEST
     marker = outer_completion_marker(terminal)
     if os.path.lexists(marker):
@@ -1762,7 +1784,7 @@ class _Attempt:
         manifest = {
             "schema": _ATTEMPT_SCHEMA,
             "experiment_id": "WM-001",
-            "protocol_version": "1.8.0",
+            "protocol_version": "1.9.0",
             "assurance": assurance_record(),
             "kind": self.kind,
             "lane": self.lane,
@@ -1842,7 +1864,7 @@ def _require_sealed_entry() -> None:
 
 def _binding_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create one atomic WM-001 v1.8 binding attempt",
+        description="Create one atomic WM-001 v1.9 binding attempt",
         allow_abbrev=False,
     )
     parser.add_argument("--output", required=True, type=Path, action=_StoreOnce)
@@ -2026,7 +2048,7 @@ def _formal_claim_value(
     return {
         "schema": _FORMAL_AUDIT_CLAIM_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.8.0",
+        "protocol_version": "1.9.0",
         "claim_status": "consumed",
         "attempt_path": str(output),
         "marker_path": str(FORMAL_AUDIT_CLAIM_MARKER),
@@ -2053,7 +2075,7 @@ def _publish_formal_audit_claim(
         label="formal audit claim marker directory",
     )
     if os.path.lexists(marker):
-        raise _FormalAuditRetired("WM-001 protocol 1.8 formal audit claim is already consumed")
+        raise _FormalAuditRetired("WM-001 protocol 1.9 formal audit claim is already consumed")
     launch_capture = _FileCapture.open(
         Path(__file__).with_name("launch_bootstrap.py"),
         label="formal audit launch bootstrap",
@@ -2070,7 +2092,7 @@ def _publish_formal_audit_claim(
         try:
             os.link(claim_path, marker, follow_symlinks=False)
         except FileExistsError as error:
-            raise _FormalAuditRetired("WM-001 protocol 1.8 formal audit claim is already consumed") from error
+            raise _FormalAuditRetired("WM-001 protocol 1.9 formal audit claim is already consumed") from error
         except OSError as error:
             raise OperatorError("formal audit claim marker could not be published") from error
         on_irreversible()
@@ -2197,7 +2219,7 @@ def _verify_formal_audit_claim(
         set(claim) != expected
         or claim.get("schema") != _FORMAL_AUDIT_CLAIM_SCHEMA
         or claim.get("experiment_id") != "WM-001"
-        or claim.get("protocol_version") != "1.8.0"
+        or claim.get("protocol_version") != "1.9.0"
         or claim.get("claim_status") != "consumed"
         or claim.get("attempt_path") != str(FORMAL_AUDIT_ATTEMPT_PATH)
         or claim.get("marker_path") != str(FORMAL_AUDIT_CLAIM_MARKER)
@@ -2293,7 +2315,7 @@ def binding_main(argv: Sequence[str] | None = None) -> int:
     arguments = _binding_parser().parse_args(argv)
     if arguments.output != FORMAL_BINDING_ATTEMPT_PATH:
         raise OperatorError(
-            f"formal binding output must be the canonical protocol-1.8 attempt path {FORMAL_BINDING_ATTEMPT_PATH}"
+            f"formal binding output must be the canonical protocol-1.9 attempt path {FORMAL_BINDING_ATTEMPT_PATH}"
         )
     output = _attempt_output(
         arguments.output,
@@ -2464,7 +2486,7 @@ def audit_main(argv: Sequence[str] | None = None) -> int:
         if arguments.output != DEVELOPMENT_AUDIT_ATTEMPT_PATH:
             raise OperatorError(
                 "development audit output must be the sole canonical "
-                f"protocol-1.8 attempt path {DEVELOPMENT_AUDIT_ATTEMPT_PATH}"
+                f"protocol-1.9 attempt path {DEVELOPMENT_AUDIT_ATTEMPT_PATH}"
             )
         if arguments.producer != DEVELOPMENT_QUALIFICATION_PATH:
             raise OperatorError(
@@ -2473,14 +2495,14 @@ def audit_main(argv: Sequence[str] | None = None) -> int:
         from . import binding as binding_module
 
         if os.path.lexists(binding_module.DEVELOPMENT_CLOSURE_PATH):
-            raise OperatorError("WM-001 protocol 1.8 development audit is retired after development closure")
+            raise OperatorError("WM-001 protocol 1.9 development audit is retired after development closure")
     else:
         if arguments.output != FORMAL_AUDIT_ATTEMPT_PATH:
             raise OperatorError(
-                f"formal audit output must be the sole canonical protocol-1.8 attempt path {FORMAL_AUDIT_ATTEMPT_PATH}"
+                f"formal audit output must be the sole canonical protocol-1.9 attempt path {FORMAL_AUDIT_ATTEMPT_PATH}"
             )
         if os.path.lexists(FORMAL_AUDIT_CLAIM_MARKER):
-            raise _FormalAuditRetired("WM-001 protocol 1.8 formal audit claim is already consumed")
+            raise _FormalAuditRetired("WM-001 protocol 1.9 formal audit claim is already consumed")
     output = _attempt_output(
         arguments.output,
         root=AUDIT_ATTEMPTS_ROOT,
@@ -2716,7 +2738,7 @@ def closure_main(argv: Sequence[str] | None = None) -> int:
     arguments = _closure_parser().parse_args(argv)
     if arguments.output != CLOSURE_ATTEMPT_PATH:
         raise OperatorError(
-            f"development closure output must be the canonical protocol-1.8 attempt path {CLOSURE_ATTEMPT_PATH}"
+            f"development closure output must be the canonical protocol-1.9 attempt path {CLOSURE_ATTEMPT_PATH}"
         )
     if arguments.producer != DEVELOPMENT_QUALIFICATION_PATH:
         raise OperatorError(
@@ -2729,7 +2751,7 @@ def closure_main(argv: Sequence[str] | None = None) -> int:
     )
     if arguments.audit_attempt != DEVELOPMENT_AUDIT_ATTEMPT_PATH:
         raise OperatorError(
-            f"development closure requires the canonical protocol-1.8 audit attempt {DEVELOPMENT_AUDIT_ATTEMPT_PATH}"
+            f"development closure requires the canonical protocol-1.9 audit attempt {DEVELOPMENT_AUDIT_ATTEMPT_PATH}"
         )
     audit_attempt = _canonical_existing_directory(
         arguments.audit_attempt,
@@ -2848,16 +2870,30 @@ def closure_main(argv: Sequence[str] | None = None) -> int:
         marker_payload = marker_capture.payload
         terminal_capture = captured_audit_files[_TERMINAL_MANIFEST]
         assert terminal_capture.payload is not None
+        from .preformal import (
+            fresh_runtime_development_closure_reopen,
+        )
+
+        fresh_reopen = fresh_runtime_development_closure_reopen(marker)
+        fresh_reopen_payload = _canonical_json_bytes(fresh_reopen)
+        _atomic_write(
+            attempt.staging / "fresh-runtime-reopen.json",
+            fresh_reopen_payload,
+        )
         reference = {
             "schema": _CLOSURE_REFERENCE_SCHEMA,
             "experiment_id": "WM-001",
-            "protocol_version": "1.8.0",
+            "protocol_version": "1.9.0",
             "closure_marker": str(marker),
             "closure_sha256": hashlib.sha256(marker_payload).hexdigest(),
             "qualification_archive": closure["qualification_archive"],
             "producer_root": str(producer.root),
             "audit_attempt": str(audit_attempt),
             "audit_attempt_manifest_sha256": hashlib.sha256(terminal_capture.payload).hexdigest(),
+            "fresh_reopen_file": "fresh-runtime-reopen.json",
+            "fresh_reopen_sha256": hashlib.sha256(
+                fresh_reopen_payload
+            ).hexdigest(),
         }
         _write_json(attempt.staging / "closure-reference.json", reference)
 

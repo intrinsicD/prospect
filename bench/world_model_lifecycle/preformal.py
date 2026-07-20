@@ -1,4 +1,4 @@
-"""Trusted, immutable preformal test evidence for WM-001 protocol 1.8."""
+"""Trusted, immutable preformal test evidence for WM-001 protocol 1.9."""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ from .assurance import ASSURANCE
 
 SCHEMA = "prospect.wm001.preformal-test-report.v2"
 EXPERIMENT_ID = "WM-001"
-PROTOCOL_VERSION = "1.8.0"
-REPORT_NAME = "preformal-test-report-v1.8.0.json"
+PROTOCOL_VERSION = "1.9.0"
+REPORT_NAME = "preformal-test-report-v1.9.0.json"
 PREFORMAL_REPORT_NAME = REPORT_NAME
-LOG_PREFIX = "preformal-v1.8.0-command-"
+LOG_PREFIX = "preformal-v1.9.0-command-"
 _EVIDENCE_PREFIX = "preformal-"
 SOURCE_RELATIVE_PATH = "bench/world_model_lifecycle/preformal.py"
-REVIEW_RELATIVE_PATH = "docs/wm001-v180-prospective-harness-review.json"
+REVIEW_RELATIVE_PATH = "docs/wm001-v190-prospective-harness-review.json"
 REVIEW_SCHEMA = "prospect.wm001.prospective-harness-review.v1"
 
 
@@ -60,7 +60,16 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_CLOSURE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.8.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.9.0.json"
+)
+CLOSURE_ATTEMPT_PATH = (
+    REPO
+    / "bench"
+    / "world_model_lifecycle"
+    / "results"
+    / "operator-v1.9"
+    / "closures"
+    / "development-closure-v1.9.0"
 )
 PREFORMAL_REPORT_PATH = DEVELOPMENT_RESULTS_ROOT / REPORT_NAME
 LAUNCH_BOOTSTRAP_PATH = REPO / "bench/world_model_lifecycle/launch_bootstrap.py"
@@ -128,7 +137,7 @@ _COMMAND_NAMES = (
     "pytest-wm001",
     "audit-runner-adversarial",
     "prospective-harness-review",
-    "runtime-development-evidence",
+    "runtime-accepted-closure-evidence",
     "runtime-bootstrap-inventory-conformance",
 )
 _WM001_MYPY_FILES = (
@@ -174,7 +183,17 @@ _RUNTIME_SEAL_FIELDS = {
 }
 _SINGLE_LINK_CUSTODY = 1
 _OUTER_FINALIZED_CUSTODY = 2
+_FRESH_CLOSURE_REOPEN_SCHEMA = (
+    "prospect.wm001.development-closure-fresh-reopen.v1"
+)
+_FRESH_IDENTITY_CONFORMANCE_SCHEMA = (
+    "prospect.wm001.fresh-runtime-identity-conformance.v1"
+)
+_FRESH_CLOSURE_REOPEN_TIMEOUT_SECONDS = 3_600
+_FRESH_CLOSURE_REOPEN_MAX_OUTPUT_BYTES = 64 << 10
 _PREFORMAL_INPUT_NLINKS = {
+    "closure_attempt_terminal": _OUTER_FINALIZED_CUSTODY,
+    "closure_outer_completion": _OUTER_FINALIZED_CUSTODY,
     "development_closure": _SINGLE_LINK_CUSTODY,
     "launch_bootstrap": _SINGLE_LINK_CUSTODY,
     "producer_bootstrap": _SINGLE_LINK_CUSTODY,
@@ -739,6 +758,8 @@ def _implementation_files(*, environment: dict[str, str] | None = None) -> list[
         REPO / "bench/world_model_lifecycle/protocol.json",
         REPO / "bench/world_model_lifecycle/schemas/raw-result.schema.json",
         REPO / "bench/world_model_lifecycle/schemas/formal-binding.schema.json",
+        REPO / "docs/wm001-v190-confirmation-plan.md",
+        REPO / "docs/wm001-v190-operator-runbook.md",
     ]
     rows: list[dict[str, object]] = []
     for path in sorted(set(candidates)):
@@ -868,10 +889,11 @@ def required_commands(
     runtime_executable_path: str | None = None,
     runtime_seal_path: Path | None = None,
     development_closure_path: Path = DEVELOPMENT_CLOSURE_PATH,
+    closure_attempt_path: Path = CLOSURE_ATTEMPT_PATH,
     prospective_review_path: Path = REVIEW_PATH,
     device: str = "cpu",
 ) -> tuple[CommandSpec, ...]:
-    """Return the fixed, ordered v1.8 preformal command contract."""
+    """Return the fixed, ordered v1.9 preformal command contract."""
 
     if device not in {"cpu", "cuda"}:
         raise PreformalEvidenceError("preformal device must be cpu or cuda")
@@ -885,12 +907,17 @@ def required_commands(
     )
     runtime_seal = (
         REPO
-        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.8.0.json"
+        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.9.0.json"
         if runtime_seal_path is None
         else _canonical_existing_file(runtime_seal_path, label="runtime seal")
     )
     development_closure = (
         development_closure_path if development_closure_path.is_absolute() else Path.cwd() / development_closure_path
+    )
+    closure_attempt = (
+        closure_attempt_path
+        if closure_attempt_path.is_absolute()
+        else Path.cwd() / closure_attempt_path
     )
     review = prospective_review_path if prospective_review_path.is_absolute() else Path.cwd() / prospective_review_path
     epistemic_tests = _test_files("test_epistemic_*.py", label="epistemic")
@@ -969,13 +996,15 @@ def required_commands(
             ),
         ),
         CommandSpec(
-            "runtime-development-evidence",
+            "runtime-accepted-closure-evidence",
             "runtime",
             (
                 *runtime_prefix,
-                "development-evidence",
+                "accepted-closure-evidence",
                 "--development-closure",
                 str(development_closure),
+                "--closure-attempt",
+                str(closure_attempt),
             ),
         ),
         CommandSpec(
@@ -1083,9 +1112,21 @@ def _input_identities(
     *,
     runtime_seal_path: Path,
     development_closure_path: Path,
+    closure_attempt_path: Path,
     prospective_review_path: Path,
 ) -> dict[str, dict[str, object]]:
+    from .operator import outer_completion_marker
+
+    closure_terminal = closure_attempt_path / "operator-attempt.json"
     inputs = {
+        "closure_attempt_terminal": (
+            closure_terminal,
+            "development closure attempt terminal",
+        ),
+        "closure_outer_completion": (
+            outer_completion_marker(closure_terminal),
+            "development closure outer completion",
+        ),
         "development_closure": (
             development_closure_path,
             "development closure",
@@ -1123,6 +1164,7 @@ def generate_preformal_report(
     runtime_executable: Path,
     runtime_seal: Path,
     development_closure: Path = DEVELOPMENT_CLOSURE_PATH,
+    closure_attempt: Path = CLOSURE_ATTEMPT_PATH,
     prospective_review: Path = REVIEW_PATH,
     device: str = "cpu",
 ) -> Path:
@@ -1134,7 +1176,7 @@ def generate_preformal_report(
         raise PreformalEvidenceError("preformal report path must not contain aliases")
     if output != PREFORMAL_REPORT_PATH:
         raise PreformalEvidenceError(
-            "preformal report must use the sole canonical protocol-1.8 "
+            "preformal report must use the sole canonical protocol-1.9 "
             f"path {PREFORMAL_REPORT_PATH}"
         )
     directory = _canonical_existing_directory(output.parent, label="evidence directory")
@@ -1148,6 +1190,14 @@ def generate_preformal_report(
         development_closure,
         label="development closure",
     )
+    closure_attempt_path = _canonical_existing_directory(
+        closure_attempt,
+        label="development closure attempt",
+    )
+    if closure_attempt_path != CLOSURE_ATTEMPT_PATH:
+        raise PreformalEvidenceError(
+            "development closure attempt must use its canonical path"
+        )
     prospective_review_path = _canonical_existing_file(
         prospective_review,
         label="prospective harness review",
@@ -1192,6 +1242,7 @@ def generate_preformal_report(
     inputs_before = _input_identities(
         runtime_seal_path=runtime_seal_path,
         development_closure_path=development_closure_path,
+        closure_attempt_path=closure_attempt_path,
         prospective_review_path=prospective_review_path,
     )
     specifications = required_commands(
@@ -1199,6 +1250,7 @@ def generate_preformal_report(
         runtime_executable_path=str(runtime_executable_path),
         runtime_seal_path=runtime_seal_path,
         development_closure_path=development_closure_path,
+        closure_attempt_path=closure_attempt_path,
         prospective_review_path=prospective_review_path,
         device=device,
     )
@@ -1251,6 +1303,7 @@ def generate_preformal_report(
     inputs_after = _input_identities(
         runtime_seal_path=runtime_seal_path,
         development_closure_path=development_closure_path,
+        closure_attempt_path=closure_attempt_path,
         prospective_review_path=prospective_review_path,
     )
     runtime_seal_after, runtime_environment_after = _validated_runtime_seal(
@@ -1350,6 +1403,174 @@ def _validate_file_identity(identity: object, *, label: str) -> dict[str, object
     return identity
 
 
+def _verified_closure_member_digests(
+    development_closure: Path,
+) -> tuple[dict[str, object], str, str]:
+    """Return verified producer/result member digests from one closure."""
+
+    from .binding import verify_development_closure
+
+    closure_path = _canonical_existing_file(
+        development_closure,
+        label="development closure with archived member identities",
+    )
+    closure = verify_development_closure(closure_path)
+    archive = closure.get("qualification_archive")
+    members = archive.get("members") if isinstance(archive, dict) else None
+    if not isinstance(members, list):
+        raise PreformalEvidenceError(
+            "verified development closure has no archive members"
+        )
+
+    def archived_member_sha256(role: str) -> str:
+        member = closure.get(role)
+        matches = [
+            row.get("sha256")
+            for row in members
+            if isinstance(row, dict) and row.get("path") == member
+        ]
+        if (
+            not isinstance(member, str)
+            or len(matches) != 1
+            or not _is_sha256(matches[0])
+        ):
+            raise PreformalEvidenceError(
+                f"verified development closure has no unique {role}"
+            )
+        return cast(str, matches[0])
+
+    return (
+        closure,
+        archived_member_sha256("producer_manifest_member"),
+        archived_member_sha256("raw_result_member"),
+    )
+
+
+def _accepted_closure_evidence_from_report(
+    directory: Path,
+    report: Mapping[str, object],
+) -> dict[str, object]:
+    """Reopen the sealed post-finalization closure authorization result."""
+
+    commands = report.get("commands")
+    matches = (
+        [
+            row
+            for row in commands
+            if isinstance(row, Mapping)
+            and row.get("name")
+            == "runtime-accepted-closure-evidence"
+        ]
+        if isinstance(commands, list)
+        else []
+    )
+    if len(matches) != 1:
+        raise PreformalEvidenceError(
+            "preformal report lacks one accepted-closure command"
+        )
+    row = matches[0]
+    stdout_reference = row.get("stdout")
+    stderr_reference = row.get("stderr")
+    if (
+        not isinstance(stdout_reference, Mapping)
+        or set(stdout_reference) != {"file", "bytes", "sha256"}
+        or type(stdout_reference.get("bytes")) is not int
+        or cast(int, stdout_reference["bytes"]) < 1
+        or not _is_sha256(stdout_reference.get("sha256"))
+        or not isinstance(stderr_reference, Mapping)
+        or set(stderr_reference) != {"file", "bytes", "sha256"}
+        or stderr_reference.get("bytes") != 0
+        or stderr_reference.get("sha256") != _sha256(b"")
+    ):
+        raise PreformalEvidenceError(
+            "accepted-closure command stream identities are malformed"
+        )
+    path = _safe_sibling(
+        directory,
+        stdout_reference.get("file"),
+        label="accepted-closure stdout",
+    )
+    payload = _read_regular(
+        path,
+        label="accepted-closure stdout",
+    )
+    if (
+        len(payload) != stdout_reference.get("bytes")
+        or _sha256(payload) != stdout_reference.get("sha256")
+    ):
+        raise PreformalEvidenceError(
+            "accepted-closure stdout identity changed"
+        )
+    value = _load_canonical_object(
+        payload,
+        label="accepted-closure stdout",
+    )
+    inputs = report.get("input_files_before")
+    if not isinstance(inputs, Mapping):
+        raise PreformalEvidenceError(
+            "accepted-closure report has no input identities"
+        )
+    closure_input = inputs.get("development_closure")
+    if (
+        not isinstance(closure_input, Mapping)
+        or not isinstance(closure_input.get("path"), str)
+    ):
+        raise PreformalEvidenceError(
+            "accepted-closure report has no closure path"
+        )
+    _, producer_manifest_sha256, raw_result_sha256 = (
+        _verified_closure_member_digests(
+            Path(cast(str, closure_input["path"])),
+        )
+    )
+    expected_fields = {
+        "schema",
+        "mode",
+        "passed",
+        "development_closure_sha256",
+        "producer_manifest_sha256",
+        "raw_result_sha256",
+        "closure_attempt_manifest_sha256",
+        "closure_outer_completion_sha256",
+    }
+    if (
+        set(value) != expected_fields
+        or value.get("schema")
+        != "prospect.wm001.preformal-runtime-check.v1"
+        or value.get("mode") != "accepted-closure-evidence"
+        or value.get("passed") is not True
+        or any(
+            not _is_sha256(value.get(field))
+            for field in (
+                "development_closure_sha256",
+                "producer_manifest_sha256",
+                "raw_result_sha256",
+                "closure_attempt_manifest_sha256",
+                "closure_outer_completion_sha256",
+            )
+        )
+        or value.get("development_closure_sha256")
+        != closure_input.get("sha256")
+        or value.get("producer_manifest_sha256")
+        != producer_manifest_sha256
+        or value.get("raw_result_sha256") != raw_result_sha256
+        or value.get("closure_attempt_manifest_sha256")
+        != cast(
+            Mapping[str, object],
+            inputs["closure_attempt_terminal"],
+        ).get("sha256")
+        or value.get("closure_outer_completion_sha256")
+        != cast(
+            Mapping[str, object],
+            inputs["closure_outer_completion"],
+        ).get("sha256")
+    ):
+        raise PreformalEvidenceError(
+            "accepted-closure stdout is not one complete sealed pass"
+        )
+    return value
+
+
 def _runtime_bootstrap_conformance_from_report(
     directory: Path,
     report: Mapping[str, object],
@@ -1412,6 +1633,7 @@ def _runtime_bootstrap_conformance_from_report(
             "passed",
             "inventory_sha256",
             "conformance_sha256",
+            "fresh_runtime_identity_conformance_sha256",
             "restart_runtime_conformance_report_sha256",
             "restart_runtime_execution_receipt_sha256",
             "restart_runtime_support_files",
@@ -1431,6 +1653,7 @@ def _runtime_bootstrap_conformance_from_report(
             for field in (
                 "inventory_sha256",
                 "conformance_sha256",
+                "fresh_runtime_identity_conformance_sha256",
                 "restart_runtime_conformance_report_sha256",
                 "restart_runtime_execution_receipt_sha256",
             )
@@ -1454,7 +1677,7 @@ def _runtime_bootstrap_conformance_from_report(
 
 
 def verify_preformal_report(report_path: Path) -> dict[str, Any]:
-    """Strictly reopen and independently validate a passing v1.8 report."""
+    """Strictly reopen and independently validate a passing v1.9 report."""
 
     lexical = report_path if report_path.is_absolute() else Path.cwd() / report_path
     absolute = Path(os.path.abspath(report_path))
@@ -1533,6 +1756,8 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
         not isinstance(inputs_before, dict)
         or set(inputs_before)
         != {
+            "closure_attempt_terminal",
+            "closure_outer_completion",
             "development_closure",
             "launch_bootstrap",
             "producer_bootstrap",
@@ -1553,6 +1778,24 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
             raise PreformalEvidenceError(f"preformal {label} input changed")
     runtime_seal_path = Path(cast(str, inputs_before["runtime_seal"]["path"]))
     development_closure_path = Path(cast(str, inputs_before["development_closure"]["path"]))
+    closure_attempt_terminal_path = Path(
+        cast(str, inputs_before["closure_attempt_terminal"]["path"])
+    )
+    closure_outer_completion_path = Path(
+        cast(str, inputs_before["closure_outer_completion"]["path"])
+    )
+    closure_attempt_path = closure_attempt_terminal_path.parent
+    from .operator import outer_completion_marker
+
+    if (
+        closure_attempt_terminal_path
+        != CLOSURE_ATTEMPT_PATH / "operator-attempt.json"
+        or closure_outer_completion_path
+        != outer_completion_marker(closure_attempt_terminal_path)
+    ):
+        raise PreformalEvidenceError(
+            "preformal closure-attempt inputs are not canonical"
+        )
     review_path = Path(cast(str, inputs_before["prospective_review"]["path"]))
     if review_path != REVIEW_PATH:
         raise PreformalEvidenceError(f"prospective harness review must be the canonical {REVIEW_RELATIVE_PATH}")
@@ -1591,6 +1834,7 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
         runtime_executable_path=cast(str, runtime_before["invocation_path"]),
         runtime_seal_path=runtime_seal_path,
         development_closure_path=development_closure_path,
+        closure_attempt_path=closure_attempt_path,
         prospective_review_path=review_path,
         device=cast(str, report["device"]),
     )
@@ -1645,6 +1889,10 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
             )
     if tuple(row["name"] for row in rows) != _COMMAND_NAMES:
         raise PreformalEvidenceError("preformal command names are not unique and ordered")
+    _accepted_closure_evidence_from_report(
+        directory,
+        report,
+    )
     _runtime_bootstrap_conformance_from_report(
         directory,
         report,
@@ -1789,6 +2037,407 @@ def _runtime_development_evidence(path: Path) -> dict[str, object]:
     }
 
 
+def _runtime_accepted_closure_evidence(
+    development_closure: Path,
+    closure_attempt: Path,
+) -> dict[str, object]:
+    """Verify the closure marker and its accepted outer-finalized attempt."""
+
+    from .operator import (
+        CLOSURE_ATTEMPT_PATH as OPERATOR_CLOSURE_ATTEMPT_PATH,
+    )
+    from .operator import (
+        outer_completion_marker,
+        verify_operator_attempt,
+        verify_outer_completion,
+    )
+
+    before = _verify_live_bootstrap_custody()
+    closure_path = _canonical_existing_file(
+        development_closure,
+        label="accepted development closure",
+    )
+    attempt_path = _canonical_existing_directory(
+        closure_attempt,
+        label="accepted development closure attempt",
+    )
+    if (
+        closure_path != DEVELOPMENT_CLOSURE_PATH
+        or attempt_path != CLOSURE_ATTEMPT_PATH
+        or attempt_path != OPERATOR_CLOSURE_ATTEMPT_PATH
+    ):
+        raise PreformalEvidenceError(
+            "accepted closure evidence is outside its canonical namespace"
+        )
+    evidence = _runtime_development_evidence(closure_path)
+    attempt = verify_operator_attempt(attempt_path)
+    primary = attempt.get("primary")
+    if (
+        attempt.get("kind") != "closure"
+        or attempt.get("lane") != "development"
+        or attempt.get("status") != "accepted"
+        or not isinstance(primary, dict)
+        or primary.get("closure_reference_file")
+        != "closure-reference.json"
+    ):
+        raise PreformalEvidenceError(
+            "development closure attempt is not accepted"
+        )
+    terminal = attempt_path / "operator-attempt.json"
+    completion = outer_completion_marker(terminal)
+    outer = verify_outer_completion(terminal)
+    terminal_identity = _file_identity(
+        terminal,
+        label="accepted closure attempt terminal",
+        expected_nlink=_OUTER_FINALIZED_CUSTODY,
+    )
+    completion_identity = _file_identity(
+        completion,
+        label="accepted closure outer completion",
+        expected_nlink=_OUTER_FINALIZED_CUSTODY,
+    )
+    if (
+        outer.get("terminal_sha256") != terminal_identity["sha256"]
+        or terminal_identity["sha256"]
+        != completion_identity["sha256"]
+    ):
+        raise PreformalEvidenceError(
+            "accepted closure completion identity changed"
+        )
+    after = _verify_live_bootstrap_custody()
+    if before != after:
+        raise PreformalEvidenceError(
+            "runtime custody changed during accepted closure verification"
+        )
+    return {
+        "schema": "prospect.wm001.preformal-runtime-check.v1",
+        "mode": "accepted-closure-evidence",
+        "passed": True,
+        "development_closure_sha256": evidence[
+            "development_closure_sha256"
+        ],
+        "producer_manifest_sha256": evidence[
+            "producer_manifest_sha256"
+        ],
+        "raw_result_sha256": evidence["raw_result_sha256"],
+        "closure_attempt_manifest_sha256": terminal_identity["sha256"],
+        "closure_outer_completion_sha256": completion_identity["sha256"],
+    }
+
+
+def _runtime_fresh_closure_reopen(
+    path: Path,
+    *,
+    challenge: str,
+    requesting_process_id: int,
+) -> dict[str, object]:
+    """Reopen closure evidence after an exec into a fresh sealed interpreter."""
+
+    from .binding import _development_matrix_contract_sha256
+
+    if (
+        not _is_sha256(challenge)
+        or type(requesting_process_id) is not int
+        or requesting_process_id <= 0
+        or requesting_process_id == os.getpid()
+    ):
+        raise PreformalEvidenceError(
+            "fresh closure-reopen challenge or process identity is malformed"
+        )
+    evidence = _runtime_development_evidence(path)
+    return {
+        "schema": _FRESH_CLOSURE_REOPEN_SCHEMA,
+        "experiment_id": EXPERIMENT_ID,
+        "protocol_version": PROTOCOL_VERSION,
+        "mode": "fresh-closure-reopen",
+        "challenge": challenge,
+        "requesting_process_id": requesting_process_id,
+        "verifier_process_id": os.getpid(),
+        "matrix_contract_sha256": _development_matrix_contract_sha256(),
+        "development_closure_sha256": evidence[
+            "development_closure_sha256"
+        ],
+        "producer_manifest_sha256": evidence[
+            "producer_manifest_sha256"
+        ],
+        "raw_result_sha256": evidence["raw_result_sha256"],
+        "passed": True,
+    }
+
+
+def validate_fresh_closure_reopen_report(
+    value: object,
+    *,
+    development_closure: Path,
+) -> dict[str, object]:
+    """Validate a retained fresh-process closure-reopen receipt."""
+
+    from .binding import _development_matrix_contract_sha256
+
+    expected_fields = {
+        "schema",
+        "experiment_id",
+        "protocol_version",
+        "mode",
+        "challenge",
+        "requesting_process_id",
+        "verifier_process_id",
+        "matrix_contract_sha256",
+        "development_closure_sha256",
+        "producer_manifest_sha256",
+        "raw_result_sha256",
+        "passed",
+    }
+    if not isinstance(value, dict):
+        raise PreformalEvidenceError(
+            "fresh closure-reopen report is not an object"
+        )
+    requesting_process_id = value.get("requesting_process_id")
+    verifier_process_id = value.get("verifier_process_id")
+    closure_path = _canonical_existing_file(
+        development_closure,
+        label="freshly reopened development closure",
+    )
+    (
+        _,
+        producer_manifest_sha256,
+        raw_result_sha256,
+    ) = _verified_closure_member_digests(closure_path)
+    if (
+        set(value) != expected_fields
+        or value.get("schema") != _FRESH_CLOSURE_REOPEN_SCHEMA
+        or value.get("experiment_id") != EXPERIMENT_ID
+        or value.get("protocol_version") != PROTOCOL_VERSION
+        or value.get("mode") != "fresh-closure-reopen"
+        or not _is_sha256(value.get("challenge"))
+        or type(requesting_process_id) is not int
+        or requesting_process_id <= 0
+        or type(verifier_process_id) is not int
+        or verifier_process_id <= 0
+        or requesting_process_id == verifier_process_id
+        or value.get("matrix_contract_sha256")
+        != _development_matrix_contract_sha256()
+        or value.get("development_closure_sha256")
+        != _file_identity(
+            closure_path,
+            label="freshly reopened development closure",
+            expected_nlink=_SINGLE_LINK_CUSTODY,
+        )["sha256"]
+        or value.get("producer_manifest_sha256")
+        != producer_manifest_sha256
+        or value.get("raw_result_sha256")
+        != raw_result_sha256
+        or value.get("passed") is not True
+    ):
+        raise PreformalEvidenceError(
+            "fresh closure-reopen report differs from live sealed evidence"
+        )
+    return cast(dict[str, object], value)
+
+
+def fresh_runtime_development_closure_reopen(
+    development_closure: Path,
+) -> dict[str, object]:
+    """Exec a fresh child on inherited seal descriptors and retain its proof."""
+
+    closure_path = _canonical_existing_file(
+        development_closure,
+        label="development closure for fresh reopen",
+    )
+    report = _fresh_runtime_child(
+        (
+            "fresh-closure-reopen",
+            "--development-closure",
+            str(closure_path),
+        ),
+        label="closure-reopen",
+    )
+    return validate_fresh_closure_reopen_report(
+        report,
+        development_closure=closure_path,
+    )
+
+
+def _fresh_runtime_child(
+    mode_arguments: tuple[str, ...],
+    *,
+    label: str,
+) -> dict[str, object]:
+    """Execute one nested sealed-runtime child without reacquiring the lock."""
+
+    before = _verify_live_bootstrap_custody()
+    bootstrap_descriptor = getattr(
+        sys,
+        "_prospect_wm001_bootstrap_fd",
+        None,
+    )
+    runtime_seal_descriptor = getattr(
+        sys,
+        "_prospect_wm001_runtime_seal_fd",
+        None,
+    )
+    if (
+        type(bootstrap_descriptor) is not int
+        or bootstrap_descriptor < 0
+        or type(runtime_seal_descriptor) is not int
+        or runtime_seal_descriptor < 0
+        or bootstrap_descriptor == runtime_seal_descriptor
+    ):
+        raise PreformalEvidenceError(
+            f"fresh {label} has no inherited seal descriptors"
+        )
+    challenge = os.urandom(32).hex()
+    requesting_process_id = os.getpid()
+    command = (
+        sys.executable,
+        "-I",
+        "-S",
+        "-B",
+        f"/proc/self/fd/{bootstrap_descriptor}",
+        "--bootstrap-fd",
+        str(bootstrap_descriptor),
+        "--runtime-seal-fd",
+        str(runtime_seal_descriptor),
+        "preformal-runtime",
+        *mode_arguments,
+        "--challenge",
+        challenge,
+        "--requesting-process-id",
+        str(requesting_process_id),
+    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=REPO,
+            env=dict(os.environ),
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            check=False,
+            pass_fds=(
+                bootstrap_descriptor,
+                runtime_seal_descriptor,
+            ),
+            timeout=_FRESH_CLOSURE_REOPEN_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise PreformalEvidenceError(
+            f"fresh sealed {label} interpreter could not start"
+        ) from error
+    diagnostic = completed.stderr[:4096].decode(
+        "utf-8",
+        errors="replace",
+    )
+    if (
+        completed.returncode != 0
+        or completed.stderr
+        or len(completed.stdout)
+        > _FRESH_CLOSURE_REOPEN_MAX_OUTPUT_BYTES
+        or len(completed.stderr)
+        > _FRESH_CLOSURE_REOPEN_MAX_OUTPUT_BYTES
+    ):
+        raise PreformalEvidenceError(
+            f"fresh sealed {label} interpreter failed or wrote stderr: "
+            f"{diagnostic}"
+        )
+    report = _load_canonical_object(
+        completed.stdout,
+        label=f"fresh sealed {label} report",
+    )
+    if (
+        report.get("challenge") != challenge
+        or report.get("requesting_process_id") != requesting_process_id
+        or type(report.get("verifier_process_id")) is not int
+        or cast(int, report["verifier_process_id"]) <= 0
+        or report.get("verifier_process_id") == requesting_process_id
+    ):
+        raise PreformalEvidenceError(
+            f"fresh sealed {label} response does not answer its challenge"
+        )
+    after = _verify_live_bootstrap_custody()
+    if before != after:
+        raise PreformalEvidenceError(
+            f"runtime custody changed during fresh {label}"
+        )
+    return report
+
+
+def _runtime_fresh_identity_conformance(
+    *,
+    challenge: str,
+    requesting_process_id: int,
+) -> dict[str, object]:
+    """Prove a nested fresh interpreter can reopen custody and the golden."""
+
+    from .binding import _development_matrix_contract_sha256
+
+    before = _verify_live_bootstrap_custody()
+    if (
+        not _is_sha256(challenge)
+        or type(requesting_process_id) is not int
+        or requesting_process_id <= 0
+        or requesting_process_id == os.getpid()
+    ):
+        raise PreformalEvidenceError(
+            "fresh identity-conformance challenge is malformed"
+        )
+    report = {
+        "schema": _FRESH_IDENTITY_CONFORMANCE_SCHEMA,
+        "experiment_id": EXPERIMENT_ID,
+        "protocol_version": PROTOCOL_VERSION,
+        "mode": "fresh-identity-conformance",
+        "challenge": challenge,
+        "requesting_process_id": requesting_process_id,
+        "verifier_process_id": os.getpid(),
+        "matrix_contract_sha256": (
+            _development_matrix_contract_sha256()
+        ),
+        "passed": True,
+    }
+    after = _verify_live_bootstrap_custody()
+    if before != after:
+        raise PreformalEvidenceError(
+            "runtime custody changed during fresh identity conformance"
+        )
+    return report
+
+
+def fresh_runtime_identity_conformance() -> dict[str, object]:
+    """Exercise the exact nested descriptor path before outcome production."""
+
+    from .binding import _development_matrix_contract_sha256
+
+    report = _fresh_runtime_child(
+        ("fresh-identity-conformance",),
+        label="identity-conformance",
+    )
+    if (
+        set(report)
+        != {
+            "schema",
+            "experiment_id",
+            "protocol_version",
+            "mode",
+            "challenge",
+            "requesting_process_id",
+            "verifier_process_id",
+            "matrix_contract_sha256",
+            "passed",
+        }
+        or report.get("schema")
+        != _FRESH_IDENTITY_CONFORMANCE_SCHEMA
+        or report.get("experiment_id") != EXPERIMENT_ID
+        or report.get("protocol_version") != PROTOCOL_VERSION
+        or report.get("mode") != "fresh-identity-conformance"
+        or report.get("matrix_contract_sha256")
+        != _development_matrix_contract_sha256()
+        or report.get("passed") is not True
+    ):
+        raise PreformalEvidenceError(
+            "fresh sealed identity-conformance report is invalid"
+        )
+    return report
+
+
 def _runtime_bootstrap_inventory_conformance(device: str) -> dict[str, object]:
     before = _verify_live_bootstrap_custody()
     try:
@@ -1813,6 +2462,7 @@ def _runtime_bootstrap_inventory_conformance(device: str) -> dict[str, object]:
         raise PreformalEvidenceError(
             "runtime custody changed during result-free Gymnasium rehearsal"
         )
+    fresh_identity = fresh_runtime_identity_conformance()
 
     from . import binding
 
@@ -1889,6 +2539,9 @@ def _runtime_bootstrap_inventory_conformance(device: str) -> dict[str, object]:
         "passed": True,
         "inventory_sha256": _sha256(_canonical_json_bytes(inventory)),
         "conformance_sha256": _sha256(_canonical_json_bytes(execution)),
+        "fresh_runtime_identity_conformance_sha256": _sha256(
+            _canonical_json_bytes(fresh_identity)
+        ),
         "restart_runtime_conformance_report_sha256": _sha256(
             restart_report_payload
         ),
@@ -1912,6 +2565,42 @@ def _runtime_parser() -> argparse.ArgumentParser:
     modes = parser.add_subparsers(dest="mode", required=True)
     development = modes.add_parser("development-evidence", allow_abbrev=False)
     development.add_argument("--development-closure", type=Path, required=True)
+    accepted = modes.add_parser(
+        "accepted-closure-evidence",
+        allow_abbrev=False,
+    )
+    accepted.add_argument(
+        "--development-closure",
+        type=Path,
+        required=True,
+    )
+    accepted.add_argument(
+        "--closure-attempt",
+        type=Path,
+        required=True,
+    )
+    reopen = modes.add_parser("fresh-closure-reopen", allow_abbrev=False)
+    reopen.add_argument(
+        "--development-closure",
+        type=Path,
+        required=True,
+    )
+    reopen.add_argument("--challenge", required=True)
+    reopen.add_argument(
+        "--requesting-process-id",
+        type=int,
+        required=True,
+    )
+    identity = modes.add_parser(
+        "fresh-identity-conformance",
+        allow_abbrev=False,
+    )
+    identity.add_argument("--challenge", required=True)
+    identity.add_argument(
+        "--requesting-process-id",
+        type=int,
+        required=True,
+    )
     conformance = modes.add_parser("bootstrap-inventory-conformance", allow_abbrev=False)
     conformance.add_argument("--device", choices=("cpu", "cuda"), required=True)
     return parser
@@ -1923,6 +2612,22 @@ def runtime_main(argv: list[str] | None = None) -> int:
     arguments = _runtime_parser().parse_args(argv)
     if arguments.mode == "development-evidence":
         report = _runtime_development_evidence(arguments.development_closure)
+    elif arguments.mode == "accepted-closure-evidence":
+        report = _runtime_accepted_closure_evidence(
+            arguments.development_closure,
+            arguments.closure_attempt,
+        )
+    elif arguments.mode == "fresh-closure-reopen":
+        report = _runtime_fresh_closure_reopen(
+            arguments.development_closure,
+            challenge=arguments.challenge,
+            requesting_process_id=arguments.requesting_process_id,
+        )
+    elif arguments.mode == "fresh-identity-conformance":
+        report = _runtime_fresh_identity_conformance(
+            challenge=arguments.challenge,
+            requesting_process_id=arguments.requesting_process_id,
+        )
     else:
         report = _runtime_bootstrap_inventory_conformance(arguments.device)
     sys.stdout.buffer.write(_canonical_json_bytes(report) + b"\n")
@@ -1940,6 +2645,11 @@ def _parser() -> argparse.ArgumentParser:
         "--development-closure",
         type=Path,
         default=DEVELOPMENT_CLOSURE_PATH,
+    )
+    generate.add_argument(
+        "--closure-attempt",
+        type=Path,
+        default=CLOSURE_ATTEMPT_PATH,
     )
     generate.add_argument(
         "--prospective-review",
@@ -1963,6 +2673,7 @@ def main(argv: list[str] | None = None) -> int:
             runtime_executable=arguments.runtime_executable,
             runtime_seal=arguments.runtime_seal,
             development_closure=arguments.development_closure,
+            closure_attempt=arguments.closure_attempt,
             prospective_review=arguments.prospective_review,
             device=arguments.device,
         )
@@ -2017,9 +2728,12 @@ __all__ = (
     "REPORT_NAME",
     "REVIEW_PATH",
     "SCHEMA",
+    "fresh_runtime_identity_conformance",
     "generate_preformal_report",
+    "fresh_runtime_development_closure_reopen",
     "required_commands",
     "runtime_main",
+    "validate_fresh_closure_reopen_report",
     "verify_preformal_report",
     "verify_prospective_review",
 )

@@ -72,19 +72,19 @@ def operator_space(
     repo = tmp_path / "repo"
     lifecycle = repo / "bench" / "world_model_lifecycle"
     lifecycle.mkdir(parents=True)
-    _write(lifecycle / "protocol.json", {"version": "1.8.0"})
-    operator_root = lifecycle / "results" / "operator-v1.8"
+    _write(lifecycle / "protocol.json", {"version": "1.9.0"})
+    operator_root = lifecycle / "results" / "operator-v1.9"
     binding_root = operator_root / "bindings"
     audit_root = operator_root / "audits"
     closure_root = operator_root / "closures"
-    completion_root = lifecycle / "results" / "outer-completions" / "v1.8"
-    formal_binding = binding_root / "formal-binding-v1.8.0"
-    development_audit = audit_root / "development-audit-v1.8.0"
-    formal_audit = audit_root / "formal-audit-v1.8.0"
-    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.8.0.json"
-    development_qualification = lifecycle / "results" / "development" / "qualification-v1.8.0"
-    development_closure = lifecycle / "results" / "development" / "development-closure-v1.8.0.json"
-    closure = closure_root / "development-closure-v1.8.0"
+    completion_root = lifecycle / "results" / "outer-completions" / "v1.9"
+    formal_binding = binding_root / "formal-binding-v1.9.0"
+    development_audit = audit_root / "development-audit-v1.9.0"
+    formal_audit = audit_root / "formal-audit-v1.9.0"
+    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.9.0.json"
+    development_qualification = lifecycle / "results" / "development" / "qualification-v1.9.0"
+    development_closure = lifecycle / "results" / "development" / "development-closure-v1.9.0.json"
+    closure = closure_root / "development-closure-v1.9.0"
     registrations: list[tuple[Path, int]] = []
 
     for name, value in {
@@ -248,7 +248,7 @@ def _patch_finalized_producer(
         _write(
             producer / "formal-binding.json",
             {
-                "schema": "prospect.world-model-lifecycle.formal-binding.v8",
+                "schema": "prospect.world-model-lifecycle.formal-binding.v9",
                 "assurance": dict(ASSURANCE),
             },
         )
@@ -296,7 +296,7 @@ def _write_reproduction_receipt(
     receipt: dict[str, object] = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.8.0",
+        "protocol_version": "1.9.0",
         "supplied_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
         "byte_identical": True,
@@ -516,7 +516,7 @@ def _install_closure_fakes(
     list[tuple[Path, Path, Path]],
 ]:
     marker = space.development_closure
-    archive = marker.with_name("development-qualification-v1.8.0.tar")
+    archive = marker.with_name("development-qualification-v1.9.0.tar")
     calls: list[tuple[Path, Path, Path]] = []
     monkeypatch.setattr(binding, "DEVELOPMENT_CLOSURE_PATH", marker)
 
@@ -565,6 +565,32 @@ def _install_closure_fakes(
         binding,
         "verify_development_closure",
         lambda path: _load(path),
+    )
+    fresh_report = {
+        "schema": "prospect.wm001.development-closure-fresh-reopen.v1",
+        "experiment_id": "WM-001",
+        "protocol_version": "1.9.0",
+        "mode": "fresh-closure-reopen",
+        "challenge": "1" * 64,
+        "requesting_process_id": 100,
+        "verifier_process_id": 101,
+        "matrix_contract_sha256": (
+            binding._DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        ),
+        "development_closure_sha256": "2" * 64,
+        "producer_manifest_sha256": "3" * 64,
+        "raw_result_sha256": "4" * 64,
+        "passed": True,
+    }
+    monkeypatch.setattr(
+        preformal,
+        "fresh_runtime_development_closure_reopen",
+        lambda path: dict(fresh_report),
+    )
+    monkeypatch.setattr(
+        preformal,
+        "validate_fresh_closure_reopen_report",
+        lambda value, *, development_closure: value,
     )
     return marker, build, calls
 
@@ -656,14 +682,14 @@ def test_sibling_binding_or_closure_attempt_is_never_canonical(
         sibling = operator_space.closure_root / "sibling-closure"
     shutil.copytree(canonical, sibling)
 
-    with pytest.raises(OperatorError, match="canonical protocol-1.8"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.9"):
         operator_module.inspect_unfinalized_operator_attempt(sibling)
 
     sibling_terminal = sibling / "operator-attempt.json"
     sibling_completion = operator_module.outer_completion_marker(sibling_terminal)
     sibling_completion.parent.mkdir(parents=True, exist_ok=True)
     os.link(sibling_terminal, sibling_completion)
-    with pytest.raises(OperatorError, match="canonical protocol-1.8"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.9"):
         operator_module.verify_operator_attempt(sibling)
 
 
@@ -849,7 +875,7 @@ def test_development_audit_is_retired_by_closure_marker(
 def test_closure_rejects_noncanonical_development_audit(
     operator_space: OperatorSpace,
 ) -> None:
-    with pytest.raises(OperatorError, match="canonical protocol-1.8 audit"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.9 audit"):
         operator_module.closure_main(
             [
                 "--producer",
@@ -868,7 +894,7 @@ def test_development_authority_rejects_sibling_qualification_producer(
     operator_space: OperatorSpace,
     entry: str,
 ) -> None:
-    sibling = operator_space.development_qualification.parent / "qualification-v1.8.0-copy"
+    sibling = operator_space.development_qualification.parent / "qualification-v1.9.0-copy"
     if entry == "audit":
         arguments = [
             "development",
@@ -1322,7 +1348,7 @@ def test_development_closure_then_binding_end_to_end(
     closure_terminal.write_bytes(original_closure_terminal)
     assert operator_module.verify_operator_attempt(operator_space.closure) == closure_manifest
 
-    report = marker.with_name("preformal-test-report-v1.8.0.json")
+    report = marker.with_name("preformal-test-report-v1.9.0.json")
     _write(report, {"passed": True})
     monkeypatch.setattr(
         binding,
@@ -1335,7 +1361,7 @@ def test_development_closure_then_binding_end_to_end(
         lambda _path, _report: [],
     )
     expected_binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v8",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v9",
         "assurance": dict(ASSURANCE),
         "source": {
             "test_report_file": report.name,

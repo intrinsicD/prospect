@@ -98,7 +98,7 @@ def _captured_descriptors(
     ("schema", "runtime_nlink"),
     [
         ("prospect.wm001.runtime-seal.v1", 2),
-        ("prospect.world-model-lifecycle.formal-binding.v8", 1),
+        ("prospect.world-model-lifecycle.formal-binding.v9", 1),
     ],
 )
 def test_experiment_accepts_schema_typed_runtime_custody(
@@ -122,7 +122,7 @@ def test_experiment_accepts_schema_typed_runtime_custody(
     ("schema", "runtime_nlink"),
     [
         ("prospect.wm001.runtime-seal.v1", 1),
-        ("prospect.world-model-lifecycle.formal-binding.v8", 2),
+        ("prospect.world-model-lifecycle.formal-binding.v9", 2),
     ],
 )
 def test_experiment_rejects_link_count_for_other_custody_type(
@@ -161,7 +161,7 @@ def test_experiment_recheck_detects_new_runtime_hardlink(
     ("schema", "runtime_nlink"),
     [
         ("prospect.wm001.runtime-seal.v1", 2),
-        ("prospect.world-model-lifecycle.formal-binding.v8", 1),
+        ("prospect.world-model-lifecycle.formal-binding.v9", 1),
     ],
 )
 def test_real_subprocess_reopens_typed_runtime_descriptor(

@@ -88,10 +88,12 @@ that boundary, but its sole independent development audit exposed one missing
 captured bootstrap support file and retired the version before closure.
 Protocol 1.7 made that dependency explicit and its audit passed, but its sole
 closure hit a 64 MiB whole-file limit while rechecking a 320 MB authenticated
-result. Protocol 1.8 replaces that read with streamed descriptor custody,
-requires a byte-canonical qualification archive with strict JSON types,
-authenticates bounded failure diagnostics, and permits only one exact formal
-output path across producers and independent readers. It also uses fresh
-seeds. Follow the
-[WM-001 v1.8 operator runbook](docs/wm001-v180-operator-runbook.md) before
+result. Protocol 1.8 repaired that boundary and completed development, audit,
+and closure, but a fresh-process closure recheck exposed nondeterministic
+serialization of unordered matrix-contract sets. It retired before preformal
+or formal authorization. Protocol 1.9 canonicalizes that contract, binds its
+golden digest, and requires a fresh sealed-runtime closure verification before
+preformal evidence may be created. It also uses fresh seeds and namespaces.
+Follow the
+[WM-001 v1.9 operator runbook](docs/wm001-v190-operator-runbook.md) before
 creating any development evidence, implementation binding, or formal attempt.

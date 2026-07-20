@@ -77,7 +77,7 @@ def _repository_root() -> Path:
 REPO = _repository_root()
 LOCKFILE = REPO / "requirements-wm001.lock"
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.8.0.json"
+DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.9.0.json"
 ROOT_DISTRIBUTIONS = (
     "gymnasium",
     "jsonschema",
@@ -362,7 +362,7 @@ def build_bound_audit_execution(
     restart_runtime_report_value = dict(restart_runtime_conformance.path_execution.report)
     if (
         restart_runtime_report_value.get("schema") != "prospect.wm001.restart-runtime-conformance.v1"
-        or restart_runtime_report_value.get("protocol_version") != "1.8.0"
+        or restart_runtime_report_value.get("protocol_version") != "1.9.0"
         or restart_runtime_report_value.get("passed") is not True
         or restart_runtime_conformance.path_execution.stdout != restart_runtime_conformance.descriptor_execution.stdout
     ):
@@ -630,7 +630,9 @@ def implementation_files() -> list[dict[str, object]]:
         REPO / "bench" / "world_model_lifecycle" / "protocol.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "raw-result.schema.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "formal-binding.schema.json",
-        REPO / "docs" / "wm001-v180-prospective-harness-review.json",
+        REPO / "docs" / "wm001-v190-confirmation-plan.md",
+        REPO / "docs" / "wm001-v190-operator-runbook.md",
+        REPO / "docs" / "wm001-v190-prospective-harness-review.json",
     ]
     unique = sorted(set(candidates))
     return [
@@ -1345,7 +1347,7 @@ def create_audit_reproduction_receipt(
     receipt = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.8.0",
+        "protocol_version": "1.9.0",
         "supplied_audit_sha256": hashlib.sha256(supplied).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(execution.stdout).hexdigest(),
         "byte_identical": True,
@@ -1825,7 +1827,7 @@ def _validate_producer_custody(
         set(runtime_seal) != _DEVELOPMENT_RUNTIME_SEAL_FIELDS
         or runtime_seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or runtime_seal.get("experiment_id") != "WM-001"
-        or runtime_seal.get("protocol_version") != "1.8.0"
+        or runtime_seal.get("protocol_version") != "1.9.0"
         or not _strict_json_equal(runtime_seal.get("assurance"), ASSURANCE)
         or runtime_seal.get("git_commit") != execution["git_commit"]
         or runtime_seal.get("git_tree") != execution["git_tree"]
@@ -1904,7 +1906,7 @@ def _validate_development_audit_evidence(
         set(receipt) != _AUDIT_RECEIPT_FIELDS
         or receipt.get("schema") != "prospect.wm001.audit-reproduction.v2"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.8.0"
+        or receipt.get("protocol_version") != "1.9.0"
         or receipt.get("supplied_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("reproduced_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("byte_identical") is not True
@@ -2038,8 +2040,8 @@ def _validate_development_audit_evidence(
     return audit, receipt
 
 
-def _development_matrix_contract_sha256() -> str:
-    """Identify the exact non-performance matrix contract checked before closure."""
+def _development_matrix_contract_value() -> dict[str, object]:
+    """Build the one canonical non-performance matrix contract."""
 
     from .verify import (
         COMMITTED_PHASE_SPLITS,
@@ -2048,12 +2050,12 @@ def _development_matrix_contract_sha256() -> str:
         PREDICTIVE_CONTRACTS,
     )
 
-    value = {
+    return {
         "episode_contract_counts": [
             [*contract, count] for contract, count in sorted(FORMAL_EPISODE_CONTRACT_COUNTS.items())
         ],
-        "predictive_contracts": [list(row) for row in PREDICTIVE_CONTRACTS],
-        "policy_contracts": [list(row) for row in EPISODE_CONTRACTS],
+        "predictive_contracts": [list(row) for row in sorted(PREDICTIVE_CONTRACTS)],
+        "policy_contracts": [list(row) for row in sorted(EPISODE_CONTRACTS)],
         "committed_phase_splits": [[phase, list(splits)] for phase, splits in sorted(COMMITTED_PHASE_SPLITS.items())],
         "episodes": 496,
         "transitions": 99_200,
@@ -2063,7 +2065,36 @@ def _development_matrix_contract_sha256() -> str:
         "optimizer_batch_manifests": 5,
         "optimizer_steps_per_committed_phase": 2_000,
     }
-    return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+_DEVELOPMENT_MATRIX_CONTRACT_SHA256 = (
+    "09a232a4a58c2690665cbef928936b49fbb28d7134405c8eb696a63371591b84"
+)
+
+
+def _development_matrix_contract_sha256() -> str:
+    """Return the reviewed, process-independent matrix-contract identity."""
+
+    observed = hashlib.sha256(
+        canonical_json_bytes(_development_matrix_contract_value())
+    ).hexdigest()
+    try:
+        protocol = json.loads(PROTOCOL_PATH.read_bytes())
+        bound = protocol["bindings"]["development_qualification"][
+            "matrix_contract_sha256"
+        ]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            "protocol has no readable development matrix-contract identity"
+        ) from error
+    if (
+        observed != _DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        or bound != _DEVELOPMENT_MATRIX_CONTRACT_SHA256
+    ):
+        raise RuntimeError(
+            "development matrix contract differs from its reviewed golden identity"
+        )
+    return observed
 
 
 def _result_qualification_payload(
@@ -2076,7 +2107,7 @@ def _result_qualification_payload(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.8.0",
+        "protocol_version": "1.9.0",
         "protocol_sha256": sha256_file(PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -2141,7 +2172,7 @@ def _validate_result_qualification(
         }
         or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.8.0"
+        or value.get("protocol_version") != "1.9.0"
         or value.get("protocol_sha256") != sha256_file(PROTOCOL_PATH)
         or value.get("raw_result_sha256") != archived_result_sha256
         or value.get("lane") != "development"
@@ -2719,7 +2750,7 @@ def verify_development_closure(path: Path) -> dict[str, object]:
         set(closure) != _DEVELOPMENT_CLOSURE_FIELDS
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.8.0"
+        or closure.get("protocol_version") != "1.9.0"
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
         or closure.get("performance_values_bound") is not False
@@ -2998,7 +3029,7 @@ def create_development_closure(
     runtime_manifest_path: Path,
     output_path: Path = DEVELOPMENT_CLOSURE_PATH,
 ) -> dict[str, object]:
-    """Close the sole v1.8 qualification into one self-contained evidence archive."""
+    """Close the sole v1.9 qualification into one self-contained evidence archive."""
 
     from .artifact import verify_producer_manifest
     from .verify import DEVELOPMENT_SEEDS, _verify_formal_matrix, verify_result
@@ -3039,7 +3070,7 @@ def create_development_closure(
         not isinstance(replicates, list)
         or tuple(row.get("master_seed") if isinstance(row, dict) else None for row in replicates) != DEVELOPMENT_SEEDS
     ):
-        raise RuntimeError("development qualification requires exactly both fresh v1.8 seeds")
+        raise RuntimeError("development qualification requires exactly both fresh v1.9 seeds")
     for replicate in replicates:
         assert isinstance(replicate, dict)
         _verify_formal_matrix(
@@ -3162,7 +3193,7 @@ def create_development_closure(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.8.0",
+        "protocol_version": "1.9.0",
         "source": {
             "git_commit": execution["git_commit"],
             "git_tree": execution["git_tree"],
@@ -3217,6 +3248,15 @@ def create_development_closure(
             prospective = Path(temporary) / (f"development-closure-{closure_digest[:16]}.json")
             atomic_write_exclusive(prospective, closure_payload)
             verify_development_closure(prospective)
+            # A new exec receives a distinct interpreter hash secret and
+            # independently reopens the exact prospective bytes through the
+            # inherited, sealed bootstrap/runtime descriptors.  The canonical
+            # marker is not published unless that fresh process agrees.
+            from .preformal import (
+                fresh_runtime_development_closure_reopen,
+            )
+
+            fresh_runtime_development_closure_reopen(prospective)
         _reverify_live_development_producer(
             producer_root,
             expected_manifest=cast(
@@ -3326,7 +3366,7 @@ def create_formal_binding(
     if conformance_cases != FORMAL_CONFORMANCE_CASES:
         raise ValueError("formal Pendulum conformance is fixed at exactly 1,024 cases (512 per task)")
     if development_closure_path is None or not development_closure_path.is_file():
-        raise RuntimeError("formal binding requires the immutable v1.8 development closure")
+        raise RuntimeError("formal binding requires the immutable v1.9 development closure")
     if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
         raise RuntimeError("CUDA formal binding requires CUBLAS_WORKSPACE_CONFIG=:4096:8")
     if output_path.exists():
@@ -3446,11 +3486,11 @@ def create_formal_binding(
             raise FileExistsError(f"refusing to replace formal audit-execution evidence: {candidate}")
     accelerator = torch.cuda.get_device_name(0) if device == "cuda" else None
     binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v8",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v9",
         "experiment_id": "WM-001",
         "assurance": assurance_record(),
         "protocol": {
-            "version": "1.8.0",
+            "version": "1.9.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),

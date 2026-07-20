@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -59,6 +60,7 @@ def _runtime_conformance(
         "passed": True,
         "inventory_sha256": "1" * 64,
         "conformance_sha256": "2" * 64,
+        "fresh_runtime_identity_conformance_sha256": "9" * 64,
         "restart_runtime_conformance_report_sha256": "3" * 64,
         "restart_runtime_execution_receipt_sha256": "4" * 64,
         "restart_runtime_support_files": [
@@ -70,6 +72,30 @@ def _runtime_conformance(
         "restart_runtime_path_descriptor_equal": True,
         "repeat_count": 3,
         "path_descriptor_equal": True,
+    }
+
+
+def _accepted_closure_evidence(
+    *,
+    development_closure: Path,
+    closure_terminal: Path,
+    closure_completion: Path,
+) -> dict[str, object]:
+    return {
+        "schema": "prospect.wm001.preformal-runtime-check.v1",
+        "mode": "accepted-closure-evidence",
+        "passed": True,
+        "development_closure_sha256": hashlib.sha256(
+            development_closure.read_bytes()
+        ).hexdigest(),
+        "producer_manifest_sha256": "5" * 64,
+        "raw_result_sha256": "6" * 64,
+        "closure_attempt_manifest_sha256": hashlib.sha256(
+            closure_terminal.read_bytes()
+        ).hexdigest(),
+        "closure_outer_completion_sha256": hashlib.sha256(
+            closure_completion.read_bytes()
+        ).hexdigest(),
     }
 
 
@@ -118,7 +144,7 @@ def _review() -> dict[str, object]:
     return {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.8.0",
+        "protocol_version": "1.9.0",
         "implementation_files": [],
         "implementation_manifest_sha256": hashlib.sha256(b"[]").hexdigest(),
         "reviewer": {
@@ -136,7 +162,7 @@ def _runtime_seal(runtime_executable: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.8.0",
+        "protocol_version": "1.9.0",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
             "tamper_resistant": False,
@@ -373,8 +399,22 @@ def _prepare_generation(
     runtime_seal_path = _write_completed_runtime_seal(inputs, seal)
     development_closure.write_bytes(_canonical({"development": "verified"}))
     review_path.write_bytes(_canonical(_review()))
+    closure_attempt = inputs / "development-closure-attempt"
+    closure_attempt.mkdir()
+    closure_terminal = closure_attempt / "operator-attempt.json"
+    closure_terminal.write_bytes(_canonical({"accepted": True}))
+    closure_completion = operator_module.outer_completion_marker(
+        closure_terminal
+    )
+    closure_completion.parent.mkdir(parents=True, exist_ok=True)
+    os.link(closure_terminal, closure_completion)
 
     monkeypatch.setattr(preformal, "REVIEW_PATH", review_path)
+    monkeypatch.setattr(
+        preformal,
+        "CLOSURE_ATTEMPT_PATH",
+        closure_attempt,
+    )
     monkeypatch.setattr(
         preformal,
         "_git_identity",
@@ -398,6 +438,11 @@ def _prepare_generation(
         "verify_prospective_review",
         lambda path: dict(_review()),
     )
+    monkeypatch.setattr(
+        preformal,
+        "_verified_closure_member_digests",
+        lambda path: ({}, "5" * 64, "6" * 64),
+    )
 
     def run_command(
         specification: preformal.CommandSpec,
@@ -416,12 +461,29 @@ def _prepare_generation(
             _canonical(_runtime_conformance())
             if specification.name
             == "runtime-bootstrap-inventory-conformance"
-            else f"stdout:{specification.name}\n".encode()
+            else (
+                _canonical(
+                    _accepted_closure_evidence(
+                        development_closure=development_closure,
+                        closure_terminal=closure_terminal,
+                        closure_completion=closure_completion,
+                    )
+                )
+                if specification.name
+                == "runtime-accepted-closure-evidence"
+                else f"stdout:{specification.name}\n".encode()
+            )
+        )
+        stderr = (
+            b""
+            if specification.name
+            == "runtime-accepted-closure-evidence"
+            else f"stderr:{specification.name}\n".encode()
         )
         return (
             exit_code,
             stdout,
-            f"stderr:{specification.name}\n".encode(),
+            stderr,
         )
 
     monkeypatch.setattr(preformal, "_run_command", run_command)
@@ -432,6 +494,7 @@ def _prepare_generation(
             "runtime_executable": runtime_executable,
             "runtime_seal": runtime_seal_path,
             "development_closure": development_closure,
+            "closure_attempt": closure_attempt,
             "prospective_review": review_path,
         },
     )
@@ -443,6 +506,7 @@ def _generate(report_path: Path, inputs: dict[str, Path]) -> Path:
         runtime_executable=inputs["runtime_executable"],
         runtime_seal=inputs["runtime_seal"],
         development_closure=inputs["development_closure"],
+        closure_attempt=inputs["closure_attempt"],
         prospective_review=inputs["prospective_review"],
     )
 
@@ -465,10 +529,12 @@ def test_exact_preformal_contract_has_ten_role_separated_commands() -> None:
         "-m",
         "bench.world_model_lifecycle.preformal",
     )
-    assert specifications[8].argv[-3:] == (
-        "development-evidence",
+    assert specifications[8].argv[-5:] == (
+        "accepted-closure-evidence",
         "--development-closure",
         str(preformal.DEVELOPMENT_CLOSURE_PATH),
+        "--closure-attempt",
+        str(preformal.CLOSURE_ATTEMPT_PATH),
     )
 
 
@@ -580,6 +646,56 @@ def test_verifier_rejects_changed_qa_closure_and_runtime_input(
         preformal.verify_preformal_report(report_path)
 
 
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    (
+        ("passed", False),
+        ("producer_manifest_sha256", "7" * 64),
+        ("raw_result_sha256", "8" * 64),
+    ),
+)
+def test_verifier_semantically_rejects_mutated_accepted_closure_stdout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    replacement: object,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    _generate(report_path, inputs)
+    report = _read_report(report_path)
+    row = next(
+        item
+        for item in report["commands"]
+        if item["name"] == "runtime-accepted-closure-evidence"
+    )
+    old_path = report_path.parent / row["stdout"]["file"]
+    value = json.loads(old_path.read_bytes())
+    value[field] = replacement
+    payload = _canonical(value)
+    digest = hashlib.sha256(payload).hexdigest()
+    new_name = preformal._log_filename(
+        row["ordinal"],
+        row["name"],
+        "stdout",
+        digest,
+    )
+    new_path = report_path.parent / new_name
+    new_path.write_bytes(payload)
+    old_path.unlink()
+    row["stdout"] = {
+        "file": new_name,
+        "bytes": len(payload),
+        "sha256": digest,
+    }
+    _rewrite_report(report_path, report)
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="accepted-closure stdout",
+    ):
+        preformal.verify_preformal_report(report_path)
+
+
 def test_verifier_rejects_tampered_missing_extra_and_aliased_logs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -664,7 +780,7 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     review = {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.8.0",
+        "protocol_version": "1.9.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -695,6 +811,18 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     path.write_bytes(_canonical(review))
     with pytest.raises(preformal.PreformalEvidenceError, match="accepted exact-source"):
         preformal.verify_prospective_review(path)
+
+
+def test_prospective_manifest_binds_v190_plan_and_runbook() -> None:
+    paths = {
+        str(row["path"])
+        for row in preformal._implementation_files()
+    }
+
+    assert {
+        "docs/wm001-v190-confirmation-plan.md",
+        "docs/wm001-v190-operator-runbook.md",
+    } <= paths
 
 
 def test_isolated_review_rejects_stale_installed_preformal_bytes(
@@ -861,6 +989,397 @@ def test_runtime_development_evidence_accepts_outer_finalized_manifest(
     }
 
 
+def test_fresh_closure_reopen_executes_inherited_seal_descriptors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closure = tmp_path / "development-closure.json"
+    closure.write_bytes(_canonical({"closure": True}))
+    custody = {"schema": "captured-runtime"}
+    challenge = "7" * 64
+    child_report = {
+        "schema": (
+            "prospect.wm001.development-closure-fresh-reopen.v1"
+        ),
+        "experiment_id": "WM-001",
+        "protocol_version": "1.9.0",
+        "mode": "fresh-closure-reopen",
+        "challenge": challenge,
+        "requesting_process_id": os.getpid(),
+        "verifier_process_id": os.getpid() + 1,
+        "matrix_contract_sha256": "8" * 64,
+        "development_closure_sha256": "9" * 64,
+        "producer_manifest_sha256": "a" * 64,
+        "raw_result_sha256": "b" * 64,
+        "passed": True,
+    }
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(
+        preformal,
+        "_verify_live_bootstrap_custody",
+        lambda: custody,
+    )
+    monkeypatch.setattr(
+        preformal,
+        "_canonical_existing_file",
+        lambda path, *, label: path,
+    )
+    monkeypatch.setattr(os, "urandom", lambda count: bytes.fromhex(challenge))
+    monkeypatch.setattr(
+        sys,
+        "_prospect_wm001_bootstrap_fd",
+        11,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sys,
+        "_prospect_wm001_runtime_seal_fd",
+        12,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        preformal,
+        "validate_fresh_closure_reopen_report",
+        lambda value, *, development_closure: value,
+    )
+
+    def run(
+        command: tuple[str, ...],
+        **arguments: object,
+    ) -> subprocess.CompletedProcess[bytes]:
+        observed["command"] = command
+        observed.update(arguments)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=_canonical(child_report),
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(subprocess, "run", run)
+
+    assert (
+        preformal.fresh_runtime_development_closure_reopen(closure)
+        == child_report
+    )
+    command = observed["command"]
+    assert isinstance(command, tuple)
+    assert command[:5] == (
+        sys.executable,
+        "-I",
+        "-S",
+        "-B",
+        "/proc/self/fd/11",
+    )
+    assert "launch_bootstrap.py" not in " ".join(command)
+    assert command[-7:] == (
+        "fresh-closure-reopen",
+        "--development-closure",
+        str(closure),
+        "--challenge",
+        challenge,
+        "--requesting-process-id",
+        str(os.getpid()),
+    )
+    assert observed["pass_fds"] == (11, 12)
+    assert (
+        observed["timeout"]
+        == preformal._FRESH_CLOSURE_REOPEN_TIMEOUT_SECONDS
+    )
+
+
+def test_fresh_closure_reopen_validator_uses_archive_member_digests(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from bench.world_model_lifecycle import binding
+
+    closure_path = tmp_path / "development-closure.json"
+    closure_payload = _canonical({"fixture": "closure"})
+    closure_path.write_bytes(closure_payload)
+    manifest_sha256 = "a" * 64
+    result_sha256 = "b" * 64
+    closure = {
+        "producer_manifest_member": "producer/producer-manifest.json",
+        "raw_result_member": "producer/result.json",
+        "qualification_archive": {
+            "members": [
+                {
+                    "path": "producer/producer-manifest.json",
+                    "sha256": manifest_sha256,
+                },
+                {
+                    "path": "producer/result.json",
+                    "sha256": result_sha256,
+                },
+            ],
+        },
+    }
+    report = {
+        "schema": (
+            "prospect.wm001.development-closure-fresh-reopen.v1"
+        ),
+        "experiment_id": "WM-001",
+        "protocol_version": "1.9.0",
+        "mode": "fresh-closure-reopen",
+        "challenge": "7" * 64,
+        "requesting_process_id": 101,
+        "verifier_process_id": 202,
+        "matrix_contract_sha256": "8" * 64,
+        "development_closure_sha256": hashlib.sha256(
+            closure_payload
+        ).hexdigest(),
+        "producer_manifest_sha256": manifest_sha256,
+        "raw_result_sha256": result_sha256,
+        "passed": True,
+    }
+    monkeypatch.setattr(
+        preformal,
+        "_canonical_existing_file",
+        lambda path, *, label: path,
+    )
+    monkeypatch.setattr(
+        preformal,
+        "_file_identity",
+        lambda path, *, label, expected_nlink: {
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        },
+    )
+    monkeypatch.setattr(
+        binding,
+        "verify_development_closure",
+        lambda path: closure,
+    )
+    monkeypatch.setattr(
+        binding,
+        "_development_matrix_contract_sha256",
+        lambda: "8" * 64,
+    )
+
+    assert (
+        preformal.validate_fresh_closure_reopen_report(
+            report,
+            development_closure=closure_path,
+        )
+        == report
+    )
+    mutated = dict(report)
+    mutated["raw_result_sha256"] = "c" * 64
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="live sealed evidence",
+    ):
+        preformal.validate_fresh_closure_reopen_report(
+            mutated,
+            development_closure=closure_path,
+        )
+
+
+def test_fresh_identity_conformance_uses_nested_descriptor_child(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from bench.world_model_lifecycle import binding
+
+    custody = {"schema": "captured-runtime"}
+    challenge = "7" * 64
+    child_report = {
+        "schema": (
+            "prospect.wm001.fresh-runtime-identity-conformance.v1"
+        ),
+        "experiment_id": "WM-001",
+        "protocol_version": "1.9.0",
+        "mode": "fresh-identity-conformance",
+        "challenge": challenge,
+        "requesting_process_id": os.getpid(),
+        "verifier_process_id": os.getpid() + 1,
+        "matrix_contract_sha256": "8" * 64,
+        "passed": True,
+    }
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(
+        preformal,
+        "_verify_live_bootstrap_custody",
+        lambda: custody,
+    )
+    monkeypatch.setattr(os, "urandom", lambda count: bytes.fromhex(challenge))
+    monkeypatch.setattr(
+        sys,
+        "_prospect_wm001_bootstrap_fd",
+        11,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sys,
+        "_prospect_wm001_runtime_seal_fd",
+        12,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        binding,
+        "_development_matrix_contract_sha256",
+        lambda: "8" * 64,
+    )
+
+    def run(
+        command: tuple[str, ...],
+        **arguments: object,
+    ) -> subprocess.CompletedProcess[bytes]:
+        observed["command"] = command
+        observed.update(arguments)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=_canonical(child_report),
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(subprocess, "run", run)
+
+    assert (
+        preformal.fresh_runtime_identity_conformance()
+        == child_report
+    )
+    command = observed["command"]
+    assert isinstance(command, tuple)
+    assert command[:5] == (
+        sys.executable,
+        "-I",
+        "-S",
+        "-B",
+        "/proc/self/fd/11",
+    )
+    assert "launch_bootstrap.py" not in " ".join(command)
+    assert command[-5:] == (
+        "fresh-identity-conformance",
+        "--challenge",
+        challenge,
+        "--requesting-process-id",
+        str(os.getpid()),
+    )
+    assert observed["pass_fds"] == (11, 12)
+
+
+def test_fresh_identity_conformance_child_rejects_same_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        preformal,
+        "_verify_live_bootstrap_custody",
+        lambda: {"schema": "captured-runtime"},
+    )
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="challenge",
+    ):
+        preformal._runtime_fresh_identity_conformance(
+            challenge="7" * 64,
+            requesting_process_id=os.getpid(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("returncode", "stdout", "stderr"),
+    (
+        (2, b"", b"child failed"),
+        (0, b"not canonical json\n", b""),
+        (
+            0,
+            b"x"
+            * (
+                preformal._FRESH_CLOSURE_REOPEN_MAX_OUTPUT_BYTES
+                + 1
+            ),
+            b"",
+        ),
+    ),
+)
+def test_fresh_closure_reopen_rejects_failed_or_malformed_child(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    returncode: int,
+    stdout: bytes,
+    stderr: bytes,
+) -> None:
+    closure = tmp_path / "development-closure.json"
+    closure.write_bytes(_canonical({"closure": True}))
+    monkeypatch.setattr(
+        preformal,
+        "_verify_live_bootstrap_custody",
+        lambda: {"schema": "captured-runtime"},
+    )
+    monkeypatch.setattr(
+        preformal,
+        "_canonical_existing_file",
+        lambda path, *, label: path,
+    )
+    monkeypatch.setattr(
+        sys,
+        "_prospect_wm001_bootstrap_fd",
+        11,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sys,
+        "_prospect_wm001_runtime_seal_fd",
+        12,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            returncode,
+            stdout=stdout,
+            stderr=stderr,
+        ),
+    )
+
+    with pytest.raises(preformal.PreformalEvidenceError):
+        preformal.fresh_runtime_development_closure_reopen(closure)
+
+
+def test_fresh_closure_reopen_rejects_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closure = tmp_path / "development-closure.json"
+    closure.write_bytes(_canonical({"closure": True}))
+    monkeypatch.setattr(
+        preformal,
+        "_verify_live_bootstrap_custody",
+        lambda: {"schema": "captured-runtime"},
+    )
+    monkeypatch.setattr(
+        preformal,
+        "_canonical_existing_file",
+        lambda path, *, label: path,
+    )
+    monkeypatch.setattr(
+        sys,
+        "_prospect_wm001_bootstrap_fd",
+        11,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sys,
+        "_prospect_wm001_runtime_seal_fd",
+        12,
+        raising=False,
+    )
+
+    def timeout(*args: object, **kwargs: object) -> None:
+        raise subprocess.TimeoutExpired("fresh child", 3_600)
+
+    monkeypatch.setattr(subprocess, "run", timeout)
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="could not start",
+    ):
+        preformal.fresh_runtime_development_closure_reopen(closure)
+
+
 def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -941,6 +1460,29 @@ def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
 
     monkeypatch.setattr(gymnasium, "make", make)
     monkeypatch.setattr(preformal, "_verify_live_bootstrap_custody", verify_custody)
+    fresh_identity = {
+        "schema": (
+            "prospect.wm001.fresh-runtime-identity-conformance.v1"
+        ),
+        "experiment_id": "WM-001",
+        "protocol_version": "1.9.0",
+        "mode": "fresh-identity-conformance",
+        "challenge": "7" * 64,
+        "requesting_process_id": 101,
+        "verifier_process_id": 202,
+        "matrix_contract_sha256": "8" * 64,
+        "passed": True,
+    }
+
+    def fresh_conformance() -> dict[str, object]:
+        events.append("fresh-identity")
+        return fresh_identity
+
+    monkeypatch.setattr(
+        preformal,
+        "fresh_runtime_identity_conformance",
+        fresh_conformance,
+    )
     monkeypatch.setattr(binding, "require_formal_process_environment", require_environment)
     monkeypatch.setattr(
         binding,
@@ -969,7 +1511,13 @@ def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
     report = preformal._runtime_bootstrap_inventory_conformance("cpu")
 
     assert report["passed"] is True
+    assert report[
+        "fresh_runtime_identity_conformance_sha256"
+    ] == hashlib.sha256(
+        preformal._canonical_json_bytes(fresh_identity)
+    ).hexdigest()
     assert report["restart_runtime_repeat_count"] == 3
     assert report["restart_runtime_path_descriptor_equal"] is True
     assert events[:4] == ["closure", "make", "close", "closure"]
+    assert "fresh-identity" in events
     assert events[-2:] == ["conformance", "closure"]

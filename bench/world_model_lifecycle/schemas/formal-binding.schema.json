@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v8.json",
+  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v9.json",
   "title": "WM-001 formal implementation binding",
   "type": "object",
   "additionalProperties": false,
@@ -23,7 +23,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.formal-binding.v8"
+      "const": "prospect.world-model-lifecycle.formal-binding.v9"
     },
     "experiment_id": {
       "const": "WM-001"
@@ -63,7 +63,7 @@
       ],
       "properties": {
         "version": {
-          "const": "1.8.0"
+          "const": "1.9.0"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -1067,14 +1067,14 @@
     },
     "formal_replicate_master_seeds": {
       "const": [
-        3362668913,
-        1230840469,
-        428983069,
-        1629522391,
-        1347202040,
-        1247885121,
-        3968594484,
-        3609284286
+        1369779618,
+        2721934008,
+        2798280967,
+        926105433,
+        4118470289,
+        919763803,
+        2112633694,
+        2832104894
       ]
     }
   },

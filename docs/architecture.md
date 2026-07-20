@@ -327,6 +327,23 @@ namespaces, seal, review, and binding.
 See the
 [v1.8 confirmation plan](wm001-v180-confirmation-plan.md).
 
+Its sole development producer, independent audit, and closure completed, but a
+fresh-process verification of the closure rejected the archived result
+qualification. The matrix-contract digest had serialized two frozensets without
+sorting them, so interpreter hash randomization changed the digest across
+processes. No K3–K6 value was opened and no preformal report, binding, formal
+launch, formal audit, semantic review, or adjudication was authorized. The
+terminal disposition is recorded in the
+[v1.8 closure-verification failure review](wm001-v180-development-closure-verification-failure.md).
+
+Protocol 1.9.0 preserves the same scientific system and repairs only this
+portability boundary. It canonicalizes every matrix-contract row, binds the
+golden digest, and requires the accepted closure and operator attempt to be
+reopened in an independent fresh sealed-runtime process before preformal
+evidence may be created. It uses fresh seeds, environments, schemas, result
+namespaces, seal, review, and binding. See the
+[v1.9 confirmation plan](wm001-v190-confirmation-plan.md).
+
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget
@@ -334,10 +351,10 @@ See the
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocol 1.8 remains prospective until its one development qualification,
+- Protocol 1.9 remains prospective until its one development qualification,
   one formal confirmation, official audit, semantic review, and terminal
   adjudication complete.
-- The v1.8 custody layer is deliberately not hardened against the repository or
+- The v1.9 custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External
   attestation, read-only media, or an independently operated transparency log
