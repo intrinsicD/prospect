@@ -191,42 +191,42 @@ def test_record_hash_decoder_requires_exact_sha256() -> None:
             decode(("sha256", "not+a+valid+digest"))
 
 
-def test_protocol_160_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (2999896578, 3783052994)
+def test_protocol_170_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (3920043614, 3703229797)
     assert verify_module.FORMAL_SEEDS == (
-        3863790658,
-        3900021454,
-        1437244820,
-        3175470977,
-        228708147,
-        3835462042,
-        3342200973,
-        1751060143,
+        2080036362,
+        865871218,
+        3636713390,
+        2195564811,
+        2000167339,
+        329754669,
+        4064290468,
+        1911057116,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            2999896578,
+            3920043614,
             index,
         )
         for index in range(8)
     ] == [
-        1845767432,
-        3661058938,
-        574263981,
-        934079335,
-        4213171309,
-        957315966,
-        1549061991,
-        3810173688,
+        1276766050,
+        1493755138,
+        3784940138,
+        2079012506,
+        262630724,
+        2559766663,
+        2864433982,
+        2819167670,
     ]
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            3783052994,
+            3703229797,
             0,
         )
-        == 2084673469
+        == 637127139
     )
     assert (
         tuple(verify_module.derive_master_seed("development", index) for index in range(2))
@@ -235,7 +235,7 @@ def test_protocol_160_seed_domain_and_master_seeds_are_exact() -> None:
     assert tuple(verify_module.derive_master_seed("formal", index) for index in range(8)) == verify_module.FORMAL_SEEDS
 
 
-def test_protocol_160_states_the_negative_assurance_boundary() -> None:
+def test_protocol_170_states_the_negative_assurance_boundary() -> None:
     protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
 
     assert protocol["trust_model"] == {
@@ -253,11 +253,11 @@ def test_implementation_manifest_binds_prospective_harness_review() -> None:
     assert [
         row
         for row in rows
-        if row["path"] == "docs/wm001-v160-prospective-harness-review.json"
+        if row["path"] == "docs/wm001-v170-prospective-harness-review.json"
     ]
 
 
-def test_protocol_160_irrelevant_control_contract_is_bound() -> None:
+def test_protocol_170_irrelevant_control_contract_is_bound() -> None:
     assert (
         "collect_irrelevant",
         verify_module.TASK_IRRELEVANT,
@@ -324,13 +324,13 @@ def test_result_runtime_must_equal_formal_binding_runtime() -> None:
         )
 
 
-def test_formal_binding_schema_binds_protocol_160_and_fresh_seeds() -> None:
+def test_formal_binding_schema_binds_protocol_170_and_fresh_seeds() -> None:
     schema = json.loads(
         verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
 
-    assert schema["$id"].endswith("wm-001-formal-binding-v6.json")
-    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v6"
+    assert schema["$id"].endswith("wm-001-formal-binding-v7.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v7"
     assert "assurance" in schema["required"]
     assert schema["properties"]["assurance"]["properties"] == {
         "trust_model_id": {
@@ -340,7 +340,7 @@ def test_formal_binding_schema_binds_protocol_160_and_fresh_seeds() -> None:
         "external_attestation": {"const": False},
         "exclusive_path_use_required": {"const": True},
     }
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.6.0"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.7.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
@@ -356,9 +356,50 @@ def test_formal_binding_schema_binds_protocol_160_and_fresh_seeds() -> None:
         "formal_test_report_sha256",
         "conformance_report_sha256",
     } <= set(coverage["required"])
+    audit_execution = schema["properties"]["audit_execution"]
+    restart_fields = {
+        "restart_runtime_conformance_report_file",
+        "restart_runtime_conformance_report_bytes",
+        "restart_runtime_conformance_report_sha256",
+        "restart_runtime_execution_receipt_file",
+        "restart_runtime_execution_receipt_bytes",
+        "restart_runtime_execution_receipt_sha256",
+        "restart_runtime_support_files",
+        "restart_runtime_repeat_count",
+        "restart_runtime_path_descriptor_equal",
+    }
+    assert restart_fields <= set(audit_execution["required"])
+    assert restart_fields <= set(audit_execution["properties"])
+    assert audit_execution["properties"][
+        "restart_runtime_support_files"
+    ]["const"] == [
+        "producer_bootstrap.py",
+        "protocol.json",
+        "schemas/raw-result.schema.json",
+    ]
 
 
-def test_raw_result_schema_binds_v160_heldout_split_and_formal_counts() -> None:
+@pytest.mark.parametrize(
+    ("observed", "expected"),
+    [
+        (False, 0),
+        (True, 1),
+        (1.0, 1),
+        ({"bytes": 3.0}, {"bytes": 3}),
+        ([{"rejected": 1}], [{"rejected": True}]),
+    ],
+)
+def test_restart_json_comparison_rejects_python_numeric_aliases(
+    observed: object,
+    expected: object,
+) -> None:
+    assert artifact_audit._strict_json_equal(expected, expected)
+    assert verify_module._strict_json_equal(expected, expected)
+    assert not artifact_audit._strict_json_equal(observed, expected)
+    assert not verify_module._strict_json_equal(observed, expected)
+
+
+def test_raw_result_schema_binds_v170_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -367,9 +408,9 @@ def test_raw_result_schema_binds_v160_heldout_split_and_formal_counts() -> None:
     predictive_properties = predictive_schema["properties"]
     gate_comparators = schema["$defs"]["gateCheck"]["properties"]["comparator"]["enum"]
 
-    assert schema["$id"].endswith("wm-001-raw-result-v6.json")
-    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v6"
-    assert schema["properties"]["protocol_version"]["const"] == "1.6.0"
+    assert schema["$id"].endswith("wm-001-raw-result-v7.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v7"
+    assert schema["properties"]["protocol_version"]["const"] == "1.7.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
@@ -410,7 +451,7 @@ def test_raw_result_schema_binds_v160_heldout_split_and_formal_counts() -> None:
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v160_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v170_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -753,7 +794,7 @@ def test_formal_binding_file_requires_single_link_custody(
 ) -> None:
     binding_path = tmp_path / "formal-binding.json"
     binding_path.write_bytes(_canonical_payload({"fixture": "binding"}))
-    verified = {"schema": "prospect.world-model-lifecycle.formal-binding.v6"}
+    verified = {"schema": "prospect.world-model-lifecycle.formal-binding.v7"}
     monkeypatch.setattr(
         verify_module,
         "verify_binding",
@@ -802,7 +843,7 @@ def _producer_custody_fixture(
     seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "assurance": dict(binding_module.ASSURANCE),
         "git_commit": execution["git_commit"],
         "git_tree": execution["git_tree"],
@@ -1269,7 +1310,7 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -1364,7 +1405,7 @@ def test_development_closure_creator_rejects_any_alternate_marker_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    canonical = tmp_path / "development-closure-v1.6.0.json"
+    canonical = tmp_path / "development-closure-v1.7.0.json"
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
 
     with pytest.raises(RuntimeError, match="only be published"):
@@ -1382,7 +1423,7 @@ def test_preserved_development_closure_name_must_be_content_addressed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _canonical_payload({"schema": "fixture"})
-    canonical = tmp_path / "development-closure-v1.6.0.json"
+    canonical = tmp_path / "development-closure-v1.7.0.json"
     canonical.write_bytes(payload)
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
     assert binding_module._closure_path_mode(canonical, payload) == "canonical"

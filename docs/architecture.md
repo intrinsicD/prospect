@@ -267,25 +267,52 @@ gap: Gymnasium's lazy import added two process variables after the environment
 had been sealed. The producer was not outer-finalized, no result or development
 closure was published, and formal execution never became eligible.
 
-Protocol 1.6.0 keeps the same agent, scientific blocks, budgets, controls,
-metrics, thresholds, and killing order. It fixes
+Protocol 1.6.0 kept the same agent, scientific blocks, budgets, controls,
+metrics, thresholds, and killing order. It fixed
 `PYGAME_HIDE_SUPPORT_PROMPT=hide` and `SDL_AUDIODRIVER=dsp` from process start,
-crosses that lazy boundary in a result-free sealed rehearsal, and makes
+crossed that lazy boundary in a result-free sealed rehearsal, and made
 development qualification consumption explicitly single-use. A non-editable
-isolated wheel and complete transitive package inventory are shared by
+isolated wheel and complete transitive package inventory were shared by
 prebinding, producer, auditor, and adjudicator.
-Prospective runtime seals, producer attempts, development audit/closure
-attempts, the formal audit, and adjudication all use an outer launcher that
-holds one repository-global cooperative sealed-runtime lock and commits the
+Its prospective runtime seals, producer attempts, development audit/closure
+attempts, formal audit, and adjudication all used an outer launcher that held
+one repository-global cooperative sealed-runtime lock and committed the
 terminal only
 after child exit and descriptor rechecks by a deterministic same-inode
-hardlink. Formal execution can consume only the accepted, outer-finalized
-canonical binding attempt; copied or direct bindings are rejected. The
-formal-audit and adjudication claims are version-scoped and single-use, and a
-no-report audit failure reaches a terminal rejected package with no replay.
-These are application-level custody properties under an explicit trusted
+hardlink. Formal execution could consume only the accepted, outer-finalized
+canonical binding attempt; copied or direct bindings were rejected. The
+formal-audit and adjudication claims were version-scoped and single-use, and a
+no-report audit failure reached a terminal rejected package with no replay.
+Those were application-level custody properties under an explicit trusted
 same-principal/kernel/filesystem boundary, not external tamper resistance. See
 the [v1.6 confirmation plan](wm001-v160-confirmation-plan.md).
+
+The sole v1.6 development producer completed and was outer-finalized, but its
+sole independent audit failed before emitting a report. The captured auditor
+ran from a private temporary directory and tried to open an undeclared sibling
+`producer_bootstrap.py`; only the protocol and raw-result schema had been
+captured. The audit attempt was outer-finalized as failure evidence, so v1.6
+has no development closure, binding, or formal authority. Its K3–K6 values
+remain unopened and unused. The exact disposition is recorded in the
+[v1.6 development-audit failure review](wm001-v160-development-audit-failure.md).
+
+Protocol 1.7.0 preserves the same scientific system and repairs only this
+auditor input boundary. Full outcome audits now require
+`producer_bootstrap.py`, `protocol.json`, and
+`schemas/raw-result.schema.json` as exact captured support files. Development
+reopens the captured bootstrap identity directly; formal audit additionally
+requires equality with the bound source snapshot. No ambient `HERE`, working
+directory, or importable-install fallback is permitted. Both restart-runtime
+branches and negative omission/mutation cases are exercised before the
+single-use development path exists. The expected bootstrap digest is bound
+independently of the captured file, and the canonical branch report plus all
+three path and three descriptor execution identities are retained and
+cross-checked from preformal rehearsal through formal verification. Version
+1.7 also drops nonexistent startup search entries, rejects extant ambient
+import roots, and restricts every retained child search directory to the bound
+standard-library or explicit package-root inventory. It uses fresh seeds, environments,
+schemas, result namespaces, seal, review, and binding. See the
+[v1.7 confirmation plan](wm001-v170-confirmation-plan.md).
 
 ## Open engineering boundaries
 
@@ -294,10 +321,10 @@ the [v1.6 confirmation plan](wm001-v160-confirmation-plan.md).
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocol 1.6 remains prospective until its one development qualification,
+- Protocol 1.7 remains prospective until its one development qualification,
   one formal confirmation, official audit, semantic review, and terminal
   adjudication complete.
-- The v1.6 custody layer is deliberately not hardened against the repository or
+- The v1.7 custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External
   attestation, read-only media, or an independently operated transparency log

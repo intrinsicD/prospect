@@ -109,7 +109,7 @@ def test_active_protocol_seed_universe_has_no_declared_collision() -> None:
     assert audit.passed_checks == 1
 
 
-def test_prebinding_protocol_requires_exact_v15_lineage(
+def test_prebinding_protocol_requires_exact_v17_supersession_lineage(
     tmp_path: Path,
 ) -> None:
     protocol = json.loads(PROTOCOL.read_text(encoding="utf-8"))
@@ -561,7 +561,7 @@ def _preformal_v2_fixture(
     review: dict[str, object] = {
         "schema": "prospect.wm001.prospective-harness-review.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "implementation_files": reviewed_files,
         "implementation_manifest_sha256": hashlib.sha256(
             artifact_audit._canonical_json_bytes(reviewed_files)
@@ -642,7 +642,7 @@ def _preformal_v2_fixture(
     runtime_seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -729,7 +729,44 @@ def _preformal_v2_fixture(
     ):
         references: dict[str, dict[str, object]] = {}
         for stream in ("stdout", "stderr"):
-            log_payload = f"{ordinal}:{name}:{stream}\n".encode()
+            log_payload = (
+                artifact_audit._canonical_json_bytes(
+                    {
+                        "schema": (
+                            "prospect.wm001.preformal-runtime-check.v1"
+                        ),
+                        "mode": (
+                            "bootstrap-inventory-conformance"
+                        ),
+                        "device": "cpu",
+                        "passed": True,
+                        "inventory_sha256": "1" * 64,
+                        "conformance_sha256": "2" * 64,
+                        "restart_runtime_conformance_report_sha256": (
+                            "3" * 64
+                        ),
+                        "restart_runtime_execution_receipt_sha256": (
+                            "4" * 64
+                        ),
+                        "restart_runtime_support_files": [
+                            "producer_bootstrap.py",
+                            "protocol.json",
+                            "schemas/raw-result.schema.json",
+                        ],
+                        "restart_runtime_repeat_count": 3,
+                        "restart_runtime_path_descriptor_equal": (
+                            True
+                        ),
+                        "repeat_count": 3,
+                        "path_descriptor_equal": True,
+                    }
+                )
+                + b"\n"
+                if name
+                == "runtime-bootstrap-inventory-conformance"
+                and stream == "stdout"
+                else f"{ordinal}:{name}:{stream}\n".encode()
+            )
             digest = hashlib.sha256(log_payload).hexdigest()
             filename = f"{artifact_audit._PREFORMAL_LOG_PREFIX}{ordinal:02d}-{name}.{stream}.{digest}.log"
             (tmp_path / filename).write_bytes(log_payload)
@@ -772,7 +809,7 @@ def _preformal_v2_fixture(
     report: dict[str, Any] = {
         "schema": "prospect.wm001.preformal-test-report.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "repository_cwd": repository_cwd,
         "device": "cpu",
         "qa_environment": qa_environment_identity,
@@ -1186,6 +1223,7 @@ def test_full_result_runtime_is_bound_field_for_field(
 
 def test_restart_restore_runtime_is_reopened_and_bound_to_parent(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     replicate_id = "wm001-formal-123"
     package_root = tmp_path / "site-packages"
@@ -1292,15 +1330,53 @@ def test_restart_restore_runtime_is_reopened_and_bound_to_parent(
         "filename": filename,
     }
 
+    # Reproduce the exact development-audit topology that retired v1.6: the
+    # captured auditor has no ambient package siblings, and formal source
+    # custody is not available. The explicit captured digest is sufficient.
+    empty_capture = tmp_path / "captured-auditor"
+    empty_capture.mkdir()
+    monkeypatch.setattr(artifact_audit, "HERE", empty_capture)
     artifact_audit._validate_restart_restore_runtime(
         root=tmp_path,
         reference=reference,
         replicate_id=replicate_id,
         execution=execution,
+        producer_bootstrap_sha256=bootstrap_digest,
+        expected_branch="development",
+        binding_runtime=None,
+        dependencies=None,
+        source=None,
+    )
+
+    # The formal branch must additionally prove equality with the retained
+    # source snapshot and its implementation-manifest row.
+    artifact_audit._validate_restart_restore_runtime(
+        root=tmp_path,
+        reference=reference,
+        replicate_id=replicate_id,
+        execution=execution,
+        producer_bootstrap_sha256=bootstrap_digest,
+        expected_branch="formal",
         binding_runtime=binding_runtime,
         dependencies=dependencies,
         source=source,
     )
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="captured producer bootstrap differs",
+    ):
+        artifact_audit._validate_restart_restore_runtime(
+            root=tmp_path,
+            reference=reference,
+            replicate_id=replicate_id,
+            execution=execution,
+            producer_bootstrap_sha256="f" * 64,
+            expected_branch="formal",
+            binding_runtime=binding_runtime,
+            dependencies=dependencies,
+            source=source,
+        )
 
     changed_body = {
         **body,
@@ -1323,6 +1399,8 @@ def test_restart_restore_runtime_is_reopened_and_bound_to_parent(
             reference=changed_reference,
             replicate_id=replicate_id,
             execution=execution,
+            producer_bootstrap_sha256=bootstrap_digest,
+            expected_branch="formal",
             binding_runtime=binding_runtime,
             dependencies=dependencies,
             source=source,
@@ -1347,11 +1425,20 @@ def test_development_qualification_is_linked_field_for_field(
         "bytes": 202,
         "sha256": "d" * 64,
     }
+    producer_bootstrap_row = {
+        "path": "bench/world_model_lifecycle/producer_bootstrap.py",
+        "bytes": 303,
+        "sha256": execution_sources["producer_bootstrap.py"],
+    }
     source = {
         "git_commit": "a" * 40,
         "git_tree": "b" * 40,
         "execution_source_sha256": execution_sources,
-        "implementation_files": [protocol_row, raw_schema_row],
+        "implementation_files": [
+            producer_bootstrap_row,
+            protocol_row,
+            raw_schema_row,
+        ],
     }
     dependencies = {
         "lockfile_sha256": "4" * 64,
@@ -1377,7 +1464,7 @@ def test_development_qualification_is_linked_field_for_field(
     preformal_runtime_seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -1469,6 +1556,11 @@ def test_development_qualification_is_linked_field_for_field(
         "auditor_source_sha256": (artifact_audit._AUDITOR_SOURCE_SHA256),
         "support_files": [
             {
+                "path": "producer_bootstrap.py",
+                "bytes": producer_bootstrap_row["bytes"],
+                "sha256": producer_bootstrap_row["sha256"],
+            },
+            {
                 "path": "protocol.json",
                 "bytes": protocol_row["bytes"],
                 "sha256": protocol_row["sha256"],
@@ -1527,7 +1619,7 @@ def test_development_qualification_is_linked_field_for_field(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "source": closure_source,
         "producer_root": ("/repo/bench/world_model_lifecycle/results/development/run"),
         **role_members,
@@ -1744,6 +1836,7 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
             "learning.py",
             "model.py",
             "planning.py",
+            "producer_bootstrap.py",
             "runtime_lane.py",
         )
     }
@@ -1848,6 +1941,7 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
         },
     }
     outcome_supports = {
+        "producer_bootstrap.py": source_payloads["producer_bootstrap.py"],
         "protocol.json": protocol_payload,
         "schemas/raw-result.schema.json": raw_schema_payload,
     }
@@ -1955,6 +2049,149 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
         )
         + b"\n"
     )
+    restart_report_payload = (
+        artifact_audit._canonical_json_bytes(
+            {
+                "schema": (
+                    "prospect.wm001.restart-runtime-conformance.v1"
+                ),
+                "protocol_version": "1.7.0",
+                "support_files": support_rows(outcome_supports),
+                "branches": {
+                    "development": {
+                        "source_block_present": False,
+                        "captured_bootstrap_bound": True,
+                        "passed": True,
+                    },
+                    "formal": {
+                        "source_block_present": True,
+                        "source_snapshot_bound": True,
+                        "captured_bootstrap_bound": True,
+                        "passed": True,
+                    },
+                },
+                "negative_cases": [
+                    {"case_id": case_id, "rejected": True}
+                    for case_id in (
+                        "missing-bootstrap-support",
+                        "extra-bootstrap-support",
+                        "mutated-bootstrap-identity",
+                        "development-formal-branch-substitution",
+                        "formal-development-branch-substitution",
+                    )
+                ],
+                "failure_code": None,
+                "passed": True,
+            }
+        )
+        + b"\n"
+    )
+    restart_path_runtime_payload = runtime_manifest(
+        "path",
+        outcome_supports,
+    )
+
+    def restart_invocation_manifest(
+        runtime_payload: bytes,
+    ) -> bytes:
+        return (
+            artifact_audit._canonical_json_bytes(
+                {
+                    "schema": (
+                        "prospect.wm001.audit-invocation-manifest.v1"
+                    ),
+                    "runtime_manifest_sha256": hashlib.sha256(
+                        runtime_payload
+                    ).hexdigest(),
+                    "working_directory": working_directory,
+                    "auditor_argv": [
+                        "--restart-runtime-conformance",
+                        "--producer-bootstrap",
+                        "@captured/producer_bootstrap.py",
+                        "--expected-producer-bootstrap-sha256",
+                        hashlib.sha256(
+                            source_payloads["producer_bootstrap.py"]
+                        ).hexdigest(),
+                    ],
+                }
+            )
+            + b"\n"
+        )
+
+    restart_invocations = {
+        "path": restart_invocation_manifest(
+            restart_path_runtime_payload
+        ),
+        "descriptor": restart_invocation_manifest(
+            outcome_runtime_payload
+        ),
+    }
+    restart_runtimes = {
+        "path": restart_path_runtime_payload,
+        "descriptor": outcome_runtime_payload,
+    }
+    restart_receipt_rows = [
+        {
+            "ordinal": ordinal,
+            "source_mode": mode,
+            "returncode": 0,
+            "stdout": {
+                "bytes": len(restart_report_payload),
+                "sha256": hashlib.sha256(
+                    restart_report_payload
+                ).hexdigest(),
+            },
+            "stderr": {
+                "bytes": 0,
+                "sha256": hashlib.sha256(b"").hexdigest(),
+            },
+            "runtime_manifest": {
+                "bytes": len(restart_runtimes[mode]),
+                "sha256": hashlib.sha256(
+                    restart_runtimes[mode]
+                ).hexdigest(),
+            },
+            "invocation_manifest": {
+                "bytes": len(restart_invocations[mode]),
+                "sha256": hashlib.sha256(
+                    restart_invocations[mode]
+                ).hexdigest(),
+            },
+            "bootstrap_sha256": hashlib.sha256(
+                bootstrap_payload
+            ).hexdigest(),
+            "auditor_source_sha256": hashlib.sha256(
+                auditor_payload
+            ).hexdigest(),
+            "support_files": support_rows(outcome_supports),
+            "auditor_report_passed": True,
+        }
+        for ordinal, mode in enumerate(
+            [
+                *(["path"] * repeat_count),
+                *(["descriptor"] * repeat_count),
+            ],
+            start=1,
+        )
+    ]
+    restart_receipt_payload = (
+        artifact_audit._canonical_json_bytes(
+            {
+                "schema": (
+                    "prospect.wm001.audit-conformance-receipt.v1"
+                ),
+                "repeat_count": repeat_count,
+                "execution_count": len(restart_receipt_rows),
+                "executions": restart_receipt_rows,
+                "report_sha256": hashlib.sha256(
+                    restart_report_payload
+                ).hexdigest(),
+                "path_descriptor_byte_identical": True,
+                "execution_conformance_passed": True,
+            }
+        )
+        + b"\n"
+    )
 
     def content_name(
         prefix: str,
@@ -2031,12 +2268,46 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
         ),
         "outcome_runtime_manifest_bytes": len(outcome_runtime_payload),
         "outcome_runtime_manifest_sha256": hashlib.sha256(outcome_runtime_payload).hexdigest(),
-        "outcome_source_mode": "descriptor",
-        "outcome_support_files": [
+        "restart_runtime_conformance_report_file": content_name(
+            "audit-restart-runtime-conformance",
+            restart_report_payload,
+            ".json",
+        ),
+        "restart_runtime_conformance_report_bytes": len(
+            restart_report_payload
+        ),
+        "restart_runtime_conformance_report_sha256": (
+            hashlib.sha256(restart_report_payload).hexdigest()
+        ),
+        "restart_runtime_execution_receipt_file": content_name(
+            "audit-restart-runtime-execution-receipt",
+            restart_receipt_payload,
+            ".json",
+        ),
+        "restart_runtime_execution_receipt_bytes": len(
+            restart_receipt_payload
+        ),
+        "restart_runtime_execution_receipt_sha256": (
+            hashlib.sha256(restart_receipt_payload).hexdigest()
+        ),
+        "restart_runtime_support_files": [
+            "producer_bootstrap.py",
             "protocol.json",
             "schemas/raw-result.schema.json",
         ],
-        "outcome_argv_role": ["<canonical-producer-root>"],
+        "restart_runtime_repeat_count": repeat_count,
+        "restart_runtime_path_descriptor_equal": True,
+        "outcome_source_mode": "descriptor",
+        "outcome_support_files": [
+            "producer_bootstrap.py",
+            "protocol.json",
+            "schemas/raw-result.schema.json",
+        ],
+        "outcome_argv_role": [
+            "<canonical-producer-root>",
+            "--producer-bootstrap",
+            "<captured-producer-bootstrap>",
+        ],
         "outcome_working_directory": working_directory,
         "interpreter_flags": ["-I", "-S", "-B"],
         "repeat_count": repeat_count,
@@ -2055,6 +2326,8 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
         report_payload=report_payload,
         execution_receipt_payload=execution_receipt_payload,
         outcome_runtime_manifest_payload=outcome_runtime_payload,
+        restart_runtime_report_payload=restart_report_payload,
+        restart_runtime_receipt_payload=restart_receipt_payload,
         dependencies=dependencies,
         runtime=runtime,
         source=source,
@@ -2088,6 +2361,8 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
             report_payload=report_payload,
             execution_receipt_payload=execution_receipt_payload,
             outcome_runtime_manifest_payload=outcome_runtime_payload,
+            restart_runtime_report_payload=restart_report_payload,
+            restart_runtime_receipt_payload=restart_receipt_payload,
             dependencies=dependencies,
             runtime=runtime,
             source=source,
@@ -2121,6 +2396,8 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
             report_payload=report_payload,
             execution_receipt_payload=changed_receipt_payload,
             outcome_runtime_manifest_payload=outcome_runtime_payload,
+            restart_runtime_report_payload=restart_report_payload,
+            restart_runtime_receipt_payload=restart_receipt_payload,
             dependencies=dependencies,
             runtime=runtime,
             source=source,
@@ -2128,6 +2405,84 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
             preformal_repository_cwd=working_directory,
             verify_live_outcome_runtime=False,
         )
+
+    aliased_prebinding_receipts: list[dict[str, Any]] = []
+    for field in ("repeat_count", "execution_count"):
+        changed = copy.deepcopy(
+            json.loads(execution_receipt_payload)
+        )
+        changed[field] = float(cast(int, changed[field]))
+        aliased_prebinding_receipts.append(changed)
+    false_returncode = copy.deepcopy(
+        json.loads(execution_receipt_payload)
+    )
+    false_returncode["executions"][0]["returncode"] = False
+    aliased_prebinding_receipts.append(false_returncode)
+    float_stdout_bytes = copy.deepcopy(
+        json.loads(execution_receipt_payload)
+    )
+    float_stdout_bytes["executions"][0]["stdout"]["bytes"] = float(
+        float_stdout_bytes["executions"][0]["stdout"]["bytes"]
+    )
+    aliased_prebinding_receipts.append(float_stdout_bytes)
+    for aliased_receipt in aliased_prebinding_receipts:
+        aliased_payload = (
+            artifact_audit._canonical_json_bytes(aliased_receipt)
+            + b"\n"
+        )
+        aliased_digest = hashlib.sha256(
+            aliased_payload
+        ).hexdigest()
+        aliased_block = dict(block)
+        aliased_block["prebinding_execution_receipt_file"] = (
+            "audit-prebinding-execution-receipt-"
+            f"{aliased_digest[:16]}.json"
+        )
+        aliased_block["prebinding_execution_receipt_bytes"] = len(
+            aliased_payload
+        )
+        aliased_block["prebinding_execution_receipt_sha256"] = (
+            aliased_digest
+        )
+        with pytest.raises(
+            artifact_audit.ArtifactAuditError,
+            match=(
+                "prebinding execution receipt does not prove every "
+                "exact path and descriptor execution"
+            ),
+        ):
+            artifact_audit._validate_audit_execution_conformance(
+                block=aliased_block,
+                bootstrap_payload=bootstrap_payload,
+                request_payload=request_payload,
+                path_runtime_manifest_payload=path_runtime_payload,
+                descriptor_runtime_manifest_payload=(
+                    descriptor_runtime_payload
+                ),
+                path_invocation_manifest_payload=(
+                    path_invocation_payload
+                ),
+                descriptor_invocation_manifest_payload=(
+                    descriptor_invocation_payload
+                ),
+                report_payload=report_payload,
+                execution_receipt_payload=aliased_payload,
+                outcome_runtime_manifest_payload=(
+                    outcome_runtime_payload
+                ),
+                restart_runtime_report_payload=(
+                    restart_report_payload
+                ),
+                restart_runtime_receipt_payload=(
+                    restart_receipt_payload
+                ),
+                dependencies=dependencies,
+                runtime=runtime,
+                source=source,
+                root=tmp_path,
+                preformal_repository_cwd=working_directory,
+                verify_live_outcome_runtime=False,
+            )
 
     changed_outcome = json.loads(outcome_runtime_payload)
     changed_outcome["source"]["mode"] = "path"
@@ -2152,6 +2507,8 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
             report_payload=report_payload,
             execution_receipt_payload=execution_receipt_payload,
             outcome_runtime_manifest_payload=changed_outcome_payload,
+            restart_runtime_report_payload=restart_report_payload,
+            restart_runtime_receipt_payload=restart_receipt_payload,
             dependencies=dependencies,
             runtime=runtime,
             source=source,
@@ -2183,6 +2540,8 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
             report_payload=rejected_payload,
             execution_receipt_payload=execution_receipt_payload,
             outcome_runtime_manifest_payload=outcome_runtime_payload,
+            restart_runtime_report_payload=restart_report_payload,
+            restart_runtime_receipt_payload=restart_receipt_payload,
             dependencies=dependencies,
             runtime=runtime,
             source=source,
@@ -2190,6 +2549,152 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
             preformal_repository_cwd=working_directory,
             verify_live_outcome_runtime=False,
         )
+
+    def validate_restart_evidence(
+        *,
+        changed_block: dict[str, object],
+        changed_report_payload: bytes = restart_report_payload,
+        changed_receipt_payload: bytes = restart_receipt_payload,
+    ) -> None:
+        artifact_audit._validate_audit_execution_conformance(
+            block=changed_block,
+            bootstrap_payload=bootstrap_payload,
+            request_payload=request_payload,
+            path_runtime_manifest_payload=path_runtime_payload,
+            descriptor_runtime_manifest_payload=descriptor_runtime_payload,
+            path_invocation_manifest_payload=path_invocation_payload,
+            descriptor_invocation_manifest_payload=descriptor_invocation_payload,
+            report_payload=report_payload,
+            execution_receipt_payload=execution_receipt_payload,
+            outcome_runtime_manifest_payload=outcome_runtime_payload,
+            restart_runtime_report_payload=changed_report_payload,
+            restart_runtime_receipt_payload=changed_receipt_payload,
+            dependencies=dependencies,
+            runtime=runtime,
+            source=source,
+            root=tmp_path,
+            preformal_repository_cwd=working_directory,
+            verify_live_outcome_runtime=False,
+        )
+
+    boolean_report = json.loads(restart_report_payload)
+    boolean_report["negative_cases"][0]["rejected"] = 1
+    boolean_report_payload = (
+        artifact_audit._canonical_json_bytes(boolean_report) + b"\n"
+    )
+    boolean_report_digest = hashlib.sha256(
+        boolean_report_payload
+    ).hexdigest()
+    boolean_report_block = dict(block)
+    boolean_report_block["restart_runtime_conformance_report_file"] = (
+        f"audit-restart-runtime-conformance-{boolean_report_digest[:16]}.json"
+    )
+    boolean_report_block["restart_runtime_conformance_report_bytes"] = len(
+        boolean_report_payload
+    )
+    boolean_report_block["restart_runtime_conformance_report_sha256"] = (
+        boolean_report_digest
+    )
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="restart-runtime conformance report is not one complete",
+    ):
+        validate_restart_evidence(
+            changed_block=boolean_report_block,
+            changed_report_payload=boolean_report_payload,
+        )
+
+    boolean_receipt = json.loads(restart_receipt_payload)
+    boolean_receipt["executions"][0]["returncode"] = False
+    boolean_receipt_payload = (
+        artifact_audit._canonical_json_bytes(boolean_receipt) + b"\n"
+    )
+    boolean_receipt_digest = hashlib.sha256(
+        boolean_receipt_payload
+    ).hexdigest()
+    boolean_receipt_block = dict(block)
+    boolean_receipt_block["restart_runtime_execution_receipt_file"] = (
+        "audit-restart-runtime-execution-receipt-"
+        f"{boolean_receipt_digest[:16]}.json"
+    )
+    boolean_receipt_block["restart_runtime_execution_receipt_bytes"] = len(
+        boolean_receipt_payload
+    )
+    boolean_receipt_block["restart_runtime_execution_receipt_sha256"] = (
+        boolean_receipt_digest
+    )
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="restart-runtime execution receipt does not prove",
+    ):
+        validate_restart_evidence(
+            changed_block=boolean_receipt_block,
+            changed_receipt_payload=boolean_receipt_payload,
+        )
+
+    float_receipt = json.loads(restart_receipt_payload)
+    float_receipt["executions"][0]["stdout"]["bytes"] = float(
+        float_receipt["executions"][0]["stdout"]["bytes"]
+    )
+    float_receipt_payload = (
+        artifact_audit._canonical_json_bytes(float_receipt) + b"\n"
+    )
+    float_receipt_digest = hashlib.sha256(float_receipt_payload).hexdigest()
+    float_receipt_block = dict(block)
+    float_receipt_block["restart_runtime_execution_receipt_file"] = (
+        "audit-restart-runtime-execution-receipt-"
+        f"{float_receipt_digest[:16]}.json"
+    )
+    float_receipt_block["restart_runtime_execution_receipt_bytes"] = len(
+        float_receipt_payload
+    )
+    float_receipt_block["restart_runtime_execution_receipt_sha256"] = (
+        float_receipt_digest
+    )
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="restart-runtime execution receipt does not prove",
+    ):
+        validate_restart_evidence(
+            changed_block=float_receipt_block,
+            changed_receipt_payload=float_receipt_payload,
+        )
+
+    for field in ("repeat_count", "execution_count"):
+        float_count_receipt = json.loads(restart_receipt_payload)
+        float_count_receipt[field] = float(
+            float_count_receipt[field]
+        )
+        float_count_payload = (
+            artifact_audit._canonical_json_bytes(
+                float_count_receipt
+            )
+            + b"\n"
+        )
+        float_count_digest = hashlib.sha256(
+            float_count_payload
+        ).hexdigest()
+        float_count_block = dict(block)
+        float_count_block[
+            "restart_runtime_execution_receipt_file"
+        ] = (
+            "audit-restart-runtime-execution-receipt-"
+            f"{float_count_digest[:16]}.json"
+        )
+        float_count_block[
+            "restart_runtime_execution_receipt_bytes"
+        ] = len(float_count_payload)
+        float_count_block[
+            "restart_runtime_execution_receipt_sha256"
+        ] = float_count_digest
+        with pytest.raises(
+            artifact_audit.ArtifactAuditError,
+            match="restart-runtime execution receipt does not prove",
+        ):
+            validate_restart_evidence(
+                changed_block=float_count_block,
+                changed_receipt_payload=float_count_payload,
+            )
 
 
 def test_cli_mode_is_mutually_exclusive_with_artifact(

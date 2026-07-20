@@ -16,6 +16,7 @@ from bench.world_model_lifecycle.audit_runner import (
     build_invocation_manifest,
     build_runtime_manifest,
     captured_support_argument,
+    conformance_receipt_bytes,
     run_captured_auditor,
     run_source_mode_conformance,
 )
@@ -51,6 +52,168 @@ def _write_distribution(
     (metadata_root / "METADATA").write_text(
         f"Metadata-Version: 2.1\nName: {distribution}\nVersion: {version}\n",
         encoding="utf-8",
+    )
+
+
+def test_restart_runtime_conformance_is_result_free_repeated_and_adversarial(
+    tmp_path: Path,
+) -> None:
+    lifecycle = (
+        Path(__file__).resolve().parents[1]
+        / "bench"
+        / "world_model_lifecycle"
+    )
+    package_root = tmp_path / "minimal-packages"
+    numpy_root = package_root / "numpy"
+    numpy_root.mkdir(parents=True)
+    (numpy_root / "__init__.py").write_text(
+        "__all__ = []\n",
+        encoding="utf-8",
+    )
+    (numpy_root / "typing.py").write_text(
+        "__all__ = []\n",
+        encoding="utf-8",
+    )
+    supports = {
+        "producer_bootstrap.py": (
+            lifecycle / "producer_bootstrap.py"
+        ),
+        "protocol.json": lifecycle / "protocol.json",
+        "schemas/raw-result.schema.json": (
+            lifecycle / "schemas" / "raw-result.schema.json"
+        ),
+    }
+    expected_bootstrap_sha256 = hashlib.sha256(
+        supports["producer_bootstrap.py"].read_bytes()
+    ).hexdigest()
+    arguments = (
+        "--restart-runtime-conformance",
+        "--producer-bootstrap",
+        captured_support_argument("producer_bootstrap.py"),
+        "--expected-producer-bootstrap-sha256",
+        expected_bootstrap_sha256,
+    )
+    conformance = run_source_mode_conformance(
+        lifecycle / "artifact_audit.py",
+        auditor_arguments=arguments,
+        support_files=supports,
+        closure_import_roots=(package_root,),
+        working_directory=Path.cwd().resolve(),
+        environment={},
+        repeat_count=3,
+    )
+    report = dict(conformance.path_execution.report)
+    receipt = json.loads(conformance_receipt_bytes(conformance))
+    assert report == {
+        "schema": "prospect.wm001.restart-runtime-conformance.v1",
+        "protocol_version": "1.7.0",
+        "support_files": [
+            {
+                "path": path,
+                "bytes": source.stat().st_size,
+                "sha256": hashlib.sha256(
+                    source.read_bytes()
+                ).hexdigest(),
+            }
+            for path, source in sorted(supports.items())
+        ],
+        "branches": {
+            "development": {
+                "source_block_present": False,
+                "captured_bootstrap_bound": True,
+                "passed": True,
+            },
+            "formal": {
+                "source_block_present": True,
+                "source_snapshot_bound": True,
+                "captured_bootstrap_bound": True,
+                "passed": True,
+            },
+        },
+        "negative_cases": [
+            {"case_id": case_id, "rejected": True}
+            for case_id in (
+                "missing-bootstrap-support",
+                "extra-bootstrap-support",
+                "mutated-bootstrap-identity",
+                "development-formal-branch-substitution",
+                "formal-development-branch-substitution",
+            )
+        ],
+        "failure_code": None,
+        "passed": True,
+    }
+    assert receipt["repeat_count"] == 3
+    assert receipt["execution_count"] == 6
+    assert [
+        row["source_mode"] for row in receipt["executions"]
+    ] == ["path"] * 3 + ["descriptor"] * 3
+    assert all(
+        row["stdout"]
+        == receipt["executions"][0]["stdout"]
+        and row["support_files"] == report["support_files"]
+        for row in receipt["executions"]
+    )
+    encoded = conformance.path_execution.stdout
+    assert conformance.descriptor_execution.stdout == encoded
+    assert str(tmp_path).encode() not in encoded
+    assert b"prospect-audit-runner-" not in encoded
+    assert b"/proc/self/fd/" not in encoded
+    assert b"/dev/fd/" not in encoded
+
+    missing = dict(supports)
+    del missing["producer_bootstrap.py"]
+    with pytest.raises(
+        AuditRunnerError,
+        match="unknown captured support",
+    ):
+        run_captured_auditor(
+            lifecycle / "artifact_audit.py",
+            auditor_arguments=arguments,
+            support_files=missing,
+            closure_import_roots=(package_root,),
+            working_directory=Path.cwd().resolve(),
+            environment={},
+        )
+
+    extra = tmp_path / "unexpected.py"
+    extra.write_text("unexpected = True\n", encoding="utf-8")
+    extra_execution = run_captured_auditor(
+        lifecycle / "artifact_audit.py",
+        auditor_arguments=arguments,
+        support_files={**supports, "unexpected.py": extra},
+        closure_import_roots=(package_root,),
+        working_directory=Path.cwd().resolve(),
+        environment={},
+    )
+    assert extra_execution.returncode == 1
+    assert extra_execution.report["passed"] is False
+    assert (
+        extra_execution.report["failure_code"]
+        == "captured_support_invalid"
+    )
+
+    mutated = tmp_path / "producer_bootstrap.py"
+    mutated.write_bytes(
+        supports["producer_bootstrap.py"].read_bytes()
+        + b"\n# mutation\n"
+    )
+    mutated_execution = run_captured_auditor(
+        lifecycle / "artifact_audit.py",
+        auditor_arguments=arguments,
+        support_files={
+            **supports,
+            "producer_bootstrap.py": mutated,
+        },
+        closure_import_roots=(package_root,),
+        working_directory=Path.cwd().resolve(),
+        environment={},
+    )
+    assert mutated_execution.returncode == 1
+    assert mutated_execution.report["passed"] is False
+    assert (
+        mutated_execution.report["failure_code"]
+        == "captured_support_invalid"
     )
 
 
@@ -356,6 +519,7 @@ def test_exact_interpreter_flags_argv_and_sanitized_environment(
     auditor = _write_auditor(
         tmp_path / "flags_auditor.py",
         "import os\n"
+        "import sysconfig\n"
         "from pathlib import Path\n"
         "cmdline = Path('/proc/self/cmdline').read_bytes().split(b'\\x00')[:-1]\n"
         "emit({\n"
@@ -370,6 +534,8 @@ def test_exact_interpreter_flags_argv_and_sanitized_environment(
         "        'no_user_site': sys.flags.no_user_site,\n"
         "        'safe_path': sys.flags.safe_path,\n"
         "    },\n"
+        "    'search_path': list(sys.path),\n"
+        "    'stdlib': sysconfig.get_path('stdlib'),\n"
         "    'passed': True,\n"
         "})",
     )
@@ -400,6 +566,17 @@ def test_exact_interpreter_flags_argv_and_sanitized_environment(
         "no_user_site": 1,
         "safe_path": True,
     }
+    stdlib = Path(str(execution.report["stdlib"]))
+    search_path = execution.report["search_path"]
+    assert isinstance(search_path, list)
+    assert search_path
+    assert search_path[0] == str(stdlib)
+    assert all(
+        Path(str(entry)).is_dir()
+        and Path(str(entry)).is_relative_to(stdlib)
+        for entry in search_path
+    )
+    assert not any(str(entry).endswith(".zip") for entry in search_path)
     cmdline = execution.report["cmdline"]
     assert isinstance(cmdline, list)
     assert cmdline[:4] == [sys.executable, "-I", "-S", "-B"]

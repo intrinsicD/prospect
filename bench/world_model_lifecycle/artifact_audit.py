@@ -42,6 +42,7 @@ import struct
 import subprocess
 import sys
 import tarfile
+import tempfile
 import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -66,7 +67,7 @@ _ASSURANCE = {
     "external_attestation": False,
     "exclusive_path_use_required": True,
 }
-_OUTER_COMPLETIONS_ROOT = Path.cwd() / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.6"
+_OUTER_COMPLETIONS_ROOT = Path.cwd() / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.7"
 
 _MAGIC = b"PROSPECT-WM001\0"
 _PREDICTION_FORMAT = "prospect.wm001.predictive-evidence.v1"
@@ -94,7 +95,15 @@ _CEM_PLANNING_HORIZON = 10
 _CEM_OPTIM_STEPS = 3
 _CEM_NUM_CANDIDATES = 64
 _CEM_TOP_K = 8
-_SEED_HASH_DOMAIN_VERSION = "1.6.0"
+_SEED_HASH_DOMAIN_VERSION = "1.7.0"
+_RESTART_RUNTIME_CONFORMANCE_SCHEMA = (
+    "prospect.wm001.restart-runtime-conformance.v1"
+)
+_RESTART_RUNTIME_SUPPORT_FILES = (
+    "producer_bootstrap.py",
+    "protocol.json",
+    "schemas/raw-result.schema.json",
+)
 _EPISODE_HORIZON = 200
 _GRAPH_SCHEMA = "prospect.wm001.domain-graph.v1"
 _MAX_GRAPH_NODES = 250_000
@@ -533,16 +542,16 @@ _TASK_CONTEXT = {
     _TASK_IRRELEVANT: 2.0,
 }
 _FORMAL_SEEDS = (
-    3_863_790_658,
-    3_900_021_454,
-    1_437_244_820,
-    3_175_470_977,
-    228_708_147,
-    3_835_462_042,
-    3_342_200_973,
-    1_751_060_143,
+    2_080_036_362,
+    865_871_218,
+    3_636_713_390,
+    2_195_564_811,
+    2_000_167_339,
+    329_754_669,
+    4_064_290_468,
+    1_911_057_116,
 )
-_DEVELOPMENT_SEEDS = (2_999_896_578, 3_783_052_994)
+_DEVELOPMENT_SEEDS = (3_920_043_614, 3_703_229_797)
 _COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
 _V100_MASTER_SEEDS = (
     101,
@@ -604,7 +613,19 @@ _V150_MASTER_SEEDS = (
     4_212_585_034,
     530_094_003,
 )
-_V150_PROTOCOL_SHA256 = "434b80c41d263e40879272e172bcbdfcbb1a1f32d2b08c85df0dd7ec9317abd2"
+_V160_MASTER_SEEDS = (
+    2_999_896_578,
+    3_783_052_994,
+    3_863_790_658,
+    3_900_021_454,
+    1_437_244_820,
+    3_175_470_977,
+    228_708_147,
+    3_835_462_042,
+    3_342_200_973,
+    1_751_060_143,
+)
+_V160_PROTOCOL_SHA256 = "6f5c21d6e77683c283e09c6257c35abd0e6857e17620e585f414024852d972b2"
 _V130_BOUNDARY_TARGET_F32_HEX = "ac3cdebd"
 _V130_BOUNDARY_MEANS_F32_HEX = (
     "8cd85cbb",
@@ -783,6 +804,26 @@ def _canonical_json_bytes(value: object) -> bytes:
         separators=(",", ":"),
         sort_keys=True,
     ).encode("utf-8")
+
+
+def _strict_json_equal(observed: object, expected: object) -> bool:
+    """Compare decoded JSON without Python's bool/int or int/float aliases."""
+
+    if type(observed) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        assert isinstance(observed, dict)
+        return set(observed) == set(expected) and all(
+            _strict_json_equal(observed[key], value)
+            for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        assert isinstance(observed, list)
+        return len(observed) == len(expected) and all(
+            _strict_json_equal(left, right)
+            for left, right in zip(observed, expected, strict=True)
+        )
+    return observed == expected
 
 
 def _json_without_duplicate_keys(payload: bytes, *, label: str) -> object:
@@ -2675,6 +2716,7 @@ def _audit_protocol_seed_contract(
         ("1.3.0", _V130_MASTER_SEEDS),
         ("1.4.0", _V140_MASTER_SEEDS),
         ("1.5.0", _V150_MASTER_SEEDS),
+        ("1.6.0", _V160_MASTER_SEEDS),
     )
     prior_masters = {master_seed for _, version_masters in prior_domains for master_seed in version_masters}
     prior_stream_values = [
@@ -2690,7 +2732,7 @@ def _audit_protocol_seed_contract(
     ]
     prior_streams = set(prior_stream_values)
     valid = (
-        protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v6"
+        protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v7"
         and schedule.get("derivation_domain_version") == _SEED_HASH_DOMAIN_VERSION
         and tuple(schedule.get("development_replicate_master_seeds", ()))
         == tuple(_derive_master_seed("development", index) for index in range(2))
@@ -2711,11 +2753,11 @@ def _audit_protocol_seed_contract(
         and collision_audit.get("current_internal_collision_count") == 0
         and collision_audit.get("current_master_stream_overlap_count") == 0
         and current_masters.isdisjoint(current_streams)
-        and collision_audit.get("prior_master_seed_count") == len(prior_masters) == 50
+        and collision_audit.get("prior_master_seed_count") == len(prior_masters) == 60
         and collision_audit.get("unique_prior_derived_stream_count")
         == len(prior_streams)
         == len(prior_stream_values)
-        == 6800
+        == 8160
         and collision_audit.get("current_prior_master_master_overlap_count") == 0
         and collision_audit.get("current_prior_stream_stream_overlap_count") == 0
         and collision_audit.get("current_master_prior_stream_overlap_count") == 0
@@ -2728,7 +2770,7 @@ def _audit_protocol_seed_contract(
     audit.require(
         valid,
         code="protocol_seed_contract_mismatch",
-        message=("protocol master derivation, schedule parity, or prior-domain collision audit differs from v1.6"),
+        message=("protocol master derivation, schedule parity, or prior-domain collision audit differs from v1.7"),
     )
 
 
@@ -3711,7 +3753,7 @@ def _audit_policy_runs(
             f"{replicate_id} does not retain the exact full seed namespace/count schedule.",
             evidence_needed=(
                 "Every sealed namespace row, in full declared counts, with each value "
-                "regenerated from the v1.6 experimental seed hash domain."
+                "regenerated from the v1.7 experimental seed hash domain."
             ),
         )
 
@@ -4312,12 +4354,20 @@ def _validate_restart_restore_runtime(
     reference: object,
     replicate_id: str,
     execution: Mapping[str, object],
+    producer_bootstrap_sha256: str,
+    expected_branch: str,
     binding_runtime: Mapping[str, object] | None,
     dependencies: Mapping[str, object] | None,
     source: Mapping[str, object] | None,
 ) -> None:
     """Reopen and bind the fresh restore interpreter to its parent closure."""
 
+    _require_restart_runtime_branch(
+        expected_branch,
+        binding_runtime=binding_runtime,
+        dependencies=dependencies,
+        source=source,
+    )
     runtime_fields = {
         "schema",
         "python_executable",
@@ -4407,8 +4457,9 @@ def _validate_restart_restore_runtime(
             dependencies.get("python_executable_sha256"),
         )
 
-    bootstrap_path = HERE / "producer_bootstrap.py"
-    expected_bootstrap_digest = _sha256_file(bootstrap_path)
+    if not _is_sha256(producer_bootstrap_sha256):
+        raise ArtifactAuditError("captured producer bootstrap identity is malformed")
+    expected_bootstrap_digest = producer_bootstrap_sha256
     if source is not None:
         implementation = source.get("implementation_files")
         bootstrap_rows = (
@@ -4431,8 +4482,11 @@ def _validate_restart_restore_runtime(
         if (
             bootstrap_rows[0].get("bytes") != len(bootstrap_payload)
             or bootstrap_rows[0].get("sha256") != hashlib.sha256(bootstrap_payload).hexdigest()
+            or bootstrap_rows[0].get("sha256") != producer_bootstrap_sha256
         ):
-            raise ArtifactAuditError("restart restore runtime bootstrap snapshot changed")
+            raise ArtifactAuditError(
+                "captured producer bootstrap differs from the formal source snapshot"
+            )
         expected_bootstrap_digest = cast(
             str,
             bootstrap_rows[0].get("sha256"),
@@ -4538,6 +4592,424 @@ def _validate_restart_restore_runtime(
         raise ArtifactAuditError("restart restore runtime differs from the parent and formal binding")
 
 
+def _restart_runtime_conformance_support_files() -> list[str]:
+    """Return every private-capture support, excluding the auditor source."""
+
+    observed: list[str] = []
+    try:
+        for directory, directory_names, filenames in os.walk(
+            HERE,
+            topdown=True,
+            followlinks=False,
+        ):
+            directory_names.sort()
+            filenames.sort()
+            current = Path(directory)
+            for name in directory_names:
+                path = current / name
+                if path.is_symlink() or not path.is_dir():
+                    raise ArtifactAuditError(
+                        "restart-runtime conformance capture contains a non-directory"
+                    )
+            for name in filenames:
+                path = current / name
+                relative = path.relative_to(HERE).as_posix()
+                if path.is_symlink() or not path.is_file():
+                    raise ArtifactAuditError(
+                        "restart-runtime conformance capture contains a non-regular file"
+                    )
+                if relative != "artifact_audit.py":
+                    observed.append(relative)
+    except OSError as error:
+        raise ArtifactAuditError(
+            "restart-runtime conformance capture cannot be enumerated"
+        ) from error
+    return sorted(observed)
+
+
+def _require_restart_runtime_support_set(observed: Sequence[str]) -> None:
+    if tuple(observed) != _RESTART_RUNTIME_SUPPORT_FILES:
+        raise ArtifactAuditError(
+            "restart-runtime conformance support set differs from the exact outcome support"
+        )
+
+
+def _require_restart_runtime_branch(
+    branch: str,
+    *,
+    binding_runtime: Mapping[str, object] | None,
+    dependencies: Mapping[str, object] | None,
+    source: Mapping[str, object] | None,
+) -> None:
+    if branch == "development":
+        if any(value is not None for value in (binding_runtime, dependencies, source)):
+            raise ArtifactAuditError(
+                "development restart-runtime conformance received formal source custody"
+            )
+        return
+    if branch == "formal":
+        if not all(
+            isinstance(value, Mapping)
+            for value in (binding_runtime, dependencies, source)
+        ):
+            raise ArtifactAuditError(
+                "formal restart-runtime conformance lacks bound source custody"
+            )
+        return
+    raise ArtifactAuditError("restart-runtime conformance branch is invalid")
+
+
+def _restart_runtime_conformance_inventory(
+    path: Path,
+    *,
+    semantics_id: str,
+) -> dict[str, object]:
+    canonical = path.resolve(strict=True)
+    if canonical != path or not path.is_dir() or path.is_symlink():
+        raise ArtifactAuditError(
+            "restart-runtime conformance inventory root is absent or aliased"
+        )
+    identity = {
+        "semantics_id": semantics_id,
+        "path_kind": "result-free-conformance",
+    }
+    return {
+        "path": str(path),
+        "semantics_id": semantics_id,
+        "file_count": 1,
+        "directory_count": 0,
+        "total_bytes": 1,
+        "inventory_sha256": hashlib.sha256(
+            _canonical_json_bytes(identity)
+        ).hexdigest(),
+    }
+
+
+def audit_restart_runtime_conformance(
+    producer_bootstrap: str | Path,
+    *,
+    expected_producer_bootstrap_sha256: str,
+) -> dict[str, object]:
+    """Exercise both restart-runtime custody branches without outcome evidence."""
+
+    bootstrap_path = Path(producer_bootstrap)
+    try:
+        bootstrap_payload, bootstrap_bytes, bootstrap_sha256, _ = (
+            _read_stable_regular_file(
+                bootstrap_path,
+                _MAX_SOURCE_FILE_BYTES,
+                label="captured producer bootstrap support",
+                capture_payload=True,
+            )
+        )
+        assert bootstrap_payload is not None
+        if (
+            not _is_sha256(expected_producer_bootstrap_sha256)
+            or bootstrap_sha256
+            != expected_producer_bootstrap_sha256
+        ):
+            raise ArtifactAuditError(
+                "captured producer bootstrap differs from its independently bound identity"
+            )
+        if (
+            bootstrap_path.resolve(strict=True)
+            != (HERE / "producer_bootstrap.py").resolve(strict=True)
+        ):
+            raise ArtifactAuditError(
+                "restart-runtime conformance did not receive its declared captured bootstrap"
+            )
+        observed_support = _restart_runtime_conformance_support_files()
+        _require_restart_runtime_support_set(observed_support)
+        protocol_payload = _read_bounded(
+            HERE / "protocol.json",
+            16 << 20,
+            label="captured protocol support",
+        )
+        schema_payload = _read_bounded(
+            RESULT_SCHEMA_PATH,
+            16 << 20,
+            label="captured raw-result schema support",
+        )
+    except (ArtifactAuditError, OSError):
+        return {
+            "schema": _RESTART_RUNTIME_CONFORMANCE_SCHEMA,
+            "protocol_version": "1.7.0",
+            "support_files": list(_RESTART_RUNTIME_SUPPORT_FILES),
+            "branches": {
+                "development": {"passed": False},
+                "formal": {"passed": False},
+            },
+            "negative_cases": [],
+            "failure_code": "captured_support_invalid",
+            "passed": False,
+        }
+
+    package_roots = [
+        Path(value)
+        for value in sys.path
+        if value
+        and Path(value).is_absolute()
+        and Path(value).is_dir()
+        and not Path(value).is_symlink()
+    ]
+    if not package_roots:
+        raise ArtifactAuditError(
+            "restart-runtime conformance has no explicit import root"
+        )
+    package_root = package_roots[0].resolve(strict=True)
+    standard_library_root = Path(os.__file__).resolve(strict=True).parent
+    package_inventory = _restart_runtime_conformance_inventory(
+        package_root,
+        semantics_id="prospect.wm001.package-root.v2",
+    )
+    standard_library = _restart_runtime_conformance_inventory(
+        standard_library_root,
+        semantics_id="prospect.wm001.standard-library.v2",
+    )
+    executable = Path(sys.executable).resolve(strict=True)
+    executable_sha256 = _sha256_file(executable)
+    runtime_seal_sha256 = hashlib.sha256(
+        b"prospect.wm001.restart-runtime-conformance.v1\0"
+        + bootstrap_payload
+    ).hexdigest()
+    producer_environment = dict(sorted({**os.environ, "PATH": "/usr/bin:/bin"}.items()))
+    package_ownership = {
+        "schema": "prospect.wm001.result-free-package-ownership.v1",
+        "identity_sha256": hashlib.sha256(
+            _canonical_json_bytes(
+                {
+                    "package_root_semantics": package_inventory["semantics_id"],
+                    "standard_library_semantics": standard_library["semantics_id"],
+                }
+            )
+        ).hexdigest(),
+    }
+    execution: dict[str, object] = {
+        "python_executable": sys.executable,
+        "python_executable_sha256": executable_sha256,
+        "python_version": platform.python_version(),
+        "python_flags": dict(_PREBINDING_PRODUCER_FLAGS),
+        "process_environment": producer_environment,
+        "package_roots": [package_inventory],
+        "package_ownership": package_ownership,
+        "standard_library": standard_library,
+        "runtime_seal_sha256": runtime_seal_sha256,
+        "runtime_seal_descriptor_custody": True,
+        "producer_bootstrap_sha256": bootstrap_sha256,
+        "bootstrap_descriptor_custody": True,
+        "deterministic_algorithms": True,
+    }
+    binding_runtime: dict[str, object] = {
+        "python_flags": dict(_PREBINDING_PRODUCER_FLAGS),
+        "process_environment": producer_environment,
+        "deterministic_algorithms": True,
+    }
+    dependencies: dict[str, object] = {
+        "python_executable": sys.executable,
+        "python_executable_sha256": executable_sha256,
+        "package_roots": [package_inventory],
+        "standard_library": standard_library,
+    }
+    source: dict[str, object] = {
+        "implementation_files": [
+            {
+                "path": (
+                    "bench/world_model_lifecycle/producer_bootstrap.py"
+                ),
+                "bytes": bootstrap_bytes,
+                "sha256": bootstrap_sha256,
+            }
+        ],
+    }
+
+    with tempfile.TemporaryDirectory(
+        prefix="prospect-wm001-restart-conformance-",
+    ) as temporary:
+        root = Path(temporary).resolve(strict=True)
+        replicate_id = "wm001-result-free-conformance"
+        snapshot = (
+            root
+            / "source"
+            / "bench"
+            / "world_model_lifecycle"
+            / "producer_bootstrap.py"
+        )
+        snapshot.parent.mkdir(parents=True)
+        snapshot.write_bytes(bootstrap_payload)
+        body = {
+            "schema": "prospect.wm001.restart-runtime.v2",
+            "python_executable": sys.executable,
+            "python_executable_sha256": executable_sha256,
+            "python_version": platform.python_version(),
+            "python_flags": dict(_PREBINDING_PRODUCER_FLAGS),
+            "process_environment": producer_environment,
+            "package_root": str(package_root),
+            "package_root_inventory": package_inventory,
+            "package_ownership": package_ownership,
+            "standard_library": standard_library,
+            "runtime_seal_sha256": runtime_seal_sha256,
+            "runtime_seal_descriptor_custody": True,
+            "bootstrap_source_sha256": bootstrap_sha256,
+            "bootstrap_descriptor_custody": True,
+            "deterministic_algorithms": True,
+        }
+        payload = _canonical_json_bytes(body) + b"\n"
+        filename = f"{replicate_id}-restore-runtime.json"
+        (root / filename).write_bytes(payload)
+        reference = {
+            **body,
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "filename": filename,
+        }
+
+        _validate_restart_restore_runtime(
+            root=root,
+            reference=reference,
+            replicate_id=replicate_id,
+            execution=execution,
+            producer_bootstrap_sha256=bootstrap_sha256,
+            expected_branch="development",
+            binding_runtime=None,
+            dependencies=None,
+            source=None,
+        )
+        _validate_restart_restore_runtime(
+            root=root,
+            reference=reference,
+            replicate_id=replicate_id,
+            execution=execution,
+            producer_bootstrap_sha256=bootstrap_sha256,
+            expected_branch="formal",
+            binding_runtime=binding_runtime,
+            dependencies=dependencies,
+            source=source,
+        )
+
+        negative_cases: list[dict[str, object]] = []
+
+        def require_rejection(case_id: str, callback: Any) -> None:
+            try:
+                callback()
+            except (ArtifactAuditError, OSError):
+                negative_cases.append(
+                    {
+                        "case_id": case_id,
+                        "rejected": True,
+                    }
+                )
+            else:
+                negative_cases.append(
+                    {
+                        "case_id": case_id,
+                        "rejected": False,
+                    }
+                )
+
+        require_rejection(
+            "missing-bootstrap-support",
+            lambda: _require_restart_runtime_support_set(
+                [
+                    "protocol.json",
+                    "schemas/raw-result.schema.json",
+                ]
+            ),
+        )
+        require_rejection(
+            "extra-bootstrap-support",
+            lambda: _require_restart_runtime_support_set(
+                [
+                    *_RESTART_RUNTIME_SUPPORT_FILES,
+                    "unexpected.py",
+                ]
+            ),
+        )
+        require_rejection(
+            "mutated-bootstrap-identity",
+            lambda: _validate_restart_restore_runtime(
+                root=root,
+                reference=reference,
+                replicate_id=replicate_id,
+                execution=execution,
+                producer_bootstrap_sha256=("f" * 64),
+                expected_branch="development",
+                binding_runtime=None,
+                dependencies=None,
+                source=None,
+            ),
+        )
+        require_rejection(
+            "development-formal-branch-substitution",
+            lambda: _validate_restart_restore_runtime(
+                root=root,
+                reference=reference,
+                replicate_id=replicate_id,
+                execution=execution,
+                producer_bootstrap_sha256=bootstrap_sha256,
+                expected_branch="development",
+                binding_runtime=binding_runtime,
+                dependencies=dependencies,
+                source=source,
+            ),
+        )
+        require_rejection(
+            "formal-development-branch-substitution",
+            lambda: _validate_restart_restore_runtime(
+                root=root,
+                reference=reference,
+                replicate_id=replicate_id,
+                execution=execution,
+                producer_bootstrap_sha256=bootstrap_sha256,
+                expected_branch="formal",
+                binding_runtime=None,
+                dependencies=None,
+                source=None,
+            ),
+        )
+
+    report: dict[str, object] = {
+        "schema": _RESTART_RUNTIME_CONFORMANCE_SCHEMA,
+        "protocol_version": "1.7.0",
+        "support_files": [
+            {
+                "path": "producer_bootstrap.py",
+                "bytes": bootstrap_bytes,
+                "sha256": bootstrap_sha256,
+            },
+            {
+                "path": "protocol.json",
+                "bytes": len(protocol_payload),
+                "sha256": hashlib.sha256(protocol_payload).hexdigest(),
+            },
+            {
+                "path": "schemas/raw-result.schema.json",
+                "bytes": len(schema_payload),
+                "sha256": hashlib.sha256(schema_payload).hexdigest(),
+            },
+        ],
+        "branches": {
+            "development": {
+                "source_block_present": False,
+                "captured_bootstrap_bound": True,
+                "passed": True,
+            },
+            "formal": {
+                "source_block_present": True,
+                "source_snapshot_bound": True,
+                "captured_bootstrap_bound": True,
+                "passed": True,
+            },
+        },
+        "negative_cases": negative_cases,
+        "failure_code": None,
+        "passed": all(
+            row.get("rejected") is True
+            for row in negative_cases
+        ),
+    }
+    return report
+
+
 def _audit_restart_parity_evidence(
     audit: _Audit,
     root: Path,
@@ -4546,6 +5018,7 @@ def _audit_restart_parity_evidence(
     replicate_id: str,
     launcher_process_id: object,
     execution: Mapping[str, object],
+    producer_bootstrap_sha256: str,
     binding_runtime: Mapping[str, object] | None,
     dependencies: Mapping[str, object] | None,
     source: Mapping[str, object] | None,
@@ -4587,6 +5060,12 @@ def _audit_restart_parity_evidence(
             reference=parity.get("restore_runtime"),
             replicate_id=replicate_id,
             execution=execution,
+            producer_bootstrap_sha256=producer_bootstrap_sha256,
+            expected_branch=(
+                "formal"
+                if source is not None
+                else "development"
+            ),
             binding_runtime=binding_runtime,
             dependencies=dependencies,
             source=source,
@@ -6272,7 +6751,7 @@ def _is_bound_implementation_path(path: Path) -> bool:
         "bench/world_model_lifecycle/protocol.json",
         "bench/world_model_lifecycle/schemas/formal-binding.schema.json",
         "bench/world_model_lifecycle/schemas/raw-result.schema.json",
-        "docs/wm001-v160-prospective-harness-review.json",
+        "docs/wm001-v170-prospective-harness-review.json",
     }:
         return True
     return (
@@ -6864,9 +7343,9 @@ def _canonical_json_object_payload(
     return value
 
 
-_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.6.0.json"
-_PREFORMAL_LOG_PREFIX = "preformal-v1.6.0-command-"
-_PREFORMAL_REVIEW_PATH = "docs/wm001-v160-prospective-harness-review.json"
+_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.7.0.json"
+_PREFORMAL_LOG_PREFIX = "preformal-v1.7.0-command-"
+_PREFORMAL_REVIEW_PATH = "docs/wm001-v170-prospective-harness-review.json"
 _PREFORMAL_COMMAND_NAMES = (
     "protocol-seal-continuity",
     "ruff",
@@ -7392,7 +7871,7 @@ def _preformal_prospective_review(
         or set(review) != fields
         or review.get("schema") != "prospect.wm001.prospective-harness-review.v1"
         or review.get("experiment_id") != "WM-001"
-        or review.get("protocol_version") != "1.6.0"
+        or review.get("protocol_version") != "1.7.0"
         or review.get("implementation_files") != expected_rows
         or review.get("implementation_manifest_sha256")
         != hashlib.sha256(_canonical_json_bytes(expected_rows)).hexdigest()
@@ -7456,7 +7935,7 @@ def _preformal_runtime_seal(
         or set(seal) != fields
         or seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or seal.get("experiment_id") != "WM-001"
-        or seal.get("protocol_version") != "1.6.0"
+        or seal.get("protocol_version") != "1.7.0"
         or seal.get("assurance") != _ASSURANCE
         or seal.get("git_commit") != source.get("git_commit")
         or seal.get("git_tree") != source.get("git_tree")
@@ -7525,7 +8004,7 @@ def _validate_preformal_test_report_v2(
     source: Mapping[str, object],
     dependencies: Mapping[str, object],
     runtime: Mapping[str, object],
-) -> Mapping[str, object]:
+) -> tuple[Mapping[str, object], Mapping[str, object]]:
     """Independently validate and reopen the complete preformal v2 custody set."""
 
     report = _canonical_json_object_payload(
@@ -7563,7 +8042,7 @@ def _validate_preformal_test_report_v2(
         set(report) != expected_report_fields
         or report.get("schema") != "prospect.wm001.preformal-test-report.v2"
         or report.get("experiment_id") != "WM-001"
-        or report.get("protocol_version") != "1.6.0"
+        or report.get("protocol_version") != "1.7.0"
         or not isinstance(repository_cwd, str)
         or not repository_cwd
         or "\0" in repository_cwd
@@ -7831,7 +8310,87 @@ def _validate_preformal_test_report_v2(
     }
     if actual_evidence != expected_evidence:
         raise ArtifactAuditError("formal preformal evidence file set has missing or extra members")
-    return report
+    runtime_commands = [
+        row
+        for row in commands
+        if isinstance(row, Mapping)
+        and row.get("name")
+        == "runtime-bootstrap-inventory-conformance"
+    ]
+    if len(runtime_commands) != 1:
+        raise ArtifactAuditError(
+            "formal test report lacks one runtime bootstrap conformance"
+        )
+    runtime_stdout = runtime_commands[0].get("stdout")
+    runtime_filename = (
+        runtime_stdout.get("file")
+        if isinstance(runtime_stdout, Mapping)
+        else None
+    )
+    runtime_path = _resolve_artifact_file(
+        root,
+        runtime_filename,
+        label="preformal runtime bootstrap conformance stdout",
+    )
+    runtime_payload = _read_bounded(
+        runtime_path,
+        4 << 20,
+        label="preformal runtime bootstrap conformance stdout",
+    )
+    runtime_conformance = _canonical_json_object_payload(
+        runtime_payload,
+        label="preformal runtime bootstrap conformance stdout",
+    )
+    if (
+        not isinstance(runtime_stdout, Mapping)
+        or runtime_stdout.get("bytes") != len(runtime_payload)
+        or runtime_stdout.get("sha256")
+        != hashlib.sha256(runtime_payload).hexdigest()
+        or set(runtime_conformance)
+        != {
+            "schema",
+            "mode",
+            "device",
+            "passed",
+            "inventory_sha256",
+            "conformance_sha256",
+            "restart_runtime_conformance_report_sha256",
+            "restart_runtime_execution_receipt_sha256",
+            "restart_runtime_support_files",
+            "restart_runtime_repeat_count",
+            "restart_runtime_path_descriptor_equal",
+            "repeat_count",
+            "path_descriptor_equal",
+        }
+        or runtime_conformance.get("schema")
+        != "prospect.wm001.preformal-runtime-check.v1"
+        or runtime_conformance.get("mode")
+        != "bootstrap-inventory-conformance"
+        or runtime_conformance.get("device") != report.get("device")
+        or runtime_conformance.get("passed") is not True
+        or any(
+            not _is_sha256(runtime_conformance.get(field))
+            for field in (
+                "inventory_sha256",
+                "conformance_sha256",
+                "restart_runtime_conformance_report_sha256",
+                "restart_runtime_execution_receipt_sha256",
+            )
+        )
+        or runtime_conformance.get("restart_runtime_support_files")
+        != list(_RESTART_RUNTIME_SUPPORT_FILES)
+        or runtime_conformance.get("restart_runtime_repeat_count") != 3
+        or runtime_conformance.get(
+            "restart_runtime_path_descriptor_equal"
+        )
+        is not True
+        or runtime_conformance.get("repeat_count") != 3
+        or runtime_conformance.get("path_descriptor_equal") is not True
+    ):
+        raise ArtifactAuditError(
+            "preformal runtime bootstrap conformance is incomplete"
+        )
+    return report, runtime_conformance
 
 
 _DEVELOPMENT_SOURCE_FIELDS = {
@@ -7969,7 +8528,7 @@ def _validate_development_qualification(
         or set(block) != block_fields
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.6.0"
+        or closure.get("protocol_version") != "1.7.0"
         or not isinstance(closure_source, Mapping)
         or not isinstance(producer_execution, Mapping)
         or not isinstance(producer_custody, Mapping)
@@ -8046,6 +8605,10 @@ def _validate_development_qualification(
     implementation_by_path = {row.get("path"): row for row in implementation_rows if isinstance(row, Mapping)}
     expected_support_files = []
     for captured_path, source_path in (
+        (
+            "producer_bootstrap.py",
+            "bench/world_model_lifecycle/producer_bootstrap.py",
+        ),
         ("protocol.json", "bench/world_model_lifecycle/protocol.json"),
         (
             "schemas/raw-result.schema.json",
@@ -8238,7 +8801,7 @@ def _validate_development_qualification(
         or archived_runtime_seal.get("schema")
         != "prospect.wm001.runtime-seal.v1"
         or archived_runtime_seal.get("experiment_id") != "WM-001"
-        or archived_runtime_seal.get("protocol_version") != "1.6.0"
+        or archived_runtime_seal.get("protocol_version") != "1.7.0"
         or archived_runtime_seal.get("assurance") != _ASSURANCE
         or archived_runtime_seal_payload != expected_runtime_seal_payload
         or hashlib.sha256(archived_runtime_seal_payload).hexdigest()
@@ -8492,6 +9055,8 @@ def _validate_audit_execution_conformance(
     report_payload: bytes,
     execution_receipt_payload: bytes,
     outcome_runtime_manifest_payload: bytes,
+    restart_runtime_report_payload: bytes,
+    restart_runtime_receipt_payload: bytes,
     dependencies: Mapping[str, object],
     runtime: Mapping[str, object],
     source: Mapping[str, object],
@@ -8531,6 +9096,15 @@ def _validate_audit_execution_conformance(
         "outcome_runtime_manifest_file",
         "outcome_runtime_manifest_bytes",
         "outcome_runtime_manifest_sha256",
+        "restart_runtime_conformance_report_file",
+        "restart_runtime_conformance_report_bytes",
+        "restart_runtime_conformance_report_sha256",
+        "restart_runtime_execution_receipt_file",
+        "restart_runtime_execution_receipt_bytes",
+        "restart_runtime_execution_receipt_sha256",
+        "restart_runtime_support_files",
+        "restart_runtime_repeat_count",
+        "restart_runtime_path_descriptor_equal",
         "outcome_source_mode",
         "outcome_support_files",
         "outcome_argv_role",
@@ -8546,9 +9120,26 @@ def _validate_audit_execution_conformance(
         or type(block.get("repeat_count")) is not int
         or cast(int, block.get("repeat_count")) < 3
         or block.get("path_descriptor_equal") is not True
+        or type(block.get("restart_runtime_repeat_count")) is not int
+        or cast(int, block.get("restart_runtime_repeat_count")) < 3
+        or block.get("restart_runtime_repeat_count")
+        != block.get("repeat_count")
+        or block.get("restart_runtime_path_descriptor_equal") is not True
+        or block.get("restart_runtime_support_files")
+        != list(_RESTART_RUNTIME_SUPPORT_FILES)
         or block.get("outcome_source_mode") != "descriptor"
-        or block.get("outcome_support_files") != ["protocol.json", "schemas/raw-result.schema.json"]
-        or block.get("outcome_argv_role") != ["<canonical-producer-root>"]
+        or block.get("outcome_support_files")
+        != [
+            "producer_bootstrap.py",
+            "protocol.json",
+            "schemas/raw-result.schema.json",
+        ]
+        or block.get("outcome_argv_role")
+        != [
+            "<canonical-producer-root>",
+            "--producer-bootstrap",
+            "<captured-producer-bootstrap>",
+        ]
         or block.get("outcome_working_directory") != preformal_repository_cwd
         or block.get("passed") is not True
     ):
@@ -8578,6 +9169,14 @@ def _validate_audit_execution_conformance(
             "prebinding_execution_receipt",
         ),
         (outcome_runtime_manifest_payload, "outcome_runtime_manifest"),
+        (
+            restart_runtime_report_payload,
+            "restart_runtime_conformance_report",
+        ),
+        (
+            restart_runtime_receipt_payload,
+            "restart_runtime_execution_receipt",
+        ),
     ):
         if (
             block.get(f"{prefix}_bytes") != len(payload)
@@ -8594,6 +9193,8 @@ def _validate_audit_execution_conformance(
         ("audit-prebinding-conformance", ".json"),
         ("audit-prebinding-execution-receipt", ".json"),
         ("audit-outcome-runtime", ".json"),
+        ("audit-restart-runtime-conformance", ".json"),
+        ("audit-restart-runtime-execution-receipt", ".json"),
     ):
         field_prefix = {
             "audit-bootstrap": "bootstrap_source",
@@ -8605,6 +9206,12 @@ def _validate_audit_execution_conformance(
             "audit-prebinding-conformance": ("prebinding_conformance_report"),
             "audit-prebinding-execution-receipt": ("prebinding_execution_receipt"),
             "audit-outcome-runtime": "outcome_runtime_manifest",
+            "audit-restart-runtime-conformance": (
+                "restart_runtime_conformance_report"
+            ),
+            "audit-restart-runtime-execution-receipt": (
+                "restart_runtime_execution_receipt"
+            ),
         }[prefix]
         digest = block.get(f"{field_prefix}_sha256")
         if not _is_sha256(digest) or block.get(f"{field_prefix}_file") != f"{prefix}-{cast(str, digest)[:16]}{suffix}":
@@ -8641,6 +9248,14 @@ def _validate_audit_execution_conformance(
     execution_receipt = _canonical_json_object_payload(
         execution_receipt_payload,
         label="prebinding execution receipt",
+    )
+    restart_runtime_report = _canonical_json_object_payload(
+        restart_runtime_report_payload,
+        label="restart-runtime conformance report",
+    )
+    restart_runtime_receipt = _canonical_json_object_payload(
+        restart_runtime_receipt_payload,
+        label="restart-runtime execution receipt",
     )
     try:
         validated_request = _prebinding_validate_request(request)
@@ -8736,6 +9351,9 @@ def _validate_audit_execution_conformance(
         4 << 20,
         label="bound raw-result schema support",
     )
+    producer_bootstrap_payload, _ = bound_source(
+        "bench/world_model_lifecycle/producer_bootstrap.py"
+    )
     prebinding_support_payloads: dict[str, bytes] = {
         "prebinding-request.json": request_payload,
         "protocol.json": protocol_payload,
@@ -8749,6 +9367,7 @@ def _validate_audit_execution_conformance(
         payload, _ = bound_source(f"bench/world_model_lifecycle/{name}")
         prebinding_support_payloads[name] = payload
     outcome_support_payloads = {
+        "producer_bootstrap.py": producer_bootstrap_payload,
         "protocol.json": protocol_payload,
         "schemas/raw-result.schema.json": raw_schema_payload,
     }
@@ -8803,15 +9422,26 @@ def _validate_audit_execution_conformance(
                 "environment",
                 "limits",
             }
-            or any(manifest.get(field) != value for field, value in expected_common.items())
-            or manifest.get("source")
-            != {
-                "mode": mode,
-                "path": "artifact_audit.py",
-                "bytes": len(auditor_payload),
-                "sha256": auditor_digest,
-            }
-            or manifest.get("support_files") != expected_support_rows(support_payloads)
+            or any(
+                not _strict_json_equal(
+                    manifest.get(field),
+                    value,
+                )
+                for field, value in expected_common.items()
+            )
+            or not _strict_json_equal(
+                manifest.get("source"),
+                {
+                    "mode": mode,
+                    "path": "artifact_audit.py",
+                    "bytes": len(auditor_payload),
+                    "sha256": auditor_digest,
+                },
+            )
+            or not _strict_json_equal(
+                manifest.get("support_files"),
+                expected_support_rows(support_payloads),
+            )
         ):
             raise ArtifactAuditError(f"{label} differs from the exact bound audit closure")
 
@@ -8834,7 +9464,10 @@ def _validate_audit_execution_conformance(
     if not isinstance(path_source, dict):
         raise ArtifactAuditError("prebinding path runtime source is malformed")
     path_source["mode"] = "descriptor"
-    if path_as_descriptor != dict(descriptor_runtime_manifest):
+    if not _strict_json_equal(
+        path_as_descriptor,
+        dict(descriptor_runtime_manifest),
+    ):
         raise ArtifactAuditError("prebinding path and descriptor manifests differ beyond source mode")
 
     expected_auditor_argv = [
@@ -8854,7 +9487,7 @@ def _validate_audit_execution_conformance(
             "working_directory": preformal_repository_cwd,
             "auditor_argv": expected_auditor_argv,
         }
-        if dict(invocation) != expected:
+        if not _strict_json_equal(dict(invocation), expected):
             raise ArtifactAuditError(f"{label} differs from the exact prebinding invocation")
 
     validate_invocation_manifest(
@@ -8961,8 +9594,14 @@ def _validate_audit_execution_conformance(
             "execution_conformance_passed",
         }
         and execution_receipt.get("schema") == "prospect.wm001.audit-conformance-receipt.v1"
-        and execution_receipt.get("repeat_count") == repeat_count
-        and execution_receipt.get("execution_count") == 2 * repeat_count
+        and _strict_json_equal(
+            execution_receipt.get("repeat_count"),
+            repeat_count,
+        )
+        and _strict_json_equal(
+            execution_receipt.get("execution_count"),
+            2 * repeat_count,
+        )
         and execution_receipt.get("report_sha256") == report_identity["sha256"]
         and execution_receipt.get("path_descriptor_byte_identical") is True
         and execution_receipt.get("execution_conformance_passed") is True
@@ -8997,13 +9636,28 @@ def _validate_audit_execution_conformance(
                 or row.get("source_mode") != mode
                 or type(row.get("returncode")) is not int
                 or row.get("returncode") != 0
-                or row.get("stdout") != report_identity
-                or row.get("stderr") != first_stderr
-                or row.get("runtime_manifest") != runtime_identities[mode]
-                or row.get("invocation_manifest") != invocation_identities[mode]
+                or not _strict_json_equal(
+                    row.get("stdout"),
+                    report_identity,
+                )
+                or not _strict_json_equal(
+                    row.get("stderr"),
+                    first_stderr,
+                )
+                or not _strict_json_equal(
+                    row.get("runtime_manifest"),
+                    runtime_identities[mode],
+                )
+                or not _strict_json_equal(
+                    row.get("invocation_manifest"),
+                    invocation_identities[mode],
+                )
                 or row.get("bootstrap_sha256") != block.get("bootstrap_source_sha256")
                 or row.get("auditor_source_sha256") != block.get("auditor_source_sha256")
-                or row.get("support_files") != expected_prebinding_support
+                or not _strict_json_equal(
+                    row.get("support_files"),
+                    expected_prebinding_support,
+                )
                 or row.get("auditor_report_passed") is not True
             ):
                 receipt_valid = False
@@ -9011,6 +9665,251 @@ def _validate_audit_execution_conformance(
     if not receipt_valid:
         raise ArtifactAuditError(
             "prebinding execution receipt does not prove every exact path and descriptor execution"
+        )
+    expected_restart_support = expected_support_rows(
+        outcome_support_payloads
+    )
+    restart_negative_case_ids = [
+        "missing-bootstrap-support",
+        "extra-bootstrap-support",
+        "mutated-bootstrap-identity",
+        "development-formal-branch-substitution",
+        "formal-development-branch-substitution",
+    ]
+    if (
+        set(restart_runtime_report)
+        != {
+            "schema",
+            "protocol_version",
+            "support_files",
+            "branches",
+            "negative_cases",
+            "failure_code",
+            "passed",
+        }
+        or restart_runtime_report.get("schema")
+        != _RESTART_RUNTIME_CONFORMANCE_SCHEMA
+        or restart_runtime_report.get("protocol_version") != "1.7.0"
+        or not _strict_json_equal(
+            restart_runtime_report.get("support_files"),
+            expected_restart_support,
+        )
+        or not _strict_json_equal(
+            restart_runtime_report.get("branches"),
+            {
+                "development": {
+                    "source_block_present": False,
+                    "captured_bootstrap_bound": True,
+                    "passed": True,
+                },
+                "formal": {
+                    "source_block_present": True,
+                    "source_snapshot_bound": True,
+                    "captured_bootstrap_bound": True,
+                    "passed": True,
+                },
+            },
+        )
+        or not _strict_json_equal(
+            restart_runtime_report.get("negative_cases"),
+            [
+                {"case_id": case_id, "rejected": True}
+                for case_id in restart_negative_case_ids
+            ],
+        )
+        or restart_runtime_report.get("failure_code") is not None
+        or restart_runtime_report.get("passed") is not True
+    ):
+        raise ArtifactAuditError(
+            "restart-runtime conformance report is not one complete result-free pass"
+        )
+
+    path_restart_runtime = json.loads(
+        _canonical_json_bytes(outcome_runtime_manifest)
+    )
+    if (
+        not isinstance(path_restart_runtime, dict)
+        or not isinstance(path_restart_runtime.get("source"), dict)
+    ):
+        raise ArtifactAuditError(
+            "restart-runtime path manifest normalization failed"
+        )
+    path_restart_runtime["source"]["mode"] = "path"
+    restart_runtime_payloads = {
+        "path": _canonical_json_bytes(path_restart_runtime) + b"\n",
+        "descriptor": outcome_runtime_manifest_payload,
+    }
+    restart_arguments = [
+        "--restart-runtime-conformance",
+        "--producer-bootstrap",
+        "@captured/producer_bootstrap.py",
+        "--expected-producer-bootstrap-sha256",
+        hashlib.sha256(producer_bootstrap_payload).hexdigest(),
+    ]
+    restart_invocation_payloads = {
+        mode: (
+            _canonical_json_bytes(
+                {
+                    "schema": (
+                        "prospect.wm001.audit-invocation-manifest.v1"
+                    ),
+                    "runtime_manifest_sha256": hashlib.sha256(
+                        runtime_payload
+                    ).hexdigest(),
+                    "working_directory": preformal_repository_cwd,
+                    "auditor_argv": restart_arguments,
+                }
+            )
+            + b"\n"
+        )
+        for mode, runtime_payload in restart_runtime_payloads.items()
+    }
+    restart_repeat_count = cast(
+        int,
+        block.get("restart_runtime_repeat_count"),
+    )
+    restart_expected_modes = [
+        *(["path"] * restart_repeat_count),
+        *(["descriptor"] * restart_repeat_count),
+    ]
+    restart_receipt_rows = restart_runtime_receipt.get("executions")
+    restart_stderr = (
+        restart_receipt_rows[0].get("stderr")
+        if isinstance(restart_receipt_rows, list)
+        and restart_receipt_rows
+        and isinstance(restart_receipt_rows[0], Mapping)
+        else None
+    )
+    restart_stderr_valid = (
+        isinstance(restart_stderr, Mapping)
+        and set(restart_stderr) == {"bytes", "sha256"}
+        and type(restart_stderr.get("bytes")) is int
+        and 0
+        <= cast(int, restart_stderr.get("bytes"))
+        <= (16 << 20)
+        and _is_sha256(restart_stderr.get("sha256"))
+        and (
+            cast(int, restart_stderr.get("bytes")) != 0
+            or restart_stderr.get("sha256")
+            == hashlib.sha256(b"").hexdigest()
+        )
+    )
+    restart_report_identity = {
+        "bytes": len(restart_runtime_report_payload),
+        "sha256": hashlib.sha256(
+            restart_runtime_report_payload
+        ).hexdigest(),
+    }
+    restart_receipt_valid = (
+        set(restart_runtime_receipt)
+        == {
+            "schema",
+            "repeat_count",
+            "execution_count",
+            "executions",
+            "report_sha256",
+            "path_descriptor_byte_identical",
+            "execution_conformance_passed",
+        }
+        and restart_runtime_receipt.get("schema")
+        == "prospect.wm001.audit-conformance-receipt.v1"
+        and _strict_json_equal(
+            restart_runtime_receipt.get("repeat_count"),
+            restart_repeat_count,
+        )
+        and _strict_json_equal(
+            restart_runtime_receipt.get("execution_count"),
+            len(restart_expected_modes),
+        )
+        and restart_runtime_receipt.get("report_sha256")
+        == restart_report_identity["sha256"]
+        and restart_runtime_receipt.get(
+            "path_descriptor_byte_identical"
+        )
+        is True
+        and restart_runtime_receipt.get(
+            "execution_conformance_passed"
+        )
+        is True
+        and isinstance(restart_receipt_rows, list)
+        and len(restart_receipt_rows) == len(restart_expected_modes)
+        and restart_stderr_valid
+    )
+    if restart_receipt_valid:
+        assert isinstance(restart_receipt_rows, list)
+        for ordinal, (row, mode) in enumerate(
+            zip(
+                restart_receipt_rows,
+                restart_expected_modes,
+                strict=True,
+            ),
+            start=1,
+        ):
+            if (
+                not isinstance(row, Mapping)
+                or set(row)
+                != {
+                    "ordinal",
+                    "source_mode",
+                    "returncode",
+                    "stdout",
+                    "stderr",
+                    "runtime_manifest",
+                    "invocation_manifest",
+                    "bootstrap_sha256",
+                    "auditor_source_sha256",
+                    "support_files",
+                    "auditor_report_passed",
+                }
+                or not _strict_json_equal(
+                    row.get("ordinal"),
+                    ordinal,
+                )
+                or row.get("source_mode") != mode
+                or not _strict_json_equal(row.get("returncode"), 0)
+                or not _strict_json_equal(
+                    row.get("stdout"),
+                    restart_report_identity,
+                )
+                or not _strict_json_equal(
+                    row.get("stderr"),
+                    restart_stderr,
+                )
+                or not _strict_json_equal(
+                    row.get("runtime_manifest"),
+                    {
+                        "bytes": len(restart_runtime_payloads[mode]),
+                        "sha256": hashlib.sha256(
+                            restart_runtime_payloads[mode]
+                        ).hexdigest(),
+                    },
+                )
+                or not _strict_json_equal(
+                    row.get("invocation_manifest"),
+                    {
+                        "bytes": len(
+                            restart_invocation_payloads[mode]
+                        ),
+                        "sha256": hashlib.sha256(
+                            restart_invocation_payloads[mode]
+                        ).hexdigest(),
+                    },
+                )
+                or row.get("bootstrap_sha256")
+                != block.get("bootstrap_source_sha256")
+                or row.get("auditor_source_sha256")
+                != block.get("auditor_source_sha256")
+                or not _strict_json_equal(
+                    row.get("support_files"),
+                    expected_restart_support,
+                )
+                or row.get("auditor_report_passed") is not True
+            ):
+                restart_receipt_valid = False
+                break
+    if not restart_receipt_valid:
+        raise ArtifactAuditError(
+            "restart-runtime execution receipt does not prove every exact path and descriptor execution"
         )
     working_directory = block.get("outcome_working_directory")
     if (
@@ -9025,15 +9924,29 @@ def _validate_audit_execution_conformance(
         try:
             current_working_directory = str(Path.cwd().resolve(strict=True))
             canonical_root = str(root.resolve(strict=True))
+            captured_bootstrap_argument = (
+                Path(sys.argv[3]).resolve(strict=True)
+                if len(sys.argv) == 4
+                else None
+            )
         except OSError as error:
             raise ArtifactAuditError("live outcome auditor path identity cannot be resolved") from error
         if (
             not descriptor_invocation
             or current_working_directory != working_directory
-            or len(sys.argv) != 2
+            or len(sys.argv) != 4
             or sys.argv[1] != canonical_root
+            or sys.argv[2] != "--producer-bootstrap"
+            or captured_bootstrap_argument
+            != (HERE / "producer_bootstrap.py").resolve(strict=True)
             or dict(os.environ) != safe_environment
             or sys.path[: len(closure_root_paths)] != closure_root_paths
+            or _read_bounded(
+                cast(Path, captured_bootstrap_argument),
+                _MAX_SOURCE_FILE_BYTES,
+                label="live captured producer bootstrap support",
+            )
+            != producer_bootstrap_payload
             or _read_bounded(
                 HERE / "protocol.json",
                 4 << 20,
@@ -9049,7 +9962,7 @@ def _validate_audit_execution_conformance(
         ):
             raise ArtifactAuditError(
                 "live outcome auditor did not use the bound descriptor "
-                "source, working directory, or canonical one-root argv"
+                "source, working directory, or canonical captured-support argv"
             )
 
 
@@ -9313,7 +10226,7 @@ def _authorization_attempt(
         set(manifest) != _AUTHORIZATION_ATTEMPT_FIELDS
         or manifest.get("schema") != "prospect.wm001.operator-attempt.v1"
         or manifest.get("experiment_id") != "WM-001"
-        or manifest.get("protocol_version") != "1.6.0"
+        or manifest.get("protocol_version") != "1.7.0"
         or manifest.get("assurance") != _ASSURANCE
         or manifest.get("kind") != kind
         or manifest.get("lane") != lane
@@ -9437,7 +10350,7 @@ def _authorization_development_producer(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.6.0"
+        / "qualification-v1.7.0"
     )
     _authorization_directory(
         producer,
@@ -9483,9 +10396,9 @@ def _authorization_development_audit(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.6"
+        / "operator-v1.7"
         / "audits"
-        / "development-audit-v1.6.0"
+        / "development-audit-v1.7.0"
     )
     attempt = _authorization_attempt(
         audit_path,
@@ -9604,7 +10517,7 @@ def _authorization_development_audit(
         or reproduction.get("schema")
         != "prospect.wm001.audit-reproduction.v2"
         or reproduction.get("experiment_id") != "WM-001"
-        or reproduction.get("protocol_version") != "1.6.0"
+        or reproduction.get("protocol_version") != "1.7.0"
         or reproduction.get("supplied_audit_sha256") != audit_digest
         or reproduction.get("reproduced_audit_sha256") != audit_digest
         or reproduction.get("byte_identical") is not True
@@ -9666,7 +10579,7 @@ def _authorization_development_closure(
     closure_path = (
         results
         / "development"
-        / "development-closure-v1.6.0.json"
+        / "development-closure-v1.7.0.json"
     )
     closure_row, closure_payload, _ = _authorization_file_row(
         closure_path,
@@ -9687,7 +10600,7 @@ def _authorization_development_closure(
         or closure.get("schema")
         != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.6.0"
+        or closure.get("protocol_version") != "1.7.0"
         or closure.get("producer_root") != str(producer)
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
@@ -9706,9 +10619,9 @@ def _authorization_development_closure(
     )
     closure_attempt_path = (
         results
-        / "operator-v1.6"
+        / "operator-v1.7"
         / "closures"
-        / "development-closure-v1.6.0"
+        / "development-closure-v1.7.0"
     )
     closure_attempt = _authorization_attempt(
         closure_attempt_path,
@@ -9765,7 +10678,7 @@ def _authorization_development_closure(
         or reference.get("schema")
         != "prospect.wm001.closure-reference.v1"
         or reference.get("experiment_id") != "WM-001"
-        or reference.get("protocol_version") != "1.6.0"
+        or reference.get("protocol_version") != "1.7.0"
         or reference.get("closure_marker") != str(closure_path)
         or reference.get("closure_sha256") != closure_row["sha256"]
         or reference.get("qualification_archive")
@@ -9824,14 +10737,14 @@ def _authorization_preformal_rows(
         report.get("schema")
         != "prospect.wm001.preformal-test-report.v2"
         or report.get("experiment_id") != "WM-001"
-        or report.get("protocol_version") != "1.6.0"
+        or report.get("protocol_version") != "1.7.0"
         or report.get("all_pass") is not True
         or not isinstance(commands, list)
         or len(commands) != len(_PREFORMAL_COMMAND_NAMES)
         or not isinstance(source, Mapping)
     ):
         raise ArtifactAuditError(
-            "canonical preformal report is not an accepted v1.6 report"
+            "canonical preformal report is not an accepted v1.7 report"
         )
     log_rows: list[dict[str, object]] = []
     relative_log_rows: list[dict[str, object]] = []
@@ -9917,9 +10830,9 @@ def _validate_formal_authorization_lineage(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.6"
+        / "operator-v1.7"
         / "bindings"
-        / "formal-binding-v1.6.0"
+        / "formal-binding-v1.7.0"
     )
     binding_attempt = _authorization_attempt(
         binding_attempt_path,
@@ -9962,6 +10875,8 @@ def _audit_formal_input_package(
     audit: _Audit,
     root: Path,
     result: Mapping[str, object],
+    *,
+    producer_bootstrap_sha256: str,
 ) -> str | None:
     if result.get("lane") != "formal":
         return None
@@ -10008,10 +10923,10 @@ def _audit_formal_input_package(
         binding: Mapping[str, object] = binding_raw
         binding_digest = hashlib.sha256(binding_payload).hexdigest()
         audit.require(
-            binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v6"
+            binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v7"
             and binding.get("experiment_id") == "WM-001",
             code="formal_binding_identity_mismatch",
-            message="formal binding is not the active WM-001 v1.6 identity",
+            message="formal binding is not the active WM-001 v1.7 identity",
         )
         audit.require(
             binding.get("assurance") == _ASSURANCE,
@@ -10037,16 +10952,16 @@ def _audit_formal_input_package(
         launch_body = dict(launch_raw)
         launch_record_sha256 = launch_body.pop("record_sha256", None)
         execution_for_launch = result.get("execution")
-        protocol_wide_marker = root.parent.parent / "formal-launch-v1.6.0.json"
+        protocol_wide_marker = root.parent.parent / "formal-launch-v1.7.0.json"
         repository = Path.cwd()
         binding_attempt = (
             repository
             / "bench"
             / "world_model_lifecycle"
             / "results"
-            / "operator-v1.6"
+            / "operator-v1.7"
             / "bindings"
-            / "formal-binding-v1.6.0"
+            / "formal-binding-v1.7.0"
         )
         binding_attempt_terminal = binding_attempt / "operator-attempt.json"
         binding_attempt_completion = (
@@ -10055,7 +10970,7 @@ def _audit_formal_input_package(
             / "world_model_lifecycle"
             / "results"
             / "outer-completions"
-            / "v1.6"
+            / "v1.7"
             / (hashlib.sha256(str(binding_attempt_terminal).encode("utf-8")).hexdigest() + ".json")
         )
         binding_attempt_payload = _read_bounded(
@@ -10143,7 +11058,7 @@ def _audit_formal_input_package(
             == launch_payload
             and launch_raw.get("schema") == "prospect.wm001.formal-launch.v2"
             and launch_raw.get("experiment_id") == "WM-001"
-            and launch_raw.get("protocol_version") == "1.6.0"
+            and launch_raw.get("protocol_version") == "1.7.0"
             and launch_raw.get("formal_binding_sha256") == binding_digest
             and launch_raw.get("formal_binding_attempt_path") == str(binding_attempt)
             and launch_raw.get("formal_binding_attempt_manifest_file") == "formal-binding-operator-attempt.json"
@@ -10165,7 +11080,7 @@ def _audit_formal_input_package(
             and binding_attempt_payload == _canonical_json_bytes(binding_attempt_raw) + b"\n"
             and binding_attempt_raw.get("schema") == "prospect.wm001.operator-attempt.v1"
             and binding_attempt_raw.get("experiment_id") == "WM-001"
-            and binding_attempt_raw.get("protocol_version") == "1.6.0"
+            and binding_attempt_raw.get("protocol_version") == "1.7.0"
             and binding_attempt_raw.get("assurance") == _ASSURANCE
             and binding_attempt_raw.get("kind") == "binding"
             and binding_attempt_raw.get("lane") is None
@@ -10177,7 +11092,7 @@ def _audit_formal_input_package(
             and binding_row.get("sha256") == binding_digest
             and (binding_attempt / "formal-binding.json").read_bytes() == binding_payload
             and launch_raw.get("attempt_directory") == root.name
-            and launch_raw.get("global_marker_file") == "formal-launch-v1.6.0.json"
+            and launch_raw.get("global_marker_file") == "formal-launch-v1.7.0.json"
             and isinstance(execution_for_launch, Mapping)
             and launch_raw.get("git_commit") == execution_for_launch.get("git_commit")
             and launch_raw.get("git_tree") == execution_for_launch.get("git_tree")
@@ -10186,7 +11101,7 @@ def _audit_formal_input_package(
             and execution_for_launch.get("formal_launch_file") == "formal-launch.json"
             and execution_for_launch.get("formal_launch_sha256") == hashlib.sha256(launch_payload).hexdigest(),
             code="formal_single_launch_binding_mismatch",
-            message=("formal result does not bind the same-inode, version-scoped protocol-wide v1.6 launch claim"),
+            message=("formal result does not bind the same-inode, version-scoped protocol-wide v1.7 launch claim"),
         )
         seal_payload = _read_bounded(
             seal_path,
@@ -10291,6 +11206,8 @@ def _audit_formal_input_package(
             and execution.get("runtime_seal_sha256") == binding_digest
             and execution.get("runtime_seal_descriptor_custody") is True
             and execution.get("producer_bootstrap_sha256") == execution_sources.get("producer_bootstrap.py")
+            and execution_sources.get("producer_bootstrap.py")
+            == producer_bootstrap_sha256
             and execution.get("bootstrap_descriptor_custody") is True
             and execution.get("package_roots") == dependencies.get("package_roots")
             and execution.get("package_ownership") == dependencies.get("package_ownership")
@@ -10438,6 +11355,20 @@ def _audit_formal_input_package(
                 "outcome_runtime_manifest_sha256",
                 "outcome descriptor runtime manifest",
             ),
+            (
+                audit_execution,
+                "restart_runtime_conformance_report_file",
+                "restart_runtime_conformance_report_bytes",
+                "restart_runtime_conformance_report_sha256",
+                "restart-runtime conformance report",
+            ),
+            (
+                audit_execution,
+                "restart_runtime_execution_receipt_file",
+                "restart_runtime_execution_receipt_bytes",
+                "restart_runtime_execution_receipt_sha256",
+                "restart-runtime execution receipt",
+            ),
         ):
             filename = block.get(filename_field)
             path = _resolve_artifact_file(root, filename, label=label)
@@ -10458,7 +11389,10 @@ def _audit_formal_input_package(
             64 << 20,
             label="formal test report",
         )
-        preformal_report = _validate_preformal_test_report_v2(
+        (
+            preformal_report,
+            preformal_runtime_conformance,
+        ) = _validate_preformal_test_report_v2(
             formal_test_payload,
             root=root,
             source=source,
@@ -10569,6 +11503,65 @@ def _audit_formal_input_package(
             4 << 20,
             label="outcome descriptor runtime manifest",
         )
+        restart_runtime_report_payload = _read_bounded(
+            _resolve_artifact_file(
+                root,
+                audit_execution.get(
+                    "restart_runtime_conformance_report_file"
+                ),
+                label="restart-runtime conformance report",
+            ),
+            4 << 20,
+            label="restart-runtime conformance report",
+        )
+        restart_runtime_receipt_payload = _read_bounded(
+            _resolve_artifact_file(
+                root,
+                audit_execution.get(
+                    "restart_runtime_execution_receipt_file"
+                ),
+                label="restart-runtime execution receipt",
+            ),
+            4 << 20,
+            label="restart-runtime execution receipt",
+        )
+        if (
+            preformal_runtime_conformance.get(
+                "conformance_sha256"
+            )
+            != hashlib.sha256(
+                _canonical_json_bytes(dict(audit_execution))
+            ).hexdigest()
+            or preformal_runtime_conformance.get(
+                "restart_runtime_conformance_report_sha256"
+            )
+            != hashlib.sha256(
+                restart_runtime_report_payload
+            ).hexdigest()
+            or preformal_runtime_conformance.get(
+                "restart_runtime_execution_receipt_sha256"
+            )
+            != hashlib.sha256(
+                restart_runtime_receipt_payload
+            ).hexdigest()
+            or preformal_runtime_conformance.get(
+                "restart_runtime_support_files"
+            )
+            != audit_execution.get("restart_runtime_support_files")
+            or preformal_runtime_conformance.get(
+                "restart_runtime_repeat_count"
+            )
+            != audit_execution.get("restart_runtime_repeat_count")
+            or preformal_runtime_conformance.get(
+                "restart_runtime_path_descriptor_equal"
+            )
+            != audit_execution.get(
+                "restart_runtime_path_descriptor_equal"
+            )
+        ):
+            raise ArtifactAuditError(
+                "formal audit execution differs from the sealed preformal rehearsal"
+            )
         _validate_audit_execution_conformance(
             block=audit_execution,
             bootstrap_payload=audit_bootstrap_payload,
@@ -10580,6 +11573,12 @@ def _audit_formal_input_package(
             report_payload=audit_conformance_payload,
             execution_receipt_payload=(audit_execution_receipt_payload),
             outcome_runtime_manifest_payload=(outcome_runtime_manifest_payload),
+            restart_runtime_report_payload=(
+                restart_runtime_report_payload
+            ),
+            restart_runtime_receipt_payload=(
+                restart_runtime_receipt_payload
+            ),
             dependencies=dependencies,
             runtime=runtime,
             source=source,
@@ -10667,7 +11666,7 @@ def _audit_formal_schedule(
     root: Path,
     result: Mapping[str, object],
 ) -> None:
-    """Independently enforce the complete v1.6 formal replicate schedule."""
+    """Independently enforce the complete v1.7 formal replicate schedule."""
 
     if result.get("lane") != "formal":
         return
@@ -10679,7 +11678,7 @@ def _audit_formal_schedule(
         seeds == _FORMAL_SEEDS and replicate_ids == expected_ids,
         code="formal_replicate_schedule_mismatch",
         message=(
-            "formal result does not contain the exact ordered eight v1.6 master seeds and seed-bound replicate IDs"
+            "formal result does not contain the exact ordered eight v1.7 master seeds and seed-bound replicate IDs"
         ),
     )
 
@@ -11868,6 +12867,7 @@ def _declare_current_coverage_gaps(
 def audit_artifact(
     artifact: str | Path,
     *,
+    producer_bootstrap: str | Path,
     validate_schema: bool = True,
     require_claim_completeness: bool = True,
     verify_custody: bool = True,
@@ -11888,6 +12888,23 @@ def audit_artifact(
         code="auditor_source_changed_during_execution",
         message="independent auditor source changed after module import",
     )
+    try:
+        _, _, producer_bootstrap_sha256, _ = _read_stable_regular_file(
+            Path(producer_bootstrap),
+            _MAX_SOURCE_FILE_BYTES,
+            label="captured producer bootstrap support",
+            capture_payload=False,
+        )
+    except (ArtifactAuditError, OSError) as error:
+        audit.error("producer_bootstrap_support_invalid", str(error))
+        return _audit_report(
+            audit,
+            root=root,
+            result_path=result_path,
+            result_sha256=None,
+            lane=None,
+            require_claim_completeness=require_claim_completeness,
+        )
     if verify_custody:
         _verify_finalized_custody(audit, root)
     try:
@@ -11915,10 +12932,10 @@ def audit_artifact(
         )
         _validate_result_schema(audit, result, schema_path=schema_path)
     audit.require(
-        result.get("schema") == "prospect.world-model-lifecycle.raw-result.v6"
+        result.get("schema") == "prospect.world-model-lifecycle.raw-result.v7"
         and result.get("experiment_id") == "WM-001",
         code="result_identity_mismatch",
-        message="artifact is not an active WM-001 raw-result v6 document",
+        message="artifact is not an active WM-001 raw-result v7 document",
     )
     protocol_source = root / "protocol.json" if (root / "protocol.json").is_file() else HERE / "protocol.json"
     protocol_value: Mapping[str, object] | None = None
@@ -11940,9 +12957,9 @@ def audit_artifact(
     except ArtifactAuditError:
         protocol_digest = ""
     audit.require(
-        result.get("protocol_version") == "1.6.0" and result.get("protocol_sha256") == protocol_digest,
+        result.get("protocol_version") == "1.7.0" and result.get("protocol_sha256") == protocol_digest,
         code="result_protocol_binding_mismatch",
-        message="result does not bind the exact WM-001 protocol 1.6.0 bytes",
+        message="result does not bind the exact WM-001 protocol 1.7.0 bytes",
     )
     replicates = _mapping_rows(result.get("replicates"))
     audit.require(
@@ -11950,10 +12967,29 @@ def audit_artifact(
         code="replicates_missing",
         message="result has no auditable replicate rows",
     )
-    bound_formal_device = _audit_formal_input_package(audit, root, result)
+    bound_formal_device = _audit_formal_input_package(
+        audit,
+        root,
+        result,
+        producer_bootstrap_sha256=producer_bootstrap_sha256,
+    )
     _audit_formal_schedule(audit, root, result)
     seen_replicates: set[str] = set()
     execution = result.get("execution")
+    if validate_schema or (
+        isinstance(execution, Mapping)
+        and "producer_bootstrap_sha256" in execution
+    ):
+        audit.require(
+            isinstance(execution, Mapping)
+            and execution.get("producer_bootstrap_sha256")
+            == producer_bootstrap_sha256,
+            code="producer_bootstrap_support_mismatch",
+            message=(
+                "captured producer bootstrap support differs from the "
+                "producer execution identity"
+            ),
+        )
     if result.get("lane") == "formal":
         # Formal arithmetic is selected only by the pre-outcome binding.  A
         # missing or malformed binding cannot silently fall back to a mutable
@@ -12025,6 +13061,7 @@ def audit_artifact(
             replicate_id=replicate_id,
             launcher_process_id=(execution.get("launcher_process_id") if isinstance(execution, Mapping) else None),
             execution=(execution if isinstance(execution, Mapping) else {}),
+            producer_bootstrap_sha256=producer_bootstrap_sha256,
             binding_runtime=audit.formal_runtime_binding,
             dependencies=audit.formal_dependency_binding,
             source=audit.formal_source_binding,
@@ -12392,18 +13429,18 @@ def _prebinding_protocol_component(
         _prebinding_fail("protocol_sha256_mismatch")
     experiment = decoded.get("experiment")
     if (
-        decoded.get("schema") != "prospect.world-model-lifecycle.protocol.v6"
+        decoded.get("schema") != "prospect.world-model-lifecycle.protocol.v7"
         or not isinstance(experiment, Mapping)
         or experiment.get("id") != "WM-001"
-        or experiment.get("protocol_version") != "1.6.0"
+        or experiment.get("protocol_version") != "1.7.0"
     ):
         _prebinding_fail("protocol_identity_mismatch")
     revision = experiment.get("revision")
     if (
         not isinstance(revision, Mapping)
-        or revision.get("supersedes") != "1.5.0"
+        or revision.get("supersedes") != "1.6.0"
         or revision.get("superseded_protocol_sha256")
-        != _V150_PROTOCOL_SHA256
+        != _V160_PROTOCOL_SHA256
     ):
         _prebinding_fail("protocol_lineage_mismatch")
     continuity = revision.get("scientific_continuity") if isinstance(revision, Mapping) else None
@@ -13514,7 +14551,7 @@ def audit_prebinding_conformance(
     raw_request_sha256: str | None = None,
     locator_root: Path | None = None,
 ) -> dict[str, object]:
-    """Run all no-outcome WM-001 v1.6 prebinding checks.
+    """Run all no-outcome WM-001 v1.7 prebinding checks.
 
     The report contains semantic identities only.  Filesystem locations,
     descriptor numbers, process IDs, clocks, and outcome/result paths are
@@ -13690,7 +14727,30 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--prebinding-conformance",
         metavar="REQUEST_JSON",
-        help=("run the result-free WM-001 v1.6 conformance request; use '-' for canonical JSON on stdin"),
+        help=("run the result-free WM-001 v1.7 conformance request; use '-' for canonical JSON on stdin"),
+    )
+    parser.add_argument(
+        "--restart-runtime-conformance",
+        action="store_true",
+        help=(
+            "run the result-free WM-001 v1.7 development/formal "
+            "restart-runtime branch conformance"
+        ),
+    )
+    parser.add_argument(
+        "--producer-bootstrap",
+        type=Path,
+        help=(
+            "explicit captured producer_bootstrap.py support used to bind "
+            "restart-runtime evidence"
+        ),
+    )
+    parser.add_argument(
+        "--expected-producer-bootstrap-sha256",
+        help=(
+            "independently bound producer_bootstrap.py SHA-256 used by "
+            "restart-runtime conformance"
+        ),
     )
     parser.add_argument(
         "--output",
@@ -13708,8 +14768,19 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
     if arguments.prebinding_conformance is not None:
-        if arguments.artifact is not None or arguments.forensic_partial:
-            raise SystemExit("--prebinding-conformance is mutually exclusive with artifact and --forensic-partial")
+        if (
+            arguments.artifact is not None
+            or arguments.forensic_partial
+            or arguments.producer_bootstrap is not None
+            or arguments.expected_producer_bootstrap_sha256 is not None
+            or arguments.restart_runtime_conformance
+        ):
+            raise SystemExit(
+                "--prebinding-conformance is mutually exclusive with artifact, "
+                "--producer-bootstrap, "
+                "--expected-producer-bootstrap-sha256, "
+                "--restart-runtime-conformance, and --forensic-partial"
+            )
         report = audit_prebinding_conformance_file(arguments.prebinding_conformance)
         encoded = _canonical_json_bytes(report) + b"\n"
         if arguments.output is not None:
@@ -13717,10 +14788,47 @@ def main(argv: Sequence[str] | None = None) -> int:
                 stream.write(encoded)
         sys.stdout.buffer.write(encoded)
         return 0 if report["passed"] is True else 1
+    if arguments.restart_runtime_conformance:
+        if arguments.artifact is not None or arguments.forensic_partial:
+            raise SystemExit(
+                "--restart-runtime-conformance is mutually exclusive with "
+                "artifact and --forensic-partial"
+            )
+        if arguments.producer_bootstrap is None:
+            raise SystemExit(
+                "--producer-bootstrap is required for restart-runtime conformance"
+            )
+        if arguments.expected_producer_bootstrap_sha256 is None:
+            raise SystemExit(
+                "--expected-producer-bootstrap-sha256 is required for "
+                "restart-runtime conformance"
+            )
+        report = audit_restart_runtime_conformance(
+            arguments.producer_bootstrap,
+            expected_producer_bootstrap_sha256=(
+                arguments.expected_producer_bootstrap_sha256
+            ),
+        )
+        encoded = _canonical_json_bytes(report) + b"\n"
+        if arguments.output is not None:
+            with arguments.output.resolve().open("xb") as stream:
+                stream.write(encoded)
+        sys.stdout.buffer.write(encoded)
+        return 0 if report["passed"] is True else 1
     if arguments.artifact is None:
-        raise SystemExit("artifact is required unless --prebinding-conformance is used")
+        raise SystemExit(
+            "artifact is required unless a conformance mode is used"
+        )
+    if arguments.expected_producer_bootstrap_sha256 is not None:
+        raise SystemExit(
+            "--expected-producer-bootstrap-sha256 is only valid for "
+            "restart-runtime conformance"
+        )
+    if arguments.producer_bootstrap is None:
+        raise SystemExit("--producer-bootstrap is required for artifact audits")
     report = audit_artifact(
         arguments.artifact,
+        producer_bootstrap=arguments.producer_bootstrap,
         validate_schema=not arguments.forensic_partial,
         require_claim_completeness=not arguments.forensic_partial,
         verify_custody=not arguments.forensic_partial,

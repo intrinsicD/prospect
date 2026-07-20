@@ -78,6 +78,8 @@ def _write_preservable_binding(
         "prebinding_conformance_report",
         "prebinding_execution_receipt",
         "outcome_runtime_manifest",
+        "restart_runtime_conformance_report",
+        "restart_runtime_execution_receipt",
     )
     audit_files = {prefix: evidence(f"{prefix}.evidence") for prefix in audit_prefixes}
     implementation = _implementation_row()
@@ -125,7 +127,7 @@ def _write_preservable_binding(
 
 def _write_minimal_formal_binding(path: Path, *, git_commit: str) -> str:
     value = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v6",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v7",
         "experiment_id": "WM-001",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
@@ -133,7 +135,7 @@ def _write_minimal_formal_binding(path: Path, *, git_commit: str) -> str:
             "external_attestation": False,
             "exclusive_path_use_required": True,
         },
-        "protocol": {"version": "1.6.0"},
+        "protocol": {"version": "1.7.0"},
         "source": {
             "git_commit": git_commit,
             "git_tree": "2" * 40,
@@ -291,7 +293,7 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
     assert copied["formal_binding_sha256"] == first_digest
     assert copied["attempt_directory"] == "attempt-a"
     assert copied["schema"] == "prospect.wm001.formal-launch.v2"
-    assert copied["protocol_version"] == "1.6.0"
+    assert copied["protocol_version"] == "1.7.0"
     assert copied["global_marker_file"] == FORMAL_LAUNCH_MARKER_NAME
     assert marker.read_bytes() == producer_record.read_bytes()
     assert os.path.samefile(marker, producer_record)
@@ -709,7 +711,7 @@ def test_formal_cli_verifies_live_copied_binding_before_outcomes(
         "formal_preflight",
     ),
 )
-def test_formal_cli_preclaim_failures_leave_v16_marker_absent(
+def test_formal_cli_preclaim_failures_leave_v17_marker_absent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     failure_stage: str,
@@ -827,7 +829,7 @@ def test_formal_experiment_requires_launch_claim_before_any_replicate(
         experiment_module,
         "_verify_live_bootstrap_custody",
         lambda: {
-            "runtime_seal": {"schema": "prospect.world-model-lifecycle.formal-binding.v6"},
+            "runtime_seal": {"schema": "prospect.world-model-lifecycle.formal-binding.v7"},
             "runtime_seal_payload": binding_path.read_bytes(),
         },
     )
@@ -891,7 +893,7 @@ def test_formal_experiment_consumes_preclaim_reports_without_rerunning_checks(
         experiment_module,
         "_verify_live_bootstrap_custody",
         lambda: {
-            "runtime_seal": {"schema": "prospect.world-model-lifecycle.formal-binding.v6"},
+            "runtime_seal": {"schema": "prospect.world-model-lifecycle.formal-binding.v7"},
             "runtime_seal_payload": binding_path.read_bytes(),
         },
     )
@@ -967,7 +969,7 @@ def test_experiment_entrypoint_refuses_unowned_or_existing_output(
         )
 
     development = experiment_module.ExperimentConfig.development(
-        master_seeds=(2999896578,),
+        master_seeds=(3920043614,),
         device="cpu",
     )
     assert (

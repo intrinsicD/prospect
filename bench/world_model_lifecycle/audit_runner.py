@@ -325,6 +325,49 @@ def canonical_directory(raw, label):
     return path
 
 
+def sanitized_standard_library_path(stdlib_root):
+    authorized = set()
+    for raw in sys.path:
+        if not isinstance(raw, str) or not raw or not Path(raw).is_absolute():
+            raise BootstrapError(
+                "module search path contains a non-absolute entry"
+            )
+        candidate = Path(raw)
+        if not os.path.lexists(candidate):
+            continue
+        candidate = canonical_directory(
+            raw,
+            "module search path entry",
+        )
+        try:
+            relative = candidate.relative_to(stdlib_root)
+        except ValueError as error:
+            raise BootstrapError(
+                "module search path contains an ambient import root"
+            ) from error
+        if {"site-packages", "dist-packages"} & set(relative.parts):
+            raise BootstrapError(
+                "module search path contains an undeclared package root"
+            )
+        if candidate in authorized:
+            raise BootstrapError(
+                "module search path contains a duplicate entry"
+            )
+        authorized.add(candidate)
+    if stdlib_root not in authorized:
+        raise BootstrapError(
+            "module search path omits the standard-library root"
+        )
+    return [
+        str(stdlib_root),
+        *(
+            str(path)
+            for path in sorted(authorized)
+            if path != stdlib_root
+        ),
+    ]
+
+
 def root_inventory(root, domain, standard_library, label):
     digest = hashlib.sha256(domain)
     file_count = 0
@@ -721,6 +764,7 @@ def execute():
     )
     if stdlib_root != Path(sysconfig.get_path("stdlib")):
         raise BootstrapError("runtime manifest identifies a different standard library")
+    baseline = sanitized_standard_library_path(stdlib_root)
     stdlib_inventory = root_inventory(
         stdlib_root,
         STDLIB_DOMAIN,
@@ -744,7 +788,6 @@ def execute():
             raise BootstrapError("closure import-root inventory differs before auditor import")
         roots.append(root)
         root_inventories.append(inventory)
-    baseline = list(sys.path)
     sys.path[:] = [str(root) for root in roots] + baseline
     os.chdir(working_directory)
     resolved_arguments = []

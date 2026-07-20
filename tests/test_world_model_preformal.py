@@ -49,6 +49,30 @@ def _read_report(path: Path) -> dict[str, Any]:
     return value
 
 
+def _runtime_conformance(
+    device: str = "cpu",
+) -> dict[str, object]:
+    return {
+        "schema": "prospect.wm001.preformal-runtime-check.v1",
+        "mode": "bootstrap-inventory-conformance",
+        "device": device,
+        "passed": True,
+        "inventory_sha256": "1" * 64,
+        "conformance_sha256": "2" * 64,
+        "restart_runtime_conformance_report_sha256": "3" * 64,
+        "restart_runtime_execution_receipt_sha256": "4" * 64,
+        "restart_runtime_support_files": [
+            "producer_bootstrap.py",
+            "protocol.json",
+            "schemas/raw-result.schema.json",
+        ],
+        "restart_runtime_repeat_count": 3,
+        "restart_runtime_path_descriptor_equal": True,
+        "repeat_count": 3,
+        "path_descriptor_equal": True,
+    }
+
+
 def _rewrite_report(path: Path, report: dict[str, Any]) -> None:
     path.write_bytes(_canonical(report))
 
@@ -94,7 +118,7 @@ def _review() -> dict[str, object]:
     return {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "implementation_files": [],
         "implementation_manifest_sha256": hashlib.sha256(b"[]").hexdigest(),
         "reviewer": {
@@ -112,7 +136,7 @@ def _runtime_seal(runtime_executable: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
             "tamper_resistant": False,
@@ -388,9 +412,15 @@ def _prepare_generation(
         assert environment == expected_environment
         calls.append(specification.name)
         exit_code = 7 if specification.name == failed_command else 0
+        stdout = (
+            _canonical(_runtime_conformance())
+            if specification.name
+            == "runtime-bootstrap-inventory-conformance"
+            else f"stdout:{specification.name}\n".encode()
+        )
         return (
             exit_code,
-            f"stdout:{specification.name}\n".encode(),
+            stdout,
             f"stderr:{specification.name}\n".encode(),
         )
 
@@ -634,7 +664,7 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     review = {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -872,13 +902,41 @@ def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
     def build_execution(**arguments: object) -> tuple[dict[str, object], dict[str, bytes]]:
         assert arguments["producer_environment"] == _RUNTIME_ENVIRONMENT
         events.append("conformance")
+        restart_report = b"restart-report\n"
+        restart_receipt = b"restart-receipt\n"
         return (
             {
                 "repeat_count": 3,
                 "path_descriptor_equal": True,
+                "restart_runtime_conformance_report_file": (
+                    "restart-report.json"
+                ),
+                "restart_runtime_conformance_report_sha256": (
+                    hashlib.sha256(restart_report).hexdigest()
+                ),
+                "restart_runtime_execution_receipt_file": (
+                    "restart-receipt.json"
+                ),
+                "restart_runtime_execution_receipt_sha256": (
+                    hashlib.sha256(restart_receipt).hexdigest()
+                ),
+                "restart_runtime_support_files": [
+                    "producer_bootstrap.py",
+                    "protocol.json",
+                    "schemas/raw-result.schema.json",
+                ],
+                "restart_runtime_repeat_count": 3,
+                "restart_runtime_path_descriptor_equal": True,
                 "passed": True,
             },
-            {f"payload-{index}": b"" for index in range(9)},
+            {
+                **{
+                    f"payload-{index}": b""
+                    for index in range(9)
+                },
+                "restart-report.json": restart_report,
+                "restart-receipt.json": restart_receipt,
+            },
         )
 
     monkeypatch.setattr(gymnasium, "make", make)
@@ -911,5 +969,7 @@ def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
     report = preformal._runtime_bootstrap_inventory_conformance("cpu")
 
     assert report["passed"] is True
+    assert report["restart_runtime_repeat_count"] == 3
+    assert report["restart_runtime_path_descriptor_equal"] is True
     assert events[:4] == ["closure", "make", "close", "closure"]
     assert events[-2:] == ["conformance", "closure"]

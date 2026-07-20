@@ -82,6 +82,12 @@ from prospect.domain import TimePoint
 MAGIC = b"PROSPECT-WM001\0"
 TASK_A = "pendulum_normal_torque"
 TASK_IRRELEVANT = "independent_phase_oscillator"
+PRODUCER_BOOTSTRAP = (
+    Path(__file__).resolve().parents[1]
+    / "bench"
+    / "world_model_lifecycle"
+    / "producer_bootstrap.py"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -156,7 +162,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
     seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "assurance": dict(artifact_audit_module._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -1518,11 +1524,11 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     owned_state = runtime.owner.snapshot_state()
     parameter_sha256 = runtime.digest
     model_version = runtime.version
-    master_seed = 2999896578
+    master_seed = 3920043614
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.6.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.7.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
@@ -2001,9 +2007,9 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         },
     }
     result: dict[str, Any] = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v6",
+        "schema": "prospect.world-model-lifecycle.raw-result.v7",
         "experiment_id": "WM-001",
-        "protocol_version": "1.6.0",
+        "protocol_version": "1.7.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),
@@ -2023,6 +2029,7 @@ def test_artifact_audit_recomputes_current_evidence_and_detects_metric_tampering
 
     report = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,
@@ -2049,6 +2056,7 @@ def test_artifact_audit_recomputes_current_evidence_and_detects_metric_tampering
 
     tampered = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,
@@ -2056,6 +2064,61 @@ def test_artifact_audit_recomputes_current_evidence_and_detects_metric_tampering
 
     assert tampered["integrity_passed"] is False
     assert "prediction_nll_mismatch" in {finding["code"] for finding in tampered["findings"]}
+
+
+def test_artifact_audit_never_falls_back_to_ambient_bootstrap(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_auditable_artifact(tmp_path)
+
+    report = audit_artifact(
+        tmp_path,
+        producer_bootstrap=tmp_path / "missing-producer-bootstrap.py",
+        validate_schema=False,
+        require_claim_completeness=False,
+        verify_custody=False,
+    )
+
+    assert report["integrity_passed"] is False
+    assert {finding["code"] for finding in report["findings"]} == {
+        "producer_bootstrap_support_invalid",
+    }
+
+
+def test_artifact_audit_rejects_mutated_explicit_bootstrap(
+    tmp_path: Path,
+) -> None:
+    result_path = _write_minimal_auditable_artifact(tmp_path)
+    result = json.loads(result_path.read_text())
+    result["execution"]["producer_bootstrap_sha256"] = hashlib.sha256(
+        PRODUCER_BOOTSTRAP.read_bytes()
+    ).hexdigest()
+    result_path.write_bytes(_canonical(result) + b"\n")
+    captured = tmp_path / "captured-producer-bootstrap.py"
+    captured.write_bytes(PRODUCER_BOOTSTRAP.read_bytes() + b"\n# mutated\n")
+
+    report = audit_artifact(
+        tmp_path,
+        producer_bootstrap=captured,
+        validate_schema=False,
+        require_claim_completeness=False,
+        verify_custody=False,
+    )
+
+    assert report["integrity_passed"] is False
+    assert "producer_bootstrap_support_mismatch" in {
+        finding["code"] for finding in report["findings"]
+    }
+
+
+def test_artifact_cli_requires_explicit_bootstrap(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        SystemExit,
+        match="--producer-bootstrap is required",
+    ):
+        artifact_audit_module.main([str(tmp_path)])
 
 
 def test_restart_audit_reopens_both_traces_and_rejects_derived_tampering(
@@ -2195,6 +2258,9 @@ def test_restart_audit_reopens_both_traces_and_rejects_derived_tampering(
         replicate_id=f"wm001-formal-{master_seed}",
         launcher_process_id=101,
         execution={},
+        producer_bootstrap_sha256=hashlib.sha256(
+            PRODUCER_BOOTSTRAP.read_bytes()
+        ).hexdigest(),
         binding_runtime=None,
         dependencies=None,
         source=None,
@@ -2211,6 +2277,9 @@ def test_restart_audit_reopens_both_traces_and_rejects_derived_tampering(
         replicate_id=f"wm001-formal-{master_seed}",
         launcher_process_id=101,
         execution={},
+        producer_bootstrap_sha256=hashlib.sha256(
+            PRODUCER_BOOTSTRAP.read_bytes()
+        ).hexdigest(),
         binding_runtime=None,
         dependencies=None,
         source=None,
@@ -2376,6 +2445,7 @@ def test_artifact_audit_rejects_fabricated_aggregate_values(
     _add_independent_analysis_rows(result_path)
     baseline = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,
@@ -2388,6 +2458,7 @@ def test_artifact_audit_rejects_fabricated_aggregate_values(
 
     report = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,
@@ -2403,6 +2474,7 @@ def test_artifact_audit_rejects_fabricated_gate_values(
     _add_independent_analysis_rows(result_path)
     baseline = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,
@@ -2418,6 +2490,7 @@ def test_artifact_audit_rejects_fabricated_gate_values(
 
     report = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,
@@ -2463,6 +2536,7 @@ def test_artifact_audit_reopens_finalized_producer_manifest(tmp_path: Path) -> N
 
     report = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
     )
@@ -2619,6 +2693,7 @@ def test_artifact_audit_rejects_reset_state_not_generated_by_episode_seed(
 
     report = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,
@@ -2643,6 +2718,7 @@ def test_artifact_audit_rejects_reordered_episode_seed_schedule(
 
     report = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,
@@ -2679,6 +2755,7 @@ def test_artifact_audit_rejects_rehashed_but_wrong_optimizer_rng_trace(
 
     report = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,
@@ -2708,6 +2785,7 @@ def test_artifact_audit_rejects_rehashed_but_wrong_corruption_permutation(
 
     report = audit_artifact(
         tmp_path,
+        producer_bootstrap=PRODUCER_BOOTSTRAP,
         validate_schema=False,
         require_claim_completeness=False,
         verify_custody=False,

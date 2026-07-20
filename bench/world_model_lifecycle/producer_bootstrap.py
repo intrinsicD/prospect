@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 _SCHEMA = "prospect.wm001.runtime-seal.v1"
-_PROTOCOL_VERSION = "1.6.0"
+_PROTOCOL_VERSION = "1.7.0"
 _PACKAGE_DOMAIN = b"prospect.wm001.package-root.v2\0"
 _STDLIB_DOMAIN = b"prospect.wm001.standard-library.v2\0"
 _ENVIRONMENT_KEYS = frozenset(
@@ -236,6 +236,69 @@ def _flags() -> dict[str, object]:
         "no_user_site": sys.flags.no_user_site,
         "safe_path": sys.flags.safe_path,
     }
+
+
+def _sanitize_module_search_path() -> tuple[str, ...]:
+    """Drop absent entries and reject every extant ambient import root."""
+
+    stdlib_root = Path(sysconfig.get_path("stdlib"))
+    _reject_symlink_components(stdlib_root, label="standard-library root")
+    if (
+        not stdlib_root.is_dir()
+        or stdlib_root.resolve(strict=True) != stdlib_root
+    ):
+        raise BootstrapError(
+            "standard-library root must be one canonical directory"
+        )
+    authorized: set[Path] = set()
+    for raw in sys.path:
+        if not isinstance(raw, str) or not raw or not Path(raw).is_absolute():
+            raise BootstrapError(
+                "module search path contains a non-absolute entry"
+            )
+        candidate = Path(raw)
+        if not os.path.lexists(candidate):
+            continue
+        _reject_symlink_components(
+            candidate,
+            label="module search path entry",
+        )
+        if (
+            not candidate.is_dir()
+            or candidate.resolve(strict=True) != candidate
+        ):
+            raise BootstrapError(
+                "module search path contains a non-directory entry"
+            )
+        try:
+            relative = candidate.relative_to(stdlib_root)
+        except ValueError as error:
+            raise BootstrapError(
+                "module search path contains an ambient import root"
+            ) from error
+        if {"site-packages", "dist-packages"} & set(relative.parts):
+            raise BootstrapError(
+                "module search path contains an undeclared package root"
+            )
+        if candidate in authorized:
+            raise BootstrapError(
+                "module search path contains a duplicate entry"
+            )
+        authorized.add(candidate)
+    if stdlib_root not in authorized:
+        raise BootstrapError(
+            "module search path omits the standard-library root"
+        )
+    ordered = (
+        str(stdlib_root),
+        *(
+            str(path)
+            for path in sorted(authorized)
+            if path != stdlib_root
+        ),
+    )
+    sys.path[:] = ordered
+    return ordered
 
 
 def _environment() -> dict[str, str]:
@@ -669,7 +732,7 @@ def _expected_from_binding(binding: dict[str, Any]) -> dict[str, object]:
     dependencies = binding.get("dependencies")
     runtime = binding.get("runtime")
     if (
-        binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v6"
+        binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v7"
         or binding.get("experiment_id") != "WM-001"
         or not isinstance(source, dict)
         or not isinstance(dependencies, dict)
@@ -714,7 +777,7 @@ def _verify_runtime_seal(
     expected = (
         _expected_from_binding(supplied)
         if supplied.get("schema")
-        == "prospect.world-model-lifecycle.formal-binding.v6"
+        == "prospect.world-model-lifecycle.formal-binding.v7"
         else supplied
     )
     current = _current_runtime_seal(bootstrap_sha256=bootstrap_sha256)
@@ -757,7 +820,7 @@ def _runtime_custody_nlink(value: dict[str, Any]) -> int:
         or schema
         not in {
             _SCHEMA,
-            "prospect.world-model-lifecycle.formal-binding.v6",
+            "prospect.world-model-lifecycle.formal-binding.v7",
         }
     ):
         raise BootstrapError(
@@ -961,6 +1024,11 @@ def _emit_outer_receipt(
 
 
 def main() -> int:
+    if _flags() != _EXPECTED_FLAGS:
+        raise BootstrapError(
+            "WM-001 bootstrap requires exact CPython flags -I -S -B"
+        )
+    _sanitize_module_search_path()
     bootstrap_descriptor, bootstrap_payload = _capture_bootstrap()
     bootstrap_sha256 = hashlib.sha256(bootstrap_payload).hexdigest()
     bootstrap_identity = _stat_identity(os.fstat(bootstrap_descriptor))

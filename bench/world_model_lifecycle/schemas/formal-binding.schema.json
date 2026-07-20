@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v6.json",
+  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v7.json",
   "title": "WM-001 formal implementation binding",
   "type": "object",
   "additionalProperties": false,
@@ -23,7 +23,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.formal-binding.v6"
+      "const": "prospect.world-model-lifecycle.formal-binding.v7"
     },
     "experiment_id": {
       "const": "WM-001"
@@ -63,7 +63,7 @@
       ],
       "properties": {
         "version": {
-          "const": "1.6.0"
+          "const": "1.7.0"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -715,6 +715,15 @@
         "outcome_runtime_manifest_file",
         "outcome_runtime_manifest_bytes",
         "outcome_runtime_manifest_sha256",
+        "restart_runtime_conformance_report_file",
+        "restart_runtime_conformance_report_bytes",
+        "restart_runtime_conformance_report_sha256",
+        "restart_runtime_execution_receipt_file",
+        "restart_runtime_execution_receipt_bytes",
+        "restart_runtime_execution_receipt_sha256",
+        "restart_runtime_support_files",
+        "restart_runtime_repeat_count",
+        "restart_runtime_path_descriptor_equal",
         "outcome_source_mode",
         "outcome_support_files",
         "outcome_argv_role",
@@ -827,18 +836,55 @@
         "outcome_runtime_manifest_sha256": {
           "$ref": "#/$defs/sha256"
         },
+        "restart_runtime_conformance_report_file": {
+          "$ref": "#/$defs/siblingFilename"
+        },
+        "restart_runtime_conformance_report_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "restart_runtime_conformance_report_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "restart_runtime_execution_receipt_file": {
+          "$ref": "#/$defs/siblingFilename"
+        },
+        "restart_runtime_execution_receipt_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "restart_runtime_execution_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "restart_runtime_support_files": {
+          "const": [
+            "producer_bootstrap.py",
+            "protocol.json",
+            "schemas/raw-result.schema.json"
+          ]
+        },
+        "restart_runtime_repeat_count": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "restart_runtime_path_descriptor_equal": {
+          "const": true
+        },
         "outcome_source_mode": {
           "const": "descriptor"
         },
         "outcome_support_files": {
           "const": [
+            "producer_bootstrap.py",
             "protocol.json",
             "schemas/raw-result.schema.json"
           ]
         },
         "outcome_argv_role": {
           "const": [
-            "<canonical-producer-root>"
+            "<canonical-producer-root>",
+            "--producer-bootstrap",
+            "<captured-producer-bootstrap>"
           ]
         },
         "outcome_working_directory": {
@@ -1021,14 +1067,14 @@
     },
     "formal_replicate_master_seeds": {
       "const": [
-        3863790658,
-        3900021454,
-        1437244820,
-        3175470977,
-        228708147,
-        3835462042,
-        3342200973,
-        1751060143
+        2080036362,
+        865871218,
+        3636713390,
+        2195564811,
+        2000167339,
+        329754669,
+        4064290468,
+        1911057116
       ]
     }
   },

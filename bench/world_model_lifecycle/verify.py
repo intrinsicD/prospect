@@ -59,16 +59,16 @@ RESULT_SCHEMA_PATH = HERE / "schemas" / "raw-result.schema.json"
 BINDING_SCHEMA_PATH = HERE / "schemas" / "formal-binding.schema.json"
 
 FORMAL_SEEDS = (
-    3863790658,
-    3900021454,
-    1437244820,
-    3175470977,
-    228708147,
-    3835462042,
-    3342200973,
-    1751060143,
+    2080036362,
+    865871218,
+    3636713390,
+    2195564811,
+    2000167339,
+    329754669,
+    4064290468,
+    1911057116,
 )
-DEVELOPMENT_SEEDS = (2999896578, 3783052994)
+DEVELOPMENT_SEEDS = (3920043614, 3703229797)
 COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
 _V100_MASTER_SEEDS = (
     101,
@@ -130,7 +130,19 @@ _V150_MASTER_SEEDS = (
     4212585034,
     530094003,
 )
-_V150_PROTOCOL_SHA256 = "434b80c41d263e40879272e172bcbdfcbb1a1f32d2b08c85df0dd7ec9317abd2"
+_V160_MASTER_SEEDS = (
+    2999896578,
+    3783052994,
+    3863790658,
+    3900021454,
+    1437244820,
+    3175470977,
+    228708147,
+    3835462042,
+    3342200973,
+    1751060143,
+)
+_V160_PROTOCOL_SHA256 = "6f5c21d6e77683c283e09c6257c35abd0e6857e17620e585f414024852d972b2"
 _SCIENTIFIC_BLOCKS = (
     "claim",
     "null_hypothesis",
@@ -428,6 +440,26 @@ def _canonical_sha256(value: object) -> str:
     return sha256(payload).hexdigest()
 
 
+def _strict_json_equal(observed: object, expected: object) -> bool:
+    """Compare decoded JSON without Python's bool/int or int/float aliases."""
+
+    if type(observed) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        assert isinstance(observed, dict)
+        return set(observed) == set(expected) and all(
+            _strict_json_equal(observed[key], value)
+            for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        assert isinstance(observed, list)
+        return len(observed) == len(expected) and all(
+            _strict_json_equal(left, right)
+            for left, right in zip(observed, expected, strict=True)
+        )
+    return observed == expected
+
+
 def _binding_sibling(path: Path, value: object, field: str) -> Path:
     _require(isinstance(value, str) and value, f"{field} is missing")
     relative = Path(value)
@@ -679,18 +711,18 @@ def _verify_coverage_conformance_report(report: object) -> None:
 
 
 def derive_seed(namespace: str, master_seed: int, index: int) -> int:
-    """Derive the exact protocol-1.6.0 uint32 seed."""
+    """Derive the exact protocol-1.7.0 uint32 seed."""
 
-    payload = f"WM-001|1.6.0|{namespace}|{master_seed}|{index}".encode()
+    payload = f"WM-001|1.7.0|{namespace}|{master_seed}|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
 def derive_master_seed(lane: str, index: int) -> int:
-    """Derive one protocol-1.6.0 lane master from its prospective index."""
+    """Derive one protocol-1.7.0 lane master from its prospective index."""
 
     if lane not in {"development", "formal"} or index < 0:
         raise ValueError("invalid WM-001 master-seed lane or index")
-    payload = f"WM-001|1.6.0|{lane}-master|{index}".encode()
+    payload = f"WM-001|1.7.0|{lane}-master|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
@@ -769,7 +801,7 @@ def verify_protocol() -> dict[str, Any]:
 
     experiment = protocol.get("experiment", {})
     trust_model = protocol.get("trust_model", {})
-    _require(protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v6", "wrong protocol schema")
+    _require(protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v7", "wrong protocol schema")
     _require(
         trust_model
         == {
@@ -782,28 +814,28 @@ def verify_protocol() -> dict[str, Any]:
         "protocol trust model is missing or overstated",
     )
     _require(experiment.get("id") == "WM-001", "wrong experiment ID")
-    _require(experiment.get("protocol_version") == "1.6.0", "wrong protocol version")
+    _require(experiment.get("protocol_version") == "1.7.0", "wrong protocol version")
     _require(experiment.get("status") == "sealed_before_formal_outcomes", "protocol is not marked sealed")
     _require(experiment.get("thresholds_sealed_before_outcomes") is True, "experiment thresholds are not sealed")
     _require(protocol.get("thresholds", {}).get("sealed_before_outcomes") is True, "threshold block is not sealed")
     scientific_continuity = experiment.get("revision", {}).get("scientific_continuity", {})
     _require(
-        experiment.get("revision", {}).get("supersedes") == "1.5.0"
+        experiment.get("revision", {}).get("supersedes") == "1.6.0"
         and experiment.get("revision", {}).get("superseded_protocol_sha256")
-        == _V150_PROTOCOL_SHA256,
-        "v1.6 protocol does not directly and exactly supersede sealed v1.5",
+        == _V160_PROTOCOL_SHA256,
+        "v1.7 protocol does not directly and exactly supersede sealed v1.6",
     )
     scientific_payload = {name: protocol.get(name) for name in _SCIENTIFIC_BLOCKS}
     _require(
         tuple(scientific_continuity.get("unchanged_top_level_blocks", ())) == _SCIENTIFIC_BLOCKS
         and scientific_continuity.get("v1_4_scientific_blocks_sha256") == _V140_SCIENTIFIC_BLOCKS_SHA256
         and _canonical_sha256(scientific_payload) == _V140_SCIENTIFIC_BLOCKS_SHA256,
-        "v1.6 scientific blocks differ from the sealed v1.4 system",
+        "v1.7 scientific blocks differ from the sealed v1.4 system",
     )
     _require(
         scientific_continuity.get("kernel_source_sha256") == _SCIENTIFIC_KERNEL_SHA256
         and all(_file_sha256(HERE / name) == digest for name, digest in _SCIENTIFIC_KERNEL_SHA256.items()),
-        "v1.6 scientific kernel source differs from the sealed v1.4 system",
+        "v1.7 scientific kernel source differs from the sealed v1.4 system",
     )
 
     _require(protocol.get("splits", {}).get("unit") == "whole_episode", "splits are not whole-episode")
@@ -834,8 +866,8 @@ def verify_protocol() -> dict[str, Any]:
 
     seed_schedule = protocol.get("seed_schedule", {})
     _require(
-        seed_schedule.get("derivation_domain_version") == "1.6.0",
-        "seed derivation domain differs from protocol 1.6.0",
+        seed_schedule.get("derivation_domain_version") == "1.7.0",
+        "seed derivation domain differs from protocol 1.7.0",
     )
     formal_seeds = tuple(seed_schedule.get("formal_replicate_master_seeds", ()))
     development_seeds = tuple(seed_schedule.get("development_replicate_master_seeds", ()))
@@ -851,7 +883,7 @@ def verify_protocol() -> dict[str, Any]:
     }
     _require(
         actual_seed_counts == EXPECTED_SEED_COUNTS,
-        "seed namespace/count schedule differs from protocol 1.6.0",
+        "seed namespace/count schedule differs from protocol 1.7.0",
     )
     master_derivation = seed_schedule.get("master_seed_derivation", {})
     _require(
@@ -882,6 +914,7 @@ def verify_protocol() -> dict[str, Any]:
         ("1.3.0", _V130_MASTER_SEEDS),
         ("1.4.0", _V140_MASTER_SEEDS),
         ("1.5.0", _V150_MASTER_SEEDS),
+        ("1.6.0", _V160_MASTER_SEEDS),
     )
     prior_masters = {master_seed for _, version_masters in prior_domains for master_seed in version_masters}
     prior_stream_values = [
@@ -905,9 +938,9 @@ def verify_protocol() -> dict[str, Any]:
         and collision_audit.get("current_internal_collision_count") == 0
         and collision_audit.get("current_master_stream_overlap_count") == 0
         and current_masters.isdisjoint(current_streams)
-        and collision_audit.get("prior_master_seed_count") == len(prior_masters) == 50
-        and collision_audit.get("unique_prior_derived_stream_count") == len(prior_streams) == 6800
-        and len(prior_stream_values) == 6800
+        and collision_audit.get("prior_master_seed_count") == len(prior_masters) == 60
+        and collision_audit.get("unique_prior_derived_stream_count") == len(prior_streams) == 8160
+        and len(prior_stream_values) == 8160
         and collision_audit.get("current_prior_master_master_overlap_count") == 0
         and collision_audit.get("current_prior_stream_stream_overlap_count") == 0
         and collision_audit.get("current_master_prior_stream_overlap_count") == 0
@@ -1026,11 +1059,11 @@ def verify_protocol() -> dict[str, Any]:
         "coverage arithmetic binding contract is incomplete",
     )
     _require(
-        result_schema.get("$id") == "https://prospect.local/schemas/wm-001-raw-result-v6.json",
+        result_schema.get("$id") == "https://prospect.local/schemas/wm-001-raw-result-v7.json",
         "wrong raw-result schema",
     )
     _require(
-        binding_schema.get("$id") == "https://prospect.local/schemas/wm-001-formal-binding-v6.json",
+        binding_schema.get("$id") == "https://prospect.local/schemas/wm-001-formal-binding-v7.json",
         "wrong formal-binding schema",
     )
     return protocol
@@ -1042,7 +1075,7 @@ def verify_binding(path: Path) -> dict[str, Any]:
     protocol = verify_protocol()
     binding = _load_json(path)
     _validate_json_schema(binding, _load_json(BINDING_SCHEMA_PATH), label="formal binding")
-    _require(binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v6", "wrong binding schema")
+    _require(binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v7", "wrong binding schema")
     _require(binding.get("experiment_id") == "WM-001", "binding has wrong experiment")
     _require(
         binding.get("assurance") == ASSURANCE,
@@ -1051,7 +1084,7 @@ def verify_binding(path: Path) -> dict[str, Any]:
     _parse_timestamp(binding.get("sealed_at_utc"), "sealed_at_utc")
 
     bound_protocol = binding.get("protocol", {})
-    _require(bound_protocol.get("version") == "1.6.0", "binding has wrong protocol version")
+    _require(bound_protocol.get("version") == "1.7.0", "binding has wrong protocol version")
     _require(bound_protocol.get("sha256") == _file_sha256(PROTOCOL_PATH), "binding has wrong protocol digest")
     _require(
         bound_protocol.get("raw_result_schema_sha256") == _file_sha256(RESULT_SCHEMA_PATH),
@@ -1351,6 +1384,16 @@ def verify_binding(path: Path) -> dict[str, Any]:
         audit_execution,
         prefix="outcome_runtime_manifest",
     )
+    _, restart_runtime_report_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="restart_runtime_conformance_report",
+    )
+    _, restart_runtime_receipt_payload = _bound_evidence_payload(
+        path,
+        audit_execution,
+        prefix="restart_runtime_execution_receipt",
+    )
     request_value = _canonical_object_payload(
         request_payload,
         label="prebinding request",
@@ -1383,6 +1426,14 @@ def verify_binding(path: Path) -> dict[str, Any]:
         outcome_runtime_payload,
         label="outcome audit runtime manifest",
     )
+    restart_runtime_report_value = _canonical_object_payload(
+        restart_runtime_report_payload,
+        label="restart-runtime conformance report",
+    )
+    restart_runtime_receipt_value = _canonical_object_payload(
+        restart_runtime_receipt_payload,
+        label="restart-runtime execution receipt",
+    )
     _require(
         request_value.get("schema") == "prospect.wm001.prebinding-conformance-request.v1"
         and conformance_value.get("schema") == "prospect.wm001.prebinding-conformance.v1"
@@ -1397,7 +1448,10 @@ def verify_binding(path: Path) -> dict[str, Any]:
     _require(
         path_runtime_value.get("source", {}).get("mode") == "path"
         and descriptor_runtime_value.get("source", {}).get("mode") == "descriptor"
-        and normalized_path_runtime == normalized_descriptor_runtime,
+        and _strict_json_equal(
+            normalized_path_runtime,
+            normalized_descriptor_runtime,
+        ),
         "prebinding path and descriptor runtime identities differ beyond source mode",
     )
     repeat_count = audit_execution.get("repeat_count")
@@ -1419,8 +1473,14 @@ def verify_binding(path: Path) -> dict[str, Any]:
     )
     _require(
         execution_receipt_value.get("schema") == "prospect.wm001.audit-conformance-receipt.v1"
-        and execution_receipt_value.get("repeat_count") == repeat_count
-        and execution_receipt_value.get("execution_count") == len(expected_modes)
+        and _strict_json_equal(
+            execution_receipt_value.get("repeat_count"),
+            repeat_count,
+        )
+        and _strict_json_equal(
+            execution_receipt_value.get("execution_count"),
+            len(expected_modes),
+        )
         and execution_receipt_value.get("report_sha256")
         == _file_sha256(path.parent / str(audit_execution["prebinding_conformance_report_file"]))
         and execution_receipt_value.get("path_descriptor_byte_identical") is True
@@ -1444,31 +1504,64 @@ def verify_binding(path: Path) -> dict[str, Any]:
                 "support_files",
                 "auditor_report_passed",
             }
-            and row.get("ordinal") == ordinal
+            and _strict_json_equal(row.get("ordinal"), ordinal)
             and row.get("source_mode") == mode
-            and row.get("returncode") == 0
+            and _strict_json_equal(row.get("returncode"), 0)
             and row.get("auditor_report_passed") is True
-            and row.get("stdout")
-            == {
-                "bytes": len(conformance_payload),
-                "sha256": _file_sha256(path.parent / str(audit_execution["prebinding_conformance_report_file"])),
-            }
-            and row.get("stderr") == stderr_identity
-            and row.get("runtime_manifest")
-            == {
-                "bytes": len(path_runtime_payload if mode == "path" else descriptor_runtime_payload),
-                "sha256": sha256(path_runtime_payload if mode == "path" else descriptor_runtime_payload).hexdigest(),
-            }
-            and row.get("invocation_manifest")
-            == {
-                "bytes": len(path_invocation_payload if mode == "path" else descriptor_invocation_payload),
-                "sha256": sha256(
-                    path_invocation_payload if mode == "path" else descriptor_invocation_payload
-                ).hexdigest(),
-            }
+            and _strict_json_equal(
+                row.get("stdout"),
+                {
+                    "bytes": len(conformance_payload),
+                    "sha256": _file_sha256(
+                        path.parent
+                        / str(
+                            audit_execution[
+                                "prebinding_conformance_report_file"
+                            ]
+                        )
+                    ),
+                },
+            )
+            and _strict_json_equal(
+                row.get("stderr"),
+                stderr_identity,
+            )
+            and _strict_json_equal(
+                row.get("runtime_manifest"),
+                {
+                    "bytes": len(
+                        path_runtime_payload
+                        if mode == "path"
+                        else descriptor_runtime_payload
+                    ),
+                    "sha256": sha256(
+                        path_runtime_payload
+                        if mode == "path"
+                        else descriptor_runtime_payload
+                    ).hexdigest(),
+                },
+            )
+            and _strict_json_equal(
+                row.get("invocation_manifest"),
+                {
+                    "bytes": len(
+                        path_invocation_payload
+                        if mode == "path"
+                        else descriptor_invocation_payload
+                    ),
+                    "sha256": sha256(
+                        path_invocation_payload
+                        if mode == "path"
+                        else descriptor_invocation_payload
+                    ).hexdigest(),
+                },
+            )
             and row.get("bootstrap_sha256") == audit_execution.get("bootstrap_source_sha256")
             and row.get("auditor_source_sha256") == audit_execution.get("auditor_source_sha256")
-            and row.get("support_files") == path_runtime_value.get("support_files")
+            and _strict_json_equal(
+                row.get("support_files"),
+                path_runtime_value.get("support_files"),
+            )
             for ordinal, (row, mode) in enumerate(
                 zip(receipt_rows, expected_modes, strict=True),
                 start=1,
@@ -1484,22 +1577,101 @@ def verify_binding(path: Path) -> dict[str, Any]:
     )
     expected_audit_environment = {key: value for key, value in process_environment.items() if key != "PATH"}
     expected_outcome_support = [
+        "producer_bootstrap.py",
         "protocol.json",
         "schemas/raw-result.schema.json",
     ]
+    expected_outcome_support_rows = [
+        {
+            "path": relative,
+            "bytes": source_path.stat().st_size,
+            "sha256": _file_sha256(source_path),
+        }
+        for relative, source_path in (
+            (
+                "producer_bootstrap.py",
+                HERE / "producer_bootstrap.py",
+            ),
+            ("protocol.json", PROTOCOL_PATH),
+            (
+                "schemas/raw-result.schema.json",
+                RESULT_SCHEMA_PATH,
+            ),
+        )
+    ]
     outcome_support_rows = outcome_runtime_value.get("support_files")
     _require(
-        outcome_runtime_value.get("schema") == "prospect.wm001.audit-runtime-manifest.v1"
-        and outcome_runtime_value.get("source", {}).get("mode") == "descriptor"
+        set(outcome_runtime_value)
+        == {
+            "schema",
+            "assurance",
+            "bootstrap_sha256",
+            "python",
+            "required_flags",
+            "source",
+            "support_files",
+            "closure_import_roots",
+            "standard_library",
+            "environment",
+            "limits",
+        }
+        and outcome_runtime_value.get("schema")
+        == "prospect.wm001.audit-runtime-manifest.v1"
+        and outcome_runtime_value.get("assurance") == ASSURANCE
+        and outcome_runtime_value.get("bootstrap_sha256")
+        == audit_execution.get("bootstrap_source_sha256")
+        and outcome_runtime_value.get("python")
+        == {
+            "executable": python_executable,
+            "resolved_executable": str(
+                Path(cast(str, python_executable)).resolve(strict=True)
+            ),
+            "sha256": dependencies.get(
+                "python_executable_sha256"
+            ),
+            "version": [
+                sys.version_info.major,
+                sys.version_info.minor,
+                sys.version_info.micro,
+            ],
+        }
+        and outcome_runtime_value.get("required_flags")
+        == {
+            "dont_write_bytecode": 1,
+            "ignore_environment": 1,
+            "isolated": 1,
+            "no_site": 1,
+            "no_user_site": 1,
+            "safe_path": True,
+        }
+        and outcome_runtime_value.get("source")
+        == {
+            "mode": "descriptor",
+            "path": "artifact_audit.py",
+            "bytes": (HERE / "artifact_audit.py").stat().st_size,
+            "sha256": _file_sha256(
+                HERE / "artifact_audit.py"
+            ),
+        }
         and outcome_runtime_value.get("closure_import_roots") == package_roots
         and outcome_runtime_value.get("standard_library") == standard_library
         and outcome_runtime_value.get("environment") == expected_audit_environment
+        and outcome_runtime_value.get("limits")
+        == {
+            "timeout_seconds": 600,
+            "stdout_bytes": 64 << 20,
+            "stderr_bytes": 16 << 20,
+        }
         and isinstance(outcome_support_rows, list)
-        and [row.get("path") if isinstance(row, dict) else None for row in outcome_support_rows]
-        == expected_outcome_support
+        and outcome_support_rows == expected_outcome_support_rows
         and audit_execution.get("outcome_source_mode") == "descriptor"
         and audit_execution.get("outcome_support_files") == expected_outcome_support
-        and audit_execution.get("outcome_argv_role") == ["<canonical-producer-root>"]
+        and audit_execution.get("outcome_argv_role")
+        == [
+            "<canonical-producer-root>",
+            "--producer-bootstrap",
+            "<captured-producer-bootstrap>",
+        ]
         and audit_execution.get("outcome_working_directory") == str(REPO)
         and audit_execution.get("interpreter_flags") == ["-I", "-S", "-B"]
         and isinstance(audit_execution.get("repeat_count"), int)
@@ -1507,6 +1679,301 @@ def verify_binding(path: Path) -> dict[str, Any]:
         and audit_execution.get("path_descriptor_equal") is True
         and audit_execution.get("passed") is True,
         "bound outcome-audit execution role differs from the exact contract",
+    )
+    from .preformal import _runtime_bootstrap_conformance_from_report
+
+    rehearsed_audit_execution = (
+        _runtime_bootstrap_conformance_from_report(
+            test_report_path.parent,
+            test_report,
+        )
+    )
+    _require(
+        rehearsed_audit_execution.get("conformance_sha256")
+        == sha256(
+            (
+                json.dumps(
+                    audit_execution,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    allow_nan=False,
+                )
+            ).encode("utf-8")
+        ).hexdigest()
+        and rehearsed_audit_execution.get(
+            "restart_runtime_conformance_report_sha256"
+        )
+        == sha256(restart_runtime_report_payload).hexdigest()
+        and rehearsed_audit_execution.get(
+            "restart_runtime_execution_receipt_sha256"
+        )
+        == sha256(restart_runtime_receipt_payload).hexdigest()
+        and rehearsed_audit_execution.get(
+            "restart_runtime_support_files"
+        )
+        == audit_execution.get("restart_runtime_support_files")
+        and rehearsed_audit_execution.get(
+            "restart_runtime_repeat_count"
+        )
+        == audit_execution.get("restart_runtime_repeat_count")
+        and rehearsed_audit_execution.get(
+            "restart_runtime_path_descriptor_equal"
+        )
+        == audit_execution.get(
+            "restart_runtime_path_descriptor_equal"
+        ),
+        "bound audit execution differs from the sealed preformal rehearsal",
+    )
+    restart_repeat_count = audit_execution.get(
+        "restart_runtime_repeat_count"
+    )
+    restart_support_files = [
+        "producer_bootstrap.py",
+        "protocol.json",
+        "schemas/raw-result.schema.json",
+    ]
+    restart_negative_case_ids = [
+        "missing-bootstrap-support",
+        "extra-bootstrap-support",
+        "mutated-bootstrap-identity",
+        "development-formal-branch-substitution",
+        "formal-development-branch-substitution",
+    ]
+    _require(
+        set(restart_runtime_report_value)
+        == {
+            "schema",
+            "protocol_version",
+            "support_files",
+            "branches",
+            "negative_cases",
+            "failure_code",
+            "passed",
+        }
+        and restart_runtime_report_value.get("schema")
+        == "prospect.wm001.restart-runtime-conformance.v1"
+        and restart_runtime_report_value.get("protocol_version") == "1.7.0"
+        and _strict_json_equal(
+            restart_runtime_report_value.get("support_files"),
+            outcome_support_rows,
+        )
+        and _strict_json_equal(
+            restart_runtime_report_value.get("branches"),
+            {
+                "development": {
+                    "source_block_present": False,
+                    "captured_bootstrap_bound": True,
+                    "passed": True,
+                },
+                "formal": {
+                    "source_block_present": True,
+                    "source_snapshot_bound": True,
+                    "captured_bootstrap_bound": True,
+                    "passed": True,
+                },
+            },
+        )
+        and _strict_json_equal(
+            restart_runtime_report_value.get("negative_cases"),
+            [
+                {"case_id": case_id, "rejected": True}
+                for case_id in restart_negative_case_ids
+            ],
+        )
+        and restart_runtime_report_value.get("failure_code") is None
+        and restart_runtime_report_value.get("passed") is True
+        and audit_execution.get("restart_runtime_support_files")
+        == restart_support_files
+        and type(restart_repeat_count) is int
+        and cast(int, restart_repeat_count) >= 3
+        and restart_repeat_count == repeat_count
+        and audit_execution.get("restart_runtime_path_descriptor_equal")
+        is True,
+        "bound restart-runtime conformance report is not one complete result-free pass",
+    )
+
+    def canonical_payload(value: object) -> bytes:
+        return (
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+            + b"\n"
+        )
+
+    path_restart_runtime_value = json.loads(
+        json.dumps(outcome_runtime_value)
+    )
+    path_restart_runtime_value["source"]["mode"] = "path"
+    path_restart_runtime_payload = canonical_payload(
+        path_restart_runtime_value
+    )
+    restart_arguments = [
+        "--restart-runtime-conformance",
+        "--producer-bootstrap",
+        "@captured/producer_bootstrap.py",
+        "--expected-producer-bootstrap-sha256",
+        _file_sha256(HERE / "producer_bootstrap.py"),
+    ]
+    restart_runtime_payloads = {
+        "path": path_restart_runtime_payload,
+        "descriptor": outcome_runtime_payload,
+    }
+    restart_invocation_payloads = {
+        mode: canonical_payload(
+            {
+                "schema": (
+                    "prospect.wm001.audit-invocation-manifest.v1"
+                ),
+                "runtime_manifest_sha256": sha256(
+                    runtime_payload
+                ).hexdigest(),
+                "working_directory": str(REPO),
+                "auditor_argv": restart_arguments,
+            }
+        )
+        for mode, runtime_payload in restart_runtime_payloads.items()
+    }
+    restart_receipt_rows = restart_runtime_receipt_value.get(
+        "executions"
+    )
+    restart_expected_modes = (
+        ["path"] * cast(int, restart_repeat_count)
+        + ["descriptor"] * cast(int, restart_repeat_count)
+    )
+    restart_stderr_identity = (
+        restart_receipt_rows[0].get("stderr")
+        if isinstance(restart_receipt_rows, list)
+        and restart_receipt_rows
+        and isinstance(restart_receipt_rows[0], dict)
+        else None
+    )
+    valid_restart_stderr_identity = (
+        isinstance(restart_stderr_identity, dict)
+        and set(restart_stderr_identity) == {"bytes", "sha256"}
+        and type(restart_stderr_identity.get("bytes")) is int
+        and 0
+        <= cast(int, restart_stderr_identity.get("bytes"))
+        <= (16 << 20)
+        and isinstance(restart_stderr_identity.get("sha256"), str)
+        and SHA256_PATTERN.fullmatch(
+            cast(str, restart_stderr_identity.get("sha256"))
+        )
+        is not None
+        and (
+            cast(int, restart_stderr_identity.get("bytes")) != 0
+            or restart_stderr_identity.get("sha256")
+            == sha256(b"").hexdigest()
+        )
+    )
+    restart_report_identity = {
+        "bytes": len(restart_runtime_report_payload),
+        "sha256": sha256(
+            restart_runtime_report_payload
+        ).hexdigest(),
+    }
+    _require(
+        set(restart_runtime_receipt_value)
+        == {
+            "schema",
+            "repeat_count",
+            "execution_count",
+            "executions",
+            "report_sha256",
+            "path_descriptor_byte_identical",
+            "execution_conformance_passed",
+        }
+        and restart_runtime_receipt_value.get("schema")
+        == "prospect.wm001.audit-conformance-receipt.v1"
+        and _strict_json_equal(
+            restart_runtime_receipt_value.get("repeat_count"),
+            restart_repeat_count,
+        )
+        and _strict_json_equal(
+            restart_runtime_receipt_value.get("execution_count"),
+            len(restart_expected_modes),
+        )
+        and restart_runtime_receipt_value.get("report_sha256")
+        == restart_report_identity["sha256"]
+        and restart_runtime_receipt_value.get(
+            "path_descriptor_byte_identical"
+        )
+        is True
+        and restart_runtime_receipt_value.get(
+            "execution_conformance_passed"
+        )
+        is True
+        and isinstance(restart_receipt_rows, list)
+        and len(restart_receipt_rows) == len(restart_expected_modes)
+        and valid_restart_stderr_identity
+        and all(
+            isinstance(row, dict)
+            and set(row)
+            == {
+                "ordinal",
+                "source_mode",
+                "returncode",
+                "stdout",
+                "stderr",
+                "runtime_manifest",
+                "invocation_manifest",
+                "bootstrap_sha256",
+                "auditor_source_sha256",
+                "support_files",
+                "auditor_report_passed",
+            }
+            and _strict_json_equal(row.get("ordinal"), ordinal)
+            and row.get("source_mode") == mode
+            and _strict_json_equal(row.get("returncode"), 0)
+            and _strict_json_equal(
+                row.get("stdout"),
+                restart_report_identity,
+            )
+            and _strict_json_equal(
+                row.get("stderr"),
+                restart_stderr_identity,
+            )
+            and _strict_json_equal(
+                row.get("runtime_manifest"),
+                {
+                    "bytes": len(restart_runtime_payloads[mode]),
+                    "sha256": sha256(
+                        restart_runtime_payloads[mode]
+                    ).hexdigest(),
+                },
+            )
+            and _strict_json_equal(
+                row.get("invocation_manifest"),
+                {
+                    "bytes": len(restart_invocation_payloads[mode]),
+                    "sha256": sha256(
+                        restart_invocation_payloads[mode]
+                    ).hexdigest(),
+                },
+            )
+            and row.get("bootstrap_sha256")
+            == audit_execution.get("bootstrap_source_sha256")
+            and row.get("auditor_source_sha256")
+            == audit_execution.get("auditor_source_sha256")
+            and _strict_json_equal(
+                row.get("support_files"),
+                outcome_support_rows,
+            )
+            and row.get("auditor_report_passed") is True
+            for ordinal, (row, mode) in enumerate(
+                zip(
+                    restart_receipt_rows,
+                    restart_expected_modes,
+                    strict=True,
+                ),
+                start=1,
+            )
+        ),
+        "bound restart-runtime receipt does not preserve every exact path and descriptor execution",
     )
     environment = binding.get("environment", {})
     _require(environment.get("id") == "Pendulum-v1", "binding has wrong environment")
@@ -1739,7 +2206,7 @@ def _verify_formal_launch_record(
         set(record) == expected_fields
         and record.get("schema") == "prospect.wm001.formal-launch.v2"
         and record.get("experiment_id") == "WM-001"
-        and record.get("protocol_version") == "1.6.0"
+        and record.get("protocol_version") == "1.7.0"
         and record.get("formal_binding_sha256") == binding_sha256
         and _file_sha256(FORMAL_BINDING_ATTEMPT_PATH / "formal-binding.json") == binding_sha256
         and record.get("formal_binding_attempt_path") == str(FORMAL_BINDING_ATTEMPT_PATH)
@@ -1763,7 +2230,7 @@ def _verify_formal_launch_record(
         and attempt_primary.get("binding_file") == "formal-binding.json"
         and completion.get("terminal_sha256") == record.get("formal_binding_attempt_manifest_sha256")
         and record.get("attempt_directory") == path.parent.name
-        and record.get("global_marker_file") == "formal-launch-v1.6.0.json"
+        and record.get("global_marker_file") == "formal-launch-v1.7.0.json"
         and record.get("git_commit") == execution.get("git_commit")
         and record.get("git_tree") == execution.get("git_tree")
         and record_sha256 == _canonical_sha256(body),
@@ -1813,9 +2280,9 @@ def verify_result(path: Path, binding_path: Path | None) -> dict[str, Any]:
     protocol = verify_protocol()
     result = _load_json(path)
     _validate_json_schema(result, _load_json(RESULT_SCHEMA_PATH), label="raw result")
-    _require(result.get("schema") == "prospect.world-model-lifecycle.raw-result.v6", "wrong result schema")
+    _require(result.get("schema") == "prospect.world-model-lifecycle.raw-result.v7", "wrong result schema")
     _require(result.get("experiment_id") == "WM-001", "result has wrong experiment")
-    _require(result.get("protocol_version") == "1.6.0", "result has wrong protocol version")
+    _require(result.get("protocol_version") == "1.7.0", "result has wrong protocol version")
     _require(result.get("protocol_sha256") == _file_sha256(PROTOCOL_PATH), "result protocol digest mismatch")
 
     lane = result.get("lane")
@@ -1969,7 +2436,7 @@ def _verify_formal_matrix(
     *,
     replicate_id: str,
 ) -> None:
-    """Require the exact sealed v1.6 formal evidence matrix."""
+    """Require the exact sealed v1.7 formal evidence matrix."""
 
     episodes = replicate["episodes"]
     actual_episode_counts = Counter(_row_contract(row) for row in episodes)
@@ -2481,7 +2948,7 @@ def _verify_replicate(
         coverage = metric.get("interval_90_coverage")
         _require(
             metric.get("coverage_semantics") == COVERAGE_SEMANTICS,
-            f"{replicate_id}: predictive coverage semantics differ from v1.6",
+            f"{replicate_id}: predictive coverage semantics differ from v1.7",
         )
         _require(
             isinstance(transition_count, int)

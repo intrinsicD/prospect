@@ -83,7 +83,10 @@ world-model implementation and adversarial tests. Direct WM-001 execution
 through `make wm001-development` is deliberately disabled so it cannot bypass
 the versioned evidence lifecycle. Protocol 1.5 is retired after an unfinalized
 development qualification exposed a lazy Gymnasium environment-custody gap;
-no result, closure, binding, or formal marker was created. Protocol 1.6 fixes
-that boundary with fresh seeds and remains prospective. Follow the
-[WM-001 v1.6 operator runbook](docs/wm001-v160-operator-runbook.md) before
+no result, closure, binding, or formal marker was created. Protocol 1.6 fixed
+that boundary, but its sole independent development audit exposed one missing
+captured bootstrap support file and retired the version before closure.
+Protocol 1.7 makes that dependency explicit, uses fresh seeds, and remains
+prospective. Follow the
+[WM-001 v1.7 operator runbook](docs/wm001-v170-operator-runbook.md) before
 creating any development evidence, implementation binding, or formal attempt.

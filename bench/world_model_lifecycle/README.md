@@ -18,7 +18,7 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.6.0 is the active prospective confirmation. It preserves the exact
+Protocol 1.7.0 is the active prospective confirmation. It preserves the exact
 v1.4 model, learning algorithm, optimizer, planner, controller, budgets,
 controls, metrics, thresholds, and K0–K7 order. Its scientific-block digest is
 `fa44fd93a672db3905d45a0e99c568985e7e2e5d02d32043c830db413005a5c3`.
@@ -26,16 +26,21 @@ Only the execution and evidence boundary changes. Protocol 1.5 is retired
 after its sole outcome-producing development qualification found that
 Gymnasium's lazy import added two unsealed process variables. That producer
 has no result, outer completion, development closure, binding, or formal
-marker. Version 1.6 fixes those variables from process start, rehearses the
-lazy boundary without resetting an environment, uses fresh seeds, and permits
-only one canonical development producer.
+marker. Protocol 1.6 fixed those variables from process start and completed
+its sole development producer, but its sole canonical audit failed because
+the captured auditor support omitted `producer_bootstrap.py`. It has no
+accepted audit, closure, binding, or formal launch. Version 1.7 makes that
+bootstrap explicit bound support, rehearses both captured-source branches
+before outcomes, and uses fresh seeds.
 
-The v1.6 harness uses a non-editable isolated wheel, complete dependency and
-package-root inventories, one captured descriptor runner, a repository-global
-cooperative outer-launch lock, deterministic same-inode terminal completion,
-canonical development audit/closure/binding attempts, and single-use formal
-audit and adjudication claims. Formal execution accepts only
-`results/operator-v1.6/bindings/formal-binding-v1.6.0/formal-binding.json`
+The v1.7 harness uses a non-editable isolated wheel, complete dependency and
+package-root inventories, a deterministic module-search path restricted to
+explicit package roots and inventoried standard-library directories, one
+captured descriptor runner, a repository-global cooperative outer-launch lock,
+deterministic same-inode terminal completion, canonical development
+audit/closure/binding attempts, and single-use formal audit and adjudication
+claims. Formal execution accepts only
+`results/operator-v1.7/bindings/formal-binding-v1.7.0/formal-binding.json`
 after that attempt is accepted and outer-finalized. A copy or directly created
 binding is not valid authorization.
 
@@ -53,15 +58,17 @@ qualification must complete, followed by its canonical independent audit,
 closure attempt, exact ten-row/20-log preformal report, independent prospective
 harness review, and canonical binding attempt. Development performance remains
 descriptive and permanently claim-ineligible. Creation of the canonical
-qualification root consumes the sole v1.6 development attempt; a failure
+qualification root consumes the sole v1.7 development attempt; a failure
 retires the version rather than authorizing a sibling retry. The complete lifecycle claim
 remains unestablished until the one new eight-seed formal producer is
 outer-finalized, the official independent audit and semantic review accept
 K0–K7, and the terminal adjudication package is accepted and independently
 verified.
 
-Protocols 1.5.0 and 1.4.0 are immutable and retired. The former stopped during
-development custody and never reached formal eligibility. The latter's eight-seed producer and direct
+Protocols 1.6.0, 1.5.0, and 1.4.0 are immutable and retired. Protocol 1.6.0's
+development outcome remains opaque and claim-ineligible after its captured
+auditor failed. Protocol 1.5.0 stopped during development custody and never
+reached formal eligibility. Protocol 1.4.0's eight-seed producer and direct
 corrected audit passed, but isolated adjudication could not reproduce the
 report because the bound closure depended on user-site visibility, and the
 rejection path then failed to preserve an official rejected package. Protocol
@@ -69,9 +76,9 @@ rejection path then failed to preserve an official rejected package. Protocol
 constant and underspecified endpoint arithmetic. Their exact evidence and
 dispositions remain in the
 [v1.4 results review](../../docs/wm001-v140-formal-results.md) and
-[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.6 does not
+[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.7 does not
 repair or relabel either attempt. The active design is the
-[v1.6 confirmation plan](../../docs/wm001-v160-confirmation-plan.md).
+[v1.7 confirmation plan](../../docs/wm001-v170-confirmation-plan.md).
 
 ## What the experiment must establish
 
@@ -201,25 +208,25 @@ resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
 
-The v1.6 development rehearsal uses only seeds `2999896578` and `3783052994`
+The v1.7 development rehearsal uses only seeds `3920043614` and `3703229797`
 and the complete formal budgets. It is useful only for schema, deterministic
 execution, exact arithmetic, audit coverage, restart, and custody validation.
 Its K3–K6 performance values are descriptive, cannot decide whether formal may
 launch, are never claim-eligible, and cannot be relabeled. After the exclusive
-development closure is published, every further v1.6 development run is
+development closure is published, every further v1.7 development run is
 forbidden.
 
-The one v1.6 formal execution uses:
+The one v1.7 formal execution uses:
 
 ```text
-3863790658, 3900021454, 1437244820, 3175470977,
-228708147, 3835462042, 3342200973, 1751060143
+2080036362, 865871218, 3636713390, 2195564811,
+2000167339, 329754669, 4064290468, 1911057116
 ```
 
 The launch-time prebinding replay may reset isolated QA-only Pendulum fixtures;
 those resets collect no formal experience, train no model, and do not consume
 the attempt. The first outcome-producing formal replicate/task reset after
-`results/formal/formal-launch-v1.6.0.json` begins the sole attempt. No resume,
+`results/formal/formal-launch-v1.7.0.json` begins the sole attempt. No resume,
 retry, corrected-audit upgrade, early stopping, extra training, exclusion, or
 analysis change is allowed.
 
@@ -230,7 +237,9 @@ There are two pre-outcome bindings:
    commit and tree, all
    executed source and test digests, dependency closure, runtime, deterministic
    settings, environment conformance, exact coverage conformance, auditor/test
-   digests, and checkpoint implementation.
+   digests, checkpoint implementation, and the content-addressed
+   restart-runtime branch report plus complete repeated path/descriptor
+   execution receipt already sealed by the preformal rehearsal.
 
 Changing scientific semantics requires a new protocol version. Changing bound
 source, dependencies, or runtime before the first outcome-producing formal
@@ -238,10 +247,10 @@ replicate/task reset requires a new implementation binding. After that reset,
 any such change requires a new protocol version; previous failed attempts
 remain evidence.
 
-## Active v1.6 runbook
+## Active v1.7 runbook
 
 Use the
-[WM-001 v1.6 operator runbook](../../docs/wm001-v160-operator-runbook.md).
+[WM-001 v1.7 operator runbook](../../docs/wm001-v170-operator-runbook.md).
 It defines the typed runtime seals, canonical operator paths, outer-completion
 checks, exact development/preformal/binding order, and the one formal,
 official-audit, and adjudication sequence.
@@ -249,7 +258,7 @@ official-audit, and adjudication sequence.
 ## Retired v1.4 command sketch — do not execute
 
 The commands below document the retired v1.4 workflow and are retained only to
-explain its evidence history. They do not satisfy v1.6 custody and must not be
+explain its evidence history. They do not satisfy v1.7 custody and must not be
 used to launch an experiment.
 
 ### 1. Install and verify the pre-outcome contract
@@ -278,6 +287,7 @@ python -m bench.world_model_lifecycle.run development \
   --output "$DEV_ARTIFACT"
 python -m bench.world_model_lifecycle.verify result "$DEV_ARTIFACT/result.json"
 python -m bench.world_model_lifecycle.artifact_audit "$DEV_ARTIFACT" \
+  --producer-bootstrap bench/world_model_lifecycle/producer_bootstrap.py \
   --output "artifacts/wm001-audits/$(basename "$DEV_ARTIFACT").json"
 ```
 
@@ -380,6 +390,8 @@ python -m bench.world_model_lifecycle.verify result \
 mkdir -p artifacts/wm001-audits
 AUDIT_REPORT="artifacts/wm001-audits/formal-$BINDING_SHA-$(date -u +%Y%m%dT%H%M%SZ).json"
 python -m bench.world_model_lifecycle.artifact_audit "$FORMAL_ATTEMPT" \
+  --producer-bootstrap \
+  "$FORMAL_ATTEMPT/source/bench/world_model_lifecycle/producer_bootstrap.py" \
   --output "$AUDIT_REPORT"
 sha256sum "$AUDIT_REPORT"
 

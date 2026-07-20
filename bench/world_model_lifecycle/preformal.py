@@ -1,4 +1,4 @@
-"""Trusted, immutable preformal test evidence for WM-001 protocol 1.6."""
+"""Trusted, immutable preformal test evidence for WM-001 protocol 1.7."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -21,13 +22,13 @@ from .assurance import ASSURANCE
 
 SCHEMA = "prospect.wm001.preformal-test-report.v2"
 EXPERIMENT_ID = "WM-001"
-PROTOCOL_VERSION = "1.6.0"
-REPORT_NAME = "preformal-test-report-v1.6.0.json"
+PROTOCOL_VERSION = "1.7.0"
+REPORT_NAME = "preformal-test-report-v1.7.0.json"
 PREFORMAL_REPORT_NAME = REPORT_NAME
-LOG_PREFIX = "preformal-v1.6.0-command-"
+LOG_PREFIX = "preformal-v1.7.0-command-"
 _EVIDENCE_PREFIX = "preformal-"
 SOURCE_RELATIVE_PATH = "bench/world_model_lifecycle/preformal.py"
-REVIEW_RELATIVE_PATH = "docs/wm001-v160-prospective-harness-review.json"
+REVIEW_RELATIVE_PATH = "docs/wm001-v170-prospective-harness-review.json"
 REVIEW_SCHEMA = "prospect.wm001.prospective-harness-review.v1"
 
 
@@ -59,7 +60,7 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_CLOSURE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.6.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.7.0.json"
 )
 PREFORMAL_REPORT_PATH = DEVELOPMENT_RESULTS_ROOT / REPORT_NAME
 LAUNCH_BOOTSTRAP_PATH = REPO / "bench/world_model_lifecycle/launch_bootstrap.py"
@@ -870,7 +871,7 @@ def required_commands(
     prospective_review_path: Path = REVIEW_PATH,
     device: str = "cpu",
 ) -> tuple[CommandSpec, ...]:
-    """Return the fixed, ordered v1.6 preformal command contract."""
+    """Return the fixed, ordered v1.7 preformal command contract."""
 
     if device not in {"cpu", "cuda"}:
         raise PreformalEvidenceError("preformal device must be cpu or cuda")
@@ -884,7 +885,7 @@ def required_commands(
     )
     runtime_seal = (
         REPO
-        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.6.0.json"
+        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.7.0.json"
         if runtime_seal_path is None
         else _canonical_existing_file(runtime_seal_path, label="runtime seal")
     )
@@ -1133,7 +1134,7 @@ def generate_preformal_report(
         raise PreformalEvidenceError("preformal report path must not contain aliases")
     if output != PREFORMAL_REPORT_PATH:
         raise PreformalEvidenceError(
-            "preformal report must use the sole canonical protocol-1.6 "
+            "preformal report must use the sole canonical protocol-1.7 "
             f"path {PREFORMAL_REPORT_PATH}"
         )
     directory = _canonical_existing_directory(output.parent, label="evidence directory")
@@ -1349,8 +1350,111 @@ def _validate_file_identity(identity: object, *, label: str) -> dict[str, object
     return identity
 
 
+def _runtime_bootstrap_conformance_from_report(
+    directory: Path,
+    report: Mapping[str, object],
+) -> dict[str, object]:
+    """Reopen the sealed command-10 result-free conformance identity."""
+
+    commands = report.get("commands")
+    matches = (
+        [
+            row
+            for row in commands
+            if isinstance(row, Mapping)
+            and row.get("name")
+            == "runtime-bootstrap-inventory-conformance"
+        ]
+        if isinstance(commands, list)
+        else []
+    )
+    if len(matches) != 1:
+        raise PreformalEvidenceError(
+            "preformal report lacks one bootstrap conformance command"
+        )
+    reference = matches[0].get("stdout")
+    if (
+        not isinstance(reference, Mapping)
+        or set(reference) != {"file", "bytes", "sha256"}
+        or type(reference.get("bytes")) is not int
+        or cast(int, reference.get("bytes")) < 1
+        or not _is_sha256(reference.get("sha256"))
+    ):
+        raise PreformalEvidenceError(
+            "bootstrap conformance stdout reference is malformed"
+        )
+    path = _safe_sibling(
+        directory,
+        reference.get("file"),
+        label="bootstrap conformance stdout",
+    )
+    payload = _read_regular(
+        path,
+        label="bootstrap conformance stdout",
+    )
+    if (
+        len(payload) != reference.get("bytes")
+        or _sha256(payload) != reference.get("sha256")
+    ):
+        raise PreformalEvidenceError(
+            "bootstrap conformance stdout identity changed"
+        )
+    value = _load_canonical_object(
+        payload,
+        label="bootstrap conformance stdout",
+    )
+    if (
+        set(value)
+        != {
+            "schema",
+            "mode",
+            "device",
+            "passed",
+            "inventory_sha256",
+            "conformance_sha256",
+            "restart_runtime_conformance_report_sha256",
+            "restart_runtime_execution_receipt_sha256",
+            "restart_runtime_support_files",
+            "restart_runtime_repeat_count",
+            "restart_runtime_path_descriptor_equal",
+            "repeat_count",
+            "path_descriptor_equal",
+        }
+        or value.get("schema")
+        != "prospect.wm001.preformal-runtime-check.v1"
+        or value.get("mode")
+        != "bootstrap-inventory-conformance"
+        or value.get("device") != report.get("device")
+        or value.get("passed") is not True
+        or any(
+            not _is_sha256(value.get(field))
+            for field in (
+                "inventory_sha256",
+                "conformance_sha256",
+                "restart_runtime_conformance_report_sha256",
+                "restart_runtime_execution_receipt_sha256",
+            )
+        )
+        or value.get("restart_runtime_support_files")
+        != [
+            "producer_bootstrap.py",
+            "protocol.json",
+            "schemas/raw-result.schema.json",
+        ]
+        or value.get("restart_runtime_repeat_count") != 3
+        or value.get("restart_runtime_path_descriptor_equal")
+        is not True
+        or value.get("repeat_count") != 3
+        or value.get("path_descriptor_equal") is not True
+    ):
+        raise PreformalEvidenceError(
+            "bootstrap conformance stdout is not one complete result-free pass"
+        )
+    return value
+
+
 def verify_preformal_report(report_path: Path) -> dict[str, Any]:
-    """Strictly reopen and independently validate a passing v1.6 report."""
+    """Strictly reopen and independently validate a passing v1.7 report."""
 
     lexical = report_path if report_path.is_absolute() else Path.cwd() / report_path
     absolute = Path(os.path.abspath(report_path))
@@ -1541,6 +1645,10 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
             )
     if tuple(row["name"] for row in rows) != _COMMAND_NAMES:
         raise PreformalEvidenceError("preformal command names are not unique and ordered")
+    _runtime_bootstrap_conformance_from_report(
+        directory,
+        report,
+    )
     actual_evidence = {
         candidate.name for candidate in directory.iterdir() if _is_preformal_evidence_name(candidate.name)
     }
@@ -1723,11 +1831,46 @@ def _runtime_bootstrap_inventory_conformance(device: str) -> dict[str, object]:
         standard_library=standard_library,
         producer_environment=environment,
     )
+    restart_report_name = execution.get(
+        "restart_runtime_conformance_report_file"
+    )
+    restart_receipt_name = execution.get(
+        "restart_runtime_execution_receipt_file"
+    )
+    restart_report_payload = (
+        payloads.get(cast(str, restart_report_name))
+        if isinstance(restart_report_name, str)
+        else None
+    )
+    restart_receipt_payload = (
+        payloads.get(cast(str, restart_receipt_name))
+        if isinstance(restart_receipt_name, str)
+        else None
+    )
     if (
         execution.get("repeat_count") != 3
         or execution.get("path_descriptor_equal") is not True
+        or execution.get("restart_runtime_repeat_count") != 3
+        or execution.get("restart_runtime_path_descriptor_equal")
+        is not True
+        or execution.get("restart_runtime_support_files")
+        != [
+            "producer_bootstrap.py",
+            "protocol.json",
+            "schemas/raw-result.schema.json",
+        ]
         or execution.get("passed") is not True
-        or len(payloads) != 9
+        or len(payloads) != 11
+        or not isinstance(restart_report_payload, bytes)
+        or not isinstance(restart_receipt_payload, bytes)
+        or _sha256(restart_report_payload)
+        != execution.get(
+            "restart_runtime_conformance_report_sha256"
+        )
+        or _sha256(restart_receipt_payload)
+        != execution.get(
+            "restart_runtime_execution_receipt_sha256"
+        )
     ):
         raise PreformalEvidenceError("bootstrap inventory conformance is incomplete")
     after = _verify_live_bootstrap_custody()
@@ -1746,6 +1889,19 @@ def _runtime_bootstrap_inventory_conformance(device: str) -> dict[str, object]:
         "passed": True,
         "inventory_sha256": _sha256(_canonical_json_bytes(inventory)),
         "conformance_sha256": _sha256(_canonical_json_bytes(execution)),
+        "restart_runtime_conformance_report_sha256": _sha256(
+            restart_report_payload
+        ),
+        "restart_runtime_execution_receipt_sha256": _sha256(
+            restart_receipt_payload
+        ),
+        "restart_runtime_support_files": [
+            "producer_bootstrap.py",
+            "protocol.json",
+            "schemas/raw-result.schema.json",
+        ],
+        "restart_runtime_repeat_count": 3,
+        "restart_runtime_path_descriptor_equal": True,
         "repeat_count": 3,
         "path_descriptor_equal": True,
     }
