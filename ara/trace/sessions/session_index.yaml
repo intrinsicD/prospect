@@ -22,8 +22,8 @@ sessions:
     open_threads: 2
   - id: "2026-07-20_001"
     date: "2026-07-20"
-    summary: "Retired v1.7, hardened v1.8 custody, and accepted the frozen prospective harness."
-    turn_count: 4
-    events_count: 7
+    summary: "Retired v1.7 and v1.8, then independently audited the prospective v1.9 identity repair before its final rebuild."
+    turn_count: 5
+    events_count: 8
     claims_touched: []
     open_threads: 2

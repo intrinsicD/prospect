@@ -53,3 +53,9 @@ entries:
       - "Did not stage a capability claim because no v1.8 outcome or performance value was produced or inspected."
       - "Did not add a new constraint: the large-file, archive, path, and review checks supply closure evidence for the already committed v1.8 custody design."
       - "Found no contradiction with C01 or C02 and left O03 unstale because WM-001 remains the active research topic."
+  - turn: "2026-07-20_001#5"
+    notes:
+      - "Routed the completed v1.9 identity and determinism audit directly as experiment N17."
+      - "Recorded the first v1.9 installations, lock, and migrated review as intentionally stale rebuild inputs, not accepted evidence."
+      - "Did not stage or crystallize a capability claim because no v1.9 outcome or performance value was created or inspected."
+      - "Found no contradiction with C01 or C02 and left O03 unstale because WM-001 remains the active research topic."

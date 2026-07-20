@@ -2,9 +2,9 @@ session:
   id: "2026-07-20_001"
   date: "2026-07-20"
   started: "2026-07-20T16:18+02:00"
-  last_turn: "2026-07-20T17:36+02:00"
-  turn_count: 4
-  summary: "Retired v1.7, hardened v1.8 custody, and accepted the frozen prospective harness."
+  last_turn: "2026-07-20T20:04+02:00"
+  turn_count: 5
+  summary: "Retired v1.7 and v1.8, then independently audited the prospective v1.9 identity repair before its final rebuild."
 
 events_logged:
   - turn: 1
@@ -49,6 +49,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Accepted the exact frozen v1.8 harness after wheel/runtime parity, large-file custody, repeated result-free conformance, and 541 tests."
+  - turn: 5
+    type: experiment
+    id: N17
+    routing: direct
+    provenance: ai-executed
+    summary: "Verified v1.9 seals, schemas, supersession, seeds, scientific continuity, cross-process matrix determinism, and exact prospective-manifest coverage before rebuilding."
 
 ai_actions:
   - turn: 1
@@ -106,6 +112,15 @@ ai_actions:
     files_changed:
       - "docs/wm001-v180-prospective-harness-review.json"
       - "ara/"
+  - turn: 5
+    action: >-
+      Performed a read-only static and focused dynamic audit of the current
+      v1.9 identity repair, including independent seed/collision arithmetic,
+      eleven fresh-process matrix digests, manifest-set equality, scientific
+      continuity, 202 identity tests, Ruff, and two mypy scopes.
+    provenance: ai-executed
+    files_changed:
+      - "ara/"
 
 claims_touched: []
 
@@ -132,10 +147,15 @@ key_context:
       The user required a thorough final check before the next immutable move;
       the accepted review was produced without opening or creating any v1.8
       performance outcome.
+  - turn: 5
+    excerpt: >-
+      The user required the repaired v1.9 harness to be checked thoroughly
+      before consuming the next immutable move; stale first-build lock and
+      review bytes are explicitly quarantined from acceptance.
 
 open_threads:
-  - "Commit the accepted v1.8 candidate and review, merge to main, and push."
-  - "Only from that clean committed state, consume the sole v1.8 development qualification and report its result."
+  - "Build the two fresh v1.9 reviewed environments from final source, regenerate the exact runtime lock and independent prospective review, then rerun all static gates."
+  - "Only from that clean committed state, consume the sole v1.9 development qualification and report its result."
 
 ai_suggestions_pending:
   - "Keep v1.7 performance evidence opaque and use only its authenticated closure-failure metadata."

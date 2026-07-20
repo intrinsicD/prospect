@@ -351,3 +351,32 @@ tree:
     also_depends_on: [N12, N13, N14, N15]
     status: resolved
     children: []
+  - id: N17
+    type: experiment
+    title: "Audit WM-001 v1.9 identity determinism before rebuild"
+    provenance: ai-executed
+    timestamp: "2026-07-20T20:04+02:00"
+    result: >-
+      The current v1.9 source passed exact protocol-seal and Draft 2020-12
+      schema validation, direct v1.8 supersession, independent master-seed and
+      collision reconstruction, scientific-block and four-kernel continuity,
+      and 11 cross-process matrix-contract checks spanning explicit and
+      randomized hash seeds. The prospective implementation manifest contains
+      86 exact rows, includes the confirmation plan and operator runbook, and
+      equals the 87-row binding manifest after excluding only the independently
+      authored review. Identity-focused tests passed 202/202; Ruff and both
+      mypy scopes passed. No v1.9 evidence path exists. The first v1.9
+      installations, lock, and mechanically migrated review remain
+      intentionally ineligible and must be regenerated from the final bytes.
+    evidence:
+      - "bench/world_model_lifecycle/protocol.json"
+      - "bench/world_model_lifecycle/SEALED_PROTOCOL.sha256"
+      - "bench/world_model_lifecycle/binding.py"
+      - "bench/world_model_lifecycle/preformal.py"
+      - "docs/wm001-v190-confirmation-plan.md"
+      - "docs/wm001-v190-operator-runbook.md"
+      - "tests/test_world_model_binding.py"
+      - "tests/test_world_model_preformal.py"
+    also_depends_on: [N16]
+    status: resolved
+    children: []
