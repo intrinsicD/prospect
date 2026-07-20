@@ -59,6 +59,8 @@ def test_bound_audit_support_paths_share_the_explicit_repository_root(
                 "LAZY_LEGACY_OP": "False",
                 "LC_ALL": "C.UTF-8",
                 "PATH": "/usr/bin:/bin",
+                "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+                "SDL_AUDIODRIVER": "dsp",
                 "TZ": "UTC",
             },
         )
@@ -116,6 +118,52 @@ def test_package_ownership_identity_matches_standard_library_bootstrap(
     ).hexdigest()
 
 
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        pytest.param("PYGAME_HIDE_SUPPORT_PROMPT", None, id="missing-pygame-prompt"),
+        pytest.param("PYGAME_HIDE_SUPPORT_PROMPT", "show", id="wrong-pygame-prompt"),
+        pytest.param("SDL_AUDIODRIVER", None, id="missing-sdl-audio"),
+        pytest.param("SDL_AUDIODRIVER", "alsa", id="wrong-sdl-audio"),
+    ],
+)
+def test_formal_environment_requires_process_start_gymnasium_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    value: str | None,
+) -> None:
+    environment = {
+        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LAZY_LEGACY_OP": "False",
+        "LC_ALL": "C.UTF-8",
+        "PATH": "/usr/bin:/bin",
+        "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+        "SDL_AUDIODRIVER": "dsp",
+        "TZ": "UTC",
+    }
+    if value is None:
+        del environment[name]
+    else:
+        environment[name] = value
+    monkeypatch.setattr(binding_module.os, "environ", environment)
+
+    with pytest.raises(RuntimeError, match="exact safe WM-001 environment"):
+        binding_module.require_formal_process_environment()
+
+
+def test_formal_binding_schema_requires_exact_gymnasium_defaults() -> None:
+    schema = json.loads(verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"))
+    environment = schema["properties"]["runtime"]["properties"]["process_environment"]
+
+    assert {"PYGAME_HIDE_SUPPORT_PROMPT", "SDL_AUDIODRIVER"} <= set(
+        environment["required"]
+    )
+    assert environment["properties"]["PYGAME_HIDE_SUPPORT_PROMPT"] == {
+        "const": "hide"
+    }
+    assert environment["properties"]["SDL_AUDIODRIVER"] == {"const": "dsp"}
+
+
 def test_record_hash_identity_uses_file_hash_fields_not_repr() -> None:
     value = importlib.metadata.FileHash("sha256=YWJj")
 
@@ -143,42 +191,42 @@ def test_record_hash_decoder_requires_exact_sha256() -> None:
             decode(("sha256", "not+a+valid+digest"))
 
 
-def test_protocol_150_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (4085517670, 2227535912)
+def test_protocol_160_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (2999896578, 3783052994)
     assert verify_module.FORMAL_SEEDS == (
-        1800791691,
-        1963228177,
-        2416009491,
-        3925214220,
-        1508934628,
-        2118526007,
-        4212585034,
-        530094003,
+        3863790658,
+        3900021454,
+        1437244820,
+        3175470977,
+        228708147,
+        3835462042,
+        3342200973,
+        1751060143,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            4085517670,
+            2999896578,
             index,
         )
         for index in range(8)
     ] == [
-        713514258,
-        3401745165,
-        1196370954,
-        1059493664,
-        596984094,
-        3926413566,
-        4280705084,
-        3504626062,
+        1845767432,
+        3661058938,
+        574263981,
+        934079335,
+        4213171309,
+        957315966,
+        1549061991,
+        3810173688,
     ]
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            2227535912,
+            3783052994,
             0,
         )
-        == 3871883717
+        == 2084673469
     )
     assert (
         tuple(verify_module.derive_master_seed("development", index) for index in range(2))
@@ -187,7 +235,7 @@ def test_protocol_150_seed_domain_and_master_seeds_are_exact() -> None:
     assert tuple(verify_module.derive_master_seed("formal", index) for index in range(8)) == verify_module.FORMAL_SEEDS
 
 
-def test_protocol_150_states_the_negative_assurance_boundary() -> None:
+def test_protocol_160_states_the_negative_assurance_boundary() -> None:
     protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
 
     assert protocol["trust_model"] == {
@@ -205,11 +253,11 @@ def test_implementation_manifest_binds_prospective_harness_review() -> None:
     assert [
         row
         for row in rows
-        if row["path"] == "docs/wm001-v150-prospective-harness-review.json"
+        if row["path"] == "docs/wm001-v160-prospective-harness-review.json"
     ]
 
 
-def test_protocol_150_irrelevant_control_contract_is_bound() -> None:
+def test_protocol_160_irrelevant_control_contract_is_bound() -> None:
     assert (
         "collect_irrelevant",
         verify_module.TASK_IRRELEVANT,
@@ -276,13 +324,13 @@ def test_result_runtime_must_equal_formal_binding_runtime() -> None:
         )
 
 
-def test_formal_binding_schema_binds_protocol_150_and_fresh_seeds() -> None:
+def test_formal_binding_schema_binds_protocol_160_and_fresh_seeds() -> None:
     schema = json.loads(
         verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
 
-    assert schema["$id"].endswith("wm-001-formal-binding-v5.json")
-    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v5"
+    assert schema["$id"].endswith("wm-001-formal-binding-v6.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v6"
     assert "assurance" in schema["required"]
     assert schema["properties"]["assurance"]["properties"] == {
         "trust_model_id": {
@@ -292,7 +340,7 @@ def test_formal_binding_schema_binds_protocol_150_and_fresh_seeds() -> None:
         "external_attestation": {"const": False},
         "exclusive_path_use_required": {"const": True},
     }
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.5.0"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.6.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
@@ -310,7 +358,7 @@ def test_formal_binding_schema_binds_protocol_150_and_fresh_seeds() -> None:
     } <= set(coverage["required"])
 
 
-def test_raw_result_schema_binds_v150_heldout_split_and_formal_counts() -> None:
+def test_raw_result_schema_binds_v160_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -319,9 +367,9 @@ def test_raw_result_schema_binds_v150_heldout_split_and_formal_counts() -> None:
     predictive_properties = predictive_schema["properties"]
     gate_comparators = schema["$defs"]["gateCheck"]["properties"]["comparator"]["enum"]
 
-    assert schema["$id"].endswith("wm-001-raw-result-v5.json")
-    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v5"
-    assert schema["properties"]["protocol_version"]["const"] == "1.5.0"
+    assert schema["$id"].endswith("wm-001-raw-result-v6.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v6"
+    assert schema["properties"]["protocol_version"]["const"] == "1.6.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
@@ -362,7 +410,7 @@ def test_raw_result_schema_binds_v150_heldout_split_and_formal_counts() -> None:
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v150_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v160_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -607,6 +655,16 @@ def test_create_binding_refuses_nonformal_conformance_budget(
     test_report.write_text("passed\n", encoding="utf-8")
     monkeypatch.setattr(verify_module, "verify_protocol", lambda: {})
     monkeypatch.setattr(binding_module, "source_is_clean", lambda: True)
+    monkeypatch.setattr(
+        binding_module,
+        "require_formal_python_flags",
+        lambda: {"isolated": 1},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "require_formal_process_environment",
+        lambda: {},
+    )
 
     with pytest.raises(ValueError, match="exactly 1,024"):
         binding_module.create_formal_binding(
@@ -615,6 +673,47 @@ def test_create_binding_refuses_nonformal_conformance_budget(
             conformance_cases=2,
             device="cpu",
         )
+
+
+def test_create_binding_validates_environment_before_gymnasium_conformance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conformance_called = False
+
+    def reject_environment() -> dict[str, str]:
+        raise RuntimeError("process-start environment rejected")
+
+    def unexpected_conformance(**_: object) -> dict[str, object]:
+        nonlocal conformance_called
+        conformance_called = True
+        return {}
+
+    monkeypatch.setattr(
+        binding_module,
+        "require_formal_python_flags",
+        lambda: {"isolated": 1},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "require_formal_process_environment",
+        reject_environment,
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "run_pendulum_conformance",
+        unexpected_conformance,
+    )
+
+    with pytest.raises(RuntimeError, match="process-start environment rejected"):
+        binding_module.create_formal_binding(
+            output_path=tmp_path / "binding.json",
+            test_report_path=tmp_path / "report.json",
+            development_closure_path=tmp_path / "closure.json",
+            device="cpu",
+        )
+
+    assert conformance_called is False
 
 
 def test_live_binding_rechecks_complete_implementation_manifest(
@@ -654,7 +753,7 @@ def test_formal_binding_file_requires_single_link_custody(
 ) -> None:
     binding_path = tmp_path / "formal-binding.json"
     binding_path.write_bytes(_canonical_payload({"fixture": "binding"}))
-    verified = {"schema": "prospect.world-model-lifecycle.formal-binding.v5"}
+    verified = {"schema": "prospect.world-model-lifecycle.formal-binding.v6"}
     monkeypatch.setattr(
         verify_module,
         "verify_binding",
@@ -703,7 +802,7 @@ def _producer_custody_fixture(
     seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": dict(binding_module.ASSURANCE),
         "git_commit": execution["git_commit"],
         "git_tree": execution["git_tree"],
@@ -1170,7 +1269,7 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -1265,7 +1364,7 @@ def test_development_closure_creator_rejects_any_alternate_marker_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    canonical = tmp_path / "development-closure-v1.5.0.json"
+    canonical = tmp_path / "development-closure-v1.6.0.json"
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
 
     with pytest.raises(RuntimeError, match="only be published"):
@@ -1283,7 +1382,7 @@ def test_preserved_development_closure_name_must_be_content_addressed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _canonical_payload({"schema": "fixture"})
-    canonical = tmp_path / "development-closure-v1.5.0.json"
+    canonical = tmp_path / "development-closure-v1.6.0.json"
     canonical.write_bytes(payload)
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
     assert binding_module._closure_path_mode(canonical, payload) == "canonical"

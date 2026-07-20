@@ -45,7 +45,7 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_QUALIFICATION_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.5.0-attempt-4"
+    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.6.0"
 )
 
 
@@ -150,14 +150,21 @@ def main() -> int:
         )
         if os.path.lexists(existing_launch_marker):
             print(
-                "WM-001 protocol 1.5 formal launch already consumed; same-version retry is forbidden",
+                "WM-001 protocol 1.6 formal launch already consumed; same-version retry is forbidden",
                 file=sys.stderr,
             )
             return 1
     else:
+        if os.path.lexists(DEVELOPMENT_QUALIFICATION_PATH):
+            print(
+                "WM-001 protocol 1.6 development qualification already consumed; "
+                "resume and sibling attempts are forbidden",
+                file=sys.stderr,
+            )
+            return 1
         if os.path.lexists(DEVELOPMENT_CLOSURE_PATH):
             print(
-                "WM-001 protocol 1.5 development is closed; additional same-version rehearsals are forbidden",
+                "WM-001 protocol 1.6 development is closed; additional same-version rehearsals are forbidden",
                 file=sys.stderr,
             )
             return 1
@@ -179,8 +186,16 @@ def main() -> int:
             )
         except ValueError as error:
             parser.error(str(error))
-    attempt = ProducerAttempt(output, lane=arguments.lane)
     config.validate()
+    try:
+        _verify_live_bootstrap_custody()
+    except Exception as error:
+        print(
+            f"WM-001 launch refused before producer-root creation: {error}",
+            file=sys.stderr,
+        )
+        return 1
+    attempt = ProducerAttempt(output, lane=arguments.lane)
     exit_code = 0
     try:
         with attempt:

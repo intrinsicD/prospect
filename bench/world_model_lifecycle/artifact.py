@@ -53,7 +53,7 @@ HERE = Path(__file__).resolve().parent
 LOCKFILE_PATH = REPO / "requirements-wm001.lock"
 MANIFEST_NAME = "producer-manifest.json"
 FORMAL_LAUNCH_NAME = "formal-launch.json"
-FORMAL_LAUNCH_MARKER_NAME = "formal-launch-v1.5.0.json"
+FORMAL_LAUNCH_MARKER_NAME = "formal-launch-v1.6.0.json"
 FORMAL_BINDING_ATTEMPT_MANIFEST_NAME = "formal-binding-operator-attempt.json"
 FORMAL_BINDING_OUTER_COMPLETION_NAME = "formal-binding-outer-completion.json"
 FORMAL_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "formal"
@@ -323,12 +323,12 @@ def formal_launch_marker_path(
         raise ValueError("formal binding is not valid JSON") from error
     if (
         not isinstance(binding, dict)
-        or binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v5"
+        or binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v6"
         or binding.get("experiment_id") != "WM-001"
         or not isinstance(binding.get("protocol"), dict)
-        or binding["protocol"].get("version") != "1.5.0"
+        or binding["protocol"].get("version") != "1.6.0"
     ):
-        raise ValueError("formal binding is not a WM-001 protocol-1.5 binding")
+        raise ValueError("formal binding is not a WM-001 protocol-1.6 binding")
     binding_sha256 = hashlib.sha256(binding_payload).hexdigest()
     results_root_lexical = (
         formal_results_root if formal_results_root.is_absolute() else Path.cwd() / formal_results_root
@@ -356,7 +356,7 @@ def _claim_formal_launch(
     *,
     formal_results_root: Path = FORMAL_RESULTS_ROOT,
 ) -> tuple[Path, str]:
-    """Publish the durable producer record as protocol 1.5's sole formal claim."""
+    """Publish the durable producer record as protocol 1.6's sole formal claim."""
 
     binding_payload = binding_path.read_bytes()
     (
@@ -440,7 +440,7 @@ def _claim_formal_launch(
     if not output.is_dir() or output.is_symlink():
         raise ValueError("formal launch requires an existing non-aliased producer directory")
     if os.path.lexists(marker_path):
-        raise RuntimeError("protocol 1.5 already has a formal launch claim; same-version resume or retry is forbidden")
+        raise RuntimeError("protocol 1.6 already has a formal launch claim; same-version resume or retry is forbidden")
     binding = _load_json(binding_path)
     source = binding.get("source", {})
     if not isinstance(source, dict):
@@ -448,7 +448,7 @@ def _claim_formal_launch(
     record: dict[str, object] = {
         "schema": "prospect.wm001.formal-launch.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "formal_binding_sha256": binding_sha256,
         "formal_binding_attempt_path": str(binding_attempt_path),
         "formal_binding_attempt_manifest_file": FORMAL_BINDING_ATTEMPT_MANIFEST_NAME,
@@ -477,7 +477,7 @@ def _claim_formal_launch(
         os.link(producer_record, marker_path)
     except FileExistsError:
         raise RuntimeError(
-            "protocol 1.5 already has a formal launch claim; same-version resume or retry is forbidden"
+            "protocol 1.6 already has a formal launch claim; same-version resume or retry is forbidden"
         ) from None
     for directory in (output, marker_path.parent):
         directory_descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
@@ -494,7 +494,7 @@ def _claim_formal_launch(
         or producer_record.read_bytes() != marker_path.read_bytes()
         or sha256_file(marker_path) != record_sha256
     ):
-        raise RuntimeError("protocol 1.5 launch publication did not preserve one exact inode")
+        raise RuntimeError("protocol 1.6 launch publication did not preserve one exact inode")
     return marker_path, record_sha256
 
 

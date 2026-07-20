@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 _SCHEMA = "prospect.wm001.runtime-seal.v1"
-_PROTOCOL_VERSION = "1.5.0"
+_PROTOCOL_VERSION = "1.6.0"
 _PACKAGE_DOMAIN = b"prospect.wm001.package-root.v2\0"
 _STDLIB_DOMAIN = b"prospect.wm001.standard-library.v2\0"
 _ENVIRONMENT_KEYS = frozenset(
@@ -42,7 +42,9 @@ _ENVIRONMENT_KEYS = frozenset(
         "OMP_NUM_THREADS",
         "OPENBLAS_NUM_THREADS",
         "PATH",
+        "PYGAME_HIDE_SUPPORT_PROMPT",
         "ROCR_VISIBLE_DEVICES",
+        "SDL_AUDIODRIVER",
         "TZ",
     }
 )
@@ -244,6 +246,8 @@ def _environment() -> dict[str, str]:
         or environment.get("LAZY_LEGACY_OP") != "False"
         or environment.get("LC_ALL") != "C.UTF-8"
         or environment.get("PATH") != "/usr/bin:/bin"
+        or environment.get("PYGAME_HIDE_SUPPORT_PROMPT") != "hide"
+        or environment.get("SDL_AUDIODRIVER") != "dsp"
         or environment.get("TZ") != "UTC"
         or any("\0" in key or "\0" in value for key, value in environment.items())
     ):
@@ -665,7 +669,7 @@ def _expected_from_binding(binding: dict[str, Any]) -> dict[str, object]:
     dependencies = binding.get("dependencies")
     runtime = binding.get("runtime")
     if (
-        binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v5"
+        binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v6"
         or binding.get("experiment_id") != "WM-001"
         or not isinstance(source, dict)
         or not isinstance(dependencies, dict)
@@ -710,7 +714,7 @@ def _verify_runtime_seal(
     expected = (
         _expected_from_binding(supplied)
         if supplied.get("schema")
-        == "prospect.world-model-lifecycle.formal-binding.v5"
+        == "prospect.world-model-lifecycle.formal-binding.v6"
         else supplied
     )
     current = _current_runtime_seal(bootstrap_sha256=bootstrap_sha256)
@@ -753,7 +757,7 @@ def _runtime_custody_nlink(value: dict[str, Any]) -> int:
         or schema
         not in {
             _SCHEMA,
-            "prospect.world-model-lifecycle.formal-binding.v5",
+            "prospect.world-model-lifecycle.formal-binding.v6",
         }
     ):
         raise BootstrapError(

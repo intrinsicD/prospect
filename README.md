@@ -81,6 +81,9 @@ python -m bench.world_model_lifecycle.verify protocol
 `make check` covers the backend-neutral core. `make check-runtime` adds the
 world-model implementation and adversarial tests. Direct WM-001 execution
 through `make wm001-development` is deliberately disabled so it cannot bypass
-the versioned evidence lifecycle. Follow the
-[WM-001 v1.5 operator runbook](docs/wm001-v150-operator-runbook.md) before
+the versioned evidence lifecycle. Protocol 1.5 is retired after an unfinalized
+development qualification exposed a lazy Gymnasium environment-custody gap;
+no result, closure, binding, or formal marker was created. Protocol 1.6 fixes
+that boundary with fresh seeds and remains prospective. Follow the
+[WM-001 v1.6 operator runbook](docs/wm001-v160-operator-runbook.md) before
 creating any development evidence, implementation binding, or formal attempt.

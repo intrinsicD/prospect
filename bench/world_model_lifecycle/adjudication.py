@@ -1,4 +1,4 @@
-"""One-shot terminal adjudication for the sole formal WM-001 v1.5 attempt.
+"""One-shot terminal adjudication for the sole formal WM-001 v1.6 attempt.
 
 The adjudicator consumes the canonical formal operator audit attempt.  A
 finalized accepted/rejected audit attempt receives exactly one bound replay.
@@ -7,7 +7,7 @@ outer completion is absent, receives no replay and is terminally rejected.
 
 The version-scoped adjudication claim is a no-replace hardlink.  It is
 published only after every pre-claim check and immediately before the sole
-replay or failure-package action.  Once that claim exists, protocol 1.5 is
+replay or failure-package action.  Once that claim exists, protocol 1.6 is
 consumed even if the process crashes.
 """
 
@@ -48,13 +48,13 @@ RUNNER_SOURCE_PATH = HERE / "audit_runner.py"
 ADJUDICATOR_SOURCE_PATH = HERE / "adjudication.py"
 LAUNCH_BOOTSTRAP_SOURCE_PATH = HERE / "launch_bootstrap.py"
 
-ADJUDICATION_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.5"
-FORMAL_ADJUDICATION_PACKAGE_PATH = ADJUDICATION_RESULTS_ROOT / "formal-adjudication-v1.5.0"
+ADJUDICATION_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.6"
+FORMAL_ADJUDICATION_PACKAGE_PATH = ADJUDICATION_RESULTS_ROOT / "formal-adjudication-v1.6.0"
 FORMAL_ADJUDICATION_CLAIM_MARKER = (
-    REPO / "bench" / "world_model_lifecycle" / "results" / "formal" / "formal-adjudication-v1.5.0.json"
+    REPO / "bench" / "world_model_lifecycle" / "results" / "formal" / "formal-adjudication-v1.6.0.json"
 )
 FORMAL_AUDIT_ATTEMPT_PATH = operator_module.FORMAL_AUDIT_ATTEMPT_PATH
-FORMAL_SEMANTIC_REVIEW_PATH = REPO / "artifacts" / "wm001-reviews" / "formal-v1.5.0.json"
+FORMAL_SEMANTIC_REVIEW_PATH = REPO / "artifacts" / "wm001-reviews" / "formal-v1.6.0.json"
 
 ADJUDICATION_MANIFEST_NAME = "adjudication-manifest.json"
 ADJUDICATION_CLAIM_NAME = "formal-adjudication-claim.json"
@@ -80,7 +80,7 @@ COPIED_BOOTSTRAP_NAME = "audit-bootstrap.py"
 COPIED_OPERATOR_PREFIX = "formal-audit-attempt--"
 COPIED_SOURCE_PREFIX = "bound-source--"
 
-_PACKAGE_SCHEMA = "prospect.wm001.adjudication-package.v7"
+_PACKAGE_SCHEMA = "prospect.wm001.adjudication-package.v8"
 _CLAIM_SCHEMA = "prospect.wm001.formal-adjudication-claim.v2"
 _EXECUTION_SCHEMA = "prospect.wm001.adjudication-audit-execution.v2"
 _REPLAY_FAILURE_SCHEMA = "prospect.wm001.adjudication-replay-failure.v1"
@@ -140,7 +140,7 @@ ReviewRole = Literal[
 
 
 class AdjudicationError(ValueError):
-    """Evidence cannot enter the sole terminal WM-001 v1.5 adjudication."""
+    """Evidence cannot enter the sole terminal WM-001 v1.6 adjudication."""
 
 
 class _AdjudicationRetired(AdjudicationError):
@@ -637,7 +637,7 @@ def _verify_launch(
         set(launch) != expected_fields
         or launch.get("schema") != "prospect.wm001.formal-launch.v2"
         or launch.get("experiment_id") != "WM-001"
-        or launch.get("protocol_version") != "1.5.0"
+        or launch.get("protocol_version") != "1.6.0"
         or launch.get("formal_binding_sha256") != binding_sha256
         or canonical_binding_payload != binding_payload
         or launch.get("formal_binding_attempt_path") != str(binding_attempt)
@@ -672,7 +672,7 @@ def _verify_launch(
         or marker_payload != launch_payload
         or not same_inode
     ):
-        raise AdjudicationError("formal result does not bind the unique v1.5 launch record")
+        raise AdjudicationError("formal result does not bind the unique v1.6 launch record")
     _manifested_digest(
         producer_manifest,
         filename="formal-launch.json",
@@ -782,16 +782,16 @@ def _load_upstream(
     if (
         binding != verified_binding
         or result != verified_result
-        or result.get("schema") != "prospect.world-model-lifecycle.raw-result.v5"
+        or result.get("schema") != "prospect.world-model-lifecycle.raw-result.v6"
         or result.get("experiment_id") != "WM-001"
-        or result.get("protocol_version") != "1.5.0"
+        or result.get("protocol_version") != "1.6.0"
         or result.get("lane") != "formal"
         or result.get("claim_eligible") is not True
         or result.get("formal_binding_sha256") != binding_sha256
-        or binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v5"
+        or binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v6"
         or binding.get("experiment_id") != "WM-001"
         or not isinstance(protocol, Mapping)
-        or protocol.get("version") != "1.5.0"
+        or protocol.get("version") != "1.6.0"
         or protocol.get("sha256") != result.get("protocol_sha256")
     ):
         raise AdjudicationError("formal result, binding, and protocol identities do not agree")
@@ -1031,14 +1031,14 @@ def _load_audit_attempt(path: Path) -> _AuditAttempt:
     if (
         manifest.get("schema") != "prospect.wm001.operator-attempt.v1"
         or manifest.get("experiment_id") != "WM-001"
-        or manifest.get("protocol_version") != "1.5.0"
+        or manifest.get("protocol_version") != "1.6.0"
         or manifest.get("kind") != "audit"
         or manifest.get("lane") != "formal"
         or manifest.get("status") not in {"accepted", "rejected", "failure"}
         or not isinstance(primary, dict)
         or not isinstance(rows, list)
     ):
-        raise AdjudicationError("operator evidence is not the formal v1.5 audit attempt")
+        raise AdjudicationError("operator evidence is not the formal v1.6 audit attempt")
     names: list[str] = []
     for row in rows:
         if (
@@ -1226,7 +1226,7 @@ def _formal_claim_value(
         set(claim) != expected
         or claim.get("schema") != "prospect.wm001.formal-audit-claim.v1"
         or claim.get("experiment_id") != "WM-001"
-        or claim.get("protocol_version") != "1.5.0"
+        or claim.get("protocol_version") != "1.6.0"
         or claim.get("claim_status") != "consumed"
         or claim.get("attempt_path") != str(FORMAL_AUDIT_ATTEMPT_PATH)
         or claim.get("marker_path") != str(operator_module.FORMAL_AUDIT_CLAIM_MARKER)
@@ -1493,7 +1493,7 @@ def _input_failure_record(
     return {
         "schema": _INPUT_FAILURE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": assurance_record(),
         "failure_code": failure_code,
         "terminal": True,
@@ -1587,7 +1587,7 @@ def _review_binding(
     return {
         "schema": _SEMANTIC_REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": assurance_record(),
         "evidence_kind": evidence.kind,
         "artifact_root": str(upstream.root),
@@ -1947,7 +1947,7 @@ def _execution_receipt(
     return {
         "schema": _EXECUTION_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": assurance_record(),
         "producer_root": str(upstream.root),
         "audit_attempt_path": str(attempt.root),
@@ -2039,7 +2039,7 @@ def _replay_failure_record(
     return {
         "schema": _REPLAY_FAILURE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": assurance_record(),
         "producer_root": str(upstream.root),
         "audit_attempt_path": str(attempt.root),
@@ -2154,8 +2154,8 @@ def _prepare_output_paths() -> Path:
         FORMAL_ADJUDICATION_CLAIM_MARKER,
         label="formal adjudication claim marker",
     )
-    if package.name != "formal-adjudication-v1.5.0" or marker.name != "formal-adjudication-v1.5.0.json":
-        raise AdjudicationError("formal adjudication paths are not version-scoped to v1.5.0")
+    if package.name != "formal-adjudication-v1.6.0" or marker.name != "formal-adjudication-v1.6.0.json":
+        raise AdjudicationError("formal adjudication paths are not version-scoped to v1.6.0")
     package.parent.mkdir(parents=True, exist_ok=True)
     marker.parent.mkdir(parents=True, exist_ok=True)
     _canonical_directory(
@@ -2167,7 +2167,7 @@ def _prepare_output_paths() -> Path:
         label="formal adjudication claim-marker parent",
     )
     if os.path.lexists(marker):
-        raise _AdjudicationRetired("WM-001 protocol 1.5 adjudication claim is already consumed")
+        raise _AdjudicationRetired("WM-001 protocol 1.6 adjudication claim is already consumed")
     if os.path.lexists(package):
         raise FileExistsError(f"refusing to replace formal adjudication package: {package}")
     return package
@@ -2184,7 +2184,7 @@ def _adjudication_claim_value(
     return {
         "schema": _CLAIM_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": assurance_record(),
         "claim_status": "consumed",
         "producer_root": str(upstream.root),
@@ -2231,12 +2231,12 @@ def _publish_adjudication_claim(
     marker = FORMAL_ADJUDICATION_CLAIM_MARKER
     payload = _canonical_json_bytes(value)
     if os.path.lexists(marker):
-        raise _AdjudicationRetired("WM-001 protocol 1.5 adjudication claim is already consumed")
+        raise _AdjudicationRetired("WM-001 protocol 1.6 adjudication claim is already consumed")
     _write_private_file(claim_path, payload)
     try:
         os.link(claim_path, marker, follow_symlinks=False)
     except FileExistsError as error:
-        raise _AdjudicationRetired("WM-001 protocol 1.5 adjudication claim is already consumed") from error
+        raise _AdjudicationRetired("WM-001 protocol 1.6 adjudication claim is already consumed") from error
     except OSError as error:
         raise AdjudicationError("formal adjudication claim marker could not be published") from error
     on_irreversible()
@@ -2314,7 +2314,7 @@ def _replay_started_record(
     return {
         "schema": _REPLAY_STARTED_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": assurance_record(),
         "producer_root": str(upstream.root),
         "producer_manifest_sha256": _sha256(upstream.producer_manifest_payload),
@@ -2376,7 +2376,7 @@ def _recovery_failure_record(
     return {
         "schema": _RECOVERY_FAILURE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": assurance_record(),
         "terminal": True,
         "disposition": "rejected",
@@ -2431,7 +2431,7 @@ def _manifest(
     return {
         "schema": _PACKAGE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": assurance_record(),
         "lane": "formal",
         "requested_disposition": requested_disposition,
@@ -2784,7 +2784,7 @@ def _verify_packaged_execution(
         set(receipt) != expected_fields
         or receipt.get("schema") != _EXECUTION_SCHEMA
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.5.0"
+        or receipt.get("protocol_version") != "1.6.0"
         or receipt.get("producer_root") != str(upstream.root)
         or receipt.get("audit_attempt_path") != str(attempt.root)
         or receipt.get("audit_attempt_manifest_sha256") != attempt.terminal.sha256
@@ -2866,7 +2866,7 @@ def _verify_replay_failure(
         }
         or failure.get("schema") != _REPLAY_FAILURE_SCHEMA
         or failure.get("experiment_id") != "WM-001"
-        or failure.get("protocol_version") != "1.5.0"
+        or failure.get("protocol_version") != "1.6.0"
         or failure.get("producer_root") != str(upstream.root)
         or failure.get("audit_attempt_path") != str(attempt.root)
         or failure.get("audit_attempt_manifest_sha256") != attempt.terminal.sha256
@@ -3011,7 +3011,7 @@ def _verify_recovery_failure(
         )
         or failure.get("schema") != _RECOVERY_FAILURE_SCHEMA
         or failure.get("experiment_id") != "WM-001"
-        or failure.get("protocol_version") != "1.5.0"
+        or failure.get("protocol_version") != "1.6.0"
         or failure.get("terminal") is not True
         or failure.get("disposition") != "rejected"
         or failure.get("producer_root") != str(upstream.root)
@@ -3069,7 +3069,7 @@ def _verify_adjudication_package(
 ) -> dict[str, object]:
     package = _canonical_directory(path, label="adjudication package")
     if not allow_staging and package != FORMAL_ADJUDICATION_PACKAGE_PATH:
-        raise AdjudicationError("public adjudication verification requires the canonical v1.5 package")
+        raise AdjudicationError("public adjudication verification requires the canonical v1.6 package")
     if require_outer:
         try:
             operator_module.verify_outer_completion(package / ADJUDICATION_MANIFEST_NAME)
@@ -3098,7 +3098,7 @@ def _verify_adjudication_package(
             set(manifest) != _MANIFEST_FIELDS
             or manifest.get("schema") != _PACKAGE_SCHEMA
             or manifest.get("experiment_id") != "WM-001"
-            or manifest.get("protocol_version") != "1.5.0"
+            or manifest.get("protocol_version") != "1.6.0"
             or manifest.get("lane") != "formal"
             or manifest.get("requested_disposition") not in {"accepted", "rejected"}
             or manifest.get("disposition") not in {"accepted", "rejected"}
@@ -3508,7 +3508,7 @@ def _verify_adjudication_package(
 
 
 def verify_adjudication_package(path: Path) -> dict[str, object]:
-    """Verify only an outer-finalized canonical v1.5 adjudication package."""
+    """Verify only an outer-finalized canonical v1.6 adjudication package."""
 
     return _verify_adjudication_package(
         path,
@@ -3727,8 +3727,8 @@ def _recover_adjudication_package(
         label="formal adjudication claim marker",
     )
     if (
-        package.name != "formal-adjudication-v1.5.0"
-        or marker_path.name != "formal-adjudication-v1.5.0.json"
+        package.name != "formal-adjudication-v1.6.0"
+        or marker_path.name != "formal-adjudication-v1.6.0.json"
     ):
         raise AdjudicationError("formal adjudication recovery paths are not version-scoped")
     package.parent.mkdir(parents=True, exist_ok=True)
@@ -3764,7 +3764,7 @@ def _recover_adjudication_package(
             if completed is not None:
                 if not allow_completed:
                     raise _AdjudicationRetired(
-                        "WM-001 protocol 1.5 adjudication is already outer-finalized"
+                        "WM-001 protocol 1.6 adjudication is already outer-finalized"
                     )
                 return completed
             exact = _verify_adjudication_package(
@@ -3979,7 +3979,7 @@ def _recover_adjudication_package(
 
 
 def recover_adjudication_package() -> dict[str, object]:
-    """Finalize a consumed v1.5 claim without another audit replay."""
+    """Finalize a consumed v1.6 claim without another audit replay."""
 
     return _recover_adjudication_package(
         recovery_mode="explicit",
@@ -3995,7 +3995,7 @@ def create_adjudication_package(
     disposition: Disposition,
     semantic_review: Path,
 ) -> dict[str, object]:
-    """Consume v1.5 and publish one accepted/rejected terminal package."""
+    """Consume v1.6 and publish one accepted/rejected terminal package."""
 
     if disposition not in {"accepted", "rejected"}:
         raise AdjudicationError("adjudication is terminal; disposition must be accepted or rejected")

@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from bench.world_model_lifecycle import artifact as artifact_module
+from bench.world_model_lifecycle import experiment as experiment_module
 from bench.world_model_lifecycle import run
 
 
@@ -18,6 +20,8 @@ def test_fresh_runtime_imports_preserve_sealed_environment() -> None:
         "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
+        "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+        "SDL_AUDIODRIVER": "dsp",
         "TZ": "UTC",
     }
     script = """
@@ -27,6 +31,7 @@ import sys
 before = dict(os.environ)
 sys.path.insert(0, sys.argv[1])
 import torch
+import gymnasium as gym
 from bench.world_model_lifecycle.artifact import ProducerAttempt
 from bench.world_model_lifecycle.binding import DEVELOPMENT_CLOSURE_PATH
 from bench.world_model_lifecycle.experiment import ExperimentConfig
@@ -39,6 +44,8 @@ assert DEVELOPMENT_CLOSURE_PATH is not None
 assert ExperimentConfig is not None
 assert FORMAL_BINDING_ATTEMPT_PATH is not None
 assert register_outer_terminal is not None
+pendulum = gym.make("Pendulum-v1")
+pendulum.close()
 config = ExperimentConfig.development(device="cuda")
 config.validate()
 assert os.environ == before
@@ -116,7 +123,7 @@ def test_installed_runner_derives_qualification_from_canonical_git_worktree(
         lifecycle
         / "results"
         / "development"
-        / "qualification-v1.5.0-attempt-4"
+        / "qualification-v1.6.0"
     )
 
 
@@ -125,7 +132,7 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.5.0-attempt-4"
+    qualification = root / "qualification-v1.6.0"
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
     monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
 
@@ -162,3 +169,60 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
         seed_override=True,
         diagnostic_stamp="stamp",
     ) == (root / "diagnostic-stamp")
+
+
+def test_existing_qualification_consumes_all_development_entrypoints(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = tmp_path / "development"
+    qualification = root / "qualification-v1.6.0"
+    qualification.mkdir(parents=True)
+    monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
+    monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
+    monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    monkeypatch.setattr(sys, "argv", ["wm001", "development", "--master-seed", "1"])
+
+    assert run.main() == 1
+    assert "qualification already consumed" in capsys.readouterr().err
+
+
+def test_runtime_custody_refusal_precedes_producer_root_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = tmp_path / "development"
+    qualification = root / "qualification-v1.6.0"
+    monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
+    monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
+    monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    monkeypatch.setattr(
+        experiment_module,
+        "_verify_live_bootstrap_custody",
+        lambda: (_ for _ in ()).throw(RuntimeError("no sealed custody")),
+    )
+    monkeypatch.setattr(
+        artifact_module,
+        "ProducerAttempt",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("producer root must not be constructed")
+        ),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "wm001",
+            "development",
+            "--device",
+            "cpu",
+            "--output",
+            str(qualification),
+        ],
+    )
+
+    assert run.main() == 1
+    assert not qualification.exists()
+    assert "refused before producer-root creation" in capsys.readouterr().err

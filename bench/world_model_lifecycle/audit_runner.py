@@ -73,7 +73,9 @@ SAFE_RUNTIME_ENVIRONMENT_KEYS = frozenset(
         "NUMEXPR_NUM_THREADS",
         "OMP_NUM_THREADS",
         "OPENBLAS_NUM_THREADS",
+        "PYGAME_HIDE_SUPPORT_PROMPT",
         "ROCR_VISIBLE_DEVICES",
+        "SDL_AUDIODRIVER",
         "TZ",
     }
 )

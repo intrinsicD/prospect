@@ -23,6 +23,8 @@ _RUNTIME_ENVIRONMENT = {
     "LAZY_LEGACY_OP": "False",
     "LC_ALL": "C.UTF-8",
     "PATH": "/usr/bin:/bin",
+    "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+    "SDL_AUDIODRIVER": "dsp",
     "TZ": "UTC",
 }
 
@@ -92,7 +94,7 @@ def _review() -> dict[str, object]:
     return {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "implementation_files": [],
         "implementation_manifest_sha256": hashlib.sha256(b"[]").hexdigest(),
         "reviewer": {
@@ -110,7 +112,7 @@ def _runtime_seal(runtime_executable: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
             "tamper_resistant": False,
@@ -465,7 +467,9 @@ def test_generates_and_strictly_verifies_exact_preformal_evidence(
         for row in report["qa_environment"]["variables"]
     }
     assert "AWS_SECRET_ACCESS_KEY" not in variables
+    assert variables["PYGAME_HIDE_SUPPORT_PROMPT"] == "hide"
     assert variables["PYTHONNOUSERSITE"] == "1"
+    assert variables["SDL_AUDIODRIVER"] == "dsp"
     logs = {
         path.name
         for path in report_path.parent.iterdir()
@@ -630,7 +634,7 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     review = {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -825,3 +829,87 @@ def test_runtime_development_evidence_accepts_outer_finalized_manifest(
             (producer / "result.json").read_bytes()
         ).hexdigest(),
     }
+
+
+def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import gymnasium
+
+    from bench.world_model_lifecycle import binding
+
+    events: list[str] = []
+    custody = {"schema": "captured-runtime"}
+
+    class ResultFreePendulum:
+        class Spec:
+            id = "Pendulum-v1"
+
+        spec = Spec()
+
+        def reset(self, *_: object, **__: object) -> None:
+            raise AssertionError("result-free rehearsal must not reset")
+
+        def step(self, *_: object, **__: object) -> None:
+            raise AssertionError("result-free rehearsal must not step")
+
+        def close(self) -> None:
+            events.append("close")
+
+    def make(environment_id: str) -> ResultFreePendulum:
+        assert environment_id == "Pendulum-v1"
+        events.append("make")
+        return ResultFreePendulum()
+
+    def verify_custody() -> dict[str, str]:
+        events.append("closure")
+        return dict(custody)
+
+    def require_environment() -> dict[str, str]:
+        events.append("environment")
+        return dict(_RUNTIME_ENVIRONMENT)
+
+    def build_execution(**arguments: object) -> tuple[dict[str, object], dict[str, bytes]]:
+        assert arguments["producer_environment"] == _RUNTIME_ENVIRONMENT
+        events.append("conformance")
+        return (
+            {
+                "repeat_count": 3,
+                "path_descriptor_equal": True,
+                "passed": True,
+            },
+            {f"payload-{index}": b"" for index in range(9)},
+        )
+
+    monkeypatch.setattr(gymnasium, "make", make)
+    monkeypatch.setattr(preformal, "_verify_live_bootstrap_custody", verify_custody)
+    monkeypatch.setattr(binding, "require_formal_process_environment", require_environment)
+    monkeypatch.setattr(
+        binding,
+        "verify_installed_source_snapshot",
+        lambda: events.append("sources"),
+    )
+    monkeypatch.setattr(binding, "package_roots", lambda: ())
+    monkeypatch.setattr(binding, "installed_package_rows", lambda: [])
+    monkeypatch.setattr(
+        binding,
+        "verify_lockfile_rows",
+        lambda _: events.append("lockfile"),
+    )
+    monkeypatch.setattr(
+        binding,
+        "standard_library_inventory",
+        lambda: {"identity": "stdlib"},
+    )
+    monkeypatch.setattr(
+        binding,
+        "package_root_ownership",
+        lambda: {"identity": "ownership"},
+    )
+    monkeypatch.setattr(binding, "build_bound_audit_execution", build_execution)
+
+    report = preformal._runtime_bootstrap_inventory_conformance("cpu")
+
+    assert report["passed"] is True
+    assert events[:4] == ["closure", "make", "close", "closure"]
+    assert events[-2:] == ["conformance", "closure"]

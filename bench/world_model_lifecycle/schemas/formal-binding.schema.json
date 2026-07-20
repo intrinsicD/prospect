@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v5.json",
+  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v6.json",
   "title": "WM-001 formal implementation binding",
   "type": "object",
   "additionalProperties": false,
@@ -23,7 +23,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.formal-binding.v5"
+      "const": "prospect.world-model-lifecycle.formal-binding.v6"
     },
     "experiment_id": {
       "const": "WM-001"
@@ -63,7 +63,7 @@
       ],
       "properties": {
         "version": {
-          "const": "1.5.0"
+          "const": "1.6.0"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -436,6 +436,8 @@
             "LAZY_LEGACY_OP",
             "LC_ALL",
             "PATH",
+            "PYGAME_HIDE_SUPPORT_PROMPT",
+            "SDL_AUDIODRIVER",
             "TZ"
           ],
           "properties": {
@@ -450,6 +452,12 @@
             },
             "PATH": {
               "const": "/usr/bin:/bin"
+            },
+            "PYGAME_HIDE_SUPPORT_PROMPT": {
+              "const": "hide"
+            },
+            "SDL_AUDIODRIVER": {
+              "const": "dsp"
             },
             "TZ": {
               "const": "UTC"
@@ -1013,14 +1021,14 @@
     },
     "formal_replicate_master_seeds": {
       "const": [
-        1800791691,
-        1963228177,
-        2416009491,
-        3925214220,
-        1508934628,
-        2118526007,
-        4212585034,
-        530094003
+        3863790658,
+        3900021454,
+        1437244820,
+        3175470977,
+        228708147,
+        3835462042,
+        3342200973,
+        1751060143
       ]
     }
   },

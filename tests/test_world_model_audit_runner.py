@@ -378,13 +378,19 @@ def test_exact_interpreter_flags_argv_and_sanitized_environment(
         auditor,
         auditor_arguments=("one", "two"),
         working_directory=tmp_path,
-        environment={"OMP_NUM_THREADS": "2"},
+        environment={
+            "OMP_NUM_THREADS": "2",
+            "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+            "SDL_AUDIODRIVER": "dsp",
+        },
     )
 
     assert execution.report["arguments"] == ["one", "two"]
     assert execution.report["environment"] == {
         "LC_ALL": "C.UTF-8",
         "OMP_NUM_THREADS": "2",
+        "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+        "SDL_AUDIODRIVER": "dsp",
     }
     assert execution.report["flags"] == {
         "dont_write_bytecode": 1,

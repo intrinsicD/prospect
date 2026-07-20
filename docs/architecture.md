@@ -261,10 +261,19 @@ demonstration. The
 [v1.4 formal results review](wm001-v140-formal-results.md) records the exact
 effects and failure.
 
-Protocol 1.5.0 keeps the same agent, scientific blocks, budgets, controls,
-metrics, thresholds, and killing order while replacing the failed execution
-boundary. A non-editable isolated wheel and complete transitive package
-inventory are shared by prebinding, producer, auditor, and adjudicator.
+Protocol 1.5.0 implemented the replacement evidence boundary but its sole
+outcome-producing development qualification exposed one remaining custody
+gap: Gymnasium's lazy import added two process variables after the environment
+had been sealed. The producer was not outer-finalized, no result or development
+closure was published, and formal execution never became eligible.
+
+Protocol 1.6.0 keeps the same agent, scientific blocks, budgets, controls,
+metrics, thresholds, and killing order. It fixes
+`PYGAME_HIDE_SUPPORT_PROMPT=hide` and `SDL_AUDIODRIVER=dsp` from process start,
+crosses that lazy boundary in a result-free sealed rehearsal, and makes
+development qualification consumption explicitly single-use. A non-editable
+isolated wheel and complete transitive package inventory are shared by
+prebinding, producer, auditor, and adjudicator.
 Prospective runtime seals, producer attempts, development audit/closure
 attempts, the formal audit, and adjudication all use an outer launcher that
 holds one repository-global cooperative sealed-runtime lock and commits the
@@ -276,7 +285,7 @@ formal-audit and adjudication claims are version-scoped and single-use, and a
 no-report audit failure reaches a terminal rejected package with no replay.
 These are application-level custody properties under an explicit trusted
 same-principal/kernel/filesystem boundary, not external tamper resistance. See
-the [v1.5 confirmation plan](wm001-v150-confirmation-plan.md).
+the [v1.6 confirmation plan](wm001-v160-confirmation-plan.md).
 
 ## Open engineering boundaries
 
@@ -285,11 +294,10 @@ the [v1.5 confirmation plan](wm001-v150-confirmation-plan.md).
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocol 1.5 implements the descriptor-bound conformance and rejected-package
-  paths, but those mechanisms remain prospective until the new development
-  qualification, one formal confirmation, official audit, semantic review, and
-  terminal adjudication complete.
-- The v1.5 custody layer is deliberately not hardened against the repository or
+- Protocol 1.6 remains prospective until its one development qualification,
+  one formal confirmation, official audit, semantic review, and terminal
+  adjudication complete.
+- The v1.6 custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External
   attestation, read-only media, or an independently operated transparency log

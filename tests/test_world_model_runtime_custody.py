@@ -98,7 +98,7 @@ def _captured_descriptors(
     ("schema", "runtime_nlink"),
     [
         ("prospect.wm001.runtime-seal.v1", 2),
-        ("prospect.world-model-lifecycle.formal-binding.v5", 1),
+        ("prospect.world-model-lifecycle.formal-binding.v6", 1),
     ],
 )
 def test_experiment_accepts_schema_typed_runtime_custody(
@@ -122,7 +122,7 @@ def test_experiment_accepts_schema_typed_runtime_custody(
     ("schema", "runtime_nlink"),
     [
         ("prospect.wm001.runtime-seal.v1", 1),
-        ("prospect.world-model-lifecycle.formal-binding.v5", 2),
+        ("prospect.world-model-lifecycle.formal-binding.v6", 2),
     ],
 )
 def test_experiment_rejects_link_count_for_other_custody_type(
@@ -161,7 +161,7 @@ def test_experiment_recheck_detects_new_runtime_hardlink(
     ("schema", "runtime_nlink"),
     [
         ("prospect.wm001.runtime-seal.v1", 2),
-        ("prospect.world-model-lifecycle.formal-binding.v5", 1),
+        ("prospect.world-model-lifecycle.formal-binding.v6", 1),
     ],
 )
 def test_real_subprocess_reopens_typed_runtime_descriptor(
@@ -235,3 +235,23 @@ print(custody["runtime_seal"]["schema"])
     assert completed.returncode == 0, completed.stderr
     assert completed.stdout == f"{schema}\n"
     assert completed.stderr == ""
+
+
+def test_post_conformance_custody_recheck_requires_exact_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = {"runtime_seal_sha256": "a" * 64}
+    monkeypatch.setattr(
+        experiment,
+        "_verify_live_bootstrap_custody",
+        lambda: dict(expected),
+    )
+    experiment._recheck_live_bootstrap_custody(expected)
+
+    monkeypatch.setattr(
+        experiment,
+        "_verify_live_bootstrap_custody",
+        lambda: {"runtime_seal_sha256": "b" * 64},
+    )
+    with pytest.raises(RuntimeError, match="changed after conformance"):
+        experiment._recheck_live_bootstrap_custody(expected)

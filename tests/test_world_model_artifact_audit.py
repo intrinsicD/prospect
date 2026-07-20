@@ -148,13 +148,15 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
             "LAZY_LEGACY_OP": "False",
             "LC_ALL": "C.UTF-8",
             "PATH": "/usr/bin:/bin",
+            "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+            "SDL_AUDIODRIVER": "dsp",
             "TZ": "UTC",
         },
     }
     seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": dict(artifact_audit_module._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -863,6 +865,8 @@ def test_formal_runtime_binding_selects_only_bound_device(
         "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
+        "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+        "SDL_AUDIODRIVER": "dsp",
         "TZ": "UTC",
     }
     for name, value in process_environment.items():
@@ -1514,11 +1518,11 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     owned_state = runtime.owner.snapshot_state()
     parameter_sha256 = runtime.digest
     model_version = runtime.version
-    master_seed = 4085517670
+    master_seed = 2999896578
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.5.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.6.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
@@ -1997,9 +2001,9 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
         },
     }
     result: dict[str, Any] = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v5",
+        "schema": "prospect.world-model-lifecycle.raw-result.v6",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),

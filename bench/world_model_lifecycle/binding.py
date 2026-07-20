@@ -77,7 +77,7 @@ def _repository_root() -> Path:
 REPO = _repository_root()
 LOCKFILE = REPO / "requirements-wm001.lock"
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.5.0.json"
+DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.6.0.json"
 ROOT_DISTRIBUTIONS = (
     "gymnasium",
     "jsonschema",
@@ -113,7 +113,9 @@ FORMAL_PROCESS_ENVIRONMENT_KEYS = frozenset(
         "OMP_NUM_THREADS",
         "OPENBLAS_NUM_THREADS",
         "PATH",
+        "PYGAME_HIDE_SUPPORT_PROMPT",
         "ROCR_VISIBLE_DEVICES",
+        "SDL_AUDIODRIVER",
         "TZ",
     }
 )
@@ -573,7 +575,7 @@ def implementation_files() -> list[dict[str, object]]:
         REPO / "bench" / "world_model_lifecycle" / "protocol.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "raw-result.schema.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "formal-binding.schema.json",
-        REPO / "docs" / "wm001-v150-prospective-harness-review.json",
+        REPO / "docs" / "wm001-v160-prospective-harness-review.json",
     ]
     unique = sorted(set(candidates))
     return [
@@ -1121,6 +1123,8 @@ def require_formal_process_environment() -> dict[str, str]:
         or environment.get("LAZY_LEGACY_OP") != "False"
         or environment.get("LC_ALL") != "C.UTF-8"
         or environment.get("PATH") != "/usr/bin:/bin"
+        or environment.get("PYGAME_HIDE_SUPPORT_PROMPT") != "hide"
+        or environment.get("SDL_AUDIODRIVER") != "dsp"
         or environment.get("TZ") != "UTC"
         or any("\0" in key or "\0" in value for key, value in environment.items())
     ):
@@ -1286,7 +1290,7 @@ def create_audit_reproduction_receipt(
     receipt = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "supplied_audit_sha256": hashlib.sha256(supplied).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(execution.stdout).hexdigest(),
         "byte_identical": True,
@@ -1660,7 +1664,7 @@ def _validate_producer_custody(
         set(runtime_seal) != _DEVELOPMENT_RUNTIME_SEAL_FIELDS
         or runtime_seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or runtime_seal.get("experiment_id") != "WM-001"
-        or runtime_seal.get("protocol_version") != "1.5.0"
+        or runtime_seal.get("protocol_version") != "1.6.0"
         or runtime_seal.get("assurance") != ASSURANCE
         or runtime_seal.get("git_commit") != execution["git_commit"]
         or runtime_seal.get("git_tree") != execution["git_tree"]
@@ -1724,7 +1728,7 @@ def _validate_development_audit_evidence(
         set(receipt) != _AUDIT_RECEIPT_FIELDS
         or receipt.get("schema") != "prospect.wm001.audit-reproduction.v2"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.5.0"
+        or receipt.get("protocol_version") != "1.6.0"
         or receipt.get("supplied_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("reproduced_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("byte_identical") is not True
@@ -1867,7 +1871,7 @@ def _result_qualification_payload(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "protocol_sha256": sha256_file(PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -1932,7 +1936,7 @@ def _validate_result_qualification(
         }
         or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.5.0"
+        or value.get("protocol_version") != "1.6.0"
         or value.get("protocol_sha256") != sha256_file(PROTOCOL_PATH)
         or value.get("raw_result_sha256") != archived_result_sha256
         or value.get("lane") != "development"
@@ -2433,7 +2437,7 @@ def verify_development_closure(path: Path) -> dict[str, object]:
         set(closure) != _DEVELOPMENT_CLOSURE_FIELDS
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.5.0"
+        or closure.get("protocol_version") != "1.6.0"
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
         or closure.get("performance_values_bound") is not False
@@ -2706,7 +2710,7 @@ def create_development_closure(
     runtime_manifest_path: Path,
     output_path: Path = DEVELOPMENT_CLOSURE_PATH,
 ) -> dict[str, object]:
-    """Close the sole v1.5 qualification into one self-contained evidence archive."""
+    """Close the sole v1.6 qualification into one self-contained evidence archive."""
 
     from .artifact import verify_producer_manifest
     from .verify import DEVELOPMENT_SEEDS, _verify_formal_matrix, verify_result
@@ -2747,7 +2751,7 @@ def create_development_closure(
         not isinstance(replicates, list)
         or tuple(row.get("master_seed") if isinstance(row, dict) else None for row in replicates) != DEVELOPMENT_SEEDS
     ):
-        raise RuntimeError("development qualification requires exactly both fresh v1.5 seeds")
+        raise RuntimeError("development qualification requires exactly both fresh v1.6 seeds")
     for replicate in replicates:
         assert isinstance(replicate, dict)
         _verify_formal_matrix(
@@ -2870,7 +2874,7 @@ def create_development_closure(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "source": {
             "git_commit": execution["git_commit"],
             "git_tree": execution["git_tree"],
@@ -3020,6 +3024,8 @@ def create_formal_binding(
 ) -> dict[str, object]:
     """Write a complete binding, refusing a dirty source tree."""
 
+    python_flags = require_formal_python_flags()
+    process_environment = require_formal_process_environment()
     from .verify import verify_protocol
 
     verify_protocol()
@@ -3032,7 +3038,7 @@ def create_formal_binding(
     if conformance_cases != FORMAL_CONFORMANCE_CASES:
         raise ValueError("formal Pendulum conformance is fixed at exactly 1,024 cases (512 per task)")
     if development_closure_path is None or not development_closure_path.is_file():
-        raise RuntimeError("formal binding requires the immutable v1.5 development closure")
+        raise RuntimeError("formal binding requires the immutable v1.6 development closure")
     if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
         raise RuntimeError("CUDA formal binding requires CUBLAS_WORKSPACE_CONFIG=:4096:8")
     if output_path.exists():
@@ -3111,8 +3117,6 @@ def create_formal_binding(
         pendulum_source,
     ]
     torch.use_deterministic_algorithms(True)
-    python_flags = require_formal_python_flags()
-    process_environment = require_formal_process_environment()
     verify_installed_source_snapshot()
     roots = package_roots()
     packages = installed_package_rows()
@@ -3133,11 +3137,11 @@ def create_formal_binding(
             raise FileExistsError(f"refusing to replace formal audit-execution evidence: {candidate}")
     accelerator = torch.cuda.get_device_name(0) if device == "cuda" else None
     binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v5",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v6",
         "experiment_id": "WM-001",
         "assurance": assurance_record(),
         "protocol": {
-            "version": "1.5.0",
+            "version": "1.6.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),

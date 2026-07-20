@@ -25,19 +25,19 @@ TASK_IRRELEVANT = "independent_phase_oscillator"
 ZERO = "0" * 64
 
 
-def test_scientific_revision_uses_fresh_v150_seed_domain() -> None:
-    master = 4_085_517_670
-    assert derive_seed("model_initialization", master, 0) == 213_482_023
-    assert derive_seed("planner", master, 0) == 1_934_725_469
-    assert derive_seed("collection_action", master, 1) == 430_662_121
-    assert derive_seed("irrelevant_collection_action", master, 0) == 3_184_279_340
-    assert derive_seed("collect_irrelevant_episode", master, 0) == 644_479_237
-    assert derive_seed("predictive_validation_irrelevant_action", master, 0) == 1_692_316_058
-    assert derive_seed("predictive_validation_irrelevant_episode", master, 0) == 713_514_258
+def test_scientific_revision_uses_fresh_v160_seed_domain() -> None:
+    master = 2_999_896_578
+    assert derive_seed("model_initialization", master, 0) == 1_595_139_768
+    assert derive_seed("planner", master, 0) == 3_305_170_892
+    assert derive_seed("collection_action", master, 1) == 1_826_557_491
+    assert derive_seed("irrelevant_collection_action", master, 0) == 1_413_357_512
+    assert derive_seed("collect_irrelevant_episode", master, 0) == 1_524_291_154
+    assert derive_seed("predictive_validation_irrelevant_action", master, 0) == 41_153_304
+    assert derive_seed("predictive_validation_irrelevant_episode", master, 0) == 1_845_767_432
 
 
 def _seed(namespace: str, master: int, index: int) -> int:
-    payload = f"WM-001|1.5.0|{namespace}|{master}|{index}".encode()
+    payload = f"WM-001|1.6.0|{namespace}|{master}|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big")
 
 
@@ -206,7 +206,7 @@ def _update(
 def _development_result() -> dict[str, Any]:
     protocol = json.loads((HERE / "protocol.json").read_text())
     protocol_sha = sha256((HERE / "protocol.json").read_bytes()).hexdigest()
-    master = 4_085_517_670
+    master = 2_999_896_578
     replicate_id = f"dev-{master}"
     cold = _digest("cold")
     after_a = _digest("after-a")
@@ -643,9 +643,9 @@ def _development_result() -> dict[str, Any]:
         },
     }
     return {
-        "schema": "prospect.world-model-lifecycle.raw-result.v5",
+        "schema": "prospect.world-model-lifecycle.raw-result.v6",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "protocol_sha256": protocol_sha,
         "lane": "development",
         "claim_eligible": False,

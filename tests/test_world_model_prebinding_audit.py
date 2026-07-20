@@ -109,6 +109,28 @@ def test_active_protocol_seed_universe_has_no_declared_collision() -> None:
     assert audit.passed_checks == 1
 
 
+def test_prebinding_protocol_requires_exact_v15_lineage(
+    tmp_path: Path,
+) -> None:
+    protocol = json.loads(PROTOCOL.read_text(encoding="utf-8"))
+    protocol["experiment"]["revision"]["superseded_protocol_sha256"] = "0" * 64
+    changed = tmp_path / "protocol.json"
+    changed.write_bytes(artifact_audit._canonical_json_bytes(protocol) + b"\n")
+    request = artifact_audit.build_prebinding_conformance_request(
+        changed,
+        scientific_source_paths=SCIENTIFIC_SOURCES,
+        root_paths={"closure": tmp_path},
+        device="cpu",
+        package_rows=[_python_row()],
+    )
+
+    with pytest.raises(
+        artifact_audit._PrebindingConformanceError,
+        match="protocol_lineage_mismatch",
+    ):
+        artifact_audit._prebinding_protocol_component(request["protocol"])
+
+
 def test_complete_prebinding_request_passes_without_outcome(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -125,6 +147,49 @@ def test_complete_prebinding_request_passes_without_outcome(
     assert str(tmp_path).encode() not in encoded
     assert b"result.json" not in encoded
     assert b"artifact_root" not in encoded
+
+
+def test_prebinding_validates_runtime_before_importing_pendulum(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _request(tmp_path)
+    calls: list[str] = []
+
+    def runtime_component(_: object) -> dict[str, object]:
+        calls.append("runtime")
+        return {
+            "identity_sha256": "a" * 64,
+            "passed": True,
+        }
+
+    def pendulum_component() -> dict[str, object]:
+        calls.append("pendulum")
+        return {
+            "identity_sha256": "b" * 64,
+            "passed": True,
+        }
+
+    monkeypatch.setattr(
+        artifact_audit,
+        "_prebinding_runtime_component",
+        runtime_component,
+    )
+    monkeypatch.setattr(
+        artifact_audit,
+        "_prebinding_pendulum_component",
+        pendulum_component,
+    )
+    _patch_expensive_semantics(monkeypatch)
+    monkeypatch.setattr(
+        artifact_audit,
+        "_prebinding_pendulum_component",
+        pendulum_component,
+    )
+
+    artifact_audit.audit_prebinding_conformance(request)
+
+    assert calls == ["runtime", "pendulum"]
 
 
 def test_changed_complete_root_inventory_fails(
@@ -496,7 +561,7 @@ def _preformal_v2_fixture(
     review: dict[str, object] = {
         "schema": "prospect.wm001.prospective-harness-review.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "implementation_files": reviewed_files,
         "implementation_manifest_sha256": hashlib.sha256(
             artifact_audit._canonical_json_bytes(reviewed_files)
@@ -536,6 +601,8 @@ def _preformal_v2_fixture(
         "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
+        "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+        "SDL_AUDIODRIVER": "dsp",
         "TZ": "UTC",
     }
     qa_environment = {
@@ -575,7 +642,7 @@ def _preformal_v2_fixture(
     runtime_seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -705,7 +772,7 @@ def _preformal_v2_fixture(
     report: dict[str, Any] = {
         "schema": "prospect.wm001.preformal-test-report.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "repository_cwd": repository_cwd,
         "device": "cpu",
         "qa_environment": qa_environment_identity,
@@ -989,6 +1056,8 @@ def test_full_result_runtime_is_bound_field_for_field(
         "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
+        "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+        "SDL_AUDIODRIVER": "dsp",
         "TZ": "UTC",
     }
     for name, value in process_environment.items():
@@ -1158,6 +1227,8 @@ def test_restart_restore_runtime_is_reopened_and_bound_to_parent(
         "LAZY_LEGACY_OP": "False",
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/bin:/bin",
+        "PYGAME_HIDE_SUPPORT_PROMPT": "hide",
+        "SDL_AUDIODRIVER": "dsp",
         "TZ": "UTC",
     }
     flags = dict(artifact_audit._PREBINDING_PRODUCER_FLAGS)
@@ -1306,7 +1377,7 @@ def test_development_qualification_is_linked_field_for_field(
     preformal_runtime_seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -1456,7 +1527,7 @@ def test_development_qualification_is_linked_field_for_field(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "source": closure_source,
         "producer_root": ("/repo/bench/world_model_lifecycle/results/development/run"),
         **role_members,

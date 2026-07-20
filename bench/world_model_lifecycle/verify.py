@@ -59,16 +59,16 @@ RESULT_SCHEMA_PATH = HERE / "schemas" / "raw-result.schema.json"
 BINDING_SCHEMA_PATH = HERE / "schemas" / "formal-binding.schema.json"
 
 FORMAL_SEEDS = (
-    1800791691,
-    1963228177,
-    2416009491,
-    3925214220,
-    1508934628,
-    2118526007,
-    4212585034,
-    530094003,
+    3863790658,
+    3900021454,
+    1437244820,
+    3175470977,
+    228708147,
+    3835462042,
+    3342200973,
+    1751060143,
 )
-DEVELOPMENT_SEEDS = (4085517670, 2227535912)
+DEVELOPMENT_SEEDS = (2999896578, 3783052994)
 COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
 _V100_MASTER_SEEDS = (
     101,
@@ -118,6 +118,19 @@ _V140_MASTER_SEEDS = (
     2206960337,
     3506881479,
 )
+_V150_MASTER_SEEDS = (
+    4085517670,
+    2227535912,
+    1800791691,
+    1963228177,
+    2416009491,
+    3925214220,
+    1508934628,
+    2118526007,
+    4212585034,
+    530094003,
+)
+_V150_PROTOCOL_SHA256 = "434b80c41d263e40879272e172bcbdfcbb1a1f32d2b08c85df0dd7ec9317abd2"
 _SCIENTIFIC_BLOCKS = (
     "claim",
     "null_hypothesis",
@@ -666,18 +679,18 @@ def _verify_coverage_conformance_report(report: object) -> None:
 
 
 def derive_seed(namespace: str, master_seed: int, index: int) -> int:
-    """Derive the exact protocol-1.5.0 uint32 seed."""
+    """Derive the exact protocol-1.6.0 uint32 seed."""
 
-    payload = f"WM-001|1.5.0|{namespace}|{master_seed}|{index}".encode()
+    payload = f"WM-001|1.6.0|{namespace}|{master_seed}|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
 def derive_master_seed(lane: str, index: int) -> int:
-    """Derive one protocol-1.5.0 lane master from its prospective index."""
+    """Derive one protocol-1.6.0 lane master from its prospective index."""
 
     if lane not in {"development", "formal"} or index < 0:
         raise ValueError("invalid WM-001 master-seed lane or index")
-    payload = f"WM-001|1.5.0|{lane}-master|{index}".encode()
+    payload = f"WM-001|1.6.0|{lane}-master|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
@@ -756,7 +769,7 @@ def verify_protocol() -> dict[str, Any]:
 
     experiment = protocol.get("experiment", {})
     trust_model = protocol.get("trust_model", {})
-    _require(protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v5", "wrong protocol schema")
+    _require(protocol.get("schema") == "prospect.world-model-lifecycle.protocol.v6", "wrong protocol schema")
     _require(
         trust_model
         == {
@@ -769,22 +782,28 @@ def verify_protocol() -> dict[str, Any]:
         "protocol trust model is missing or overstated",
     )
     _require(experiment.get("id") == "WM-001", "wrong experiment ID")
-    _require(experiment.get("protocol_version") == "1.5.0", "wrong protocol version")
+    _require(experiment.get("protocol_version") == "1.6.0", "wrong protocol version")
     _require(experiment.get("status") == "sealed_before_formal_outcomes", "protocol is not marked sealed")
     _require(experiment.get("thresholds_sealed_before_outcomes") is True, "experiment thresholds are not sealed")
     _require(protocol.get("thresholds", {}).get("sealed_before_outcomes") is True, "threshold block is not sealed")
     scientific_continuity = experiment.get("revision", {}).get("scientific_continuity", {})
+    _require(
+        experiment.get("revision", {}).get("supersedes") == "1.5.0"
+        and experiment.get("revision", {}).get("superseded_protocol_sha256")
+        == _V150_PROTOCOL_SHA256,
+        "v1.6 protocol does not directly and exactly supersede sealed v1.5",
+    )
     scientific_payload = {name: protocol.get(name) for name in _SCIENTIFIC_BLOCKS}
     _require(
         tuple(scientific_continuity.get("unchanged_top_level_blocks", ())) == _SCIENTIFIC_BLOCKS
         and scientific_continuity.get("v1_4_scientific_blocks_sha256") == _V140_SCIENTIFIC_BLOCKS_SHA256
         and _canonical_sha256(scientific_payload) == _V140_SCIENTIFIC_BLOCKS_SHA256,
-        "v1.5 scientific blocks differ from the sealed v1.4 system",
+        "v1.6 scientific blocks differ from the sealed v1.4 system",
     )
     _require(
         scientific_continuity.get("kernel_source_sha256") == _SCIENTIFIC_KERNEL_SHA256
         and all(_file_sha256(HERE / name) == digest for name, digest in _SCIENTIFIC_KERNEL_SHA256.items()),
-        "v1.5 scientific kernel source differs from the sealed v1.4 system",
+        "v1.6 scientific kernel source differs from the sealed v1.4 system",
     )
 
     _require(protocol.get("splits", {}).get("unit") == "whole_episode", "splits are not whole-episode")
@@ -815,8 +834,8 @@ def verify_protocol() -> dict[str, Any]:
 
     seed_schedule = protocol.get("seed_schedule", {})
     _require(
-        seed_schedule.get("derivation_domain_version") == "1.5.0",
-        "seed derivation domain differs from protocol 1.5.0",
+        seed_schedule.get("derivation_domain_version") == "1.6.0",
+        "seed derivation domain differs from protocol 1.6.0",
     )
     formal_seeds = tuple(seed_schedule.get("formal_replicate_master_seeds", ()))
     development_seeds = tuple(seed_schedule.get("development_replicate_master_seeds", ()))
@@ -832,7 +851,7 @@ def verify_protocol() -> dict[str, Any]:
     }
     _require(
         actual_seed_counts == EXPECTED_SEED_COUNTS,
-        "seed namespace/count schedule differs from protocol 1.5.0",
+        "seed namespace/count schedule differs from protocol 1.6.0",
     )
     master_derivation = seed_schedule.get("master_seed_derivation", {})
     _require(
@@ -862,6 +881,7 @@ def verify_protocol() -> dict[str, Any]:
         ("1.2.0", _V120_MASTER_SEEDS),
         ("1.3.0", _V130_MASTER_SEEDS),
         ("1.4.0", _V140_MASTER_SEEDS),
+        ("1.5.0", _V150_MASTER_SEEDS),
     )
     prior_masters = {master_seed for _, version_masters in prior_domains for master_seed in version_masters}
     prior_stream_values = [
@@ -885,9 +905,9 @@ def verify_protocol() -> dict[str, Any]:
         and collision_audit.get("current_internal_collision_count") == 0
         and collision_audit.get("current_master_stream_overlap_count") == 0
         and current_masters.isdisjoint(current_streams)
-        and collision_audit.get("prior_master_seed_count") == len(prior_masters) == 40
-        and collision_audit.get("unique_prior_derived_stream_count") == len(prior_streams) == 5440
-        and len(prior_stream_values) == 5440
+        and collision_audit.get("prior_master_seed_count") == len(prior_masters) == 50
+        and collision_audit.get("unique_prior_derived_stream_count") == len(prior_streams) == 6800
+        and len(prior_stream_values) == 6800
         and collision_audit.get("current_prior_master_master_overlap_count") == 0
         and collision_audit.get("current_prior_stream_stream_overlap_count") == 0
         and collision_audit.get("current_master_prior_stream_overlap_count") == 0
@@ -1006,11 +1026,11 @@ def verify_protocol() -> dict[str, Any]:
         "coverage arithmetic binding contract is incomplete",
     )
     _require(
-        result_schema.get("$id") == "https://prospect.local/schemas/wm-001-raw-result-v5.json",
+        result_schema.get("$id") == "https://prospect.local/schemas/wm-001-raw-result-v6.json",
         "wrong raw-result schema",
     )
     _require(
-        binding_schema.get("$id") == "https://prospect.local/schemas/wm-001-formal-binding-v5.json",
+        binding_schema.get("$id") == "https://prospect.local/schemas/wm-001-formal-binding-v6.json",
         "wrong formal-binding schema",
     )
     return protocol
@@ -1022,7 +1042,7 @@ def verify_binding(path: Path) -> dict[str, Any]:
     protocol = verify_protocol()
     binding = _load_json(path)
     _validate_json_schema(binding, _load_json(BINDING_SCHEMA_PATH), label="formal binding")
-    _require(binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v5", "wrong binding schema")
+    _require(binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v6", "wrong binding schema")
     _require(binding.get("experiment_id") == "WM-001", "binding has wrong experiment")
     _require(
         binding.get("assurance") == ASSURANCE,
@@ -1031,7 +1051,7 @@ def verify_binding(path: Path) -> dict[str, Any]:
     _parse_timestamp(binding.get("sealed_at_utc"), "sealed_at_utc")
 
     bound_protocol = binding.get("protocol", {})
-    _require(bound_protocol.get("version") == "1.5.0", "binding has wrong protocol version")
+    _require(bound_protocol.get("version") == "1.6.0", "binding has wrong protocol version")
     _require(bound_protocol.get("sha256") == _file_sha256(PROTOCOL_PATH), "binding has wrong protocol digest")
     _require(
         bound_protocol.get("raw_result_schema_sha256") == _file_sha256(RESULT_SCHEMA_PATH),
@@ -1234,6 +1254,8 @@ def verify_binding(path: Path) -> dict[str, Any]:
         and process_environment.get("LAZY_LEGACY_OP") == "False"
         and process_environment.get("LC_ALL") == "C.UTF-8"
         and process_environment.get("PATH") == "/usr/bin:/bin"
+        and process_environment.get("PYGAME_HIDE_SUPPORT_PROMPT") == "hide"
+        and process_environment.get("SDL_AUDIODRIVER") == "dsp"
         and process_environment.get("TZ") == "UTC"
         and set(process_environment)
         <= {
@@ -1249,7 +1271,9 @@ def verify_binding(path: Path) -> dict[str, Any]:
             "OMP_NUM_THREADS",
             "OPENBLAS_NUM_THREADS",
             "PATH",
+            "PYGAME_HIDE_SUPPORT_PROMPT",
             "ROCR_VISIBLE_DEVICES",
+            "SDL_AUDIODRIVER",
             "TZ",
         },
         "formal producer process environment is not the exact safe contract",
@@ -1715,7 +1739,7 @@ def _verify_formal_launch_record(
         set(record) == expected_fields
         and record.get("schema") == "prospect.wm001.formal-launch.v2"
         and record.get("experiment_id") == "WM-001"
-        and record.get("protocol_version") == "1.5.0"
+        and record.get("protocol_version") == "1.6.0"
         and record.get("formal_binding_sha256") == binding_sha256
         and _file_sha256(FORMAL_BINDING_ATTEMPT_PATH / "formal-binding.json") == binding_sha256
         and record.get("formal_binding_attempt_path") == str(FORMAL_BINDING_ATTEMPT_PATH)
@@ -1739,7 +1763,7 @@ def _verify_formal_launch_record(
         and attempt_primary.get("binding_file") == "formal-binding.json"
         and completion.get("terminal_sha256") == record.get("formal_binding_attempt_manifest_sha256")
         and record.get("attempt_directory") == path.parent.name
-        and record.get("global_marker_file") == "formal-launch-v1.5.0.json"
+        and record.get("global_marker_file") == "formal-launch-v1.6.0.json"
         and record.get("git_commit") == execution.get("git_commit")
         and record.get("git_tree") == execution.get("git_tree")
         and record_sha256 == _canonical_sha256(body),
@@ -1789,9 +1813,9 @@ def verify_result(path: Path, binding_path: Path | None) -> dict[str, Any]:
     protocol = verify_protocol()
     result = _load_json(path)
     _validate_json_schema(result, _load_json(RESULT_SCHEMA_PATH), label="raw result")
-    _require(result.get("schema") == "prospect.world-model-lifecycle.raw-result.v5", "wrong result schema")
+    _require(result.get("schema") == "prospect.world-model-lifecycle.raw-result.v6", "wrong result schema")
     _require(result.get("experiment_id") == "WM-001", "result has wrong experiment")
-    _require(result.get("protocol_version") == "1.5.0", "result has wrong protocol version")
+    _require(result.get("protocol_version") == "1.6.0", "result has wrong protocol version")
     _require(result.get("protocol_sha256") == _file_sha256(PROTOCOL_PATH), "result protocol digest mismatch")
 
     lane = result.get("lane")
@@ -1945,7 +1969,7 @@ def _verify_formal_matrix(
     *,
     replicate_id: str,
 ) -> None:
-    """Require the exact sealed v1.5 formal evidence matrix."""
+    """Require the exact sealed v1.6 formal evidence matrix."""
 
     episodes = replicate["episodes"]
     actual_episode_counts = Counter(_row_contract(row) for row in episodes)
@@ -2457,7 +2481,7 @@ def _verify_replicate(
         coverage = metric.get("interval_90_coverage")
         _require(
             metric.get("coverage_semantics") == COVERAGE_SEMANTICS,
-            f"{replicate_id}: predictive coverage semantics differ from v1.5",
+            f"{replicate_id}: predictive coverage semantics differ from v1.6",
         )
         _require(
             isinstance(transition_count, int)

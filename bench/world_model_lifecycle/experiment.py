@@ -1,7 +1,7 @@
 """End-to-end WM-001 experiment harness.
 
 This module executes the sealed causal sequence.  Formal configuration is
-accepted only at the exact protocol budgets; the v1.5 development rehearsal
+accepted only at the exact protocol budgets; the v1.6 development rehearsal
 uses the same budgets but remains permanently claim-ineligible.
 """
 
@@ -137,7 +137,7 @@ def _runtime_custody_value(payload: bytes) -> tuple[dict[str, object], int]:
     schema = value.get("schema")
     if schema == "prospect.wm001.runtime-seal.v1":
         return cast(dict[str, object], value), 2
-    if schema == "prospect.world-model-lifecycle.formal-binding.v5":
+    if schema == "prospect.world-model-lifecycle.formal-binding.v6":
         return cast(dict[str, object], value), 1
     raise RuntimeError("captured runtime seal has an unsupported schema")
 
@@ -247,7 +247,7 @@ def _verify_live_bootstrap_custody() -> dict[str, object]:
             "process_environment": seal.get("process_environment"),
         }
         expected_bootstrap = seal.get("bootstrap_source_sha256")
-    elif seal.get("schema") == "prospect.world-model-lifecycle.formal-binding.v5":
+    elif seal.get("schema") == "prospect.world-model-lifecycle.formal-binding.v6":
         source = cast(dict[str, object], seal.get("source", {}))
         dependencies = cast(dict[str, object], seal.get("dependencies", {}))
         runtime = cast(dict[str, object], seal.get("runtime", {}))
@@ -278,6 +278,17 @@ def _verify_live_bootstrap_custody() -> dict[str, object]:
     ):
         raise RuntimeError("live runtime closure differs from its pre-import bootstrap seal")
     return custody
+
+
+def _recheck_live_bootstrap_custody(
+    expected: dict[str, object],
+) -> None:
+    """Require exact custody again after lazy runtime initialization."""
+
+    if _verify_live_bootstrap_custody() != expected:
+        raise RuntimeError(
+            "live runtime custody identity changed after conformance"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1623,7 +1634,7 @@ def run_restart_parity(
     runtime_seal = cast(dict[str, object], bootstrap_custody["runtime_seal"])
     closure_block = (
         cast(dict[str, object], runtime_seal.get("dependencies", {}))
-        if runtime_seal.get("schema") == "prospect.world-model-lifecycle.formal-binding.v5"
+        if runtime_seal.get("schema") == "prospect.world-model-lifecycle.formal-binding.v6"
         else runtime_seal
     )
     package_rows = closure_block.get("package_roots")
@@ -2540,7 +2551,7 @@ def run_experiment(
             raise ValueError("formal execution requires its pre-run implementation binding")
         if (
             cast(dict[str, object], bootstrap_custody["runtime_seal"]).get("schema")
-            != "prospect.world-model-lifecycle.formal-binding.v5"
+            != "prospect.world-model-lifecycle.formal-binding.v6"
             or formal_binding_path.read_bytes() != bootstrap_custody["runtime_seal_payload"]
         ):
             raise ValueError("formal binding differs from the pre-import runtime seal")
@@ -2578,6 +2589,7 @@ def run_experiment(
             formal_preflight_reports,
             binding_path=formal_binding_path,
         )
+        _recheck_live_bootstrap_custody(bootstrap_custody)
         _, formal_launch_sha256 = claim_formal_launch_with_digest(
             formal_binding_path,
             output_directory,
@@ -2600,6 +2612,7 @@ def run_experiment(
         )
         if oscillator_conformance.get("passed") is not True:
             raise RuntimeError("independent oscillator conformance preflight failed")
+        _recheck_live_bootstrap_custody(bootstrap_custody)
     replicate_results: list[dict[str, object]] = []
     for master_seed in config.master_seeds:
         replicate = run_replicate(
@@ -2646,7 +2659,7 @@ def run_experiment(
     runtime_seal = cast(dict[str, object], bootstrap_custody["runtime_seal"])
     closure_block = (
         cast(dict[str, object], runtime_seal.get("dependencies", {}))
-        if runtime_seal.get("schema") == "prospect.world-model-lifecycle.formal-binding.v5"
+        if runtime_seal.get("schema") == "prospect.world-model-lifecycle.formal-binding.v6"
         else runtime_seal
     )
     package_root_inventories = closure_block.get("package_roots")
@@ -2661,9 +2674,9 @@ def run_experiment(
     ):
         raise RuntimeError("captured runtime seal has malformed closure inventories")
     result: dict[str, object] = {
-        "schema": "prospect.world-model-lifecycle.raw-result.v5",
+        "schema": "prospect.world-model-lifecycle.raw-result.v6",
         "experiment_id": "WM-001",
-        "protocol_version": "1.5.0",
+        "protocol_version": "1.6.0",
         "protocol_sha256": PROTOCOL_SHA256,
         "lane": config.lane,
         "claim_eligible": config.lane == "formal",
