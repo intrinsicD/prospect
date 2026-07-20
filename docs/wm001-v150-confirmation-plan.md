@@ -148,11 +148,26 @@ support root. The finalized `runtime-seal-v1.5.0-attempt-2.json` remains
 preserved; no `qualification-v1.5.0-attempt-2` directory or result was
 created. The repair derives the protocol and result-schema support files from
 the same explicit live repository root as the frozen scientific sources, and
-moves the only outcome-producing qualification and its seal to fresh
-`*-attempt-3` paths.
+moved the next qualification and seal to fresh `*-attempt-3` paths.
 
-Neither repair changes a scientific component, seed, budget, controller,
-metric, or threshold.
+That bootstrap-inventory rehearsal passed, but it only rechecked descriptor
+stability around the inventory work. The subsequent development entry again
+stopped at its first live-closure comparison, before task reset, collection,
+training, evaluation, or a result write. The preserved
+`qualification-v1.5.0-attempt-3` failure showed that the standard-library
+bootstrap hashed the package-ownership JSON identity with its file-terminating
+newline while the imported binder and independent auditor hashed the same
+canonical JSON value without a newline. Counts and owner rows were identical;
+only the framing digest differed.
+
+The repair gives the bootstrap an explicit canonical-value encoder for the
+ownership digest, independently tests equality with the binder, and makes the
+sealed bootstrap-inventory rehearsal invoke the same full live-closure
+recomputation as the experiment entrypoint. The only outcome-producing
+qualification and its seal therefore move to fresh `*-attempt-4` paths.
+
+None of these repairs changes a scientific component, seed, budget,
+controller, metric, or threshold.
 
 ## One audit runner everywhere
 

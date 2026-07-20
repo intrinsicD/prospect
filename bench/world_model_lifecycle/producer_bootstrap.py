@@ -68,17 +68,18 @@ class BootstrapError(RuntimeError):
     """The process differs from its pre-import runtime seal."""
 
 
+def _canonical_value_bytes(value: object) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
 def _canonical_bytes(value: object) -> bytes:
-    return (
-        json.dumps(
-            value,
-            ensure_ascii=False,
-            allow_nan=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        + b"\n"
-    )
+    return _canonical_value_bytes(value) + b"\n"
 
 
 def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -569,7 +570,9 @@ def _package_ownership(root: Path) -> dict[str, object]:
         "file_count": len(actual_files),
         "directory_count": len(actual_directories),
         "shared_file_count": shared_file_count,
-        "identity_sha256": hashlib.sha256(_canonical_bytes(ownership_identity)).hexdigest(),
+        "identity_sha256": hashlib.sha256(
+            _canonical_value_bytes(ownership_identity)
+        ).hexdigest(),
     }
 
 

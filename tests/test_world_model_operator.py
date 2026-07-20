@@ -83,7 +83,7 @@ def operator_space(
     formal_audit = audit_root / "formal-audit-v1.5.0"
     formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.5.0.json"
     development_qualification = (
-        lifecycle / "results" / "development" / "qualification-v1.5.0-attempt-3"
+        lifecycle / "results" / "development" / "qualification-v1.5.0-attempt-4"
     )
     development_closure = lifecycle / "results" / "development" / "development-closure-v1.5.0.json"
     closure = closure_root / "development-closure-v1.5.0"

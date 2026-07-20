@@ -19,9 +19,14 @@ The outcome-free failed development preflight at
 finalized seal, `runtime-seal-v1.5.0-attempt-2.json`, is also retained after
 its no-outcome bootstrap-inventory rehearsal rejected a mixed wheel/live
 support root. No `qualification-v1.5.0-attempt-2` directory was created. The
-commands below use fresh `*-attempt-3` paths after binding TorchRL's
-`LAZY_LEGACY_OP=False` default and unifying captured support files under the
-explicit live repository root.
+third finalized seal, `runtime-seal-v1.5.0-attempt-3.json`, and the
+outcome-free failed `qualification-v1.5.0-attempt-3` producer are retained
+after the initial live-closure check exposed inconsistent newline framing in
+the bootstrap's package-ownership identity. The commands below use fresh
+`*-attempt-4` paths after binding TorchRL's `LAZY_LEGACY_OP=False` default,
+unifying captured support roots, aligning the ownership identity encoder, and
+making the sealed rehearsal perform the experiment's exact live-closure
+recomputation.
 
 ## Fixed paths and safe launcher
 
@@ -38,7 +43,7 @@ QA_PY="/home/alex/.venvs/prospect-wm001-v15/bin/python"
 RUNTIME_PY="/home/alex/.venvs/prospect-wm001-v15-runtime/bin/python"
 LAUNCH="$REPO/bench/world_model_lifecycle/launch_bootstrap.py"
 BOOTSTRAP="$REPO/bench/world_model_lifecycle/producer_bootstrap.py"
-RUNTIME_SEAL="$REPO/bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-3.json"
+RUNTIME_SEAL="$REPO/bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-4.json"
 DEV_ROOT="$REPO/bench/world_model_lifecycle/results/development"
 OPERATOR_ROOT="$REPO/bench/world_model_lifecycle/results/operator-v1.5"
 OUTER_ROOT="$REPO/bench/world_model_lifecycle/results/outer-completions/v1.5"
@@ -172,13 +177,28 @@ mkdir -p "$DEV_ROOT"
 The command succeeds only if the repository is clean. The seal and its
 deterministic file in `OUTER_ROOT` must be the same inode with link count two.
 
+Before any outcome-producing command, run the sealed, result-free inventory
+rehearsal. This dispatches the experiment entrypoint's exact live-closure
+recomputation, including the imported package-ownership identity:
+
+```bash
+"${SAFE_ENV[@]}" "$RUNTIME_PY" -I -S -B "$LAUNCH" \
+  --bootstrap "$BOOTSTRAP" \
+  --runtime-seal "$RUNTIME_SEAL" \
+  -- preformal-runtime bootstrap-inventory-conformance \
+  --device cuda
+```
+
+Any refusal here stops the confirmation without consuming a development
+qualification. Do not launch development until the rehearsal returns zero.
+
 ## One development qualification
 
 Choose one new direct child of the development root and run the fixed two
 development seeds without overrides:
 
 ```bash
-DEV="$DEV_ROOT/qualification-v1.5.0-attempt-3"
+DEV="$DEV_ROOT/qualification-v1.5.0-attempt-4"
 
 "${SAFE_ENV[@]}" "$RUNTIME_PY" -I -S -B "$LAUNCH" \
   --bootstrap "$BOOTSTRAP" \
@@ -268,7 +288,7 @@ BINDING="$BINDING_ATTEMPT/formal-binding.json"
   --closure-attempt "$CLOSURE_ATTEMPT" \
   --device cuda
 
-"$QA_PY" -m bench.world_model_lifecycle.verify binding "$BINDING"
+"$QA_PY" -I -B -m bench.world_model_lifecycle.verify binding "$BINDING"
 ```
 
 The formal binding remains singly linked inside the accepted attempt. Formal
@@ -288,6 +308,28 @@ Before formal launch, repeat all read-only repository checks and verify:
 - every required outer-completion marker is present and same-inode;
 - no unreviewed source, lock, protocol, schema, documentation, or environment
   change occurred after the prospective review and binding.
+
+Execute those checks rather than relying on the earlier commands:
+
+```bash
+test ! -e "$REPO/bench/world_model_lifecycle/results/formal/formal-launch-v1.5.0.json"
+test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+"$QA_PY" -I -B -m bench.world_model_lifecycle.verify protocol
+"$QA_PY" -I -B -m bench.world_model_lifecycle.verify result "$DEV/result.json"
+"$QA_PY" -I -B -m bench.world_model_lifecycle.preformal verify-report \
+  --report "$PREFORMAL"
+"$QA_PY" -I -B -m bench.world_model_lifecycle.verify binding "$BINDING"
+
+"$QA_PY" -I -B -c \
+  'import sys; from pathlib import Path; from bench.world_model_lifecycle.artifact import verify_producer_manifest; from bench.world_model_lifecycle.binding import verify_development_closure; from bench.world_model_lifecycle.operator import verify_operator_attempt,verify_outer_completion; producer=Path(sys.argv[1]); verify_producer_manifest(producer); verify_outer_completion(producer/"producer-manifest.json"); [verify_operator_attempt(Path(value)) for value in sys.argv[2:5]]; verify_development_closure(Path(sys.argv[5]))' \
+  "$DEV" "$DEV_AUDIT" "$CLOSURE_ATTEMPT" "$BINDING_ATTEMPT" "$DEV_CLOSURE"
+```
+
+The binding verifier reopens the bound commit, tree, implementation manifest,
+development identity, runtime closure, and operator authorization. The
+attempt verifiers also require each terminal and deterministic outer
+completion to be the same inode.
 
 Any failure stops the confirmation. Fixing it requires a new protocol version
 if it changes a closed qualification, bound source, dependency, environment,
@@ -366,7 +408,11 @@ accepted disposition merely from the producer's summary. Then adjudicate:
 
 ```bash
 SEMANTIC_REVIEW="$REPO/artifacts/wm001-reviews/formal-v1.5.0.json"
-DISPOSITION="accepted"  # use rejected if the audit/review requires rejection
+: "${DISPOSITION:?set DISPOSITION to accepted or rejected only after the independent review}"
+case "$DISPOSITION" in
+  accepted|rejected) ;;
+  *) echo "invalid semantic-review disposition: $DISPOSITION" >&2; exit 2 ;;
+esac
 
 set +e
 "${SAFE_ENV[@]}" "$RUNTIME_PY" -I -S -B "$LAUNCH" \

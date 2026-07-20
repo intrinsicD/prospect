@@ -75,6 +75,47 @@ def test_bound_audit_support_paths_share_the_explicit_repository_root(
     }
 
 
+def test_package_ownership_identity_matches_standard_library_bootstrap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "site-packages"
+    package = root / "fixture"
+    metadata = root / "fixture-1.0.dist-info"
+    package.mkdir(parents=True)
+    metadata.mkdir()
+    (package / "__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (metadata / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: fixture\nVersion: 1.0\n\n",
+        encoding="utf-8",
+    )
+    (metadata / "RECORD").write_text(
+        "fixture/__init__.py,,\n"
+        "fixture-1.0.dist-info/METADATA,,\n"
+        "fixture-1.0.dist-info/RECORD,,\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(binding_module, "package_roots", lambda: (root,))
+
+    bootstrap_identity = producer_bootstrap._package_ownership(root)
+    imported_identity = binding_module.package_root_ownership()
+    identity_value = {
+        "semantics_id": "prospect.wm001.package-ownership.v1",
+        "root": str(root),
+        "files": [
+            {"path": "fixture-1.0.dist-info/METADATA", "owners": ["fixture"]},
+            {"path": "fixture-1.0.dist-info/RECORD", "owners": ["fixture"]},
+            {"path": "fixture/__init__.py", "owners": ["fixture"]},
+        ],
+        "directories": ["fixture", "fixture-1.0.dist-info"],
+    }
+
+    assert bootstrap_identity == imported_identity
+    assert bootstrap_identity["identity_sha256"] == hashlib.sha256(
+        binding_module.canonical_json_bytes(identity_value)
+    ).hexdigest()
+
+
 def test_record_hash_identity_uses_file_hash_fields_not_repr() -> None:
     value = importlib.metadata.FileHash("sha256=YWJj")
 

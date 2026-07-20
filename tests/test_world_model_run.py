@@ -39,6 +39,8 @@ assert DEVELOPMENT_CLOSURE_PATH is not None
 assert ExperimentConfig is not None
 assert FORMAL_BINDING_ATTEMPT_PATH is not None
 assert register_outer_terminal is not None
+config = ExperimentConfig.development(device="cuda")
+config.validate()
 assert os.environ == before
 """
     completed = subprocess.run(
@@ -114,7 +116,7 @@ def test_installed_runner_derives_qualification_from_canonical_git_worktree(
         lifecycle
         / "results"
         / "development"
-        / "qualification-v1.5.0-attempt-3"
+        / "qualification-v1.5.0-attempt-4"
     )
 
 
@@ -123,7 +125,7 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.5.0-attempt-3"
+    qualification = root / "qualification-v1.5.0-attempt-4"
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
     monkeypatch.setattr(run, "DEVELOPMENT_QUALIFICATION_PATH", qualification)
 

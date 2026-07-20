@@ -356,7 +356,7 @@ def _prospective_runtime_seal(repository: Path) -> Path:
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "runtime-seal-v1.5.0-attempt-3.json"
+        / "runtime-seal-v1.5.0-attempt-4.json"
     )
 
 
@@ -423,7 +423,7 @@ def _verify_development_producer(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.5.0-attempt-3"
+        / "qualification-v1.5.0-attempt-4"
     )
     _reject_symlink_components(root, label="canonical development qualification")
     if not root.is_dir():
@@ -587,7 +587,7 @@ def _verify_development_audit(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.5.0-attempt-3"
+        / "qualification-v1.5.0-attempt-4"
     )
     if (
         set(manifest) != expected_fields
@@ -783,7 +783,7 @@ def _verify_closure_authorization(
     expected_producer = (
         results
         / "development"
-        / "qualification-v1.5.0-attempt-3"
+        / "qualification-v1.5.0-attempt-4"
     )
     if (
         set(reference) != expected_reference_fields

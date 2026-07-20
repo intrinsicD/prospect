@@ -878,7 +878,7 @@ def required_commands(
     )
     runtime_seal = (
         REPO
-        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-3.json"
+        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-4.json"
         if runtime_seal_path is None
         else _canonical_existing_file(runtime_seal_path, label="runtime seal")
     )
@@ -1594,6 +1594,8 @@ def _captured_payload(prefix: str) -> bytes:
 
 
 def _verify_live_bootstrap_custody() -> dict[str, Any]:
+    from .experiment import _verify_live_bootstrap_custody as verify_live_closure
+
     runtime_payload = _captured_payload("runtime_seal")
     _captured_payload("bootstrap")
     seal = _load_canonical_object(runtime_payload, label="captured runtime seal")
@@ -1605,6 +1607,16 @@ def _verify_live_bootstrap_custody() -> dict[str, Any]:
         or seal.get("assurance") != ASSURANCE
     ):
         raise PreformalEvidenceError("captured runtime seal is malformed")
+    try:
+        live_custody = verify_live_closure()
+    except RuntimeError as error:
+        raise PreformalEvidenceError(
+            "live runtime closure differs from its pre-import bootstrap seal"
+        ) from error
+    if live_custody.get("runtime_seal") != seal:
+        raise PreformalEvidenceError(
+            "recomputed runtime closure returned a different captured seal"
+        )
     return seal
 
 

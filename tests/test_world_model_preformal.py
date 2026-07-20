@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from bench.world_model_lifecycle import experiment as experiment_module
 from bench.world_model_lifecycle import operator as operator_module
 from bench.world_model_lifecycle import preformal
 
@@ -246,7 +247,20 @@ def test_live_bootstrap_custody_rejects_assurance_overstatement(
         "_captured_payload",
         lambda prefix: payload if prefix == "runtime_seal" else b"bootstrap",
     )
+    recomputations = 0
+
+    def verify_live_closure() -> dict[str, object]:
+        nonlocal recomputations
+        recomputations += 1
+        return {"runtime_seal": seal}
+
+    monkeypatch.setattr(
+        experiment_module,
+        "_verify_live_bootstrap_custody",
+        verify_live_closure,
+    )
     assert preformal._verify_live_bootstrap_custody() == seal
+    assert recomputations == 1
 
     assurance = seal["assurance"]
     assert isinstance(assurance, dict)
@@ -255,6 +269,57 @@ def test_live_bootstrap_custody_rejects_assurance_overstatement(
     with pytest.raises(
         preformal.PreformalEvidenceError,
         match="captured runtime seal is malformed",
+    ):
+        preformal._verify_live_bootstrap_custody()
+
+
+def test_live_bootstrap_custody_translates_exact_recomputation_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seal = _runtime_seal(Path(sys.executable))
+    payload = _canonical(seal)
+    monkeypatch.setattr(
+        preformal,
+        "_captured_payload",
+        lambda prefix: payload if prefix == "runtime_seal" else b"bootstrap",
+    )
+
+    def reject_live_closure() -> dict[str, object]:
+        raise RuntimeError("package ownership differs")
+
+    monkeypatch.setattr(
+        experiment_module,
+        "_verify_live_bootstrap_custody",
+        reject_live_closure,
+    )
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="live runtime closure differs from its pre-import bootstrap seal",
+    ):
+        preformal._verify_live_bootstrap_custody()
+
+
+def test_live_bootstrap_custody_rejects_mismatched_recomputed_seal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seal = _runtime_seal(Path(sys.executable))
+    payload = _canonical(seal)
+    monkeypatch.setattr(
+        preformal,
+        "_captured_payload",
+        lambda prefix: payload if prefix == "runtime_seal" else b"bootstrap",
+    )
+    mismatched = dict(seal)
+    mismatched["protocol_version"] = "unexpected"
+    monkeypatch.setattr(
+        experiment_module,
+        "_verify_live_bootstrap_custody",
+        lambda: {"runtime_seal": mismatched},
+    )
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="recomputed runtime closure returned a different captured seal",
     ):
         preformal._verify_live_bootstrap_custody()
 
