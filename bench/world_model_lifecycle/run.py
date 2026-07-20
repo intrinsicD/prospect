@@ -45,7 +45,7 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_QUALIFICATION_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.5.0-attempt-2"
+    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.5.0-attempt-3"
 )
 
 

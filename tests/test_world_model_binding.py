@@ -20,6 +20,61 @@ from bench.world_model_lifecycle.assurance import TRUST_MODEL_STATEMENT
 from bench.world_model_lifecycle.planning import run_pendulum_conformance
 
 
+def test_bound_audit_support_paths_share_the_explicit_repository_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "repository"
+    support_root = repository / "bench" / "world_model_lifecycle"
+    wheel_protocol = tmp_path / "site-packages" / "bench" / "world_model_lifecycle" / "protocol.json"
+    observed: dict[str, object] = {}
+
+    class ExpectedCall(Exception):
+        pass
+
+    def capture_request(
+        protocol_path: Path,
+        **arguments: object,
+    ) -> dict[str, object]:
+        observed["protocol_path"] = protocol_path
+        observed.update(arguments)
+        raise ExpectedCall
+
+    monkeypatch.setattr(binding_module, "REPO", repository)
+    monkeypatch.setattr(binding_module, "PROTOCOL_PATH", wheel_protocol)
+    monkeypatch.setattr(
+        artifact_audit,
+        "build_prebinding_conformance_request",
+        capture_request,
+    )
+
+    with pytest.raises(ExpectedCall):
+        binding_module.build_bound_audit_execution(
+            device="cuda",
+            packages=[],
+            roots=(),
+            standard_library={"path": str(tmp_path / "stdlib")},
+            producer_environment={
+                "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+                "LAZY_LEGACY_OP": "False",
+                "LC_ALL": "C.UTF-8",
+                "PATH": "/usr/bin:/bin",
+                "TZ": "UTC",
+            },
+        )
+
+    assert observed["protocol_path"] == support_root / "protocol.json"
+    assert observed["support_locator_root"] == support_root
+    scientific_sources = observed["scientific_source_paths"]
+    assert isinstance(scientific_sources, dict)
+    assert set(scientific_sources.values()) == {
+        support_root / "learning.py",
+        support_root / "model.py",
+        support_root / "planning.py",
+        support_root / "runtime_lane.py",
+    }
+
+
 def test_record_hash_identity_uses_file_hash_fields_not_repr() -> None:
     value = importlib.metadata.FileHash("sha256=YWJj")
 

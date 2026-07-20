@@ -125,7 +125,7 @@ accepted binding attempt; its sibling terminal `operator-attempt.json` and
 deterministic outer-completion marker establish the attempt's publication.
 Copied, direct, failed, or unfinalized binding files are not runtime seals.
 
-## Outcome-free preflight repair
+## Outcome-free preflight repairs
 
 The first development invocation stopped at the initial live-bootstrap custody
 check, before any task reset, experience collection, training, evaluation, or
@@ -139,9 +139,20 @@ TorchRL dependency materialized its default `LAZY_LEGACY_OP=False` setting
 after the pre-import seal, so the exact pre/post environment comparison
 correctly rejected the process. The repair explicitly fixes and binds that
 same default value, adds a fresh-process no-environment-mutation regression,
-and moves the only outcome-producing development qualification and its runtime
-seal to the non-overwriting `*-attempt-2` paths. No scientific component,
-seed, budget, controller, metric, or threshold changed.
+and moved the next seal to a non-overwriting `*-attempt-2` path.
+
+The exact sealed bootstrap-inventory rehearsal then stopped before development
+launch because the installed binder supplied its wheel-local `protocol.json`
+while requiring every support locator to be relative to the live repository
+support root. The finalized `runtime-seal-v1.5.0-attempt-2.json` remains
+preserved; no `qualification-v1.5.0-attempt-2` directory or result was
+created. The repair derives the protocol and result-schema support files from
+the same explicit live repository root as the frozen scientific sources, and
+moves the only outcome-producing qualification and its seal to fresh
+`*-attempt-3` paths.
+
+Neither repair changes a scientific component, seed, budget, controller,
+metric, or threshold.
 
 ## One audit runner everywhere
 

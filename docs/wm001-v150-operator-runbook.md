@@ -15,9 +15,13 @@ If it exists, do not run a formal command again.
 
 The outcome-free failed development preflight at
 `results/development/qualification-v1.5.0` and its finalized
-`runtime-seal-v1.5.0.json` are retained and must not be changed. The commands
-below use fresh `*-attempt-2` paths after binding TorchRL's
-`LAZY_LEGACY_OP=False` default.
+`runtime-seal-v1.5.0.json` are retained and must not be changed. The second
+finalized seal, `runtime-seal-v1.5.0-attempt-2.json`, is also retained after
+its no-outcome bootstrap-inventory rehearsal rejected a mixed wheel/live
+support root. No `qualification-v1.5.0-attempt-2` directory was created. The
+commands below use fresh `*-attempt-3` paths after binding TorchRL's
+`LAZY_LEGACY_OP=False` default and unifying captured support files under the
+explicit live repository root.
 
 ## Fixed paths and safe launcher
 
@@ -34,7 +38,7 @@ QA_PY="/home/alex/.venvs/prospect-wm001-v15/bin/python"
 RUNTIME_PY="/home/alex/.venvs/prospect-wm001-v15-runtime/bin/python"
 LAUNCH="$REPO/bench/world_model_lifecycle/launch_bootstrap.py"
 BOOTSTRAP="$REPO/bench/world_model_lifecycle/producer_bootstrap.py"
-RUNTIME_SEAL="$REPO/bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-2.json"
+RUNTIME_SEAL="$REPO/bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-3.json"
 DEV_ROOT="$REPO/bench/world_model_lifecycle/results/development"
 OPERATOR_ROOT="$REPO/bench/world_model_lifecycle/results/operator-v1.5"
 OUTER_ROOT="$REPO/bench/world_model_lifecycle/results/outer-completions/v1.5"
@@ -174,7 +178,7 @@ Choose one new direct child of the development root and run the fixed two
 development seeds without overrides:
 
 ```bash
-DEV="$DEV_ROOT/qualification-v1.5.0-attempt-2"
+DEV="$DEV_ROOT/qualification-v1.5.0-attempt-3"
 
 "${SAFE_ENV[@]}" "$RUNTIME_PY" -I -S -B "$LAUNCH" \
   --bootstrap "$BOOTSTRAP" \

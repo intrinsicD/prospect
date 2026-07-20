@@ -202,7 +202,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
         / "world_model_lifecycle"
         / "results"
     )
-    producer = results / "development" / "qualification-v1.5.0-attempt-2"
+    producer = results / "development" / "qualification-v1.5.0-attempt-3"
     producer_manifest = producer / "producer-manifest.json"
     producer_result = producer / "result.json"
     producer_rows = [

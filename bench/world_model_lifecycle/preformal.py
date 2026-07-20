@@ -878,7 +878,7 @@ def required_commands(
     )
     runtime_seal = (
         REPO
-        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-2.json"
+        / "bench/world_model_lifecycle/results/development/runtime-seal-v1.5.0-attempt-3.json"
         if runtime_seal_path is None
         else _canonical_existing_file(runtime_seal_path, label="runtime seal")
     )

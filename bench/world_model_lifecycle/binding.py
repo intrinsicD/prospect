@@ -271,6 +271,8 @@ def build_bound_audit_execution(
         raise ValueError("audit execution requires at least three source-mode repeats")
     auditor_source = Path(__file__).with_name("artifact_audit.py")
     support_root = REPO / "bench" / "world_model_lifecycle"
+    protocol_path = support_root / "protocol.json"
+    result_schema_path = support_root / "schemas" / "raw-result.schema.json"
     scientific_sources = {
         name: support_root / name
         for name in (
@@ -285,7 +287,7 @@ def build_bound_audit_execution(
         "standard-library": Path(str(standard_library["path"])),
     }
     request = build_prebinding_conformance_request(
-        PROTOCOL_PATH,
+        protocol_path,
         scientific_source_paths=scientific_sources,
         root_paths=root_paths,
         device=device,
@@ -295,7 +297,7 @@ def build_bound_audit_execution(
     request_bytes = canonical_prebinding_request_bytes(request)
     safe_environment = _audit_environment(producer_environment)
     support_sources = {
-        "protocol.json": PROTOCOL_PATH,
+        "protocol.json": protocol_path,
         **scientific_sources,
     }
     with tempfile.TemporaryDirectory(
@@ -328,8 +330,8 @@ def build_bound_audit_execution(
     conformance_report = conformance.path_execution.stdout
     conformance_receipt = conformance_receipt_bytes(conformance)
     outcome_support_files = {
-        "protocol.json": PROTOCOL_PATH,
-        "schemas/raw-result.schema.json": RESULT_SCHEMA_PATH,
+        "protocol.json": protocol_path,
+        "schemas/raw-result.schema.json": result_schema_path,
     }
     outcome_runtime = build_runtime_manifest(
         auditor_source,

@@ -93,7 +93,7 @@ def _formal_binding_attempt(
     )
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_bytes(_canonical({"passed": True}))
-    producer = results / "development" / "qualification-v1.5.0-attempt-2"
+    producer = results / "development" / "qualification-v1.5.0-attempt-3"
     producer.mkdir()
     result = producer / "result.json"
     result.write_bytes(
@@ -607,7 +607,7 @@ def test_completed_runtime_seal_rejects_missing_or_forged_marker(
     runtime_seal = (
         results
         / "development"
-        / "runtime-seal-v1.5.0-attempt-2.json"
+        / "runtime-seal-v1.5.0-attempt-3.json"
     )
     runtime_seal.parent.mkdir()
     runtime_seal.write_bytes(_canonical(_prospective_runtime_seal_value()))
@@ -1257,7 +1257,7 @@ def test_real_outer_launcher_dispatches_actual_producer_bootstrap(
         lifecycle
         / "results"
         / "development"
-        / "runtime-seal-v1.5.0-attempt-2.json"
+        / "runtime-seal-v1.5.0-attempt-3.json"
     )
     runtime_seal.parent.mkdir(parents=True, exist_ok=True)
     environment = {

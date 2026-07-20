@@ -34,7 +34,7 @@ nvidia-nvshmem-cu12==3.3.20 --distribution-sha256=55852fc75afc8ea3784b677e2bfe76
 nvidia-nvtx-cu12==12.8.90 --distribution-sha256=768bb8860727103d9250e2ea95e9c03aa226153ab2549092a53500c65612dac7
 orjson==3.11.9 --distribution-sha256=bc7bcfae42b7961caa680d26402a8eb39738f5f3e1b856d3aac83db23d09dd8d
 packaging==24.2 --distribution-sha256=2d6ad0d304cad02f9eb0a097764c724cebdc5a77cdee253cba36e81adbd01629
-prospect==0.0.1 --distribution-sha256=7cb496ccbc01e5c2ada3093bc1a4861b34dbdfb72a3ed1b02dff0d42fdfccef3
+prospect==0.0.1 --distribution-sha256=24350b1f0a97a390432793e64f56d5c6f36bc22a9594b5f83b6f89f7f1d86526
 pyvers==0.2.3 --distribution-sha256=6dd75b92d86220ffad7642c7825549fc428954c452cfd98c9d435a6be539ce7d
 referencing==0.37.0 --distribution-sha256=771c0599ef6190537198d7edacc339e7cbe5d20f3230c0a756a2e89a4e0740cf
 rpds-py==2026.6.3 --distribution-sha256=906aeb81e70a7113280bf5f9b1bf6cb2da6a300e3191f0f74a8211d06738578a
