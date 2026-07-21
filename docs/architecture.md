@@ -468,21 +468,21 @@ verified, a second `TarFile` iterator replayed a cached member and the valid
 archive was falsely rejected as having a physical extra member. The terminal
 failed binding was outer-finalized; no formal launch or formal outcome exists.
 
-Protocol 1.15 is the fresh prospective successor. It preserves the scientific
-system, formal-binding v10, raw-result v9, and all previous runtime,
-stream/schema, and report-role repairs. It keeps one independent archive
-iterator through exhaustion, roots membership in the archived producer
-manifest, binds both bootstraps and every live authorization input to the
-corresponding archived role, and enforces strict JSON scalar identity, real
-timestamp ordering, stable single-link reads, canonical closure naming,
-archive namespace/collision safety, bounded aggregate retained evidence, and
-empty stderr for all ten preformal commands. A shared real archive regression,
-real producer/audit-to-closure authorization role joins, and separate complete
-qualification/formal-input tests bind those distinctions. It uses fresh paths,
-environments, seeds, wheel, lock, schemas, seal, prospective review, and
-evidence claims. The plan and exact operator sequence are in the
+Protocol 1.15 repaired the archive-reader boundary and passed its prospective
+gates, development, accepted audit, closure, fresh-runtime reopen, preformal
+report, accepted binding, and the operator-recorded final stop/go sequence. Its
+sole formal invocation then returned `1` before producer custody. The
+operator-diagnostic traceback
+identifies a separate standard-library custody defect: the launcher reused its
+64 MiB bounded control-file reader for every development-producer file and
+therefore rejected the authenticated 320,977,868-byte `result.json`. The
+fsynced binding-keyed root was consumed, but no formal
+marker, confirmation directory, producer, outcome, audit, review, or
+adjudication exists. The plan and frozen operator sequence remain in the
 [v1.15 confirmation plan](wm001-v1150-confirmation-plan.md) and
-[v1.15 operator runbook](wm001-v1150-operator-runbook.md).
+[v1.15 operator runbook](wm001-v1150-operator-runbook.md); the terminal
+disposition and fresh-version repair requirements are in the
+[v1.15 formal-invocation failure](wm001-v1150-formal-invocation-failure.md).
 
 ## Open engineering boundaries
 
@@ -491,13 +491,11 @@ evidence claims. The plan and exact operator sequence are in the
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocols 1.10 through 1.14 are terminally retired without formal authority.
-  Protocol 1.15 is the fresh prospective successor and must pass the real
-  continuous-iterator archive, archived-manifest membership, bootstrap/live
-  authorization linkage, strict-scalar/timestamp, collision, aggregate-limit,
-  formal-binding stream/schema, recorded-versus-live, warning-free precision,
-  and all-ten-command empty-stderr gates before any new outcome-producing
-  attempt.
+- Protocols 1.10 through 1.15 are terminally retired without formal authority.
+  A fresh successor must retain the v1.15 archive and authorization repairs,
+  separate bounded control parsing from streamed bulk-evidence hashing, and
+  exercise the exact accepted-binding-to-standard-library formal-custody branch
+  with a production-sized result before consuming formal authority.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External

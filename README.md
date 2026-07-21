@@ -142,14 +142,14 @@ which replayed a cached member. The failed binding was outer-finalized and no
 formal launch occurred. Its terminal disposition is preserved in the
 [v1.14 independent archive-verifier failure](docs/wm001-v1140-development-archive-membership-failure.md).
 
-Protocol 1.15 is the active prospective confirmation. It preserves the
-scientific system and serialized contracts, retains one archive iterator
-through exhaustion, roots membership in the archived producer manifest, binds
-both bootstraps and every live authorization input to its archived role,
-enforces strict JSON scalar and real timestamp semantics, repairs archive-name
-collision handling, bounds aggregate retained evidence, requires empty stderr
-for all ten preformal commands, and adds a shared real archive regression plus
-real producer/audit-to-closure role-join regressions. It uses fresh seeds,
-environments, and namespaces and cannot reuse v1.14 evidence. Follow the
-[WM-001 v1.15 operator runbook](docs/wm001-v1150-operator-runbook.md) before
-creating any development evidence, implementation binding, or formal attempt.
+Protocol 1.15 repaired the archive-reader boundary and passed its prospective
+gates, result-free rehearsal, development, accepted audit, closure, fresh
+runtime reopen, all ten preformal commands, accepted binding, and the
+operator-recorded final stop/go sequence. Its sole formal invocation then
+returned `1` before producer
+custody. The operator-diagnostic traceback identifies the standard-library
+launcher applying its 64 MiB control-file reader to the 320,977,868-byte
+development result. The fsynced binding-keyed root is consumed and remains
+empty; no formal marker, producer, outcome, audit, review, or adjudication
+exists. Its terminal disposition and evidence caveat are preserved in the
+[v1.15 formal-invocation failure](docs/wm001-v1150-formal-invocation-failure.md).
