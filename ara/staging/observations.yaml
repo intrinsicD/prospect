@@ -280,3 +280,58 @@ observations:
     promoted_to: "logic/solution/heuristics.md:H02"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O17
+    timestamp: "2026-07-21T23:03+02:00"
+    provenance: ai-suggested
+    content: >-
+      WM-001 v1.16 establishes engineering qualification through accepted
+      binding but no formal capability result. The mandatory pre-root
+      rehearsal failed before dispatch, development is claim-ineligible, and
+      Prospect's general learning, improvement, and retention capability
+      remains unresolved.
+    context: >-
+      The v1.16 lifecycle reached an accepted, outer-finalized binding, but the
+      result-free accepted-binding rehearsal exposed a stale audit-runtime
+      filename before any formal authority or producer was created.
+    potential_type: claim
+    bound_to: [N23, N25, N26]
+    promoted: true
+    promoted_to: "logic/claims.md:C04"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O18
+    timestamp: "2026-07-21T23:03+02:00"
+    provenance: ai-suggested
+    content: >-
+      Cross-component evidence contracts require artifacts emitted by the real
+      upstream producer to pass through the real independent consumer.
+      Synthetic fixtures whose producers and consumers repeat the same literal
+      cannot establish composition, even when each component passes alone.
+    context: >-
+      The outer-launcher test and launcher agreed on a stale runtime filename,
+      while the actual audit-reproduction receipt correctly named a distinct
+      content-addressed sidecar.
+    potential_type: heuristic
+    bound_to: [N24, N26]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H03"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O19
+    timestamp: "2026-07-21T23:03+02:00"
+    provenance: ai-suggested
+    content: >-
+      A result-free pre-root rehearsal intended to prove return-code and
+      exactly-once behavior requires a deterministic single-use claim plus an
+      authenticated accepted or failed terminal package, while granting no
+      formal authority and creating no formal root.
+    context: >-
+      The v1.16 temporary stdout and stderr captures preserved diagnostics but
+      could not independently authenticate the observed return code or prove
+      exactly-once execution.
+    potential_type: constraint
+    bound_to: [N23, N25, N26]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R09"
+    crystallized_via: artifact-commitment
+    stale: false

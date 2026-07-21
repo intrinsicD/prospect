@@ -2,9 +2,9 @@ session:
   id: "2026-07-21_001"
   date: "2026-07-21"
   started: "2026-07-21T17:03+02:00"
-  last_turn: "2026-07-21T17:03+02:00"
-  turn_count: 1
-  summary: "Retired WM-001 v1.15 after its accepted binding reached a production-scale formal-custody failure before producer dispatch."
+  last_turn: "2026-07-21T23:03+02:00"
+  turn_count: 2
+  summary: "Retired WM-001 v1.16 after engineering qualification reached accepted binding but its mandatory pre-root rehearsal exposed a stale cross-component audit contract."
 
 events_logged:
   - turn: 1
@@ -49,6 +49,48 @@ events_logged:
     routing: crystallized
     provenance: ai-suggested
     summary: "Crystallized exact accepted-binding preclaim rehearsal and result-qualification reuse as H02."
+  - turn: 2
+    type: experiment
+    id: N23
+    routing: direct
+    provenance: ai-executed
+    summary: "Executed the sealed v1.16 lifecycle through accepted binding; the mandatory pre-root rehearsal returned 1 before child dispatch."
+  - turn: 2
+    type: dead_end
+    id: N24
+    routing: direct
+    provenance: ai-executed
+    summary: "A synthetic outer fixture repeated the launcher's stale audit-runtime literal and failed to model the real producer-consumer contract."
+  - turn: 2
+    type: decision
+    id: N25
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired v1.16 without retry or formal authority and reserved the composition repair for a fresh version."
+  - turn: 2
+    type: experiment
+    id: N26
+    routing: direct
+    provenance: ai-executed
+    summary: "Adversarial referees confirmed the exact cause and absence of any v1.16 formal or scientific result."
+  - turn: 2
+    type: claim
+    id: O17
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the absence of any v1.16 formal capability result as C04 through artifact commitment."
+  - turn: 2
+    type: heuristic
+    id: O18
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized real producer-to-consumer contract testing as H03 through artifact commitment."
+  - turn: 2
+    type: constraint
+    id: O19
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized authenticated result-free rehearsal custody as R09 through artifact commitment."
 
 ai_actions:
   - turn: 1
@@ -79,11 +121,50 @@ ai_actions:
       - "bench/world_model_lifecycle/README.md"
       - "docs/architecture.md"
       - "ara/"
+  - turn: 2
+    action: >-
+      Repaired streamed outer evidence custody, terminal-bound development
+      qualification, and accepted-binding rehearsal gates; sealed protocol
+      v1.16 after 799 tests plus static, environment, source, seed, archive,
+      CUDA, and independent prospective-review checks.
+    provenance: ai-executed
+    files_changed:
+      - "bench/world_model_lifecycle/"
+      - "tests/"
+      - "docs/wm001-v1160-confirmation-plan.md"
+      - "docs/wm001-v1160-operator-runbook.md"
+      - "docs/wm001-v1160-prospective-harness-review.json"
+      - "requirements-wm001.lock"
+  - turn: 2
+    action: >-
+      Executed the sealed v1.16 one-shot lifecycle through accepted binding and
+      the final stop/go gate, then stopped when the mandatory result-free
+      pre-root rehearsal failed before dispatch. No formal root or formal
+      artifact was created and no raw development outcome was opened.
+    provenance: ai-executed
+    files_changed:
+      - "bench/world_model_lifecycle/results/operator-v1.16/"
+  - turn: 2
+    action: >-
+      Isolated the stale audit-runtime filename against the canonical
+      audit-reproduction receipt, ran independent cause and results audits,
+      documented the terminal disposition and provenance limits, and updated
+      repository research status surfaces.
+    provenance: ai-executed
+    files_changed:
+      - "docs/wm001-v1160-accepted-binding-rehearsal-failure.md"
+      - "README.md"
+      - "bench/world_model_lifecycle/README.md"
+      - "docs/architecture.md"
+      - "ara/"
 
 claims_touched:
   - id: C03
     action: crystallized
     turn: 1
+  - id: C04
+    action: crystallized
+    turn: 2
 
 key_context:
   - turn: 1
@@ -96,9 +177,19 @@ key_context:
       The precommitted one-shot rule makes the fsynced binding-keyed root
       terminal even though the launcher failed before producing an
       authenticated formal manifest.
+  - turn: 2
+    excerpt: >-
+      The user requested continuation through completion, appropriate commits,
+      merge to main, and remote push after the fresh-version repair and next
+      immutable move.
+  - turn: 2
+    excerpt: >-
+      The mandatory accepted-binding rehearsal failed before child dispatch;
+      the protocol was retired with no retry, no formal authority, and no
+      scientific interpretation of development evidence.
 
 open_threads:
-  - "Decide whether to build a fresh successor with per-consumer streamed producer custody and an exact accepted-binding preclaim rehearsal."
+  - "Build a fresh successor whose real audit-reproduction receipt drives the outer launcher and whose pre-root rehearsal publishes an authenticated single-use terminal."
 
 ai_suggestions_pending:
-  - "Reuse the terminal-bound development-result qualification, enforce exact 4 GiB per-file and 16 GiB aggregate live-producer limits, and exercise the existing result-free binding path before formal-root creation."
+  - "In a fresh protocol version, replace the stale audit-runtime literal with receipt-driven selection, pass a real operator-produced audit package through the launcher in integration tests, and authenticate the result-free rehearsal terminal before any formal root can exist."

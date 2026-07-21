@@ -52,3 +52,31 @@
 - **Adjudication packages**: accepted and rejected intended outputs both absent
 - **Forensic nodes**: N07, N08, N09, N10
 - **Crystallized claim**: C02
+
+## WM-001 protocol 1.16.0 engineering attempt
+
+- **Disposition**: retired at the mandatory accepted-binding pre-root rehearsal;
+  no formal authority or capability result exists
+- **Tracked prospective review**:
+  `docs/wm001-v1160-prospective-harness-review.json`
+- **Tracked terminal review**:
+  `docs/wm001-v1160-accepted-binding-rehearsal-failure.md`
+- **Sealed commit**:
+  `2b5dc659a8a8db872f5d3e6d9655d5da307e857b`
+- **Protocol SHA-256**:
+  `ac7a8aa331f15412c80a1dad6af9b30c154db33b6d313940e8d2ee546b57dc00`
+- **Claim-ineligible development result**: retained opaque at 320,935,092
+  bytes; SHA-256
+  `90868e3d3e1ca2368758251695569f60650042fd53f5255399b358923d1d82d8`
+- **Accepted formal binding SHA-256**:
+  `437ad669deaf02c78e261318a2d40d67847c24ab5007c9b0dc9d0e93b16f5104`
+- **Rehearsal diagnostic capture**:
+  `/tmp/prospect-wm001-v116-binding-rehearsal.na20hR`; stdout was empty and
+  stderr was 1,395 bytes with SHA-256
+  `e2d081dfb354c5c80da6f9fde4301433c375cc10f863d9f8d466e9a464185884`.
+  This temporary capture does not independently authenticate the return code or
+  exactly-once execution.
+- **Formal evidence**: binding-keyed formal root, marker, producer, outcome,
+  audit, review, and adjudication all absent
+- **Forensic nodes**: N23, N24, N25, N26
+- **Crystallized claim**: C04

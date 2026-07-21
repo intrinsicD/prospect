@@ -503,3 +503,100 @@ tree:
     also_depends_on: [N19, N20, N21]
     status: resolved
     children: []
+  - id: N23
+    type: experiment
+    title: "Execute the sealed WM-001 v1.16 lifecycle"
+    provenance: ai-executed
+    timestamp: "2026-07-21T23:03+02:00"
+    result: >-
+      Protocol v1.16 repaired streamed bulk-producer custody and terminal-bound
+      result qualification. The sealed candidate passed the operator-recorded
+      799-test prospective suite, static/environment/source/seed gates,
+      result-free rehearsal, development, accepted byte-identical audit,
+      closure and fresh-runtime reopen, ten-command preformal, accepted binding,
+      and operator-recorded stop/go. The operator-designated pre-root
+      accepted-binding rehearsal then returned 1 with empty stdout and 1,395
+      stderr bytes before child dispatch. Binding-keyed formal root, marker,
+      producer, outcome, audit, review, and adjudication paths remain absent.
+    evidence:
+      - "git:2b5dc659a8a8db872f5d3e6d9655d5da307e857b"
+      - "docs/wm001-v1160-prospective-harness-review.json"
+      - "docs/wm001-v1160-accepted-binding-rehearsal-failure.md"
+      - "bench/world_model_lifecycle/results/operator-v1.16/bindings/formal-binding-v1.16.0"
+    also_depends_on: [N20, N21, N22]
+    status: resolved
+    children: []
+  - id: N24
+    type: dead_end
+    title: "Model the real audit contract with a synthetic outer fixture"
+    provenance: ai-executed
+    timestamp: "2026-07-21T23:03+02:00"
+    hypothesis: >-
+      A real outer-launcher subprocess test using a production-scale producer
+      plus a hand-authored accepted audit package would establish composition
+      parity with the actual operator and binding pipeline.
+    failure_mode: >-
+      The fixture had five nonterminal audit members versus the live package's
+      15, was not backed by a canonical audit-reproduction v2 receipt, and
+      collapsed the execution runtime capture with the distinct
+      content-addressed reproduction-runtime sidecar. Both fixture and launcher
+      hardcoded audit-execution-02.runtime.json, while the real receipt and
+      terminal correctly named development-audit-runtime-085a40783f42dc5c.json.
+    lesson: >-
+      Cross-component contracts must be tested by carrying artifacts emitted by
+      the real upstream producer through the independent downstream consumer;
+      mutually agreeing synthetic literals do not establish composition.
+    evidence:
+      - "bench/world_model_lifecycle/binding.py"
+      - "bench/world_model_lifecycle/operator.py"
+      - "bench/world_model_lifecycle/launch_bootstrap.py"
+      - "tests/test_world_model_launch_bootstrap.py"
+      - "docs/wm001-v1160-accepted-binding-rehearsal-failure.md"
+    also_depends_on: [N23]
+    status: resolved
+    children: []
+  - id: N25
+    type: decision
+    title: "Retire WM-001 v1.16 before formal authority"
+    provenance: ai-executed
+    timestamp: "2026-07-21T23:03+02:00"
+    choice: >-
+      Preserve the engineering chain through accepted binding and the temporary
+      rehearsal diagnostic, create no formal root or downstream formal artifact,
+      do not retry or repair v1.16 in place, and permit only a fresh-version
+      receipt-driven composition repair.
+    alternatives:
+      - "Retry the accepted-binding rehearsal after changing the launcher."
+      - "Create the formal root despite the failed mandatory gate."
+      - "Interpret claim-ineligible development outcomes as confirmation."
+      - "Retire v1.16 and require fresh prospective authority."
+    evidence:
+      - N23
+      - N24
+      - "docs/wm001-v1160-operator-runbook.md"
+      - "docs/wm001-v1160-accepted-binding-rehearsal-failure.md"
+    also_depends_on: [N23, N24]
+    status: resolved
+    children: []
+  - id: N26
+    type: experiment
+    title: "Adversarially audit the v1.16 terminal claims"
+    provenance: ai-executed
+    timestamp: "2026-07-21T23:03+02:00"
+    result: >-
+      Independent cause and results referees confirmed all authenticated
+      identities and engineering custody through accepted binding, isolated the
+      sole mismatch among 23 outer audit-terminal predicates, and verified
+      complete formal-path absence. They narrowed both rehearsal return codes
+      and exactly-once status to trusted-operator observations because temporary
+      captures have no authenticated terminals. Every v1.16 learning,
+      improvement, retention, restart, and general-capability claim was retired
+      or left unresolved; no raw outcome or K value was opened.
+    evidence:
+      - "docs/wm001-v1160-accepted-binding-rehearsal-failure.md"
+      - "bench/world_model_lifecycle/launch_bootstrap.py"
+      - "bench/world_model_lifecycle/artifact_audit.py"
+      - "tests/test_world_model_launch_bootstrap.py"
+    also_depends_on: [N23, N24, N25]
+    status: resolved
+    children: []

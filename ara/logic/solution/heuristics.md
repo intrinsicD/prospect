@@ -35,3 +35,23 @@
 - **Evidence**: [N20, N21, N22,
   `docs/wm001-v1150-formal-invocation-failure.md`]
 - **From staging**: O16
+
+## H03: Bridge producer-consumer contracts with real generated artifacts
+
+- **Rationale**: Component tests can agree on the same stale assumption and
+  still pass. For every cross-component evidence contract, generate the input
+  with the production upstream component and carry that exact artifact through
+  the independent production consumer. Synthetic fixtures remain useful for
+  local invariants, but cannot by themselves establish composition parity.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**:
+  [`bench/world_model_lifecycle/binding.py`,
+  `bench/world_model_lifecycle/operator.py`,
+  `bench/world_model_lifecycle/launch_bootstrap.py`,
+  `tests/test_world_model_launch_bootstrap.py`,
+  pending: fresh successor producer-to-consumer integration fixture]
+- **Evidence**: [N24, N26,
+  `docs/wm001-v1160-accepted-binding-rehearsal-failure.md`]
+- **From staging**: O18

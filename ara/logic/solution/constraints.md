@@ -113,3 +113,20 @@
 - **Evidence**: [N19, N20, N22,
   `docs/wm001-v1150-formal-invocation-failure.md`]
 - **From staging**: O14
+
+## R09: Authenticate result-free pre-root rehearsal custody
+
+- **Statement**: A result-free accepted-binding rehearsal used to establish
+  return-code and exactly-once behavior must acquire a deterministic single-use
+  claim and publish an authenticated accepted or failed terminal package. The
+  rehearsal must neither grant formal authority nor create the binding-keyed
+  formal root.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Code refs**:
+  [`bench/world_model_lifecycle/launch_bootstrap.py`,
+  `bench/world_model_lifecycle/operator.py`,
+  pending: fresh successor rehearsal claim, terminal, and adversarial tests]
+- **Evidence**: [N23, N25, N26,
+  `docs/wm001-v1160-accepted-binding-rehearsal-failure.md`]
+- **From staging**: O19

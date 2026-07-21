@@ -29,8 +29,8 @@ sessions:
     open_threads: 1
   - id: "2026-07-21_001"
     date: "2026-07-21"
-    summary: "Retired WM-001 v1.15 after its accepted binding reached a production-scale formal-custody failure before producer dispatch."
-    turn_count: 1
-    events_count: 7
-    claims_touched: [C03]
+    summary: "Retired WM-001 v1.16 after engineering qualification reached accepted binding but its mandatory pre-root rehearsal exposed a stale cross-component audit contract."
+    turn_count: 2
+    events_count: 14
+    claims_touched: [C03, C04]
     open_threads: 1

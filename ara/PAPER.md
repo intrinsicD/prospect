@@ -3,9 +3,10 @@
 - **Working title:** Auditable Learning and Retention in World-Model Agents
 - **Author:** Alexander Dieckmann
 - **Venue:** Not selected
-- **Status:** WM-001 v1.4 formal attempt completed; direct bound-runtime audit
-  supports the bounded mechanism evidence, but adjudication reproduction failed
-  and the complete capability claim remains unaccepted
+- **Status:** WM-001 v1.16 completed engineering qualification through accepted
+  binding, but its mandatory result-free pre-root rehearsal failed before child
+  dispatch. No v1.16 formal authority, producer, outcome, or capability result
+  exists; the complete learning-and-retention claim remains unresolved
 
 ## Layer index
 

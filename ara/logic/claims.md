@@ -79,3 +79,29 @@
 - **Architecture/constraint refs**: [A01, A02, R03, R07, R08]
 - **Tags**: world-model, no-formal-result, claim-ineligible, unresolved-capability
 - **From staging**: O15
+
+## C04: WM-001 v1.16 has no formal capability result
+
+- **Statement**: WM-001 protocol 1.16.0 completed engineering qualification
+  through an accepted, outer-finalized binding, but its mandatory result-free
+  accepted-binding rehearsal failed before child dispatch. No v1.16 formal
+  root, marker, producer, outcome, audit, review, or adjudication exists;
+  development is permanently claim-ineligible. The attempt therefore
+  establishes no learning, improvement, retention, restart, or threshold
+  result and does not show that Prospect generally has or lacks the desired
+  capability.
+- **Status**: supported
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A preexisting authenticated v1.16 formal producer
+  terminal and independently accepted adjudication package are demonstrated
+  without retrying the rehearsal or creating formal authority after the failed
+  mandatory gate.
+- **Proof**:
+  [`docs/wm001-v1160-accepted-binding-rehearsal-failure.md`,
+  `bench/world_model_lifecycle/results/operator-v1.16/bindings/formal-binding-v1.16.0`,
+  N23, N25, N26]
+- **Dependencies**: []
+- **Architecture/constraint refs**: [A01, A02, R03, R08, R09]
+- **Tags**: world-model, no-formal-result, claim-ineligible, unresolved-capability
+- **From staging**: O17
