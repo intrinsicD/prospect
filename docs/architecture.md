@@ -460,19 +460,29 @@ sole binding attempt failed before acceptance and was outer-finalized; no
 formal launch occurred. Its disposition is recorded in the
 [v1.13 binding-verifier failure](wm001-v1130-binding-verifier-failure.md).
 
-Protocol 1.14 is the fresh prospective successor. It preserves the scientific
-system, formal-binding v10, raw-result v9, and every existing runtime and
-stream/schema repair. The canonical role remains path-exclusive. A separate
-preserved role validates the exact report and referenced 20 logs inside the
-binding package while permitting declared non-preformal sidecars and rejecting
-additional preformal-named evidence. Both roles independently enforce the same
-fixed command, input, environment, semantic, and stream-byte contract, and a
-real mixed-package producer-to-strict-consumer regression binds the
-distinction. It uses fresh
-paths, environments, seeds, wheel, lock, schemas, seal, prospective review,
-and evidence claims. The plan and exact operator sequence are in the
-[v1.14 confirmation plan](wm001-v1140-confirmation-plan.md) and
-[v1.14 operator runbook](wm001-v1140-operator-runbook.md).
+Protocol 1.14 repaired the canonical-versus-preserved report role and passed
+its prospective gates, development, independent audit, closure, fresh-runtime
+reopen, and preformal report. Its sole binding transaction then exposed a
+separate independent archive-reader defect: after all 86 declared members had
+verified, a second `TarFile` iterator replayed a cached member and the valid
+archive was falsely rejected as having a physical extra member. The terminal
+failed binding was outer-finalized; no formal launch or formal outcome exists.
+
+Protocol 1.15 is the fresh prospective successor. It preserves the scientific
+system, formal-binding v10, raw-result v9, and all previous runtime,
+stream/schema, and report-role repairs. It keeps one independent archive
+iterator through exhaustion, roots membership in the archived producer
+manifest, binds both bootstraps and every live authorization input to the
+corresponding archived role, and enforces strict JSON scalar identity, real
+timestamp ordering, stable single-link reads, canonical closure naming,
+archive namespace/collision safety, bounded aggregate retained evidence, and
+empty stderr for all ten preformal commands. A shared real archive regression,
+real producer/audit-to-closure authorization role joins, and separate complete
+qualification/formal-input tests bind those distinctions. It uses fresh paths,
+environments, seeds, wheel, lock, schemas, seal, prospective review, and
+evidence claims. The plan and exact operator sequence are in the
+[v1.15 confirmation plan](wm001-v1150-confirmation-plan.md) and
+[v1.15 operator runbook](wm001-v1150-operator-runbook.md).
 
 ## Open engineering boundaries
 
@@ -481,11 +491,13 @@ and evidence claims. The plan and exact operator sequence are in the
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocols 1.10 through 1.13 are terminally retired without formal authority.
-  Protocol 1.14 is the fresh prospective successor and must pass its
-  canonical-versus-preserved report-role regression, formal-binding
-  stream/schema compatibility, recorded-versus-live, warning-free precision,
-  and exact command-10 stderr gates before any new outcome-producing attempt.
+- Protocols 1.10 through 1.14 are terminally retired without formal authority.
+  Protocol 1.15 is the fresh prospective successor and must pass the real
+  continuous-iterator archive, archived-manifest membership, bootstrap/live
+  authorization linkage, strict-scalar/timestamp, collision, aggregate-limit,
+  formal-binding stream/schema, recorded-versus-live, warning-free precision,
+  and all-ten-command empty-stderr gates before any new outcome-producing
+  attempt.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External

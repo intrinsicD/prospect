@@ -34,7 +34,11 @@ from packaging.markers import default_environment
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
-from .artifact import atomic_write_exclusive
+from .artifact import (
+    _PRODUCER_MANIFEST_FIELDS,
+    _parse_utc_timestamp,
+    atomic_write_exclusive,
+)
 from .assurance import ASSURANCE, assurance_record
 from .checkpoint import canonical_json_bytes, manifest_schema_sha256
 from .model import (
@@ -83,7 +87,7 @@ def _repository_root() -> Path:
 REPO = _repository_root()
 LOCKFILE = REPO / "requirements-wm001.lock"
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.14.0.json"
+DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.15.0.json"
 ROOT_DISTRIBUTIONS = (
     "gymnasium",
     "jsonschema",
@@ -545,15 +549,23 @@ def verify_bound_machine_test_report(
         raise RuntimeError("bound preformal recorded identity is malformed") from error
     del qa_environment
     if (
-        runtime_environment != runtime.get("process_environment")
-        or report.get("git_before") != report.get("git_after")
-        or report.get("git_before")
-        != {
-            "commit": source.get("git_commit"),
-            "tree": source.get("git_tree"),
-            "worktree_clean": True,
-        }
-        or qa_closure != runtime_closure
+        not _strict_json_equal(
+            runtime_environment,
+            runtime.get("process_environment"),
+        )
+        or not _strict_json_equal(
+            report.get("git_before"),
+            report.get("git_after"),
+        )
+        or not _strict_json_equal(
+            report.get("git_before"),
+            {
+                "commit": source.get("git_commit"),
+                "tree": source.get("git_tree"),
+                "worktree_clean": True,
+            },
+        )
+        or not _strict_json_equal(qa_closure, runtime_closure)
     ):
         raise RuntimeError("bound preformal runtime, Git, or QA identity differs")
 
@@ -566,8 +578,14 @@ def verify_bound_machine_test_report(
         label="runtime",
     )
     if (
-        report.get("qa_executable_after") != qa_executable
-        or report.get("runtime_executable_after") != runtime_executable
+        not _strict_json_equal(
+            report.get("qa_executable_after"),
+            qa_executable,
+        )
+        or not _strict_json_equal(
+            report.get("runtime_executable_after"),
+            runtime_executable,
+        )
         or runtime_executable.get("invocation_path")
         != dependencies.get("python_executable")
         or runtime_executable.get("sha256")
@@ -580,7 +598,8 @@ def verify_bound_machine_test_report(
     if (
         not isinstance(inputs_before, Mapping)
         or set(inputs_before) != preformal._PREFORMAL_INPUT_FIELDS
-        or inputs_before != inputs_after
+        or not isinstance(inputs_after, Mapping)
+        or set(inputs_after) != preformal._PREFORMAL_INPUT_FIELDS
     ):
         raise RuntimeError("bound preformal input identities are incomplete or changed")
     inputs: dict[str, dict[str, object]] = {}
@@ -590,6 +609,14 @@ def verify_bound_machine_test_report(
                 identity,
                 label=name,
             )
+            after = preformal._validate_file_identity(
+                inputs_after[name],
+                label=f"{name} after",
+            )
+            if not _strict_json_equal(inputs[name], after):
+                raise preformal.PreformalEvidenceError(
+                    f"{name} before/after identity differs"
+                )
     except preformal.PreformalEvidenceError as error:
         raise RuntimeError("bound preformal input identity is malformed") from error
     from .operator import outer_completion_marker
@@ -610,7 +637,7 @@ def verify_bound_machine_test_report(
         inputs[name].get("path") != expected_path
         for name, expected_path in expected_input_paths.items()
     ):
-        raise RuntimeError("bound preformal input path is not canonical v1.14")
+        raise RuntimeError("bound preformal input path is not canonical v1.15")
 
     implementation = _bound_preformal_implementation_map(source)
     generator = implementation.get(preformal.SOURCE_RELATIVE_PATH)
@@ -848,6 +875,14 @@ def verify_bound_machine_test_report(
                 or hashlib.sha256(log_payload).hexdigest() != digest
             ):
                 raise RuntimeError(f"bound preformal command {ordinal} {stream} bytes changed")
+            if stream == "stderr" and (
+                reference.get("bytes") != 0
+                or digest != hashlib.sha256(b"").hexdigest()
+                or log_payload != b""
+            ):
+                raise RuntimeError(
+                    f"bound preformal command {ordinal} stderr is not exactly empty"
+                )
             expected_names.add(filename)
             log_rows.append(
                 {
@@ -1295,7 +1330,7 @@ def build_bound_audit_execution(
     restart_runtime_report_value = dict(restart_runtime_conformance.path_execution.report)
     if (
         restart_runtime_report_value.get("schema") != "prospect.wm001.restart-runtime-conformance.v1"
-        or restart_runtime_report_value.get("protocol_version") != "1.14.0"
+        or restart_runtime_report_value.get("protocol_version") != "1.15.0"
         or restart_runtime_report_value.get("passed") is not True
         or restart_runtime_conformance.path_execution.stdout != restart_runtime_conformance.descriptor_execution.stdout
     ):
@@ -1563,9 +1598,9 @@ def implementation_files() -> list[dict[str, object]]:
         REPO / "bench" / "world_model_lifecycle" / "protocol.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "raw-result.schema.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "formal-binding.schema.json",
-        REPO / "docs" / "wm001-v1140-confirmation-plan.md",
-        REPO / "docs" / "wm001-v1140-operator-runbook.md",
-        REPO / "docs" / "wm001-v1140-prospective-harness-review.json",
+        REPO / "docs" / "wm001-v1150-confirmation-plan.md",
+        REPO / "docs" / "wm001-v1150-operator-runbook.md",
+        REPO / "docs" / "wm001-v1150-prospective-harness-review.json",
     ]
     unique = sorted(set(candidates))
     return [
@@ -2280,7 +2315,7 @@ def create_audit_reproduction_receipt(
     receipt = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "supplied_audit_sha256": hashlib.sha256(supplied).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(execution.stdout).hexdigest(),
         "byte_identical": True,
@@ -2408,6 +2443,68 @@ _MAX_QUALIFICATION_TOTAL_MEMBER_BYTES = 32 << 30
 _MAX_QUALIFICATION_ARCHIVE_BYTES = 40 << 30
 _MAX_RETAINED_QUALIFICATION_MEMBER_BYTES = 64 << 20
 _MAX_RETAINED_QUALIFICATION_TOTAL_BYTES = 256 << 20
+_DEVELOPMENT_AUDIT_FIELDS = {
+    "schema",
+    "artifact_root",
+    "result_file",
+    "result_sha256",
+    "lane",
+    "integrity_passed",
+    "engineering_complete",
+    "complete_for_claim",
+    "passed",
+    "check_counts",
+    "audit_implementation",
+    "audit_execution_conformance_verified",
+    "resource_limits_bytes",
+    "custody",
+    "findings",
+    "coverage_gaps",
+    "independence_limitations",
+}
+_DEVELOPMENT_AUDIT_RESOURCE_LIMITS = {
+    "result": 4 << 30,
+    "prediction_sidecar": 8 << 20,
+    "owned_model_state": 256 << 20,
+    "optimizer_manifest": 64 << 20,
+    "target_permutation": 64 << 20,
+    "restart_evaluation": 16 << 20,
+    "checkpoint_archive": 4 << 30,
+    "source_file": 64 << 20,
+    "source_snapshot": 512 << 20,
+}
+_DEVELOPMENT_AUDIT_INDEPENDENCE_LIMITATIONS = [
+    (
+        "The producer manifest is fully reopened and hash-checked, but it is not "
+        "externally signed or transparency-log anchored; filesystem-level "
+        "replacement of the entire root and manifest is outside this audit's "
+        "threat model."
+    ),
+    (
+        "Pendulum reset observations are reconstructed from the documented "
+        "Gymnasium 0.29.1 default_rng/PCG64 algorithm without importing "
+        "Gymnasium; exact replay consequently relies on NumPy's bound Generator "
+        "semantics. The independent oscillator is reconstructed directly from "
+        "its SHA-256 reset and autonomous analytic dynamics."
+    ),
+    (
+        "Bootstrap, balanced-minibatch, minibatch-order, and "
+        "corruption-permutation bytes are regenerated without producer sampling "
+        "code, but exact replay uses the same dependency-bound Torch CPU RNG "
+        "primitives rather than a separately implemented Philox engine."
+    ),
+    (
+        "CEM is independently reimplemented from the public algorithm and "
+        "retained tensor bytes rather than calling producer planning/model code, "
+        "but bit-exact action replay intentionally uses the same bound Torch "
+        "device kernels and RNG implementation as the producer."
+    ),
+    (
+        "This is development evidence, not formal claim evidence. Protocol 1.4 "
+        "makes K3-K6 development outcomes descriptive and permanently ineligible "
+        "for capability adjudication."
+    ),
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -2760,7 +2857,7 @@ def _validate_producer_custody(
         set(runtime_seal) != _DEVELOPMENT_RUNTIME_SEAL_FIELDS
         or runtime_seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or runtime_seal.get("experiment_id") != "WM-001"
-        or runtime_seal.get("protocol_version") != "1.14.0"
+        or runtime_seal.get("protocol_version") != "1.15.0"
         or not _strict_json_equal(runtime_seal.get("assurance"), ASSURANCE)
         or runtime_seal.get("git_commit") != execution["git_commit"]
         or runtime_seal.get("git_tree") != execution["git_tree"]
@@ -2801,9 +2898,80 @@ def _validate_producer_custody(
     }
 
 
+def _validate_development_audit_report(
+    audit: dict[str, object],
+    *,
+    producer_root: Path,
+    producer_manifest_sha256: str,
+    result_sha256: str,
+    auditor_sha256: str,
+) -> None:
+    counts = audit.get("check_counts")
+    audit_implementation = audit.get("audit_implementation")
+    expected_audit_implementation = {
+        "auditor_source_sha256": auditor_sha256,
+        "bound_auditor_source_sha256": None,
+        "formal_test_report_sha256": None,
+        "coverage_conformance_report_sha256": None,
+        "auditor_source_matches_binding": False,
+        "coverage_conformance_verified": False,
+        "audit_execution_conformance_verified": False,
+    }
+    expected_custody = {
+        "producer_manifest_checked": True,
+        "producer_manifest_status": "completed",
+        "producer_manifest_sha256": producer_manifest_sha256,
+    }
+    if (
+        set(audit) != _DEVELOPMENT_AUDIT_FIELDS
+        or audit.get("schema")
+        != "prospect.world-model-lifecycle.artifact-audit.v2"
+        or audit.get("artifact_root") != str(producer_root)
+        or audit.get("result_file") != "result.json"
+        or audit.get("result_sha256") != result_sha256
+        or audit.get("lane") != "development"
+        or audit.get("integrity_passed") is not True
+        or audit.get("engineering_complete") is not True
+        or audit.get("complete_for_claim") is not False
+        or audit.get("passed") is not True
+        or not isinstance(counts, dict)
+        or set(counts) != {"passed", "failed", "coverage_gaps"}
+        or type(counts.get("passed")) is not int
+        or cast(int, counts["passed"]) <= 0
+        or type(counts.get("failed")) is not int
+        or counts.get("failed") != 0
+        or type(counts.get("coverage_gaps")) is not int
+        or counts.get("coverage_gaps") != 0
+        or audit.get("coverage_gaps") != []
+        or audit.get("findings") != []
+        or audit.get("audit_execution_conformance_verified") is not False
+        or not isinstance(audit_implementation, dict)
+        or not _strict_json_equal(
+            audit_implementation,
+            expected_audit_implementation,
+        )
+        or not _strict_json_equal(
+            audit.get("resource_limits_bytes"),
+            _DEVELOPMENT_AUDIT_RESOURCE_LIMITS,
+        )
+        or not _strict_json_equal(
+            audit.get("custody"),
+            expected_custody,
+        )
+        or not _strict_json_equal(
+            audit.get("independence_limitations"),
+            _DEVELOPMENT_AUDIT_INDEPENDENCE_LIMITATIONS,
+        )
+    ):
+        raise RuntimeError(
+            "development independent audit is not a complete passing audit"
+        )
+
+
 def _validate_development_audit_evidence(
     *,
     producer_root: Path,
+    producer_manifest_sha256: str,
     result_sha256: str,
     execution: dict[str, object],
     audit_payload: bytes,
@@ -2839,7 +3007,7 @@ def _validate_development_audit_evidence(
         set(receipt) != _AUDIT_RECEIPT_FIELDS
         or receipt.get("schema") != "prospect.wm001.audit-reproduction.v2"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.14.0"
+        or receipt.get("protocol_version") != "1.15.0"
         or receipt.get("supplied_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("reproduced_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("byte_identical") is not True
@@ -2887,32 +3055,13 @@ def _validate_development_audit_evidence(
         or receipt.get("passed") is not True
     ):
         raise RuntimeError("development audit reproduction receipt is invalid")
-    audit_implementation = audit.get("audit_implementation")
-    if (
-        audit.get("schema") != "prospect.world-model-lifecycle.artifact-audit.v2"
-        or audit.get("artifact_root") != str(producer_root)
-        or audit.get("result_file") != "result.json"
-        or audit.get("result_sha256") != result_sha256
-        or audit.get("lane") != "development"
-        or audit.get("integrity_passed") is not True
-        or audit.get("engineering_complete") is not True
-        or audit.get("complete_for_claim") is not False
-        or audit.get("passed") is not True
-        or not isinstance(audit.get("check_counts"), dict)
-        or type(cast(dict[str, object], audit["check_counts"]).get("failed")) is not int
-        or cast(dict[str, object], audit["check_counts"]).get("failed") != 0
-        or type(
-            cast(dict[str, object], audit["check_counts"]).get(
-                "coverage_gaps",
-            )
-        )
-        is not int
-        or cast(dict[str, object], audit["check_counts"]).get("coverage_gaps") != 0
-        or audit.get("coverage_gaps") != []
-        or not isinstance(audit_implementation, dict)
-        or audit_implementation.get("auditor_source_sha256") != auditor_sha256
-    ):
-        raise RuntimeError("development independent audit is not a complete passing audit")
+    _validate_development_audit_report(
+        audit,
+        producer_root=producer_root,
+        producer_manifest_sha256=producer_manifest_sha256,
+        result_sha256=result_sha256,
+        auditor_sha256=auditor_sha256,
+    )
     runtime_python = runtime.get("python")
     source = runtime.get("source")
     expected_flags = {
@@ -3040,7 +3189,7 @@ def _result_qualification_payload(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "protocol_sha256": sha256_file(PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -3105,7 +3254,7 @@ def _validate_result_qualification(
         }
         or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.14.0"
+        or value.get("protocol_version") != "1.15.0"
         or value.get("protocol_sha256") != sha256_file(PROTOCOL_PATH)
         or value.get("raw_result_sha256") != archived_result_sha256
         or value.get("lane") != "development"
@@ -3219,9 +3368,28 @@ def _write_qualification_archive(
         f"producer/{path.relative_to(producer_root).as_posix()}": (_development_producer_source(producer_root, path))
         for path in _regular_producer_files(producer_root)
     }
+    evidence_names = set(evidence_payloads)
+    if (
+        evidence_names & set(sources)
+        or any(
+            not isinstance(name, str)
+            or not name.startswith("evidence/")
+            or "\\" in name
+            or Path(name).as_posix() != name
+            or Path(name).is_absolute()
+            or "." in Path(name).parts
+            or ".." in Path(name).parts
+            or len(Path(name).parts) != 2
+            for name in evidence_names
+        )
+        or any(type(payload) is not bytes for payload in evidence_payloads.values())
+    ):
+        raise RuntimeError(
+            "development qualification evidence names collide or leave their namespace"
+        )
     sources.update(evidence_payloads)
     names = sorted(sources)
-    if len(names) != len(set(names)) or not 1 <= len(names) <= _MAX_QUALIFICATION_MEMBERS:
+    if not 1 <= len(names) <= _MAX_QUALIFICATION_MEMBERS:
         raise RuntimeError("development qualification archive member names collided")
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=".development-qualification-",
@@ -3515,6 +3683,58 @@ def _stream_qualification_archive(
     return retained
 
 
+def _validated_qualification_member_rows(
+    value: object,
+) -> list[dict[str, object]]:
+    """Validate archive member identities before any caller indexes them."""
+
+    if not isinstance(value, list) or not 1 <= len(value) <= _MAX_QUALIFICATION_MEMBERS:
+        raise RuntimeError(
+            "development qualification archive member identities are malformed"
+        )
+    rows: list[dict[str, object]] = []
+    names: list[str] = []
+    total_bytes = 0
+    for raw_row in value:
+        if not isinstance(raw_row, dict):
+            raise RuntimeError(
+                "development qualification archive member identities are malformed"
+            )
+        name = raw_row.get("path")
+        member_bytes = raw_row.get("bytes")
+        digest = raw_row.get("sha256")
+        if (
+            set(raw_row) != {"path", "bytes", "sha256"}
+            or not isinstance(name, str)
+            or not name
+            or "\\" in name
+            or Path(name).is_absolute()
+            or "." in Path(name).parts
+            or ".." in Path(name).parts
+            or Path(name).as_posix() != name
+            or type(member_bytes) is not int
+            or not 0 <= member_bytes <= _MAX_QUALIFICATION_MEMBER_BYTES
+            or not isinstance(digest, str)
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+        ):
+            raise RuntimeError(
+                "development qualification archive member identities are malformed"
+            )
+        names.append(name)
+        total_bytes += member_bytes
+        rows.append(raw_row)
+    if (
+        names != sorted(names)
+        or len(names) != len(set(names))
+        or total_bytes > _MAX_QUALIFICATION_TOTAL_MEMBER_BYTES
+    ):
+        raise RuntimeError(
+            "development qualification archive member identities are malformed"
+        )
+    return rows
+
+
 def _validate_archived_producer(
     retained: dict[str, bytes],
     member_rows: list[dict[str, object]],
@@ -3526,7 +3746,8 @@ def _validate_archived_producer(
     )
     rows = manifest.get("files")
     if (
-        manifest.get("schema") != "prospect.wm001.producer-manifest.v1"
+        set(manifest) != _PRODUCER_MANIFEST_FIELDS
+        or manifest.get("schema") != "prospect.wm001.producer-manifest.v1"
         or manifest.get("experiment_id") != "WM-001"
         or manifest.get("lane") != "development"
         or manifest.get("status") != "completed"
@@ -3538,6 +3759,23 @@ def _validate_archived_producer(
         or any(not isinstance(row, dict) or set(row) != {"path", "bytes", "sha256"} for row in rows)
     ):
         raise RuntimeError("archived development producer manifest is incomplete")
+    try:
+        started_at = _parse_utc_timestamp(
+            manifest.get("started_at_utc"),
+            field="started_at_utc",
+        )
+        completed_at = _parse_utc_timestamp(
+            manifest.get("completed_at_utc"),
+            field="completed_at_utc",
+        )
+    except ValueError as error:
+        raise RuntimeError(
+            "archived development producer manifest timestamps are invalid"
+        ) from error
+    if completed_at < started_at:
+        raise RuntimeError(
+            "archived development producer completed before it started"
+        )
     manifest_paths: list[str] = []
     for raw_row in rows:
         row = cast(dict[str, object], raw_row)
@@ -3683,7 +3921,7 @@ def verify_development_closure(path: Path) -> dict[str, object]:
         set(closure) != _DEVELOPMENT_CLOSURE_FIELDS
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.14.0"
+        or closure.get("protocol_version") != "1.15.0"
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
         or closure.get("performance_values_bound") is not False
@@ -3791,6 +4029,9 @@ def verify_development_closure(path: Path) -> dict[str, object]:
         str(producer_custody["producer_bootstrap_member"]),
         str(producer_custody["launch_bootstrap_member"]),
     }
+    expected_evidence_members = retained_members - {
+        "producer/producer-manifest.json",
+    }
     if {
         producer_custody["runtime_seal_member"],
         producer_custody["producer_bootstrap_member"],
@@ -3815,16 +4056,38 @@ def verify_development_closure(path: Path) -> dict[str, object]:
     archive_path = REPO / archive_relative
     if archive_path != DEVELOPMENT_RESULTS_ROOT / archive_file or archive_path.resolve(strict=False) != archive_path:
         raise RuntimeError("development qualification archive path is not canonical")
+    member_rows = _validated_qualification_member_rows(
+        archive_identity["members"]
+    )
+    observed_evidence_members = {
+        str(row["path"])
+        for row in member_rows
+        if str(row["path"]).startswith("evidence/")
+    }
+    if observed_evidence_members != expected_evidence_members:
+        raise RuntimeError(
+            "development qualification evidence member set is not exact"
+        )
     retained = _stream_qualification_archive(
         archive_path,
         archive_identity,
         retained_members=retained_members,
     )
-    member_rows = cast(list[dict[str, object]], archive_identity["members"])
     _validate_archived_producer(retained, member_rows)
-    result_rows = [row for row in member_rows if row["path"] == "producer/result.json"]
-    if len(result_rows) != 1:
-        raise RuntimeError("development qualification archive omits raw result identity")
+    manifest_rows = [
+        row
+        for row in member_rows
+        if row["path"] == "producer/producer-manifest.json"
+    ]
+    result_rows = [
+        row
+        for row in member_rows
+        if row["path"] == "producer/result.json"
+    ]
+    if len(manifest_rows) != 1 or len(result_rows) != 1:
+        raise RuntimeError(
+            "development qualification archive omits producer identities"
+        )
     result_sha256 = str(result_rows[0]["sha256"])
     qualification, execution = _validate_result_qualification(
         retained["evidence/development-result-qualification.json"],
@@ -3846,6 +4109,7 @@ def verify_development_closure(path: Path) -> dict[str, object]:
     stderr_member = str(closure["audit_stderr_member"])
     _, receipt = _validate_development_audit_evidence(
         producer_root=producer_root,
+        producer_manifest_sha256=str(manifest_rows[0]["sha256"]),
         result_sha256=result_sha256,
         execution=execution,
         audit_payload=retained["evidence/independent-audit.json"],
@@ -3962,7 +4226,7 @@ def create_development_closure(
     runtime_manifest_path: Path,
     output_path: Path = DEVELOPMENT_CLOSURE_PATH,
 ) -> dict[str, object]:
-    """Close the sole v1.14 qualification into one self-contained evidence archive."""
+    """Close the sole v1.15 qualification into one self-contained evidence archive."""
 
     from .artifact import verify_producer_manifest
     from .verify import DEVELOPMENT_SEEDS, _verify_formal_matrix, verify_result
@@ -4003,7 +4267,7 @@ def create_development_closure(
         not isinstance(replicates, list)
         or tuple(row.get("master_seed") if isinstance(row, dict) else None for row in replicates) != DEVELOPMENT_SEEDS
     ):
-        raise RuntimeError("development qualification requires exactly both fresh v1.14 seeds")
+        raise RuntimeError("development qualification requires exactly both fresh v1.15 seeds")
     for replicate in replicates:
         assert isinstance(replicate, dict)
         _verify_formal_matrix(
@@ -4052,6 +4316,9 @@ def create_development_closure(
     )
     _validate_development_audit_evidence(
         producer_root=producer_root,
+        producer_manifest_sha256=sha256_file(
+            producer_root / "producer-manifest.json"
+        ),
         result_sha256=result_sha256,
         execution=execution,
         audit_payload=audit_payload,
@@ -4126,7 +4393,7 @@ def create_development_closure(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "source": {
             "git_commit": execution["git_commit"],
             "git_tree": execution["git_tree"],
@@ -4299,7 +4566,7 @@ def create_formal_binding(
     if conformance_cases != FORMAL_CONFORMANCE_CASES:
         raise ValueError("formal Pendulum conformance is fixed at exactly 1,024 cases (512 per task)")
     if development_closure_path is None or not development_closure_path.is_file():
-        raise RuntimeError("formal binding requires the immutable v1.14 development closure")
+        raise RuntimeError("formal binding requires the immutable v1.15 development closure")
     if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
         raise RuntimeError("CUDA formal binding requires CUBLAS_WORKSPACE_CONFIG=:4096:8")
     if output_path.exists():
@@ -4445,7 +4712,7 @@ def create_formal_binding(
         "experiment_id": "WM-001",
         "assurance": assurance_record(),
         "protocol": {
-            "version": "1.14.0",
+            "version": "1.15.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),

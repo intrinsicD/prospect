@@ -180,7 +180,7 @@ def _fresh_identity_conformance() -> dict[str, object]:
     return {
         "schema": "prospect.wm001.fresh-runtime-identity-conformance.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "mode": "fresh-identity-conformance",
         "challenge": "7" * 64,
         "requesting_process_id": 101,
@@ -270,7 +270,7 @@ def _development_closure(producer_root: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "source": {
             "git_commit": "a" * 40,
             "git_tree": "b" * 40,
@@ -448,7 +448,7 @@ def _review(
     return {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -468,7 +468,7 @@ def _runtime_seal(runtime_executable: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
             "tamper_resistant": False,
@@ -687,8 +687,9 @@ def _prepare_generation(
     monkeypatch: pytest.MonkeyPatch,
     *,
     failed_command: str | None = None,
+    stderr_command: str | None = None,
 ) -> tuple[Path, list[str], dict[str, Path]]:
-    directory = tmp_path / "v1.14.0" / "preformal"
+    directory = tmp_path / "v1.15.0" / "preformal"
     monkeypatch.setattr(
         preformal,
         "PREFORMAL_REPORT_PATH",
@@ -787,9 +788,9 @@ def _prepare_generation(
             )
         )
         stderr = (
-            b""
-            if specification.role == "runtime"
-            else f"stderr:{specification.name}\n".encode()
+            f"stderr:{specification.name}\n".encode()
+            if specification.name == stderr_command
+            else b""
         )
         return (
             exit_code,
@@ -1194,7 +1195,7 @@ def _strict_audit_execution_fixture(
     outcome_runtime_payload = _canonical(outcome_runtime)
     restart_report = {
         "schema": "prospect.wm001.restart-runtime-conformance.v1",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "support_files": support_rows,
         "branches": {
             "development": {
@@ -1549,6 +1550,32 @@ def test_live_verifier_rejects_alternate_bootstrap_input_path(
         preformal.verify_preformal_report(report_path)
 
 
+def test_live_verifier_rejects_after_input_numeric_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    _generate(report_path, inputs)
+    report = _read_report(report_path)
+    report["input_files_after"] = copy.deepcopy(
+        report["input_files_before"]
+    )
+    byte_count = report["input_files_after"]["launch_bootstrap"]["bytes"]
+    report["input_files_after"]["launch_bootstrap"]["bytes"] = float(
+        byte_count
+    )
+    _rewrite_report(report_path, report)
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match=(
+            "launch_bootstrap after identity is malformed|"
+            "input file identities are incomplete or changed"
+        ),
+    ):
+        preformal.verify_preformal_report(report_path)
+
+
 def test_live_verifier_rejects_distinct_two_link_closure_inodes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1677,6 +1704,55 @@ def test_generates_and_strictly_verifies_exact_preformal_evidence(
         if path.name.startswith(preformal.LOG_PREFIX)
     }
     assert len(logs) == 20
+
+
+def test_nonempty_command_1_stderr_prevents_preformal_authorization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    report_path, _, inputs = _prepare_generation(
+        tmp_path,
+        monkeypatch,
+        stderr_command="protocol-seal-continuity",
+    )
+    exit_code = preformal.main(
+        [
+            "generate-report",
+            "--output",
+            str(report_path),
+            "--runtime-executable",
+            str(inputs["runtime_executable"]),
+            "--runtime-seal",
+            str(inputs["runtime_seal"]),
+            "--development-closure",
+            str(inputs["development_closure"]),
+            "--closure-attempt",
+            str(inputs["closure_attempt"]),
+            "--prospective-review",
+            str(inputs["prospective_review"]),
+        ]
+    )
+    generation = json.loads(capsys.readouterr().out)
+    report = _read_report(report_path)
+
+    assert exit_code == 1
+    assert generation["passed"] is False
+    assert generation["failed_commands"] == []
+    assert generation["failed_checks"] == [
+        "command_01_stderr_not_empty"
+    ]
+    assert report["commands"][0]["passed"] is True
+    assert report["all_pass"] is False
+    assert preformal._semantic_failure_checks(
+        report_path.parent,
+        report,
+    ) == ["command_01_stderr_not_empty"]
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="protocol-seal-continuity stderr is not exactly empty",
+    ):
+        preformal.verify_preformal_report(report_path)
 
 
 def test_preserved_preformal_bound_projection_accepts_mixed_sidecars_without_ambient_origins(
@@ -1930,32 +2006,40 @@ def test_preserved_preformal_bound_projection_rejects_boolean_ordinal(
         )
 
 
-def test_preserved_preformal_bound_projection_rejects_command_9_stderr(
+@pytest.mark.parametrize(
+    "command_name",
+    (
+        "protocol-seal-continuity",
+        "runtime-accepted-closure-evidence",
+    ),
+)
+def test_preserved_preformal_bound_projection_rejects_any_command_stderr(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    command_name: str,
 ) -> None:
     copied_report, binding, _ = _prepare_preserved_preformal_projection(
         tmp_path,
         monkeypatch,
     )
     report = _read_report(copied_report)
-    accepted = next(
+    command = next(
         row
         for row in report["commands"]
-        if row["name"] == "runtime-accepted-closure-evidence"
+        if row["name"] == command_name
     )
-    old_path = copied_report.parent / accepted["stderr"]["file"]
+    old_path = copied_report.parent / command["stderr"]["file"]
     diagnostic = b"unexpected runtime diagnostic\n"
     digest = hashlib.sha256(diagnostic).hexdigest()
     filename = preformal._log_filename(
-        accepted["ordinal"],
-        accepted["name"],
+        command["ordinal"],
+        command["name"],
         "stderr",
         digest,
     )
     old_path.unlink()
     (copied_report.parent / filename).write_bytes(diagnostic)
-    accepted["stderr"] = {
+    command["stderr"] = {
         "file": filename,
         "bytes": len(diagnostic),
         "sha256": digest,
@@ -1963,7 +2047,10 @@ def test_preserved_preformal_bound_projection_rejects_command_9_stderr(
     _rewrite_report(copied_report, report)
     _refresh_preserved_projection_binding(copied_report, binding)
 
-    with pytest.raises(RuntimeError, match="accepted-closure stderr"):
+    with pytest.raises(
+        RuntimeError,
+        match=rf"command {command['ordinal']} stderr",
+    ):
         binding_module.verify_bound_machine_test_report(
             copied_report,
             binding,
@@ -2002,6 +2089,35 @@ def test_preserved_preformal_bound_projection_rejects_rebound_paths(
     _refresh_preserved_projection_binding(copied_report, binding)
 
     with pytest.raises(RuntimeError, match=message):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+def test_preserved_preformal_bound_projection_rejects_after_numeric_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    report = _read_report(copied_report)
+    report["input_files_after"] = copy.deepcopy(
+        report["input_files_before"]
+    )
+    byte_count = report["input_files_after"]["launch_bootstrap"]["bytes"]
+    report["input_files_after"]["launch_bootstrap"]["bytes"] = float(
+        byte_count
+    )
+    _rewrite_report(copied_report, report)
+    _refresh_preserved_projection_binding(copied_report, binding)
+
+    with pytest.raises(
+        RuntimeError,
+        match="input identity is malformed|input identities are incomplete",
+    ):
         binding_module.verify_bound_machine_test_report(
             copied_report,
             binding,
@@ -2767,7 +2883,7 @@ def test_command_10_semantics_require_empty_stderr(
 
     with pytest.raises(
         preformal.PreformalEvidenceError,
-        match="runtime_conformance_semantics_failed",
+        match="stderr is not exactly empty",
     ):
         preformal.verify_preformal_report(report_path)
 
@@ -3169,7 +3285,7 @@ def test_versioned_preformal_bundle_ignores_retained_prior_version_evidence(
         return rows
 
     before = legacy_fingerprint()
-    bundle_root = legacy_root / "v1.14.0" / "preformal"
+    bundle_root = legacy_root / "v1.15.0" / "preformal"
     bundle_root.parent.mkdir(parents=True)
     fixture_root = tmp_path / "fixture"
     fixture_root.mkdir()
@@ -3229,7 +3345,7 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     review = {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -3262,15 +3378,15 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
         preformal.verify_prospective_review(path)
 
 
-def test_prospective_manifest_binds_v1140_plan_and_runbook() -> None:
+def test_prospective_manifest_binds_v1150_plan_and_runbook() -> None:
     paths = {
         str(row["path"])
         for row in preformal._implementation_files()
     }
 
     assert {
-        "docs/wm001-v1140-confirmation-plan.md",
-        "docs/wm001-v1140-operator-runbook.md",
+        "docs/wm001-v1150-confirmation-plan.md",
+        "docs/wm001-v1150-operator-runbook.md",
     } <= paths
 
 
@@ -3451,7 +3567,7 @@ def test_fresh_closure_reopen_executes_inherited_seal_descriptors(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "mode": "fresh-closure-reopen",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -3554,7 +3670,7 @@ def test_fresh_closure_reopen_validator_uses_archive_member_digests(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "mode": "fresh-closure-reopen",
         "challenge": "7" * 64,
         "requesting_process_id": 101,
@@ -3611,7 +3727,7 @@ def test_fresh_identity_conformance_uses_nested_descriptor_child(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "mode": "fresh-identity-conformance",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -3889,7 +4005,7 @@ def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "mode": "fresh-identity-conformance",
         "challenge": "7" * 64,
         "requesting_process_id": 101,

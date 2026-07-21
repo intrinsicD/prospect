@@ -171,7 +171,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
     seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "assurance": dict(artifact_audit_module._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -232,6 +232,50 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
             dependencies=dependencies,
             runtime=runtime,
             runtime_executable=runtime_executable,
+        )
+
+
+def test_independent_preformal_log_parser_requires_empty_stderr() -> None:
+    empty_digest = hashlib.sha256(b"").hexdigest()
+    empty = {
+        "file": (
+            "preformal-v1.15.0-command-02-ruff.stderr."
+            f"{empty_digest}.log"
+        ),
+        "bytes": 0,
+        "sha256": empty_digest,
+    }
+
+    assert artifact_audit_module._preformal_log_reference(
+        empty,
+        ordinal=2,
+        command_name="ruff",
+        stream="stderr",
+    ) == {
+        "path": empty["file"],
+        "bytes": 0,
+        "sha256": empty_digest,
+    }
+
+    diagnostic = b"unexpected diagnostic\n"
+    diagnostic_digest = hashlib.sha256(diagnostic).hexdigest()
+    nonempty = {
+        "file": (
+            "preformal-v1.15.0-command-02-ruff.stderr."
+            f"{diagnostic_digest}.log"
+        ),
+        "bytes": len(diagnostic),
+        "sha256": diagnostic_digest,
+    }
+    with pytest.raises(
+        ArtifactAuditError,
+        match="command 2 stderr is not exactly empty",
+    ):
+        artifact_audit_module._preformal_log_reference(
+            nonempty,
+            ordinal=2,
+            command_name="ruff",
+            stream="stderr",
         )
 
 
@@ -1117,13 +1161,13 @@ def test_formal_launch_namespace_requires_exact_confirmation_name(
         / "results"
         / "formal"
         / binding_digest
-        / "confirmation-v1.14.0"
+        / "confirmation-v1.15.0"
     )
 
     assert artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical,
         binding_digest=binding_digest,
-        launch={"attempt_directory": "confirmation-v1.14.0"},
+        launch={"attempt_directory": "confirmation-v1.15.0"},
     )
     assert not artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical.with_name("wrong-child"),
@@ -1571,11 +1615,11 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     owned_state = runtime.owner.snapshot_state()
     parameter_sha256 = runtime.digest
     model_version = runtime.version
-    master_seed = 630481329
+    master_seed = 2388891654
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.14.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.15.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
@@ -2056,7 +2100,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     result: dict[str, Any] = {
         "schema": "prospect.world-model-lifecycle.raw-result.v9",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),
@@ -2638,6 +2682,44 @@ def test_local_producer_manifest_validates_top_level_identity(
     manifest = _write_test_producer_manifest(tmp_path)
     manifest[field] = value
     (tmp_path / "producer-manifest.json").write_bytes(_canonical(manifest) + b"\n")
+
+    with pytest.raises(ArtifactAuditError, match=message):
+        _verify_producer_manifest_locally(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("started", "completed", "message"),
+    [
+        (
+            "not-a-timeZ",
+            "2026-07-17T01:00:00Z",
+            "canonical UTC",
+        ),
+        (
+            "2026-07-17T00:00:00Z",
+            "2026-99-17T01:00:00Z",
+            "real UTC timestamp",
+        ),
+        (
+            "2026-07-17T02:00:00Z",
+            "2026-07-17T01:00:00Z",
+            "completed before",
+        ),
+    ],
+)
+def test_local_producer_manifest_requires_real_ordered_utc_timestamps(
+    tmp_path: Path,
+    started: str,
+    completed: str,
+    message: str,
+) -> None:
+    _write_minimal_auditable_artifact(tmp_path)
+    manifest = _write_test_producer_manifest(tmp_path)
+    manifest["started_at_utc"] = started
+    manifest["completed_at_utc"] = completed
+    (tmp_path / "producer-manifest.json").write_bytes(
+        _canonical(manifest) + b"\n"
+    )
 
     with pytest.raises(ArtifactAuditError, match=message):
         _verify_producer_manifest_locally(tmp_path)

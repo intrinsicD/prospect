@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tarfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -327,42 +327,42 @@ def test_record_hash_decoder_requires_exact_sha256() -> None:
             decode(("sha256", "not+a+valid+digest"))
 
 
-def test_protocol_1140_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (630481329, 2204125221)
+def test_protocol_1150_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (2388891654, 3201418215)
     assert verify_module.FORMAL_SEEDS == (
-        900802928,
-        2035185068,
-        3817247901,
-        14769188,
-        2670334085,
-        2866408483,
-        671156171,
-        333753598,
+        2465968807,
+        3494485289,
+        1615601571,
+        2220840580,
+        280448223,
+        597199725,
+        712207456,
+        1727907751,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            630481329,
+            2388891654,
             index,
         )
         for index in range(8)
     ] == [
-        696651623,
-        2591703586,
-        2707355286,
-        631431238,
-        599776448,
-        2787515156,
-        2907597599,
-        663923271,
+        1440603746,
+        676602015,
+        4115749952,
+        861950113,
+        4230008866,
+        343859791,
+        3620023289,
+        2456087322,
     ]
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            2204125221,
+            3201418215,
             0,
         )
-        == 2766881974
+        == 3556116261
     )
     assert (
         tuple(verify_module.derive_master_seed("development", index) for index in range(2))
@@ -375,11 +375,11 @@ def test_protocol_1140_seed_domain_and_master_seeds_are_exact() -> None:
     assert collision_audit["current_master_seed_count"] == 10
     assert collision_audit["current_derived_stream_count"] == 1360
     assert collision_audit["unique_current_derived_stream_count"] == 1360
-    assert collision_audit["prior_master_seed_count"] == 130
-    assert collision_audit["unique_prior_derived_stream_count"] == 17680
+    assert collision_audit["prior_master_seed_count"] == 140
+    assert collision_audit["unique_prior_derived_stream_count"] == 19040
 
 
-def test_protocol_1140_states_the_negative_assurance_boundary() -> None:
+def test_protocol_1150_states_the_negative_assurance_boundary() -> None:
     protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
 
     assert protocol["trust_model"] == {
@@ -462,7 +462,7 @@ def test_verify_binding_rejects_rebound_nonempty_conformance_stderr(
             "schema": (
                 "prospect.wm001.restart-runtime-conformance.v1"
             ),
-            "protocol_version": "1.14.0",
+            "protocol_version": "1.15.0",
             "passed": True,
         }
     )
@@ -791,16 +791,16 @@ def test_verify_binding_rejects_rebound_nonempty_conformance_stderr(
         verify_module.verify_binding(binding_path)
 
 
-def test_implementation_manifest_binds_reviewed_v1140_documents() -> None:
+def test_implementation_manifest_binds_reviewed_v1150_documents() -> None:
     paths = {
         str(row["path"])
         for row in binding_module.implementation_files()
     }
 
     assert {
-        "docs/wm001-v1140-confirmation-plan.md",
-        "docs/wm001-v1140-operator-runbook.md",
-        "docs/wm001-v1140-prospective-harness-review.json",
+        "docs/wm001-v1150-confirmation-plan.md",
+        "docs/wm001-v1150-operator-runbook.md",
+        "docs/wm001-v1150-prospective-harness-review.json",
     } <= paths
 
 
@@ -887,7 +887,7 @@ def test_formal_binding_schema_binds_protocol_1140_and_fresh_seeds() -> None:
         "external_attestation": {"const": False},
         "exclusive_path_use_required": {"const": True},
     }
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.14.0"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.15.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
@@ -990,7 +990,7 @@ def test_root_binding_schema_accepts_realistic_zero_byte_stderr_logs(
     verify_module._validate_json_schema(
         candidate,
         schema,
-        label="synthetic v1.14 formal binding",
+        label="synthetic v1.15 formal binding",
     )
     assert len(rows) == 20
     assert all(row["bytes"] > 0 for row in rows[0::2])
@@ -1020,7 +1020,7 @@ def test_root_binding_schema_rejects_negative_log_bytes_and_zero_source_bytes(
         verify_module._validate_json_schema(
             negative_log,
             schema,
-            label="synthetic v1.14 formal binding",
+            label="synthetic v1.15 formal binding",
         )
 
     empty_source = copy.deepcopy(candidate)
@@ -1032,7 +1032,7 @@ def test_root_binding_schema_rejects_negative_log_bytes_and_zero_source_bytes(
         verify_module._validate_json_schema(
             empty_source,
             schema,
-            label="synthetic v1.14 formal binding",
+            label="synthetic v1.15 formal binding",
         )
 
 
@@ -1076,7 +1076,7 @@ def test_restart_json_comparison_rejects_python_numeric_aliases(
     assert not verify_module._strict_json_equal(observed, expected)
 
 
-def test_raw_result_schema_binds_v1140_heldout_split_and_formal_counts() -> None:
+def test_raw_result_schema_binds_v1150_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -1087,7 +1087,7 @@ def test_raw_result_schema_binds_v1140_heldout_split_and_formal_counts() -> None
 
     assert schema["$id"].endswith("wm-001-raw-result-v9.json")
     assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v9"
-    assert schema["properties"]["protocol_version"]["const"] == "1.14.0"
+    assert schema["properties"]["protocol_version"]["const"] == "1.15.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
@@ -1128,7 +1128,7 @@ def test_raw_result_schema_binds_v1140_heldout_split_and_formal_counts() -> None
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v1140_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v1150_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -1558,7 +1558,7 @@ def test_create_formal_binding_root_schema_preflight_accepts_actual_log_rows(
     verify_module._validate_json_schema(
         created,
         schema,
-        label="generated v1.14 formal binding",
+        label="generated v1.15 formal binding",
     )
     assert created["source"]["test_log_files"] == binding_module.preformal_log_rows(
         report_path,
@@ -1829,9 +1829,9 @@ def _recorded_development_closure_fixture(
     closure: dict[str, object] = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "source": source,
-        "producer_root": str((tmp_path / "qualification-v1.14.0").resolve()),
+        "producer_root": str((tmp_path / "qualification-v1.15.0").resolve()),
         **{
             field: member
             for field, member in role_paths.items()
@@ -2060,7 +2060,7 @@ def _producer_custody_fixture(
     seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "assurance": dict(binding_module.ASSURANCE),
         "git_commit": execution["git_commit"],
         "git_tree": execution["git_tree"],
@@ -2304,6 +2304,79 @@ def test_development_qualification_archive_is_deterministic_and_stream_verified(
     )
     assert second_identity == first_identity
     assert second_path.read_bytes() == first_payload
+
+
+@pytest.mark.parametrize(
+    "invalid_name",
+    [
+        "producer/result.json",
+        "outside.json",
+        "evidence/nested/member.json",
+        "evidence/../result.json",
+        "evidence/evil\\name",
+    ],
+)
+def test_development_qualification_archive_rejects_invalid_evidence_namespace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_name: str,
+) -> None:
+    producer = tmp_path / "producer"
+    producer.mkdir()
+    (producer / "result.json").write_bytes(b"{}\n")
+    destination = tmp_path / "results" / "development"
+    destination.mkdir(parents=True)
+    monkeypatch.setattr(binding_module, "REPO", tmp_path)
+    monkeypatch.setattr(
+        binding_module,
+        "DEVELOPMENT_RESULTS_ROOT",
+        destination,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="collide or leave their namespace",
+    ):
+        binding_module._write_qualification_archive(
+            destination_directory=destination,
+            producer_root=producer,
+            evidence_payloads={invalid_name: b"evidence"},
+        )
+
+
+@pytest.mark.parametrize(
+    "evidence_payloads",
+    [
+        {1: b"evidence"},
+        {"evidence/audit.json": bytearray(b"evidence")},
+    ],
+)
+def test_development_qualification_archive_rejects_untyped_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    evidence_payloads: object,
+) -> None:
+    producer = tmp_path / "producer"
+    producer.mkdir()
+    (producer / "result.json").write_bytes(b"{}\n")
+    destination = tmp_path / "results" / "development"
+    destination.mkdir(parents=True)
+    monkeypatch.setattr(binding_module, "REPO", tmp_path)
+    monkeypatch.setattr(
+        binding_module,
+        "DEVELOPMENT_RESULTS_ROOT",
+        destination,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="collide or leave their namespace",
+    ):
+        binding_module._write_qualification_archive(
+            destination_directory=destination,
+            producer_root=producer,
+            evidence_payloads=cast(dict[str, bytes], evidence_payloads),
+        )
 
 
 def test_development_archive_rejects_recomputed_identity_with_nonzero_tail(
@@ -2821,6 +2894,8 @@ def test_archived_producer_rejects_member_size_numeric_aliases(
         "experiment_id": "WM-001",
         "lane": "development",
         "status": "completed",
+        "started_at_utc": "2026-07-20T00:00:00Z",
+        "completed_at_utc": "2026-07-20T00:00:01Z",
         "error": None,
         "manifest_excludes": ["producer-manifest.json"],
         "file_count": 1,
@@ -2867,6 +2942,8 @@ def test_archived_producer_rejects_file_count_numeric_alias(
         "experiment_id": "WM-001",
         "lane": "development",
         "status": "completed",
+        "started_at_utc": "2026-07-20T00:00:00Z",
+        "completed_at_utc": "2026-07-20T00:00:01Z",
         "error": None,
         "manifest_excludes": ["producer-manifest.json"],
         "file_count": replacement,
@@ -2896,6 +2973,75 @@ def test_archived_producer_rejects_file_count_numeric_alias(
     ]
 
     with pytest.raises(RuntimeError, match="manifest is incomplete"):
+        binding_module._validate_archived_producer(
+            retained,
+            member_rows,
+        )
+
+
+@pytest.mark.parametrize(
+    ("manifest_update", "expected_message"),
+    [
+        (
+            {"started_at_utc": "2026-02-30T00:00:00Z"},
+            "timestamps are invalid",
+        ),
+        (
+            {
+                "started_at_utc": "2026-07-20T00:00:02Z",
+                "completed_at_utc": "2026-07-20T00:00:01Z",
+            },
+            "completed before it started",
+        ),
+        (
+            {"unexpected": True},
+            "manifest is incomplete",
+        ),
+    ],
+)
+def test_archived_producer_rejects_invalid_timestamps_or_extra_fields(
+    manifest_update: dict[str, object],
+    expected_message: str,
+) -> None:
+    payload = b"x"
+    payload_sha256 = hashlib.sha256(payload).hexdigest()
+    manifest = {
+        "schema": "prospect.wm001.producer-manifest.v1",
+        "experiment_id": "WM-001",
+        "lane": "development",
+        "status": "completed",
+        "started_at_utc": "2026-07-20T00:00:00Z",
+        "completed_at_utc": "2026-07-20T00:00:01Z",
+        "error": None,
+        "manifest_excludes": ["producer-manifest.json"],
+        "file_count": 1,
+        "files": [
+            {
+                "path": "payload.bin",
+                "bytes": len(payload),
+                "sha256": payload_sha256,
+            }
+        ],
+        **manifest_update,
+    }
+    manifest_payload = _canonical_payload(manifest)
+    retained = {
+        "producer/producer-manifest.json": manifest_payload,
+    }
+    member_rows = [
+        {
+            "path": "producer/payload.bin",
+            "bytes": len(payload),
+            "sha256": payload_sha256,
+        },
+        {
+            "path": "producer/producer-manifest.json",
+            "bytes": len(manifest_payload),
+            "sha256": hashlib.sha256(manifest_payload).hexdigest(),
+        },
+    ]
+
+    with pytest.raises(RuntimeError, match=expected_message):
         binding_module._validate_archived_producer(
             retained,
             member_rows,
@@ -2978,6 +3124,46 @@ def test_archive_streamer_does_not_materialize_unretained_large_member(
         )
 
 
+def test_archive_streamer_enforces_aggregate_retained_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer = tmp_path / "producer"
+    producer.mkdir()
+    (producer / "result.json").write_bytes(b"result")
+    destination = tmp_path / "results" / "development"
+    destination.mkdir(parents=True)
+    monkeypatch.setattr(binding_module, "REPO", tmp_path)
+    monkeypatch.setattr(
+        binding_module,
+        "DEVELOPMENT_RESULTS_ROOT",
+        destination,
+    )
+    archive_path, identity = binding_module._write_qualification_archive(
+        destination_directory=destination,
+        producer_root=producer,
+        evidence_payloads={
+            "evidence/a.json": b"aaaa",
+            "evidence/b.json": b"bbbb",
+        },
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "_MAX_RETAINED_QUALIFICATION_TOTAL_BYTES",
+        7,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="retained qualification evidence exceeds its total limit",
+    ):
+        binding_module._stream_qualification_archive(
+            archive_path,
+            identity,
+            retained_members={"evidence/a.json", "evidence/b.json"},
+        )
+
+
 def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2991,7 +3177,7 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -3122,7 +3308,7 @@ def test_result_qualification_created_in_one_process_reopens_in_two_others(
     qualification = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "protocol_sha256": binding_module.sha256_file(
             binding_module.PROTOCOL_PATH
         ),
@@ -3234,11 +3420,114 @@ def test_development_qualification_archive_rejects_link_members(
         )
 
 
+@pytest.mark.parametrize(
+    "members",
+    [
+        True,
+        [
+            {
+                "path": "producer/result.json",
+                "bytes": 1.0,
+                "sha256": "a" * 64,
+            }
+        ],
+    ],
+)
+def test_development_closure_rejects_malformed_archive_members_before_indexing(
+    members: object,
+) -> None:
+    with pytest.raises(
+        RuntimeError,
+        match="member identities are malformed",
+    ):
+        binding_module._validated_qualification_member_rows(members)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["truncated", "extra", "numeric-count-alias"],
+)
+def test_central_development_audit_requires_exact_full_report(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    producer_root = tmp_path / "qualification-v1.15.0"
+    producer_manifest_sha256 = "a" * 64
+    result_sha256 = "b" * 64
+    auditor_sha256 = "c" * 64
+    audit: dict[str, object] = {
+        "schema": "prospect.world-model-lifecycle.artifact-audit.v2",
+        "artifact_root": str(producer_root),
+        "result_file": "result.json",
+        "result_sha256": result_sha256,
+        "lane": "development",
+        "integrity_passed": True,
+        "engineering_complete": True,
+        "complete_for_claim": False,
+        "passed": True,
+        "check_counts": {
+            "passed": 1,
+            "failed": 0,
+            "coverage_gaps": 0,
+        },
+        "audit_implementation": {
+            "auditor_source_sha256": auditor_sha256,
+            "bound_auditor_source_sha256": None,
+            "formal_test_report_sha256": None,
+            "coverage_conformance_report_sha256": None,
+            "auditor_source_matches_binding": False,
+            "coverage_conformance_verified": False,
+            "audit_execution_conformance_verified": False,
+        },
+        "audit_execution_conformance_verified": False,
+        "resource_limits_bytes": dict(
+            binding_module._DEVELOPMENT_AUDIT_RESOURCE_LIMITS
+        ),
+        "custody": {
+            "producer_manifest_checked": True,
+            "producer_manifest_status": "completed",
+            "producer_manifest_sha256": producer_manifest_sha256,
+        },
+        "findings": [],
+        "coverage_gaps": [],
+        "independence_limitations": list(
+            binding_module._DEVELOPMENT_AUDIT_INDEPENDENCE_LIMITATIONS
+        ),
+    }
+    binding_module._validate_development_audit_report(
+        copy.deepcopy(audit),
+        producer_root=producer_root,
+        producer_manifest_sha256=producer_manifest_sha256,
+        result_sha256=result_sha256,
+        auditor_sha256=auditor_sha256,
+    )
+    if mutation == "truncated":
+        audit.pop("resource_limits_bytes")
+    elif mutation == "extra":
+        audit["unbound"] = True
+    else:
+        counts = audit["check_counts"]
+        assert isinstance(counts, dict)
+        counts["failed"] = 0.0
+
+    with pytest.raises(
+        RuntimeError,
+        match="not a complete passing audit",
+    ):
+        binding_module._validate_development_audit_report(
+            audit,
+            producer_root=producer_root,
+            producer_manifest_sha256=producer_manifest_sha256,
+            result_sha256=result_sha256,
+            auditor_sha256=auditor_sha256,
+        )
+
+
 def test_development_closure_creator_rejects_any_alternate_marker_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    canonical = tmp_path / "development-closure-v1.14.0.json"
+    canonical = tmp_path / "development-closure-v1.15.0.json"
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
 
     with pytest.raises(RuntimeError, match="only be published"):
@@ -3256,7 +3545,7 @@ def test_preserved_development_closure_name_must_be_content_addressed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _canonical_payload({"schema": "fixture"})
-    canonical = tmp_path / "development-closure-v1.14.0.json"
+    canonical = tmp_path / "development-closure-v1.15.0.json"
     canonical.write_bytes(payload)
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
     assert binding_module._closure_path_mode(canonical, payload) == "canonical"

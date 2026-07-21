@@ -1,4 +1,4 @@
-"""Trusted, immutable preformal test evidence for WM-001 protocol 1.14."""
+"""Trusted, immutable preformal test evidence for WM-001 protocol 1.15."""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ from .assurance import ASSURANCE
 
 SCHEMA = "prospect.wm001.preformal-test-report.v2"
 EXPERIMENT_ID = "WM-001"
-PROTOCOL_VERSION = "1.14.0"
-REPORT_NAME = "preformal-test-report-v1.14.0.json"
+PROTOCOL_VERSION = "1.15.0"
+REPORT_NAME = "preformal-test-report-v1.15.0.json"
 PREFORMAL_REPORT_NAME = REPORT_NAME
-LOG_PREFIX = "preformal-v1.14.0-command-"
+LOG_PREFIX = "preformal-v1.15.0-command-"
 _EVIDENCE_PREFIX = "preformal-"
 SOURCE_RELATIVE_PATH = "bench/world_model_lifecycle/preformal.py"
-REVIEW_RELATIVE_PATH = "docs/wm001-v1140-prospective-harness-review.json"
+REVIEW_RELATIVE_PATH = "docs/wm001-v1150-prospective-harness-review.json"
 REVIEW_SCHEMA = "prospect.wm001.prospective-harness-review.v1"
 
 
@@ -60,22 +60,22 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_CLOSURE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.14.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.15.0.json"
 )
 RUNTIME_SEAL_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "runtime-seal-v1.14.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "runtime-seal-v1.15.0.json"
 )
 PREFORMAL_BUNDLE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "v1.14.0" / "preformal"
+    DEVELOPMENT_RESULTS_ROOT / "v1.15.0" / "preformal"
 )
 CLOSURE_ATTEMPT_PATH = (
     REPO
     / "bench"
     / "world_model_lifecycle"
     / "results"
-    / "operator-v1.14"
+    / "operator-v1.15"
     / "closures"
-    / "development-closure-v1.14.0"
+    / "development-closure-v1.15.0"
 )
 PREFORMAL_REPORT_PATH = PREFORMAL_BUNDLE_PATH / REPORT_NAME
 LAUNCH_BOOTSTRAP_PATH = REPO / "bench/world_model_lifecycle/launch_bootstrap.py"
@@ -312,6 +312,17 @@ def _canonical_json_bytes(value: object) -> bytes:
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
+
+
+def _strict_json_equal(observed: object, expected: object) -> bool:
+    """Compare JSON values without Python's bool/int/float aliases."""
+
+    try:
+        return _canonical_json_bytes(observed) == _canonical_json_bytes(
+            expected
+        )
+    except (TypeError, ValueError):
+        return False
 
 
 def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -939,8 +950,8 @@ def _implementation_files(*, environment: dict[str, str] | None = None) -> list[
         REPO / "bench/world_model_lifecycle/protocol.json",
         REPO / "bench/world_model_lifecycle/schemas/raw-result.schema.json",
         REPO / "bench/world_model_lifecycle/schemas/formal-binding.schema.json",
-        REPO / "docs/wm001-v1140-confirmation-plan.md",
-        REPO / "docs/wm001-v1140-operator-runbook.md",
+        REPO / "docs/wm001-v1150-confirmation-plan.md",
+        REPO / "docs/wm001-v1150-operator-runbook.md",
     ]
     rows: list[dict[str, object]] = []
     for path in sorted(set(candidates)):
@@ -1074,7 +1085,7 @@ def required_commands(
     prospective_review_path: Path = REVIEW_PATH,
     device: str = "cpu",
 ) -> tuple[CommandSpec, ...]:
-    """Return the fixed, ordered v1.14 preformal command contract."""
+    """Return the fixed, ordered v1.15 preformal command contract."""
 
     if device not in {"cpu", "cuda"}:
         raise PreformalEvidenceError("preformal device must be cpu or cuda")
@@ -1356,7 +1367,7 @@ def generate_preformal_report(
         raise PreformalEvidenceError("preformal report path must not contain aliases")
     if output != PREFORMAL_REPORT_PATH:
         raise PreformalEvidenceError(
-            "preformal report must use the sole canonical protocol-1.14 "
+            "preformal report must use the sole canonical protocol-1.15 "
             f"path {PREFORMAL_REPORT_PATH}"
         )
     final_directory = output.parent
@@ -1372,11 +1383,11 @@ def generate_preformal_report(
     )
     if runtime_seal_path != RUNTIME_SEAL_PATH:
         raise PreformalEvidenceError(
-            "runtime seal must use its canonical v1.14 path"
+            "runtime seal must use its canonical v1.15 path"
         )
     if development_closure_path != DEVELOPMENT_CLOSURE_PATH:
         raise PreformalEvidenceError(
-            "development closure must use its canonical v1.14 path"
+            "development closure must use its canonical v1.15 path"
         )
     if closure_attempt_path != CLOSURE_ATTEMPT_PATH:
         raise PreformalEvidenceError(
@@ -1601,6 +1612,17 @@ def _verify_log(
     payload = _read_regular(path, label=f"{command_name} {stream} log")
     if len(payload) != size or _sha256(payload) != digest:
         raise PreformalEvidenceError(f"{command_name} {stream} log identity changed")
+    if (
+        stream == "stderr"
+        and (
+            size != 0
+            or digest != _sha256(b"")
+            or payload != b""
+        )
+    ):
+        raise PreformalEvidenceError(
+            f"{command_name} stderr is not exactly empty"
+        )
     return expected_filename
 
 
@@ -2522,11 +2544,39 @@ def _runtime_bootstrap_conformance_from_report(
     return value
 
 
+def _command_stderr_failure_checks(
+    directory: Path,
+    commands: object,
+) -> list[str]:
+    """Return stable identifiers for command stderr authorization failures."""
+
+    if not isinstance(commands, list):
+        return []
+    failures: list[str] = []
+    for ordinal, row in enumerate(commands, start=1):
+        if not isinstance(row, Mapping) or not isinstance(
+            row.get("name"),
+            str,
+        ):
+            continue
+        try:
+            _verify_log(
+                directory,
+                row.get("stderr"),
+                ordinal=ordinal,
+                command_name=cast(str, row["name"]),
+                stream="stderr",
+            )
+        except PreformalEvidenceError:
+            failures.append(f"command_{ordinal:02d}_stderr_not_empty")
+    return failures
+
+
 def _semantic_failure_checks(
     directory: Path,
     report: Mapping[str, object],
 ) -> list[str]:
-    """Return exact semantic failures for successful runtime command rows."""
+    """Return exact semantic failures beyond command exit statuses."""
 
     commands = report.get("commands")
     checks = (
@@ -2541,7 +2591,7 @@ def _semantic_failure_checks(
             _runtime_bootstrap_conformance_from_report,
         ),
     )
-    failures: list[str] = []
+    failures = _command_stderr_failure_checks(directory, commands)
     for command_name, failure_name, verifier in checks:
         matches = (
             [
@@ -2626,7 +2676,8 @@ def _verify_preformal_report(
     qa_after = report.get("qa_executable_after")
     if (
         not isinstance(qa_before, dict)
-        or qa_before != qa_after
+        or not isinstance(qa_after, dict)
+        or not _strict_json_equal(qa_before, qa_after)
         or not isinstance(qa_before.get("invocation_path"), str)
         or not isinstance(qa_before.get("implementation"), str)
         or not isinstance(qa_before.get("version"), str)
@@ -2646,7 +2697,8 @@ def _verify_preformal_report(
     runtime_after = report.get("runtime_executable_after")
     if (
         not isinstance(runtime_before, dict)
-        or runtime_before != runtime_after
+        or not isinstance(runtime_after, dict)
+        or not _strict_json_equal(runtime_before, runtime_after)
         or not isinstance(runtime_before.get("invocation_path"), str)
         or not isinstance(runtime_before.get("version"), str)
     ):
@@ -2667,11 +2719,20 @@ def _verify_preformal_report(
     if (
         not isinstance(inputs_before, dict)
         or set(inputs_before) != _PREFORMAL_INPUT_FIELDS
-        or inputs_before != inputs_after
+        or not isinstance(inputs_after, dict)
+        or set(inputs_after) != _PREFORMAL_INPUT_FIELDS
     ):
         raise PreformalEvidenceError("preformal input file identities are incomplete or changed")
     for label, identity in inputs_before.items():
         recorded = _validate_file_identity(identity, label=label)
+        recorded_after = _validate_file_identity(
+            inputs_after[label],
+            label=f"{label} after",
+        )
+        if not _strict_json_equal(recorded, recorded_after):
+            raise PreformalEvidenceError(
+                "preformal input file identities are incomplete or changed"
+            )
         live = _file_identity(
             Path(cast(str, recorded["path"])),
             label=label,
@@ -2750,23 +2811,50 @@ def _verify_preformal_report(
         or report.get("protocol_version") != PROTOCOL_VERSION
         or report.get("repository_cwd") != str(repository)
         or report.get("device") not in {"cpu", "cuda"}
-        or report.get("git_before") != git
-        or report.get("git_after") != git
-        or report.get("qa_executable_before") != qa_executable
-        or report.get("qa_executable_after") != qa_executable
+        or not _strict_json_equal(report.get("git_before"), git)
+        or not _strict_json_equal(report.get("git_after"), git)
+        or not _strict_json_equal(
+            report.get("qa_executable_before"),
+            qa_executable,
+        )
+        or not _strict_json_equal(
+            report.get("qa_executable_after"),
+            qa_executable,
+        )
         or (
             require_live_qa_identity
-            and live_qa_executable != qa_executable
+            and not _strict_json_equal(
+                live_qa_executable,
+                qa_executable,
+            )
         )
-        or runtime_before != runtime_executable
-        or report.get("qa_closure_after") != qa_closure
-        or qa_closure != live_qa_closure
-        or report.get("runtime_seal") != runtime_seal
-        or report.get("runtime_environment") != _environment_identity(live_runtime_environment)
-        or runtime_environment != live_runtime_environment
-        or report.get("prospective_review") != prospective_review
-        or report.get("generator_source_before") != source
-        or report.get("generator_source_after") != source
+        or not _strict_json_equal(runtime_before, runtime_executable)
+        or not _strict_json_equal(
+            report.get("qa_closure_after"),
+            qa_closure,
+        )
+        or not _strict_json_equal(qa_closure, live_qa_closure)
+        or not _strict_json_equal(report.get("runtime_seal"), runtime_seal)
+        or not _strict_json_equal(
+            report.get("runtime_environment"),
+            _environment_identity(live_runtime_environment),
+        )
+        or not _strict_json_equal(
+            runtime_environment,
+            live_runtime_environment,
+        )
+        or not _strict_json_equal(
+            report.get("prospective_review"),
+            prospective_review,
+        )
+        or not _strict_json_equal(
+            report.get("generator_source_before"),
+            source,
+        )
+        or not _strict_json_equal(
+            report.get("generator_source_after"),
+            source,
+        )
         or report.get("identities_stable") is not True
         or type(report.get("all_pass")) is not bool
         or git.get("worktree_clean") is not True

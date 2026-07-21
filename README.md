@@ -132,12 +132,24 @@ was outer-finalized and no formal launch occurred. Its terminal disposition is
 preserved in the
 [v1.13 binding-verifier failure](docs/wm001-v1130-binding-verifier-failure.md).
 
-Protocol 1.14 is the active prospective confirmation. It preserves the
-scientific system, formal-binding v10, raw-result v9, and every prior runtime,
-schema, and zero-stderr repair. It separates canonical live-bundle validation
-from preserved binding-package validation while requiring both roles to
-enforce the same fixed semantic and stream-byte contract, and adds a real
-producer-to-strict-consumer archive regression. It uses fresh seeds,
-environments, and namespaces and cannot reuse v1.13 evidence. Follow the
-[WM-001 v1.14 operator runbook](docs/wm001-v1140-operator-runbook.md) before
+Protocol 1.14 repaired that report-role boundary and passed its prospective
+gates, result-free rehearsal, development, independent audit, closure, fresh
+runtime reopen, and all ten preformal commands. Its sole binding transaction
+then reached the independent development-archive auditor, which falsely
+reported an extra member after verifying all 86 declared members. The archive
+had no membership delta: the final check created a second `TarFile` iterator,
+which replayed a cached member. The failed binding was outer-finalized and no
+formal launch occurred. Its terminal disposition is preserved in the
+[v1.14 independent archive-verifier failure](docs/wm001-v1140-development-archive-membership-failure.md).
+
+Protocol 1.15 is the active prospective confirmation. It preserves the
+scientific system and serialized contracts, retains one archive iterator
+through exhaustion, roots membership in the archived producer manifest, binds
+both bootstraps and every live authorization input to its archived role,
+enforces strict JSON scalar and real timestamp semantics, repairs archive-name
+collision handling, bounds aggregate retained evidence, requires empty stderr
+for all ten preformal commands, and adds a shared real archive regression plus
+real producer/audit-to-closure role-join regressions. It uses fresh seeds,
+environments, and namespaces and cannot reuse v1.14 evidence. Follow the
+[WM-001 v1.15 operator runbook](docs/wm001-v1150-operator-runbook.md) before
 creating any development evidence, implementation binding, or formal attempt.

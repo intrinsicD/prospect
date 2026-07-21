@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import sysconfig
+from datetime import UTC, datetime
 from pathlib import Path
 
 _MAX_CONTROL_BYTES = 64 << 20
@@ -24,9 +25,13 @@ _FORMAL_BINDING_SCHEMA = "prospect.world-model-lifecycle.formal-binding.v10"
 _OPERATOR_ATTEMPT_SCHEMA = "prospect.wm001.operator-attempt.v1"
 _OPERATOR_TERMINAL = "operator-attempt.json"
 _CLOSURE_REFERENCE_SCHEMA = "prospect.wm001.closure-reference.v1"
-_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.14.0.json"
-_PREFORMAL_LOG_PREFIX = "preformal-v1.14.0-command-"
+_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.15.0.json"
+_PREFORMAL_LOG_PREFIX = "preformal-v1.15.0-command-"
 _SHA256_EMPTY = hashlib.sha256(b"").hexdigest()
+_UTC_TIMESTAMP = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
+    r"[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?Z$"
+)
 _DEVELOPMENT_MATRIX_CONTRACT_SHA256 = (
     "09a232a4a58c2690665cbef928936b49fbb28d7134405c8eb696a63371591b84"
 )
@@ -299,6 +304,40 @@ def _canonical_object(payload: bytes, *, label: str) -> dict[str, object]:
     return value
 
 
+def _strict_json_equal(observed: object, expected: object) -> bool:
+    """Compare decoded JSON without bool/int or int/float aliases."""
+
+    if type(observed) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        assert isinstance(observed, dict)
+        return set(observed) == set(expected) and all(
+            _strict_json_equal(observed[key], value)
+            for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        assert isinstance(observed, list)
+        return len(observed) == len(expected) and all(
+            _strict_json_equal(left, right)
+            for left, right in zip(observed, expected, strict=True)
+        )
+    return observed == expected
+
+
+def _parse_utc_timestamp(value: object, *, label: str) -> datetime:
+    if not isinstance(value, str) or _UTC_TIMESTAMP.fullmatch(value) is None:
+        raise LaunchError(f"{label} is not canonical UTC")
+    try:
+        parsed = datetime.fromisoformat(
+            value.removesuffix("Z") + "+00:00"
+        )
+    except ValueError as error:
+        raise LaunchError(f"{label} is not a real UTC timestamp") from error
+    if parsed.tzinfo != UTC:
+        raise LaunchError(f"{label} is not UTC")
+    return parsed
+
+
 def _canonical_digest(value: object) -> str:
     payload = json.dumps(
         value,
@@ -362,7 +401,7 @@ def _acquire_runtime_lock(repository: Path) -> int:
     parent = repository / "bench" / "world_model_lifecycle" / "results"
     parent.mkdir(parents=True, exist_ok=True)
     _reject_symlink_components(parent, label="runtime lock directory")
-    lock_path = parent / ".wm001-v1.14-runtime.lock"
+    lock_path = parent / ".wm001-v1.15-runtime.lock"
     existed = os.path.lexists(lock_path)
     flags = os.O_RDWR | os.O_CREAT
     if hasattr(os, "O_CLOEXEC"):
@@ -387,7 +426,7 @@ def _acquire_runtime_lock(repository: Path) -> int:
                 fcntl.LOCK_EX | fcntl.LOCK_NB,
             )
         except BlockingIOError as error:
-            raise LaunchError("another WM-001 v1.14 outer invocation holds the runtime lock") from error
+            raise LaunchError("another WM-001 v1.15 outer invocation holds the runtime lock") from error
         if not existed:
             parent_descriptor = os.open(
                 parent,
@@ -405,7 +444,7 @@ def _acquire_runtime_lock(repository: Path) -> int:
 
 
 def _prepare_completion_root(repository: Path) -> Path:
-    root = repository / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.14"
+    root = repository / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.15"
     root.mkdir(parents=True, exist_ok=True)
     _reject_symlink_components(root, label="outer completion directory")
     if root.resolve(strict=True) != root:
@@ -446,7 +485,7 @@ def _prospective_runtime_seal(repository: Path) -> Path:
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "runtime-seal-v1.14.0.json"
+        / "runtime-seal-v1.15.0.json"
     )
 
 
@@ -622,7 +661,7 @@ def _recorded_fresh_identity_conformance(value: object) -> dict[str, object]:
         or value.get("schema")
         != "prospect.wm001.fresh-runtime-identity-conformance.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.14.0"
+        or value.get("protocol_version") != "1.15.0"
         or value.get("mode") != "fresh-identity-conformance"
         or not _sha256_string(value.get("challenge"))
         or type(requesting) is not int
@@ -802,7 +841,7 @@ def _verify_development_producer(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.14.0"
+        / "qualification-v1.15.0"
     )
     _reject_symlink_components(root, label="canonical development qualification")
     if not root.is_dir():
@@ -830,6 +869,14 @@ def _verify_development_producer(
         "files",
     }
     rows = manifest.get("files")
+    started_at = _parse_utc_timestamp(
+        manifest.get("started_at_utc"),
+        label="canonical development producer start time",
+    )
+    completed_at = _parse_utc_timestamp(
+        manifest.get("completed_at_utc"),
+        label="canonical development producer completion time",
+    )
     if (
         set(manifest) != expected_manifest_fields
         or manifest.get("schema") != "prospect.wm001.producer-manifest.v1"
@@ -838,9 +885,9 @@ def _verify_development_producer(
         or manifest.get("status") != "completed"
         or manifest.get("error") is not None
         or manifest.get("manifest_excludes") != ["producer-manifest.json"]
-        or not isinstance(manifest.get("started_at_utc"), str)
-        or not isinstance(manifest.get("completed_at_utc"), str)
+        or started_at > completed_at
         or not isinstance(rows, list)
+        or type(manifest.get("file_count")) is not int
         or manifest.get("file_count") != len(rows)
     ):
         raise LaunchError("canonical development producer manifest is malformed")
@@ -874,7 +921,7 @@ def _verify_development_producer(
                 }
             )
     actual_rows.sort(key=lambda row: str(row["path"]))
-    if rows != actual_rows:
+    if not _strict_json_equal(rows, actual_rows):
         raise LaunchError("canonical development producer files differ from its manifest")
     result_path = root / "result.json"
     result_row, result_payload, _ = _regular_row(
@@ -888,7 +935,7 @@ def _verify_development_producer(
     if (
         result.get("schema") != "prospect.world-model-lifecycle.raw-result.v9"
         or result.get("experiment_id") != "WM-001"
-        or result.get("protocol_version") != "1.14.0"
+        or result.get("protocol_version") != "1.15.0"
         or result.get("lane") != "development"
     ):
         raise LaunchError("canonical development raw result is malformed")
@@ -920,9 +967,9 @@ def _verify_development_audit(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.14"
+        / "operator-v1.15"
         / "audits"
-        / "development-audit-v1.14.0"
+        / "development-audit-v1.15.0"
     )
     terminal = attempt / _OPERATOR_TERMINAL
     terminal_row, terminal_payload, terminal_identity = _regular_row(
@@ -966,18 +1013,24 @@ def _verify_development_audit(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.14.0"
+        / "qualification-v1.15.0"
     )
     if (
         set(manifest) != expected_fields
         or manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
         or manifest.get("experiment_id") != "WM-001"
-        or manifest.get("protocol_version") != "1.14.0"
-        or manifest.get("assurance") != _ASSURANCE
+        or manifest.get("protocol_version") != "1.15.0"
+        or not _strict_json_equal(
+            manifest.get("assurance"),
+            _ASSURANCE,
+        )
         or manifest.get("kind") != "audit"
         or manifest.get("lane") != "development"
         or manifest.get("status") != "accepted"
-        or manifest.get("inputs") != producer_rows
+        or not _strict_json_equal(
+            manifest.get("inputs"),
+            producer_rows,
+        )
         or manifest.get("error") is not None
         or manifest.get("manifest_excludes") != [_OPERATOR_TERMINAL]
         or not isinstance(primary, dict)
@@ -995,6 +1048,7 @@ def _verify_development_audit(
         != "audit-execution-02.runtime.json"
         or primary.get("claim_file") is not None
         or not isinstance(files, list)
+        or type(manifest.get("file_count")) is not int
         or manifest.get("file_count") != len(files)
     ):
         raise LaunchError("canonical development audit terminal is malformed")
@@ -1023,7 +1077,7 @@ def _verify_development_audit(
                     "sha256": row["sha256"],
                 }
             )
-    if files != actual_file_rows:
+    if not _strict_json_equal(files, actual_file_rows):
         raise LaunchError("canonical development audit files differ from its terminal")
     marker = _completion_marker(completion_root, terminal)
     marker_row, marker_payload, marker_identity = _regular_row(
@@ -1061,7 +1115,7 @@ def _verify_closure_authorization(
     dict[str, object],
 ]:
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    closure_path = results / "development" / "development-closure-v1.14.0.json"
+    closure_path = results / "development" / "development-closure-v1.15.0.json"
     closure_row, closure_payload, _ = _regular_row(
         closure_path,
         label="canonical development closure",
@@ -1073,6 +1127,7 @@ def _verify_closure_authorization(
     development = binding.get("development_qualification")
     if (
         not isinstance(development, dict)
+        or type(development.get("closure_bytes")) is not int
         or development.get("closure_bytes") != closure_row["bytes"]
         or development.get("closure_sha256") != closure_row["sha256"]
         or closure.get("engineering_verified") is not True
@@ -1081,7 +1136,7 @@ def _verify_closure_authorization(
     ):
         raise LaunchError("formal binding differs from the canonical development closure")
 
-    attempt = results / "operator-v1.14" / "closures" / "development-closure-v1.14.0"
+    attempt = results / "operator-v1.15" / "closures" / "development-closure-v1.15.0"
     terminal = attempt / _OPERATOR_TERMINAL
     terminal_row, terminal_payload, terminal_identity = _regular_row(
         terminal,
@@ -1092,21 +1147,47 @@ def _verify_closure_authorization(
         terminal_payload,
         label="canonical closure attempt terminal",
     )
+    expected_terminal_fields = {
+        "schema",
+        "experiment_id",
+        "protocol_version",
+        "assurance",
+        "kind",
+        "lane",
+        "status",
+        "inputs",
+        "primary",
+        "error",
+        "files",
+        "file_count",
+        "manifest_excludes",
+    }
     if (
-        terminal_manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
+        set(terminal_manifest) != expected_terminal_fields
+        or terminal_manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
         or terminal_manifest.get("experiment_id") != "WM-001"
-        or terminal_manifest.get("protocol_version") != "1.14.0"
-        or terminal_manifest.get("assurance") != _ASSURANCE
+        or terminal_manifest.get("protocol_version") != "1.15.0"
+        or not _strict_json_equal(
+            terminal_manifest.get("assurance"),
+            _ASSURANCE,
+        )
         or terminal_manifest.get("kind") != "closure"
         or terminal_manifest.get("lane") != "development"
         or terminal_manifest.get("status") != "accepted"
-        or terminal_manifest.get("primary") != {"closure_reference_file": "closure-reference.json"}
+        or not _strict_json_equal(
+            terminal_manifest.get("primary"),
+            {"closure_reference_file": "closure-reference.json"},
+        )
         or terminal_manifest.get("error") is not None
         or terminal_manifest.get("manifest_excludes") != [_OPERATOR_TERMINAL]
     ):
         raise LaunchError("canonical closure attempt terminal is not accepted")
     rows = terminal_manifest.get("files")
-    if not isinstance(rows, list) or terminal_manifest.get("file_count") != len(rows):
+    if (
+        not isinstance(rows, list)
+        or type(terminal_manifest.get("file_count")) is not int
+        or terminal_manifest.get("file_count") != len(rows)
+    ):
         raise LaunchError("canonical closure attempt file identities are malformed")
     actual_rows: list[dict[str, object]] = []
     for entry in sorted(os.scandir(attempt), key=lambda item: item.name):
@@ -1134,7 +1215,7 @@ def _verify_closure_authorization(
             )
         finally:
             os.close(descriptor)
-    if rows != actual_rows:
+    if not _strict_json_equal(rows, actual_rows):
         raise LaunchError("canonical closure attempt files differ from its terminal")
     reference_path = attempt / "closure-reference.json"
     reference_descriptor, reference_payload, _ = _open_regular(
@@ -1161,20 +1242,23 @@ def _verify_closure_authorization(
         "fresh_reopen_file",
         "fresh_reopen_sha256",
     }
-    expected_audit = results / "operator-v1.14" / "audits" / "development-audit-v1.14.0"
+    expected_audit = results / "operator-v1.15" / "audits" / "development-audit-v1.15.0"
     expected_producer = (
         results
         / "development"
-        / "qualification-v1.14.0"
+        / "qualification-v1.15.0"
     )
     if (
         set(reference) != expected_reference_fields
         or reference.get("schema") != _CLOSURE_REFERENCE_SCHEMA
         or reference.get("experiment_id") != "WM-001"
-        or reference.get("protocol_version") != "1.14.0"
+        or reference.get("protocol_version") != "1.15.0"
         or reference.get("closure_marker") != str(closure_path)
         or reference.get("closure_sha256") != hashlib.sha256(closure_payload).hexdigest()
-        or reference.get("qualification_archive") != closure.get("qualification_archive")
+        or not _strict_json_equal(
+            reference.get("qualification_archive"),
+            closure.get("qualification_archive"),
+        )
         or reference.get("producer_root") != str(expected_producer)
         or closure.get("producer_root") != str(expected_producer)
         or reference.get("audit_attempt") != str(expected_audit)
@@ -1230,7 +1314,7 @@ def _verify_closure_authorization(
         or fresh_reopen.get("schema")
         != "prospect.wm001.development-closure-fresh-reopen.v1"
         or fresh_reopen.get("experiment_id") != "WM-001"
-        or fresh_reopen.get("protocol_version") != "1.14.0"
+        or fresh_reopen.get("protocol_version") != "1.15.0"
         or fresh_reopen.get("mode") != "fresh-closure-reopen"
         or not _sha256_string(fresh_reopen.get("challenge"))
         or type(requesting_process_id) is not int
@@ -1271,8 +1355,10 @@ def _verify_closure_authorization(
         audit_attempt != expected_audit
         or reference.get("audit_attempt_manifest_sha256")
         != audit_terminal_row["sha256"]
-        or terminal_manifest.get("inputs")
-        != [*producer_rows, *audit_input_rows]
+        or not _strict_json_equal(
+            terminal_manifest.get("inputs"),
+            [*producer_rows, *audit_input_rows],
+        )
         or development.get("producer_manifest_sha256")
         != producer_rows[0]["sha256"]
         or development.get("raw_result_sha256")
@@ -1361,14 +1447,21 @@ def _verify_binding_attempt_terminal(
             set(manifest) != expected_fields
             or manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
             or manifest.get("experiment_id") != "WM-001"
-            or manifest.get("protocol_version") != "1.14.0"
-            or manifest.get("assurance") != _ASSURANCE
+            or manifest.get("protocol_version") != "1.15.0"
+            or not _strict_json_equal(
+                manifest.get("assurance"),
+                _ASSURANCE,
+            )
             or manifest.get("kind") != "binding"
             or manifest.get("lane") is not None
             or manifest.get("status") != "accepted"
-            or manifest.get("primary") != {"binding_file": "formal-binding.json"}
+            or not _strict_json_equal(
+                manifest.get("primary"),
+                {"binding_file": "formal-binding.json"},
+            )
             or manifest.get("error") is not None
             or not isinstance(rows, list)
+            or type(manifest.get("file_count")) is not int
             or manifest.get("file_count") != len(rows)
             or manifest.get("manifest_excludes") != [_OPERATOR_TERMINAL]
             or not isinstance(inputs, list)
@@ -1416,7 +1509,7 @@ def _verify_binding_attempt_terminal(
                 )
             finally:
                 os.close(descriptor)
-        if rows != actual_rows or not any(
+        if not _strict_json_equal(rows, actual_rows) or not any(
             row
             == {
                 "path": "formal-binding.json",
@@ -1482,7 +1575,8 @@ def _verify_binding_attempt_terminal(
             or preflight.get("schema")
             != _FORMAL_INPUT_PREFLIGHT_SCHEMA
             or preflight.get("experiment_id") != "WM-001"
-            or preflight.get("protocol_version") != "1.14.0"
+            or preflight.get("protocol_version") != "1.15.0"
+            or type(preflight.get("binding_bytes")) is not int
             or preflight.get("binding_bytes") != len(binding_payload)
             or preflight.get("binding_sha256")
             != hashlib.sha256(binding_payload).hexdigest()
@@ -1514,7 +1608,7 @@ def _verify_binding_attempt_terminal(
             / "world_model_lifecycle"
             / "results"
             / "development"
-            / "v1.14.0"
+            / "v1.15.0"
             / "preformal"
             / _PREFORMAL_REPORT_NAME
         )
@@ -1533,7 +1627,7 @@ def _verify_binding_attempt_terminal(
             report.get("schema")
             != "prospect.wm001.preformal-test-report.v2"
             or report.get("experiment_id") != "WM-001"
-            or report.get("protocol_version") != "1.14.0"
+            or report.get("protocol_version") != "1.15.0"
             or report.get("device") not in {"cpu", "cuda"}
             or report.get("device") != runtime.get("device")
             or report.get("all_pass") is not True
@@ -1591,7 +1685,8 @@ def _verify_binding_attempt_terminal(
             stderr = command.get("stderr")
             ordinal = _PREFORMAL_COMMAND_NAMES.index(command_name) + 1
             if (
-                command.get("exit_code") != 0
+                type(command.get("exit_code")) is not int
+                or command.get("exit_code") != 0
                 or command.get("passed") is not True
                 or not isinstance(stdout, dict)
                 or set(stdout) != {"file", "bytes", "sha256"}
@@ -1607,6 +1702,7 @@ def _verify_binding_attempt_terminal(
                 or stdout["file"] not in log_payloads
                 or not isinstance(stderr, dict)
                 or set(stderr) != {"file", "bytes", "sha256"}
+                or type(stderr.get("bytes")) is not int
                 or stderr.get("bytes") != 0
                 or stderr.get("sha256") != _SHA256_EMPTY
                 or stderr.get("file")
@@ -1690,9 +1786,10 @@ def _verify_binding_attempt_terminal(
         ]
         if (
             source.get("test_report_file") != _PREFORMAL_REPORT_NAME
+            or type(source.get("test_report_bytes")) is not int
             or source.get("test_report_bytes") != report_row["bytes"]
             or source.get("test_report_sha256") != report_row["sha256"]
-            or inputs != expected_inputs
+            or not _strict_json_equal(inputs, expected_inputs)
             or preflight.get("preformal_report_sha256")
             != report_row["sha256"]
             or preflight.get("development_closure_sha256")
@@ -1716,7 +1813,7 @@ def _verify_binding_attempt_terminal(
                 / "world_model_lifecycle"
                 / "results"
                 / "development"
-                / "development-closure-v1.14.0.json"
+                / "development-closure-v1.15.0.json"
             )
         ):
             raise LaunchError("formal binding authorization inputs differ from live evidence")
@@ -1740,7 +1837,7 @@ def _open_typed_runtime_custody(
     """Capture exactly one of the two protocol-authorized runtime seals."""
 
     results_root = repository / "bench" / "world_model_lifecycle" / "results"
-    binding_attempt = results_root / "operator-v1.14" / "bindings" / "formal-binding-v1.14.0"
+    binding_attempt = results_root / "operator-v1.15" / "bindings" / "formal-binding-v1.15.0"
     formal_binding = binding_attempt / "formal-binding.json"
     prospective_runtime_seal = _prospective_runtime_seal(repository)
     if (
@@ -1749,7 +1846,7 @@ def _open_typed_runtime_custody(
         or path.resolve(strict=False) != path
         or path not in {formal_binding, prospective_runtime_seal}
     ):
-        raise LaunchError("runtime seal path is not one canonical protocol-1.14 seal")
+        raise LaunchError("runtime seal path is not one canonical protocol-1.15 seal")
     is_formal_binding = path == formal_binding
     expected_nlink = 1 if is_formal_binding else 2
     seal_fd, seal_payload, seal_identity = _open_regular(
@@ -1766,12 +1863,15 @@ def _open_typed_runtime_custody(
         if (
             value.get("schema") != expected_schema
             or value.get("experiment_id") != "WM-001"
-            or value.get("assurance") != _ASSURANCE
+            or not _strict_json_equal(
+                value.get("assurance"),
+                _ASSURANCE,
+            )
             or (
                 not is_formal_binding
                 and (
                     set(value) != _RUNTIME_SEAL_FIELDS
-                    or value.get("protocol_version") != "1.14.0"
+                    or value.get("protocol_version") != "1.15.0"
                 )
             )
         ):
@@ -1827,8 +1927,11 @@ def _commit_outer_receipt(
         set(receipt) != expected
         or receipt.get("schema") != _OUTER_RECEIPT_SCHEMA
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.14.0"
-        or receipt.get("assurance") != _ASSURANCE
+        or receipt.get("protocol_version") != "1.15.0"
+        or not _strict_json_equal(
+            receipt.get("assurance"),
+            _ASSURANCE,
+        )
         or receipt.get("trust_model") != _OUTER_TRUST_MODEL
         or not isinstance(terminal_raw, str)
         or type(terminal_bytes) is not int
@@ -1912,7 +2015,7 @@ def _run_locked(
         and arguments.create_runtime_seal != _prospective_runtime_seal(repository)
     ):
         raise LaunchError(
-            "runtime-seal creation requires the sole canonical protocol-1.14 prospective path"
+            "runtime-seal creation requires the sole canonical protocol-1.15 prospective path"
         )
     bootstrap_fd, bootstrap_payload, bootstrap_identity = _open_regular(
         arguments.bootstrap,

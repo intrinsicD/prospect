@@ -207,7 +207,7 @@ def test_independent_preformal_contract_matches_live_producer_contract() -> None
         runtime_seal_path=str(
             preformal.REPO
             / "bench/world_model_lifecycle/results/development/"
-            "runtime-seal-v1.14.0.json"
+            "runtime-seal-v1.15.0.json"
         ),
         development_closure_path=str(
             preformal.DEVELOPMENT_CLOSURE_PATH
@@ -316,14 +316,14 @@ def test_active_protocol_seed_universe_has_no_declared_collision() -> None:
     assert audit.passed_checks == 1
 
 
-def test_prebinding_protocol_requires_exact_v1130_supersession_lineage(
+def test_prebinding_protocol_requires_exact_v1140_supersession_lineage(
     tmp_path: Path,
 ) -> None:
     protocol = json.loads(PROTOCOL.read_text(encoding="utf-8"))
     revision = protocol["experiment"]["revision"]
-    assert revision["supersedes"] == "1.13.0"
+    assert revision["supersedes"] == "1.14.0"
     assert revision["superseded_protocol_sha256"] == (
-        artifact_audit._V1130_PROTOCOL_SHA256
+        artifact_audit._V1140_PROTOCOL_SHA256
     )
     protocol["experiment"]["revision"]["superseded_protocol_sha256"] = "0" * 64
     changed = tmp_path / "protocol.json"
@@ -759,9 +759,16 @@ def _preformal_v2_fixture(
     }
     source_payloads = {
         "bench/world_model_lifecycle/audit_runner.py": b"# audit runner\n",
-        "bench/world_model_lifecycle/launch_bootstrap.py": b"# launch\n",
+        "bench/world_model_lifecycle/artifact_audit.py": (
+            (WM001 / "artifact_audit.py").read_bytes()
+        ),
+        "bench/world_model_lifecycle/launch_bootstrap.py": (
+            (WM001 / "launch_bootstrap.py").read_bytes()
+        ),
         "bench/world_model_lifecycle/preformal.py": (b"def generate_preformal_report(): ...\n"),
-        "bench/world_model_lifecycle/producer_bootstrap.py": b"# producer\n",
+        "bench/world_model_lifecycle/producer_bootstrap.py": (
+            (WM001 / "producer_bootstrap.py").read_bytes()
+        ),
         "bench/world_model_lifecycle/protocol.json": b"{}\n",
         "bench/world_model_lifecycle/schemas/raw-result.schema.json": (
             b"{}\n"
@@ -782,7 +789,7 @@ def _preformal_v2_fixture(
     review: dict[str, object] = {
         "schema": "prospect.wm001.prospective-harness-review.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "implementation_files": reviewed_files,
         "implementation_manifest_sha256": hashlib.sha256(
             artifact_audit._canonical_json_bytes(reviewed_files)
@@ -918,7 +925,7 @@ def _preformal_v2_fixture(
     runtime_seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -951,7 +958,7 @@ def _preformal_v2_fixture(
         / "development"
     )
     development_root.mkdir(parents=True)
-    runtime_seal_path = development_root / "runtime-seal-v1.14.0.json"
+    runtime_seal_path = development_root / "runtime-seal-v1.15.0.json"
     runtime_seal_path.write_bytes(runtime_seal_payload)
     runtime_seal_completion = (
         repository
@@ -959,7 +966,7 @@ def _preformal_v2_fixture(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.14"
+        / "v1.15"
         / (
             hashlib.sha256(
                 str(runtime_seal_path).encode("utf-8")
@@ -972,7 +979,7 @@ def _preformal_v2_fixture(
     development_closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "producer_manifest_member": "producer/producer-manifest.json",
         "raw_result_member": "producer/result.json",
         "qualification_archive": {
@@ -994,7 +1001,7 @@ def _preformal_v2_fixture(
         artifact_audit._canonical_json_bytes(development_closure) + b"\n"
     )
     development_path = (
-        development_root / "development-closure-v1.14.0.json"
+        development_root / "development-closure-v1.15.0.json"
     )
     development_path.write_bytes(development_payload)
     closure_terminal = (
@@ -1002,9 +1009,9 @@ def _preformal_v2_fixture(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.14"
+        / "operator-v1.15"
         / "closures"
-        / "development-closure-v1.14.0"
+        / "development-closure-v1.15.0"
         / "operator-attempt.json"
     )
     closure_terminal.parent.mkdir(parents=True)
@@ -1016,7 +1023,7 @@ def _preformal_v2_fixture(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.14"
+        / "v1.15"
         / (
             hashlib.sha256(
                 str(closure_terminal).encode("utf-8")
@@ -1103,7 +1110,9 @@ def _preformal_v2_fixture(
     ):
         references: dict[str, dict[str, object]] = {}
         for stream in ("stdout", "stderr"):
-            if (
+            if stream == "stderr":
+                log_payload = b""
+            elif (
                 name == "runtime-accepted-closure-evidence"
                 and stream == "stdout"
             ):
@@ -1133,11 +1142,6 @@ def _preformal_v2_fixture(
                     + b"\n"
                 )
             elif (
-                name == "runtime-accepted-closure-evidence"
-                and stream == "stderr"
-            ):
-                log_payload = b""
-            elif (
                 name == "runtime-bootstrap-inventory-conformance"
                 and stream == "stdout"
             ):
@@ -1153,7 +1157,7 @@ def _preformal_v2_fixture(
                         "fresh-runtime-identity-conformance.v1"
                     ),
                     "experiment_id": "WM-001",
-                    "protocol_version": "1.14.0",
+                    "protocol_version": "1.15.0",
                     "mode": "fresh-identity-conformance",
                     "challenge": "7" * 64,
                     "requesting_process_id": 101,
@@ -1212,11 +1216,6 @@ def _preformal_v2_fixture(
                     )
                     + b"\n"
                 )
-            elif (
-                name == "runtime-bootstrap-inventory-conformance"
-                and stream == "stderr"
-            ):
-                log_payload = b""
             else:
                 log_payload = f"{ordinal}:{name}:{stream}\n".encode()
             digest = hashlib.sha256(log_payload).hexdigest()
@@ -1261,7 +1260,7 @@ def _preformal_v2_fixture(
     report: dict[str, Any] = {
         "schema": "prospect.wm001.preformal-test-report.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "repository_cwd": repository_cwd,
         "device": "cpu",
         "qa_environment": qa_environment_identity,
@@ -1472,6 +1471,39 @@ def test_v2_machine_test_receipt_rejects_noncanonical_live_input_path(
         )
 
 
+def test_v2_machine_test_receipt_rejects_after_input_numeric_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, source, dependencies, runtime, report = _preformal_v2_fixture(
+        tmp_path,
+        monkeypatch,
+    )
+    report["input_files_after"] = copy.deepcopy(
+        report["input_files_before"]
+    )
+    byte_count = report["input_files_after"]["launch_bootstrap"]["bytes"]
+    report["input_files_after"]["launch_bootstrap"]["bytes"] = float(
+        byte_count
+    )
+    payload = _rewrite_preformal_v2_report(tmp_path, report, source)
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match=(
+            "launch_bootstrap after file identity is malformed|"
+            "input-file identities are incomplete or changed"
+        ),
+    ):
+        artifact_audit._validate_preformal_test_report_v2(
+            payload,
+            root=tmp_path,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+        )
+
+
 def test_v2_machine_test_receipt_rejects_equal_bytes_on_distinct_two_link_inodes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1642,7 +1674,7 @@ def test_v2_machine_test_receipt_rejects_command9_nonempty_stderr(
 
     with pytest.raises(
         artifact_audit.ArtifactAuditError,
-        match="accepted-closure",
+        match="command 9 stderr is not exactly empty",
     ):
         artifact_audit._validate_preformal_test_report_v2(
             payload,
@@ -1673,7 +1705,38 @@ def test_v2_machine_test_receipt_rejects_command10_nonempty_stderr(
 
     with pytest.raises(
         artifact_audit.ArtifactAuditError,
-        match="runtime bootstrap conformance",
+        match="command 10 stderr is not exactly empty",
+    ):
+        artifact_audit._validate_preformal_test_report_v2(
+            payload,
+            root=tmp_path,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+        )
+
+
+def test_v2_machine_test_receipt_rejects_command1_nonempty_stderr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, source, dependencies, runtime, report = _preformal_v2_fixture(
+        tmp_path,
+        monkeypatch,
+    )
+    _replace_preformal_v2_log(
+        tmp_path,
+        report=report,
+        source=source,
+        command_index=0,
+        stream="stderr",
+        payload=b"unexpected early diagnostic\n",
+    )
+    payload = _rewrite_preformal_v2_report(tmp_path, report, source)
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="command 1 stderr is not exactly empty",
     ):
         artifact_audit._validate_preformal_test_report_v2(
             payload,
@@ -2036,7 +2099,7 @@ def _preflight_package_fixture(
     (tmp_path / artifact_audit._PREFORMAL_REPORT_NAME).write_bytes(
         report_payload
     )
-    (tmp_path / "development-closure-v1.14.0.json").write_bytes(
+    (tmp_path / "development-closure-v1.15.0.json").write_bytes(
         closure_payload
     )
     audit_execution = {
@@ -2051,7 +2114,7 @@ def _preflight_package_fixture(
         "restart_runtime_path_descriptor_equal": True,
     }
     development = {
-        "closure_file": "development-closure-v1.14.0.json",
+        "closure_file": "development-closure-v1.15.0.json",
         "closure_sha256": hashlib.sha256(
             closure_payload
         ).hexdigest(),
@@ -2085,7 +2148,7 @@ def _preflight_package_fixture(
         "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "experiment_id": "WM-001",
         "assurance": dict(artifact_audit._ASSURANCE),
-        "protocol": {"version": "1.14.0"},
+        "protocol": {"version": "1.15.0"},
         "source": {
             "test_report_file": artifact_audit._PREFORMAL_REPORT_NAME,
         },
@@ -2500,19 +2563,21 @@ def test_restart_restore_runtime_is_reopened_and_bound_to_parent(
 
 
 def _development_qualification_fixture(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     *,
     source: dict[str, Any],
     dependencies: dict[str, object],
     runtime: dict[str, object],
     preformal_runtime_seal: Mapping[str, object],
+    semantic_mutation: str | None = None,
 ) -> tuple[
     bytes,
     dict[str, object],
     dict[str, object],
-    str,
-    bytes,
 ]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(tmp_path)
     execution_sources = cast(
         dict[str, str], source["execution_source_sha256"]
     )
@@ -2531,19 +2596,37 @@ def _development_qualification_fixture(
     raw_schema_row = implementation_by_path[
         "bench/world_model_lifecycle/schemas/raw-result.schema.json"
     ]
+    auditor_row = implementation_by_path[
+        "bench/world_model_lifecycle/artifact_audit.py"
+    ]
+    producer_bootstrap_payload = (WM001 / "producer_bootstrap.py").read_bytes()
+    launch_bootstrap_payload = (WM001 / "launch_bootstrap.py").read_bytes()
+    assert hashlib.sha256(producer_bootstrap_payload).hexdigest() == (
+        execution_sources["producer_bootstrap.py"]
+    )
+    assert hashlib.sha256(launch_bootstrap_payload).hexdigest() == (
+        execution_sources["launch_bootstrap.py"]
+    )
+    live_source_root = (
+        tmp_path / "bench" / "world_model_lifecycle"
+    )
+    live_source_root.mkdir(parents=True, exist_ok=True)
+    (live_source_root / "producer_bootstrap.py").write_bytes(
+        producer_bootstrap_payload
+    )
+    (live_source_root / "launch_bootstrap.py").write_bytes(
+        b"# changed live launch bootstrap\n"
+        if semantic_mutation == "live-launch-bootstrap"
+        else launch_bootstrap_payload
+    )
     runtime_seal_payload = (
         artifact_audit._canonical_json_bytes(preformal_runtime_seal) + b"\n"
     )
     runtime_seal_sha256 = hashlib.sha256(runtime_seal_payload).hexdigest()
     runtime_seal_member = "evidence/producer-runtime-seal.json"
-    monkeypatch.setattr(
-        artifact_audit,
-        "_verify_development_qualification_archive",
-        lambda *_args, **_kwargs: {
-            runtime_seal_member: runtime_seal_payload,
-        },
-    )
-    audit_bootstrap_sha256 = "6" * 64
+    audit_bootstrap_sha256 = hashlib.sha256(
+        b"# isolated audit bootstrap fixture\n"
+    ).hexdigest()
     bound_audit_execution = {
         "bootstrap_source_sha256": audit_bootstrap_sha256,
         "restart_runtime_conformance_report_sha256": "3" * 64,
@@ -2556,16 +2639,29 @@ def _development_qualification_fixture(
         "restart_runtime_repeat_count": 3,
         "restart_runtime_path_descriptor_equal": True,
     }
+    development_root = (
+        tmp_path
+        / "bench"
+        / "world_model_lifecycle"
+        / "results"
+        / "development"
+    )
+    producer_root = development_root / "qualification-v1.15.0"
+    producer_root.mkdir(parents=True, exist_ok=True)
     closure_source = {
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
         "worktree_clean": True,
-        "dependency_lock_sha256": "4" * 64,
+        "dependency_lock_sha256": dependencies["lockfile_sha256"],
         "producer_bootstrap_sha256": execution_sources["producer_bootstrap.py"],
         "launch_bootstrap_sha256": execution_sources["launch_bootstrap.py"],
         "runner_source_sha256": execution_sources["audit_runner.py"],
         "auditor_source_sha256": (artifact_audit._AUDITOR_SOURCE_SHA256),
     }
+    sealed_python = cast(
+        Mapping[str, object], preformal_runtime_seal["python"]
+    )
+    sealed_version = cast(list[int], sealed_python["version"])
     producer_execution = {
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -2573,7 +2669,7 @@ def _development_qualification_fixture(
         "dependency_lock_sha256": dependencies["lockfile_sha256"],
         "python_executable": dependencies["python_executable"],
         "python_executable_sha256": dependencies["python_executable_sha256"],
-        "python_version": "3.12.9",
+        "python_version": ".".join(str(part) for part in sealed_version),
         "platform": runtime["platform"],
         "machine": runtime["machine"],
         "device": runtime["device"],
@@ -2602,32 +2698,285 @@ def _development_qualification_fixture(
         "launch_bootstrap_sha256": execution_sources["launch_bootstrap.py"],
         "package_ownership": dependencies["package_ownership"],
     }
-    audit_execution = {
-        "receipt_sha256": "8" * 64,
-        "runtime_manifest_sha256": "9" * 64,
-        "invocation_manifest_sha256": "a" * 64,
-        "stderr_sha256": "b" * 64,
+    support_files = [
+        {
+            "path": "producer_bootstrap.py",
+            "bytes": producer_bootstrap_row["bytes"],
+            "sha256": producer_bootstrap_row["sha256"],
+        },
+        {
+            "path": "protocol.json",
+            "bytes": protocol_row["bytes"],
+            "sha256": protocol_row["sha256"],
+        },
+        {
+            "path": "schemas/raw-result.schema.json",
+            "bytes": raw_schema_row["bytes"],
+            "sha256": raw_schema_row["sha256"],
+        },
+    ]
+    audit_execution_base = {
         "bootstrap_sha256": audit_bootstrap_sha256,
         "runner_source_sha256": execution_sources["audit_runner.py"],
         "auditor_source_sha256": (artifact_audit._AUDITOR_SOURCE_SHA256),
-        "support_files": [
-            {
-                "path": "producer_bootstrap.py",
-                "bytes": producer_bootstrap_row["bytes"],
-                "sha256": producer_bootstrap_row["sha256"],
-            },
-            {
-                "path": "protocol.json",
-                "bytes": protocol_row["bytes"],
-                "sha256": protocol_row["sha256"],
-            },
-            {
-                "path": "schemas/raw-result.schema.json",
-                "bytes": raw_schema_row["bytes"],
-                "sha256": raw_schema_row["sha256"],
-            },
-        ],
+        "support_files": support_files,
         "source_mode": "descriptor",
+    }
+
+    raw_result_payload = (
+        artifact_audit._canonical_json_bytes(
+            {"schema": "fixture.raw-result.v1", "lane": "development"}
+        )
+        + b"\n"
+    )
+    raw_result_sha256 = hashlib.sha256(raw_result_payload).hexdigest()
+    producer_manifest = {
+        "schema": "prospect.wm001.producer-manifest.v1",
+        "experiment_id": "WM-001",
+        "lane": "development",
+        "status": "completed",
+        "started_at_utc": "2026-07-21T00:00:00Z",
+        "completed_at_utc": "2026-07-21T00:00:01Z",
+        "error": None,
+        "manifest_excludes": ["producer-manifest.json"],
+        "file_count": 1,
+        "files": [
+            {
+                "path": "result.json",
+                "bytes": len(raw_result_payload),
+                "sha256": raw_result_sha256,
+            }
+        ],
+    }
+    qualification = {
+        "schema": "prospect.wm001.development-result-qualification.v1",
+        "experiment_id": "WM-001",
+        "protocol_version": "1.15.0",
+        "protocol_sha256": protocol_row["sha256"],
+        "raw_result_sha256": raw_result_sha256,
+        "lane": "development",
+        "claim_eligible": False,
+        "replicates": [
+            {
+                "replicate_id": f"development-{index:02d}",
+                "master_seed": seed,
+                "episodes": 496,
+                "transitions": 99_200,
+                "predictive_metrics": 12,
+                "policy_runs": 20,
+                "updates": 6,
+                "optimizer_batch_manifests": 5,
+            }
+            for index, seed in enumerate(
+                artifact_audit._DEVELOPMENT_SEEDS
+            )
+        ],
+        "matrix_contract_sha256": (
+            artifact_audit._DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        ),
+        "producer_execution": producer_execution,
+    }
+    audit = {
+        "schema": "prospect.world-model-lifecycle.artifact-audit.v2",
+        "artifact_root": str(producer_root),
+        "result_file": "result.json",
+        "result_sha256": raw_result_sha256,
+        "lane": "development",
+        "integrity_passed": True,
+        "engineering_complete": True,
+        "complete_for_claim": False,
+        "check_counts": {
+            "passed": 1,
+            "failed": 0,
+            "coverage_gaps": 0,
+        },
+        "coverage_gaps": [],
+        "audit_implementation": {
+            "auditor_source_sha256": artifact_audit._AUDITOR_SOURCE_SHA256,
+            "bound_auditor_source_sha256": None,
+            "formal_test_report_sha256": None,
+            "coverage_conformance_report_sha256": None,
+            "auditor_source_matches_binding": False,
+            "coverage_conformance_verified": False,
+            "audit_execution_conformance_verified": False,
+        },
+        "audit_execution_conformance_verified": False,
+        "resource_limits_bytes": {
+            "result": artifact_audit._MAX_RESULT_BYTES,
+            "prediction_sidecar": artifact_audit._MAX_PREDICTION_BYTES,
+            "owned_model_state": artifact_audit._MAX_OWNED_MODEL_BYTES,
+            "optimizer_manifest": artifact_audit._MAX_MANIFEST_BYTES,
+            "target_permutation": artifact_audit._MAX_PERMUTATION_BYTES,
+            "restart_evaluation": (
+                artifact_audit._MAX_RESTART_EVALUATION_BYTES
+            ),
+            "checkpoint_archive": artifact_audit._MAX_CHECKPOINT_BYTES,
+            "source_file": artifact_audit._MAX_SOURCE_FILE_BYTES,
+            "source_snapshot": (
+                artifact_audit._MAX_SOURCE_SNAPSHOT_BYTES
+            ),
+        },
+        "custody": {
+            "producer_manifest_checked": True,
+            "producer_manifest_status": "completed",
+            "producer_manifest_sha256": None,
+        },
+        "findings": [],
+        "independence_limitations": [
+            artifact_audit._PRODUCER_CUSTODY_INDEPENDENCE_LIMITATION,
+            (
+                artifact_audit
+                ._PENDULUM_RECONSTRUCTION_INDEPENDENCE_LIMITATION
+            ),
+            artifact_audit._OPTIMIZER_RNG_INDEPENDENCE_LIMITATION,
+            artifact_audit._CEM_REPLAY_INDEPENDENCE_LIMITATION,
+            artifact_audit._DEVELOPMENT_EVIDENCE_INDEPENDENCE_LIMITATION,
+        ],
+        "passed": True,
+    }
+    runtime_manifest = {
+        "schema": "prospect.wm001.audit-runtime-manifest.v1",
+        "assurance": dict(artifact_audit._ASSURANCE),
+        "bootstrap_sha256": audit_bootstrap_sha256,
+        "python": {
+            "executable": dependencies["python_executable"],
+            "resolved_executable": str(
+                Path(cast(str, dependencies["python_executable"])).resolve(
+                    strict=True
+                )
+            ),
+            "sha256": dependencies["python_executable_sha256"],
+            "version": sealed_version,
+        },
+        "required_flags": dict(artifact_audit._PREBINDING_AUDITOR_FLAGS),
+        "source": {
+            "mode": "descriptor",
+            "path": "artifact_audit.py",
+            "bytes": auditor_row["bytes"],
+            "sha256": auditor_row["sha256"],
+        },
+        "support_files": support_files,
+        "closure_import_roots": dependencies["package_roots"],
+        "standard_library": dependencies["standard_library"],
+        "environment": {
+            key: value
+            for key, value in cast(
+                Mapping[str, str], runtime["process_environment"]
+            ).items()
+            if key in artifact_audit._PREBINDING_SHARED_ENVIRONMENT_KEYS
+        },
+        "limits": {
+            "timeout_seconds": 600,
+            "stdout_bytes": 64 << 20,
+            "stderr_bytes": 16 << 20,
+        },
+    }
+    if semantic_mutation == "qualification-seed-alias":
+        qualification["replicates"][0]["master_seed"] = float(
+            artifact_audit._DEVELOPMENT_SEEDS[0]
+        )
+    elif semantic_mutation == "producer-manifest-omits-result":
+        producer_manifest["file_count"] = 0
+        producer_manifest["files"] = []
+    elif semantic_mutation == "producer-manifest-invalid-timestamp":
+        producer_manifest["started_at_utc"] = "2026-02-30T00:00:00Z"
+    elif semantic_mutation == "producer-manifest-reversed-timestamps":
+        producer_manifest["started_at_utc"] = "2026-07-21T00:00:02Z"
+        producer_manifest["completed_at_utc"] = "2026-07-21T00:00:01Z"
+    elif semantic_mutation == "audit-runtime-source-digest":
+        runtime_manifest["source"]["sha256"] = "f" * 64
+    elif semantic_mutation == "audit-extra-field":
+        audit["unexpected"] = True
+    elif semantic_mutation == "audit-check-count-alias":
+        audit["check_counts"]["passed"] = 1.0
+    elif semantic_mutation in {
+        "omit-launch-bootstrap",
+        "live-launch-bootstrap",
+    }:
+        pass
+    elif semantic_mutation is not None:
+        raise AssertionError(f"unknown semantic mutation: {semantic_mutation}")
+
+    producer_manifest_payload = (
+        artifact_audit._canonical_json_bytes(producer_manifest) + b"\n"
+    )
+    audit["custody"]["producer_manifest_sha256"] = hashlib.sha256(
+        producer_manifest_payload
+    ).hexdigest()
+    qualification_payload = (
+        artifact_audit._canonical_json_bytes(qualification) + b"\n"
+    )
+    audit_payload = artifact_audit._canonical_json_bytes(audit) + b"\n"
+    runtime_manifest_payload = (
+        artifact_audit._canonical_json_bytes(runtime_manifest) + b"\n"
+    )
+    runtime_manifest_sha256 = hashlib.sha256(
+        runtime_manifest_payload
+    ).hexdigest()
+    invocation_manifest = {
+        "schema": "prospect.wm001.audit-invocation-manifest.v1",
+        "runtime_manifest_sha256": runtime_manifest_sha256,
+        "working_directory": str(tmp_path),
+        "auditor_argv": [
+            str(producer_root),
+            "--producer-bootstrap",
+            "@captured/producer_bootstrap.py",
+        ],
+    }
+    invocation_manifest_payload = (
+        artifact_audit._canonical_json_bytes(invocation_manifest) + b"\n"
+    )
+    invocation_manifest_sha256 = hashlib.sha256(
+        invocation_manifest_payload
+    ).hexdigest()
+    stderr_payload = b""
+    stderr_sha256 = hashlib.sha256(stderr_payload).hexdigest()
+    runtime_member = (
+        "evidence/development-audit-runtime-"
+        f"{runtime_manifest_sha256[:16]}.json"
+    )
+    invocation_member = (
+        "evidence/development-audit-invocation-"
+        f"{invocation_manifest_sha256[:16]}.json"
+    )
+    stderr_member = (
+        "evidence/development-audit-stderr-"
+        f"{stderr_sha256[:16]}.log"
+    )
+    receipt = {
+        "schema": "prospect.wm001.audit-reproduction.v2",
+        "experiment_id": "WM-001",
+        "protocol_version": "1.15.0",
+        "supplied_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
+        "reproduced_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
+        "byte_identical": True,
+        "returncode": 0,
+        "source_mode": "descriptor",
+        "stdout_bytes": len(audit_payload),
+        "stderr_file": stderr_member.removeprefix("evidence/"),
+        "stderr_bytes": len(stderr_payload),
+        "stderr_sha256": stderr_sha256,
+        "runtime_manifest_file": runtime_member.removeprefix("evidence/"),
+        "runtime_manifest_bytes": len(runtime_manifest_payload),
+        "runtime_manifest_sha256": runtime_manifest_sha256,
+        "invocation_manifest_file": invocation_member.removeprefix(
+            "evidence/"
+        ),
+        "invocation_manifest_bytes": len(invocation_manifest_payload),
+        "invocation_manifest_sha256": invocation_manifest_sha256,
+        "bootstrap_sha256": audit_bootstrap_sha256,
+        "runner_source_sha256": execution_sources["audit_runner.py"],
+        "auditor_source_sha256": artifact_audit._AUDITOR_SOURCE_SHA256,
+        "support_files": support_files,
+        "passed": True,
+    }
+    receipt_payload = artifact_audit._canonical_json_bytes(receipt) + b"\n"
+    audit_execution = {
+        "receipt_sha256": hashlib.sha256(receipt_payload).hexdigest(),
+        "runtime_manifest_sha256": runtime_manifest_sha256,
+        "invocation_manifest_sha256": invocation_manifest_sha256,
+        "stderr_sha256": stderr_sha256,
+        **audit_execution_base,
     }
     role_members = {
         "producer_manifest_member": "producer/producer-manifest.json",
@@ -2635,49 +2984,39 @@ def _development_qualification_fixture(
         "result_qualification_member": ("evidence/development-result-qualification.json"),
         "independent_audit_member": "evidence/independent-audit.json",
         "audit_reproduction_member": "evidence/audit-reproduction.json",
-        "audit_runtime_manifest_member": (
-            f"evidence/development-audit-runtime-{audit_execution['runtime_manifest_sha256'][:16]}.json"
-        ),
-        "audit_invocation_manifest_member": (
-            f"evidence/development-audit-invocation-{audit_execution['invocation_manifest_sha256'][:16]}.json"
-        ),
-        "audit_stderr_member": (f"evidence/development-audit-stderr-{audit_execution['stderr_sha256'][:16]}.log"),
+        "audit_runtime_manifest_member": runtime_member,
+        "audit_invocation_manifest_member": invocation_member,
+        "audit_stderr_member": stderr_member,
     }
-    member_rows = [
-        {
-            "path": path,
-            "bytes": (
-                len(runtime_seal_payload)
-                if path == runtime_seal_member
-                else index + 1
-            ),
-            "sha256": (
-                runtime_seal_sha256
-                if path == runtime_seal_member
-                else f"{index + 5:064x}"
-            ),
-        }
-        for index, path in enumerate(
-            sorted({*role_members.values(), runtime_seal_member})
-        )
-    ]
+    archive_payloads = {
+        "producer/producer-manifest.json": producer_manifest_payload,
+        "producer/result.json": raw_result_payload,
+        "evidence/development-result-qualification.json": (
+            qualification_payload
+        ),
+        "evidence/independent-audit.json": audit_payload,
+        "evidence/audit-reproduction.json": receipt_payload,
+        runtime_member: runtime_manifest_payload,
+        invocation_member: invocation_manifest_payload,
+        stderr_member: stderr_payload,
+        runtime_seal_member: runtime_seal_payload,
+        "evidence/producer-bootstrap.py": producer_bootstrap_payload,
+        "evidence/launch-bootstrap.py": launch_bootstrap_payload,
+    }
+    if semantic_mutation == "omit-launch-bootstrap":
+        del archive_payloads["evidence/launch-bootstrap.py"]
+    _, archive = _write_independent_development_archive(
+        tmp_path,
+        archive_payloads,
+    )
+    member_rows = cast(list[dict[str, object]], archive["members"])
     digests = {row["path"]: row["sha256"] for row in member_rows}
-    archive = {
-        "format": "ustar-uncompressed-v1",
-        "file": "development-qualification-9999999999999999.tar",
-        "canonical_path": (
-            "bench/world_model_lifecycle/results/development/development-qualification-9999999999999999.tar"
-        ),
-        "bytes": 10_240,
-        "sha256": "9" * 64,
-        "members": member_rows,
-    }
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "source": closure_source,
-        "producer_root": ("/repo/bench/world_model_lifecycle/results/development/run"),
+        "producer_root": str(producer_root),
         **role_members,
         "producer_execution": producer_execution,
         "producer_custody": producer_custody,
@@ -2729,18 +3068,33 @@ def _development_qualification_fixture(
         payload,
         block,
         bound_audit_execution,
-        runtime_seal_member,
-        runtime_seal_payload,
     )
 
 
 def test_development_qualification_is_linked_field_for_field(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    implementation_payloads = {
+        f"bench/world_model_lifecycle/{name}": (WM001 / name).read_bytes()
+        for name in (
+            "artifact_audit.py",
+            "audit_runner.py",
+            "launch_bootstrap.py",
+            "producer_bootstrap.py",
+            "protocol.json",
+            "schemas/raw-result.schema.json",
+        )
+    }
     execution_sources = {
-        "audit_runner.py": "1" * 64,
-        "producer_bootstrap.py": "2" * 64,
-        "launch_bootstrap.py": "3" * 64,
+        name: hashlib.sha256(
+            implementation_payloads[f"bench/world_model_lifecycle/{name}"]
+        ).hexdigest()
+        for name in (
+            "audit_runner.py",
+            "producer_bootstrap.py",
+            "launch_bootstrap.py",
+        )
     }
     source: dict[str, Any] = {
         "git_commit": "a" * 40,
@@ -2748,29 +3102,22 @@ def test_development_qualification_is_linked_field_for_field(
         "execution_source_sha256": execution_sources,
         "implementation_files": [
             {
-                "path": "bench/world_model_lifecycle/producer_bootstrap.py",
-                "bytes": 303,
-                "sha256": execution_sources["producer_bootstrap.py"],
-            },
-            {
-                "path": "bench/world_model_lifecycle/protocol.json",
-                "bytes": 101,
-                "sha256": "c" * 64,
-            },
-            {
-                "path": (
-                    "bench/world_model_lifecycle/schemas/"
-                    "raw-result.schema.json"
-                ),
-                "bytes": 202,
-                "sha256": "d" * 64,
-            },
+                "path": path,
+                "bytes": len(value),
+                "sha256": hashlib.sha256(value).hexdigest(),
+            }
+            for path, value in sorted(implementation_payloads.items())
         ],
     }
+    executable = Path(artifact_audit.sys.executable)
+    resolved_executable = executable.resolve(strict=True)
+    executable_sha256 = hashlib.sha256(
+        resolved_executable.read_bytes()
+    ).hexdigest()
     dependencies: dict[str, object] = {
         "lockfile_sha256": "4" * 64,
-        "python_executable": "/venv/bin/python",
-        "python_executable_sha256": "5" * 64,
+        "python_executable": str(executable),
+        "python_executable_sha256": executable_sha256,
         "package_roots": [{"path": "/venv/site-packages"}],
         "standard_library": {"path": "/stdlib"},
         "package_ownership": {"semantics_id": "fixture"},
@@ -2791,16 +3138,20 @@ def test_development_qualification_is_linked_field_for_field(
     preformal_runtime_seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
         "worktree_clean": True,
         "python": {
             "executable": dependencies["python_executable"],
-            "resolved_executable": "/venv/bin/python3.12",
+            "resolved_executable": str(resolved_executable),
             "sha256": dependencies["python_executable_sha256"],
-            "version": [3, 12, 9],
+            "version": [
+                artifact_audit.sys.version_info.major,
+                artifact_audit.sys.version_info.minor,
+                artifact_audit.sys.version_info.micro,
+            ],
         },
         "required_flags": runtime["python_flags"],
         "process_environment": runtime["process_environment"],
@@ -2815,9 +3166,8 @@ def test_development_qualification_is_linked_field_for_field(
         payload,
         block,
         bound_audit_execution,
-        runtime_seal_member,
-        runtime_seal_payload,
     ) = _development_qualification_fixture(
+        tmp_path,
         monkeypatch,
         source=source,
         dependencies=dependencies,
@@ -2851,32 +3201,14 @@ def test_development_qualification_is_linked_field_for_field(
             preformal_runtime_seal=preformal_runtime_seal,
         )
 
-    overstated_runtime_seal = {
-        **preformal_runtime_seal,
-        "assurance": {
-            **artifact_audit._ASSURANCE,
-            "tamper_resistant": True,
-        },
-    }
-    monkeypatch.setattr(
-        artifact_audit,
-        "_verify_development_qualification_archive",
-        lambda *_args, **_kwargs: {
-            runtime_seal_member: (
-                artifact_audit._canonical_json_bytes(
-                    overstated_runtime_seal
-                )
-                + b"\n"
-            ),
-        },
-    )
+    changed_block = {**block, "raw_result_sha256": "6" * 64}
     with pytest.raises(
         artifact_audit.ArtifactAuditError,
-        match="exact preformal assured seal",
+        match="projection differs",
     ):
         artifact_audit._validate_development_qualification(
             payload,
-            block=block,
+            block=changed_block,
             source=source,
             dependencies=dependencies,
             runtime=runtime,
@@ -2884,27 +3216,106 @@ def test_development_qualification_is_linked_field_for_field(
             preformal_runtime_seal=preformal_runtime_seal,
         )
 
-    monkeypatch.setattr(
-        artifact_audit,
-        "_verify_development_qualification_archive",
-        lambda *_args, **_kwargs: {
-            runtime_seal_member: runtime_seal_payload,
+    archived_runtime_seal = {
+        **preformal_runtime_seal,
+        "process_environment": {
+            **cast(
+                Mapping[str, str],
+                preformal_runtime_seal["process_environment"],
+            ),
+            "FIXTURE_EXTRA": "1",
         },
+    }
+    (
+        seal_payload,
+        seal_block,
+        seal_audit_execution,
+    ) = _development_qualification_fixture(
+        tmp_path / "runtime-seal-mismatch",
+        monkeypatch,
+        source=source,
+        dependencies=dependencies,
+        runtime=runtime,
+        preformal_runtime_seal=archived_runtime_seal,
     )
-    block["raw_result_sha256"] = "6" * 64
     with pytest.raises(
         artifact_audit.ArtifactAuditError,
-        match="projection differs",
+        match="exact preformal assured seal",
     ):
         artifact_audit._validate_development_qualification(
-            payload,
-            block=block,
+            seal_payload,
+            block=seal_block,
             source=source,
             dependencies=dependencies,
             runtime=runtime,
-            bound_audit_execution=bound_audit_execution,
+            bound_audit_execution=seal_audit_execution,
             preformal_runtime_seal=preformal_runtime_seal,
         )
+
+    for mutation, error in (
+        (
+            "qualification-seed-alias",
+            "result qualification is not exact",
+        ),
+        (
+            "producer-manifest-omits-result",
+            "producer member set differs",
+        ),
+        (
+            "producer-manifest-invalid-timestamp",
+            "real UTC timestamp",
+        ),
+        (
+            "producer-manifest-reversed-timestamps",
+            "completed before it started",
+        ),
+        (
+            "audit-runtime-source-digest",
+            "audit runtime differs",
+        ),
+        (
+            "audit-extra-field",
+            "independent audit is not passing",
+        ),
+        (
+            "audit-check-count-alias",
+            "independent audit is not passing",
+        ),
+        (
+            "omit-launch-bootstrap",
+            "producer custody member is absent",
+        ),
+        (
+            "live-launch-bootstrap",
+            "live development bootstrap differs",
+        ),
+    ):
+        (
+            mutated_payload,
+            mutated_block,
+            mutated_audit_execution,
+        ) = _development_qualification_fixture(
+            tmp_path / mutation,
+            monkeypatch,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+            preformal_runtime_seal=preformal_runtime_seal,
+            semantic_mutation=mutation,
+        )
+        with pytest.raises(
+            artifact_audit.ArtifactAuditError,
+            match=error,
+        ):
+            artifact_audit._validate_development_qualification(
+                mutated_payload,
+                block=mutated_block,
+                source=source,
+                dependencies=dependencies,
+                runtime=runtime,
+                bound_audit_execution=mutated_audit_execution,
+                preformal_runtime_seal=preformal_runtime_seal,
+            )
 
 
 def test_formal_input_preflight_runs_both_substantive_validators(
@@ -2922,9 +3333,8 @@ def test_formal_input_preflight_runs_both_substantive_validators(
         closure_payload,
         development,
         audit_execution,
-        _,
-        _,
     ) = _development_qualification_fixture(
+        tmp_path,
         monkeypatch,
         source=source,
         dependencies=dependencies,
@@ -3033,7 +3443,7 @@ def test_formal_input_preflight_runs_both_substantive_validators(
         "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "experiment_id": "WM-001",
         "assurance": dict(artifact_audit._ASSURANCE),
-        "protocol": {"version": "1.14.0"},
+        "protocol": {"version": "1.15.0"},
         "source": source,
         "dependencies": dependencies,
         "runtime": runtime,
@@ -3131,6 +3541,268 @@ def test_development_archive_rejects_hidden_gnu_longname_header(
             )
     finally:
         os.close(descriptor)
+
+
+def _write_independent_development_archive(
+    tmp_path: Path,
+    payloads: Mapping[str, bytes],
+) -> tuple[Path, dict[str, object]]:
+    root = (
+        tmp_path
+        / "bench"
+        / "world_model_lifecycle"
+        / "results"
+        / "development"
+    )
+    root.mkdir(parents=True, exist_ok=True)
+    temporary = root / "qualification.tar"
+    rows: list[dict[str, object]] = []
+    with artifact_audit.tarfile.open(
+        temporary,
+        mode="w",
+        format=artifact_audit.tarfile.USTAR_FORMAT,
+    ) as archive:
+        for name, payload in sorted(payloads.items()):
+            member = artifact_audit.tarfile.TarInfo(name)
+            member.size = len(payload)
+            member.mode = 0o444
+            member.uid = member.gid = 0
+            member.uname = member.gname = ""
+            member.mtime = 0
+            member.type = artifact_audit.tarfile.REGTYPE
+            member.pax_headers = {}
+            archive.addfile(member, io.BytesIO(payload))
+            rows.append(
+                {
+                    "path": name,
+                    "bytes": len(payload),
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                }
+            )
+    archive_payload = temporary.read_bytes()
+    archive_sha256 = hashlib.sha256(archive_payload).hexdigest()
+    archive_path = root / (
+        f"development-qualification-{archive_sha256[:16]}.tar"
+    )
+    temporary.rename(archive_path)
+    return archive_path, {
+        "format": "ustar-uncompressed-v1",
+        "file": archive_path.name,
+        "canonical_path": archive_path.relative_to(tmp_path).as_posix(),
+        "bytes": len(archive_payload),
+        "sha256": archive_sha256,
+        "members": rows,
+    }
+
+
+def test_independent_development_archive_accepts_one_continuous_member_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payloads = {
+        "evidence/runtime.json": b'{"passed":true}\n',
+        "producer/producer-manifest.json": b'{"status":"completed"}\n',
+        "producer/result.json": b'{"lane":"development"}\n',
+    }
+    _, identity = _write_independent_development_archive(
+        tmp_path,
+        payloads,
+    )
+    monkeypatch.chdir(tmp_path)
+
+    retained = artifact_audit._verify_development_qualification_archive(
+        identity,
+        members=cast(list[object], identity["members"]),
+        retain_members=frozenset(
+            {
+                "evidence/runtime.json",
+                "producer/producer-manifest.json",
+            }
+        ),
+    )
+
+    assert retained == {
+        "evidence/runtime.json": payloads["evidence/runtime.json"],
+        "producer/producer-manifest.json": payloads[
+            "producer/producer-manifest.json"
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    ("limit_name", "limit", "expected_message"),
+    [
+        (
+            "_MAX_RETAINED_DEVELOPMENT_ARCHIVE_MEMBER_BYTES",
+            3,
+            "member exceeds its byte limit",
+        ),
+        (
+            "_MAX_RETAINED_DEVELOPMENT_ARCHIVE_TOTAL_BYTES",
+            7,
+            "evidence exceeds its total byte limit",
+        ),
+    ],
+)
+def test_independent_development_archive_enforces_retained_byte_limits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    limit_name: str,
+    limit: int,
+    expected_message: str,
+) -> None:
+    _, identity = _write_independent_development_archive(
+        tmp_path,
+        {
+            "evidence/a.json": b"aaaa",
+            "evidence/b.json": b"bbbb",
+        },
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(artifact_audit, limit_name, limit)
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match=expected_message,
+    ):
+        artifact_audit._verify_development_qualification_archive(
+            identity,
+            members=cast(list[object], identity["members"]),
+            retain_members=frozenset(
+                {"evidence/a.json", "evidence/b.json"}
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "reordered", "duplicated"],
+)
+def test_independent_development_archive_rejects_declared_member_mutations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    payloads = (
+        {"producer/a.json": b"a"}
+        if mutation == "missing"
+        else {
+            "producer/a.json": b"a",
+            "producer/b.json": b"b",
+        }
+    )
+    _, identity = _write_independent_development_archive(
+        tmp_path,
+        payloads,
+    )
+    rows = copy.deepcopy(cast(list[object], identity["members"]))
+    if mutation == "missing":
+        rows.append(
+            {
+                "path": "producer/b.json",
+                "bytes": 1,
+                "sha256": hashlib.sha256(b"b").hexdigest(),
+            }
+        )
+    elif mutation == "reordered":
+        rows.reverse()
+    else:
+        rows.insert(1, copy.deepcopy(rows[0]))
+    identity["members"] = rows
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="header|metadata|count|length|terminal|extra",
+    ):
+        artifact_audit._verify_development_qualification_archive(
+            identity,
+            members=rows,
+        )
+
+
+def test_independent_development_archive_rejects_physical_truncation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive_path, identity = _write_independent_development_archive(
+        tmp_path,
+        {"producer/result.json": b"x" * 12_000},
+    )
+    truncated = archive_path.read_bytes()[:-512]
+    archive_path.write_bytes(truncated)
+    digest = hashlib.sha256(truncated).hexdigest()
+    renamed = archive_path.with_name(
+        f"development-qualification-{digest[:16]}.tar"
+    )
+    archive_path.rename(renamed)
+    identity.update(
+        {
+            "file": renamed.name,
+            "canonical_path": renamed.relative_to(tmp_path).as_posix(),
+            "bytes": len(truncated),
+            "sha256": digest,
+        }
+    )
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="length|terminal",
+    ):
+        artifact_audit._verify_development_qualification_archive(
+            identity,
+            members=cast(list[object], identity["members"]),
+        )
+
+
+def test_independent_development_archive_enforces_total_archive_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, identity = _write_independent_development_archive(
+        tmp_path,
+        {"producer/result.json": b"result"},
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        artifact_audit,
+        "_MAX_DEVELOPMENT_QUALIFICATION_ARCHIVE_BYTES",
+        cast(int, identity["bytes"]) - 1,
+    )
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="custody is invalid",
+    ):
+        artifact_audit._verify_development_qualification_archive(
+            identity,
+            members=cast(list[object], identity["members"]),
+        )
+
+
+def test_independent_development_archive_rejects_a_real_unbound_member(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, identity = _write_independent_development_archive(
+        tmp_path,
+        {
+            "producer/a.json": b"a",
+            "producer/b.json": b"b",
+        },
+    )
+    monkeypatch.chdir(tmp_path)
+    declared = cast(list[object], identity["members"])[:-1]
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="length|terminal|extra",
+    ):
+        artifact_audit._verify_development_qualification_archive(
+            identity,
+            members=declared,
+        )
 
 
 def test_bound_prebinding_execution_requires_complete_passing_report(
@@ -3382,7 +4054,7 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
                 "schema": (
                     "prospect.wm001.restart-runtime-conformance.v1"
                 ),
-                "protocol_version": "1.14.0",
+                "protocol_version": "1.15.0",
                 "support_files": support_rows(outcome_supports),
                 "branches": {
                     "development": {

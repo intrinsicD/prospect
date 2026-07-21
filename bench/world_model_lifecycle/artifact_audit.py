@@ -46,6 +46,7 @@ import tempfile
 import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn, cast
 
@@ -67,8 +68,8 @@ _ASSURANCE = {
     "external_attestation": False,
     "exclusive_path_use_required": True,
 }
-_OUTER_COMPLETIONS_ROOT = Path.cwd() / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.14"
-_FORMAL_CONFIRMATION_NAME = "confirmation-v1.14.0"
+_OUTER_COMPLETIONS_ROOT = Path.cwd() / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.15"
+_FORMAL_CONFIRMATION_NAME = "confirmation-v1.15.0"
 
 _MAGIC = b"PROSPECT-WM001\0"
 _PREDICTION_FORMAT = "prospect.wm001.predictive-evidence.v1"
@@ -96,7 +97,7 @@ _CEM_PLANNING_HORIZON = 10
 _CEM_OPTIM_STEPS = 3
 _CEM_NUM_CANDIDATES = 64
 _CEM_TOP_K = 8
-_SEED_HASH_DOMAIN_VERSION = "1.14.0"
+_SEED_HASH_DOMAIN_VERSION = "1.15.0"
 _RESTART_RUNTIME_CONFORMANCE_SCHEMA = (
     "prospect.wm001.restart-runtime-conformance.v1"
 )
@@ -446,6 +447,39 @@ _MAX_PRODUCER_FILE_BYTES = 4 << 30
 _MAX_PRODUCER_TOTAL_BYTES = 16 << 30
 _MAX_PRODUCER_FILES = 100_000
 _MAX_PRODUCER_TREE_ENTRIES = 200_000
+_MAX_DEVELOPMENT_QUALIFICATION_ARCHIVE_BYTES = 40 << 30
+_MAX_RETAINED_DEVELOPMENT_ARCHIVE_MEMBER_BYTES = 64 << 20
+_MAX_RETAINED_DEVELOPMENT_ARCHIVE_TOTAL_BYTES = 256 << 20
+_PRODUCER_CUSTODY_INDEPENDENCE_LIMITATION = (
+    "The producer manifest is fully reopened and hash-checked, but it is not "
+    "externally signed or transparency-log anchored; filesystem-level "
+    "replacement of the entire root and manifest is outside this audit's "
+    "threat model."
+)
+_DEVELOPMENT_EVIDENCE_INDEPENDENCE_LIMITATION = (
+    "This is development evidence, not formal claim evidence. Protocol 1.4 "
+    "makes K3-K6 development outcomes descriptive and permanently ineligible "
+    "for capability adjudication."
+)
+_PENDULUM_RECONSTRUCTION_INDEPENDENCE_LIMITATION = (
+    "Pendulum reset observations are reconstructed from the documented "
+    "Gymnasium 0.29.1 default_rng/PCG64 algorithm without importing "
+    "Gymnasium; exact replay consequently relies on NumPy's bound Generator "
+    "semantics. The independent oscillator is reconstructed directly from "
+    "its SHA-256 reset and autonomous analytic dynamics."
+)
+_OPTIMIZER_RNG_INDEPENDENCE_LIMITATION = (
+    "Bootstrap, balanced-minibatch, minibatch-order, and "
+    "corruption-permutation bytes are regenerated without producer sampling "
+    "code, but exact replay uses the same dependency-bound Torch CPU RNG "
+    "primitives rather than a separately implemented Philox engine."
+)
+_CEM_REPLAY_INDEPENDENCE_LIMITATION = (
+    "CEM is independently reimplemented from the public algorithm and "
+    "retained tensor bytes rather than calling producer planning/model code, "
+    "but bit-exact action replay intentionally uses the same bound Torch "
+    "device kernels and RNG implementation as the producer."
+)
 _MAX_PREBINDING_REQUEST_BYTES = 16 << 20
 _MAX_PREBINDING_ROOT_ENTRIES = 250_000
 _MAX_PREBINDING_ROOT_BYTES = 32 << 30
@@ -493,6 +527,10 @@ _PRODUCER_MANIFEST_FIELDS = frozenset(
         "file_count",
         "files",
     }
+)
+_UTC_TIMESTAMP = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
+    r"[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?Z$"
 )
 _FORMAL_CONFORMANCE_KEYS = frozenset(
     {
@@ -543,16 +581,16 @@ _TASK_CONTEXT = {
     _TASK_IRRELEVANT: 2.0,
 }
 _FORMAL_SEEDS = (
-    900_802_928,
-    2_035_185_068,
-    3_817_247_901,
-    14_769_188,
-    2_670_334_085,
-    2_866_408_483,
-    671_156_171,
-    333_753_598,
+    2_465_968_807,
+    3_494_485_289,
+    1_615_601_571,
+    2_220_840_580,
+    280_448_223,
+    597_199_725,
+    712_207_456,
+    1_727_907_751,
 )
-_DEVELOPMENT_SEEDS = (630_481_329, 2_204_125_221)
+_DEVELOPMENT_SEEDS = (2_388_891_654, 3_201_418_215)
 _COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
 _V100_MASTER_SEEDS = (
     101,
@@ -727,6 +765,21 @@ _V1130_MASTER_SEEDS = (
 )
 _V1130_PROTOCOL_SHA256 = (
     "e7988e3605079b7b7830949d6fd107f26066059ac3cc3974c5bfe15af876dc0c"
+)
+_V1140_MASTER_SEEDS = (
+    630_481_329,
+    2_204_125_221,
+    900_802_928,
+    2_035_185_068,
+    3_817_247_901,
+    14_769_188,
+    2_670_334_085,
+    2_866_408_483,
+    671_156_171,
+    333_753_598,
+)
+_V1140_PROTOCOL_SHA256 = (
+    "39f5820a91c8a504355f971449726ae0a9067cc856111a575bb038455d1fd635"
 )
 _DEVELOPMENT_MATRIX_CONTRACT_SHA256 = "09a232a4a58c2690665cbef928936b49fbb28d7134405c8eb696a63371591b84"
 _V130_BOUNDARY_TARGET_F32_HEX = "ac3cdebd"
@@ -927,6 +980,18 @@ def _strict_json_equal(observed: object, expected: object) -> bool:
             for left, right in zip(observed, expected, strict=True)
         )
     return observed == expected
+
+
+def _parse_utc_timestamp(value: object, *, label: str) -> datetime:
+    if not isinstance(value, str) or _UTC_TIMESTAMP.fullmatch(value) is None:
+        raise ArtifactAuditError(f"{label} is not canonical UTC")
+    try:
+        parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    except ValueError as error:
+        raise ArtifactAuditError(f"{label} is not a real UTC timestamp") from error
+    if parsed.tzinfo != UTC:
+        raise ArtifactAuditError(f"{label} is not UTC")
+    return parsed
 
 
 def _json_without_duplicate_keys(payload: bytes, *, label: str) -> object:
@@ -2741,12 +2806,7 @@ def _audit_optimizer_manifests(
         ),
         replicate_id=replicate_id,
     )
-    audit.limitation(
-        "Bootstrap, balanced-minibatch, minibatch-order, and corruption-permutation "
-        "bytes are regenerated without producer sampling code, but exact replay uses "
-        "the same dependency-bound Torch CPU RNG primitives rather than a separately "
-        "implemented Philox engine."
-    )
+    audit.limitation(_OPTIMIZER_RNG_INDEPENDENCE_LIMITATION)
 
 
 def _mapping_rows(value: object) -> list[Mapping[str, object]]:
@@ -2827,6 +2887,7 @@ def _audit_protocol_seed_contract(
         ("1.11.0", _V1110_MASTER_SEEDS),
         ("1.12.0", _V1120_MASTER_SEEDS),
         ("1.13.0", _V1130_MASTER_SEEDS),
+        ("1.14.0", _V1140_MASTER_SEEDS),
     )
     prior_masters = {master_seed for _, version_masters in prior_domains for master_seed in version_masters}
     prior_stream_values = [
@@ -2869,11 +2930,11 @@ def _audit_protocol_seed_contract(
         and collision_audit.get("current_internal_collision_count") == 0
         and collision_audit.get("current_master_stream_overlap_count") == 0
         and current_masters.isdisjoint(current_streams)
-        and collision_audit.get("prior_master_seed_count") == len(prior_masters) == 130
+        and collision_audit.get("prior_master_seed_count") == len(prior_masters) == 140
         and collision_audit.get("unique_prior_derived_stream_count")
         == len(prior_streams)
         == len(prior_stream_values)
-        == 17680
+        == 19040
         and collision_audit.get("current_prior_master_master_overlap_count") == 0
         and collision_audit.get("current_prior_stream_stream_overlap_count") == 0
         and collision_audit.get("current_master_prior_stream_overlap_count") == 0
@@ -2891,7 +2952,7 @@ def _audit_protocol_seed_contract(
         code="protocol_seed_contract_mismatch",
         message=(
             "protocol master derivation, schedule parity, prior-domain collision audit, "
-            "or matrix-contract binding differs from v1.14"
+            "or matrix-contract binding differs from v1.15"
         ),
     )
 
@@ -3416,13 +3477,7 @@ def _audit_transition_and_episode_rows(
             replicate_id=replicate_id,
             transition_id=transition_id,
         )
-    audit.limitation(
-        "Pendulum reset observations are reconstructed from the documented "
-        "Gymnasium 0.29.1 default_rng/PCG64 algorithm without importing "
-        "Gymnasium; exact replay consequently relies on NumPy's bound Generator "
-        "semantics. The independent oscillator is reconstructed directly from "
-        "its SHA-256 reset and autonomous analytic dynamics."
-    )
+    audit.limitation(_PENDULUM_RECONSTRUCTION_INDEPENDENCE_LIMITATION)
     return transitions_by_id
 
 
@@ -3890,7 +3945,7 @@ def _audit_policy_runs(
             f"{replicate_id} does not retain the exact full seed namespace/count schedule.",
             evidence_needed=(
                 "Every sealed namespace row, in full declared counts, with each value "
-                "regenerated from the v1.14 experimental seed hash domain."
+                "regenerated from the v1.15 experimental seed hash domain."
             ),
         )
 
@@ -4201,12 +4256,7 @@ def _audit_policy_runs(
             evidence_needed=("Successful exact replay for every learned and oracle CEM policy run."),
         )
     if cem_replay_count:
-        audit.limitation(
-            "CEM is independently reimplemented from the public algorithm and "
-            "retained tensor bytes rather than calling producer planning/model code, "
-            "but bit-exact action replay intentionally uses the same bound Torch "
-            "device kernels and RNG implementation as the producer."
-        )
+        audit.limitation(_CEM_REPLAY_INDEPENDENCE_LIMITATION)
     audit.require(
         not cem_rng_pairs or len(set(cem_rng_pairs)) == 1,
         code="paired_cem_rng_mismatch",
@@ -4870,7 +4920,7 @@ def audit_restart_runtime_conformance(
     except (ArtifactAuditError, OSError):
         return {
             "schema": _RESTART_RUNTIME_CONFORMANCE_SCHEMA,
-            "protocol_version": "1.14.0",
+            "protocol_version": "1.15.0",
             "support_files": list(_RESTART_RUNTIME_SUPPORT_FILES),
             "branches": {
                 "development": {"passed": False},
@@ -5106,7 +5156,7 @@ def audit_restart_runtime_conformance(
 
     report: dict[str, object] = {
         "schema": _RESTART_RUNTIME_CONFORMANCE_SCHEMA,
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "support_files": [
             {
                 "path": "producer_bootstrap.py",
@@ -6461,11 +6511,16 @@ def _verify_producer_manifest_locally(root: Path) -> tuple[dict[str, object], st
         or not isinstance(error.get("message"), str)
     ):
         raise ArtifactAuditError("failed producer manifest has an invalid error identity")
-    if any(
-        not isinstance(manifest.get(field), str) or not str(manifest[field]).endswith("Z")
-        for field in ("started_at_utc", "completed_at_utc")
-    ):
-        raise ArtifactAuditError("producer manifest timestamps are invalid")
+    started_at = _parse_utc_timestamp(
+        manifest.get("started_at_utc"),
+        label="producer manifest started_at_utc",
+    )
+    completed_at = _parse_utc_timestamp(
+        manifest.get("completed_at_utc"),
+        label="producer manifest completed_at_utc",
+    )
+    if completed_at < started_at:
+        raise ArtifactAuditError("producer manifest completed before it started")
     if manifest.get("manifest_excludes") != [_PRODUCER_MANIFEST_NAME]:
         raise ArtifactAuditError("producer manifest exclusion contract is invalid")
 
@@ -6576,9 +6631,7 @@ def _verify_finalized_custody(audit: _Audit, root: Path) -> None:
             message="producer manifest does not identify a completed attempt",
         )
         audit.independence_limitations.append(
-            "The producer manifest is fully reopened and hash-checked, but it is not "
-            "externally signed or transparency-log anchored; filesystem-level replacement "
-            "of the entire root and manifest is outside this audit's threat model."
+            _PRODUCER_CUSTODY_INDEPENDENCE_LIMITATION
         )
     except (ArtifactAuditError, OSError, ValueError) as error:
         audit.error(
@@ -6888,9 +6941,9 @@ def _is_bound_implementation_path(path: Path) -> bool:
         "bench/world_model_lifecycle/protocol.json",
         "bench/world_model_lifecycle/schemas/formal-binding.schema.json",
         "bench/world_model_lifecycle/schemas/raw-result.schema.json",
-        "docs/wm001-v1140-confirmation-plan.md",
-        "docs/wm001-v1140-operator-runbook.md",
-        "docs/wm001-v1140-prospective-harness-review.json",
+        "docs/wm001-v1150-confirmation-plan.md",
+        "docs/wm001-v1150-operator-runbook.md",
+        "docs/wm001-v1150-prospective-harness-review.json",
     }:
         return True
     return (
@@ -7655,7 +7708,7 @@ def _preformal_fresh_identity_conformance(
         or value.get("schema")
         != "prospect.wm001.fresh-runtime-identity-conformance.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.14.0"
+        or value.get("protocol_version") != "1.15.0"
         or value.get("mode") != "fresh-identity-conformance"
         or not _is_sha256(value.get("challenge"))
         or type(requesting_process_id) is not int
@@ -7742,10 +7795,10 @@ def _preformal_runtime_conformance(
     return value
 
 
-_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.14.0.json"
-_PREFORMAL_LOG_PREFIX = "preformal-v1.14.0-command-"
-_PREFORMAL_REVIEW_PATH = "docs/wm001-v1140-prospective-harness-review.json"
-_PREFORMAL_LIVE_RELATIVE_DIRECTORY = Path("v1.14.0") / "preformal"
+_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.15.0.json"
+_PREFORMAL_LOG_PREFIX = "preformal-v1.15.0-command-"
+_PREFORMAL_REVIEW_PATH = "docs/wm001-v1150-prospective-harness-review.json"
+_PREFORMAL_LIVE_RELATIVE_DIRECTORY = Path("v1.15.0") / "preformal"
 _FORMAL_INPUT_PREFLIGHT_NAME = "formal-input-preflight.json"
 _PREFORMAL_COMMAND_NAMES = (
     "protocol-seal-continuity",
@@ -7763,10 +7816,11 @@ _PREFORMAL_AUTHORIZATION_CONTRACT: Mapping[str, object] = {
     "report_schema": "prospect.wm001.preformal-test-report.v2",
     "canonical_directory": (
         "bench/world_model_lifecycle/results/development/"
-        "v1.14.0/preformal"
+        "v1.15.0/preformal"
     ),
     "report_file": _PREFORMAL_REPORT_NAME,
     "ordered_commands": list(_PREFORMAL_COMMAND_NAMES),
+    "all_command_stderr_bytes": 0,
     "input_link_counts": {
         "closure_attempt_terminal": 2,
         "closure_outer_completion": 2,
@@ -7820,15 +7874,16 @@ _PREFORMAL_AUTHORIZATION_CONTRACT: Mapping[str, object] = {
     ),
     "failure_rule": (
         "The report preserves every command result. all_pass exactly equals "
-        "the conjunction of the ten zero exit statuses, a clean post-command "
-        "Git worktree, and stable pre/post Git, source, executable, package, "
+        "the conjunction of the ten zero exit statuses, ten exactly empty "
+        "stderr streams, a clean post-command Git worktree, and stable "
+        "pre/post Git, source, executable, package, "
         "runtime-seal, review, and input identities, plus strict semantic "
         "validation of accepted-closure and runtime-conformance stdout. "
         "Generation returns nonzero with passed=false, exact failed-command "
         "ordinals, names, and exit codes, and exact non-command failure "
-        "identifiers for post-run worktree drift, pre/post identity drift, "
-        "accepted-closure semantics, or runtime-conformance semantics. Failed "
-        "evidence can never authorize binding."
+        "identifiers for nonempty command stderr, post-run worktree drift, "
+        "pre/post identity drift, accepted-closure semantics, or runtime-"
+        "conformance semantics. Failed evidence can never authorize binding."
     ),
     "public_runtime_modes": [
         "accepted-closure-evidence",
@@ -8411,7 +8466,7 @@ def _preformal_prospective_review(
         or set(review) != fields
         or review.get("schema") != "prospect.wm001.prospective-harness-review.v1"
         or review.get("experiment_id") != "WM-001"
-        or review.get("protocol_version") != "1.14.0"
+        or review.get("protocol_version") != "1.15.0"
         or review.get("implementation_files") != expected_rows
         or review.get("implementation_manifest_sha256")
         != hashlib.sha256(_canonical_json_bytes(expected_rows)).hexdigest()
@@ -8476,8 +8531,8 @@ def _preformal_runtime_seal(
         or set(seal) != fields
         or seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or seal.get("experiment_id") != "WM-001"
-        or seal.get("protocol_version") != "1.14.0"
-        or seal.get("assurance") != _ASSURANCE
+        or seal.get("protocol_version") != "1.15.0"
+        or not _strict_json_equal(seal.get("assurance"), _ASSURANCE)
         or seal.get("git_commit") != source.get("git_commit")
         or seal.get("git_tree") != source.get("git_tree")
         or seal.get("worktree_clean") is not True
@@ -8502,14 +8557,32 @@ def _preformal_runtime_seal(
         or python.get("resolved_executable")
         != runtime_executable.get("resolved_path")
         or python.get("sha256") != runtime_executable.get("sha256")
-        or seal.get("required_flags") != _PREFORMAL_RUNTIME_FLAGS
-        or seal.get("required_flags") != runtime.get("python_flags")
-        or seal.get("process_environment") != runtime.get("process_environment")
+        or not _strict_json_equal(
+            seal.get("required_flags"),
+            _PREFORMAL_RUNTIME_FLAGS,
+        )
+        or not _strict_json_equal(
+            seal.get("required_flags"),
+            runtime.get("python_flags"),
+        )
+        or not _strict_json_equal(
+            seal.get("process_environment"),
+            runtime.get("process_environment"),
+        )
         or not isinstance(execution_sources, Mapping)
         or seal.get("bootstrap_source_sha256") != execution_sources.get("producer_bootstrap.py")
-        or seal.get("standard_library") != dependencies.get("standard_library")
-        or seal.get("package_roots") != dependencies.get("package_roots")
-        or seal.get("package_ownership") != dependencies.get("package_ownership")
+        or not _strict_json_equal(
+            seal.get("standard_library"),
+            dependencies.get("standard_library"),
+        )
+        or not _strict_json_equal(
+            seal.get("package_roots"),
+            dependencies.get("package_roots"),
+        )
+        or not _strict_json_equal(
+            seal.get("package_ownership"),
+            dependencies.get("package_ownership"),
+        )
     ):
         raise ArtifactAuditError("formal test report runtime seal differs from the formal binding")
     return seal
@@ -8539,6 +8612,12 @@ def _preformal_log_reference(
         or Path(expected_name).name != expected_name
     ):
         raise ArtifactAuditError(f"formal test report {command_name} {stream} identity is invalid")
+    if stream == "stderr" and (
+        size != 0 or digest != _SHA256_EMPTY
+    ):
+        raise ArtifactAuditError(
+            f"formal test report command {ordinal} stderr is not exactly empty"
+        )
     return {
         "path": expected_name,
         "bytes": size,
@@ -8596,7 +8675,7 @@ def _preformal_accepted_closure_evidence(
         closure.get("schema")
         != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.14.0"
+        or closure.get("protocol_version") != "1.15.0"
         or closure.get("producer_manifest_member")
         != "producer/producer-manifest.json"
         or closure.get("raw_result_member") != "producer/result.json"
@@ -8773,7 +8852,7 @@ def _validate_preformal_test_report_v2(
         set(report) != expected_report_fields
         or report.get("schema") != "prospect.wm001.preformal-test-report.v2"
         or report.get("experiment_id") != "WM-001"
-        or report.get("protocol_version") != "1.14.0"
+        or report.get("protocol_version") != "1.15.0"
         or not isinstance(repository_cwd, str)
         or not repository_cwd
         or "\0" in repository_cwd
@@ -8859,10 +8938,22 @@ def _validate_preformal_test_report_v2(
     if (
         not isinstance(inputs_before, Mapping)
         or set(inputs_before) != _PREFORMAL_INPUT_FIELDS
-        or inputs_before != inputs_after
+        or not isinstance(inputs_after, Mapping)
+        or set(inputs_after) != _PREFORMAL_INPUT_FIELDS
     ):
         raise ArtifactAuditError("formal test report input-file identities are incomplete or changed")
-    inputs = {name: _preformal_file_identity(identity, label=name) for name, identity in inputs_before.items()}
+    inputs: dict[str, Mapping[str, object]] = {}
+    for name, identity in inputs_before.items():
+        inputs[name] = _preformal_file_identity(identity, label=name)
+        after = _preformal_file_identity(
+            inputs_after[name],
+            label=f"{name} after",
+        )
+        if not _strict_json_equal(inputs[name], after):
+            raise ArtifactAuditError(
+                "formal test report input-file identities are incomplete "
+                "or changed"
+            )
     development_root = (
         Path(repository_cwd)
         / "bench"
@@ -8871,10 +8962,10 @@ def _validate_preformal_test_report_v2(
         / "development"
     )
     expected_development_closure_path = (
-        development_root / "development-closure-v1.14.0.json"
+        development_root / "development-closure-v1.15.0.json"
     )
     expected_runtime_seal_path = (
-        development_root / "runtime-seal-v1.14.0.json"
+        development_root / "runtime-seal-v1.15.0.json"
     )
     runtime_seal_path = Path(
         cast(str, inputs["runtime_seal"]["path"])
@@ -8894,7 +8985,7 @@ def _validate_preformal_test_report_v2(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.14"
+        / "v1.15"
         / (
             hashlib.sha256(
                 str(expected_runtime_seal_path).encode("utf-8")
@@ -8950,9 +9041,9 @@ def _validate_preformal_test_report_v2(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.14"
+        / "operator-v1.15"
         / "closures"
-        / "development-closure-v1.14.0"
+        / "development-closure-v1.15.0"
         / "operator-attempt.json"
     )
     closure_completion_path = (
@@ -8961,7 +9052,7 @@ def _validate_preformal_test_report_v2(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.14"
+        / "v1.15"
         / (
             hashlib.sha256(
                 str(closure_terminal_path).encode("utf-8")
@@ -9030,7 +9121,10 @@ def _validate_preformal_test_report_v2(
         if (
             recorded.get("path") != str(Path(repository_cwd) / relative)
             or not isinstance(bound, Mapping)
-            or recorded.get("bytes") != bound.get("bytes")
+            or not _strict_json_equal(
+                recorded.get("bytes"),
+                bound.get("bytes"),
+            )
             or recorded.get("sha256") != bound.get("sha256")
         ):
             raise ArtifactAuditError(f"formal test report {name} differs from its source binding")
@@ -9045,15 +9139,27 @@ def _validate_preformal_test_report_v2(
     ):
         raise ArtifactAuditError("formal test report embedded review or runtime seal bytes are misbound")
     if (
-        git_before != git_after
-        or qa_executable_before != qa_executable_after
-        or runtime_executable_before != runtime_executable_after
-        or qa_closure_before != qa_closure_after
+        not _strict_json_equal(git_before, git_after)
+        or not _strict_json_equal(
+            qa_executable_before,
+            qa_executable_after,
+        )
+        or not _strict_json_equal(
+            runtime_executable_before,
+            runtime_executable_after,
+        )
+        or not _strict_json_equal(
+            qa_closure_before,
+            qa_closure_after,
+        )
         or not isinstance(generator_before, Mapping)
         or set(generator_before) != {"path", "bytes", "sha256"}
-        or generator_before != generator_after
+        or not _strict_json_equal(generator_before, generator_after)
         or len(preformal_rows) != 1
-        or dict(generator_before) != dict(preformal_rows[0])
+        or not _strict_json_equal(
+            dict(generator_before),
+            dict(preformal_rows[0]),
+        )
     ):
         raise ArtifactAuditError("formal test report source, Git, or executable identity changed")
     qa_executable = qa_executable_before.get("invocation_path")
@@ -9332,6 +9438,522 @@ _DEVELOPMENT_AUDIT_EXECUTION_FIELDS = {
 }
 
 
+def _validate_archived_development_producer(
+    retained: Mapping[str, bytes],
+    members: Sequence[object],
+) -> None:
+    """Bind the archived producer namespace to its own terminal manifest."""
+
+    manifest_member = "producer/producer-manifest.json"
+    manifest_payload = retained.get(manifest_member)
+    if not isinstance(manifest_payload, bytes):
+        raise ArtifactAuditError(
+            "development archive omits its producer manifest payload"
+        )
+    manifest = _canonical_json_object_payload(
+        manifest_payload,
+        label="archived development producer manifest",
+    )
+    rows = manifest.get("files")
+    if (
+        set(manifest) != _PRODUCER_MANIFEST_FIELDS
+        or manifest.get("schema") != "prospect.wm001.producer-manifest.v1"
+        or manifest.get("experiment_id") != "WM-001"
+        or manifest.get("lane") != "development"
+        or manifest.get("status") != "completed"
+        or manifest.get("error") is not None
+        or manifest.get("manifest_excludes") != [_PRODUCER_MANIFEST_NAME]
+        or not isinstance(rows, list)
+        or type(manifest.get("file_count")) is not int
+        or manifest.get("file_count") != len(rows)
+    ):
+        raise ArtifactAuditError(
+            "archived development producer manifest is incomplete"
+        )
+    started_at = _parse_utc_timestamp(
+        manifest.get("started_at_utc"),
+        label="archived development producer started_at_utc",
+    )
+    completed_at = _parse_utc_timestamp(
+        manifest.get("completed_at_utc"),
+        label="archived development producer completed_at_utc",
+    )
+    if completed_at < started_at:
+        raise ArtifactAuditError(
+            "archived development producer completed before it started"
+        )
+    manifest_paths: list[str] = []
+    expected_producer: dict[str, dict[str, object]] = {}
+    for index, raw_row in enumerate(rows):
+        if not isinstance(raw_row, Mapping) or set(raw_row) != {
+            "path",
+            "bytes",
+            "sha256",
+        }:
+            raise ArtifactAuditError(
+                f"archived development producer manifest row {index} is malformed"
+            )
+        relative = raw_row.get("path")
+        byte_count = raw_row.get("bytes")
+        digest = raw_row.get("sha256")
+        if (
+            not isinstance(relative, str)
+            or not relative
+            or "\\" in relative
+            or Path(relative).is_absolute()
+            or "." in Path(relative).parts
+            or ".." in Path(relative).parts
+            or Path(relative).as_posix() != relative
+            or type(byte_count) is not int
+            or cast(int, byte_count) < 0
+            or cast(int, byte_count) > (4 << 30)
+            or not _is_sha256(digest)
+        ):
+            raise ArtifactAuditError(
+                f"archived development producer manifest row {index} is malformed"
+            )
+        manifest_paths.append(relative)
+        expected_producer[f"producer/{relative}"] = {
+            "bytes": byte_count,
+            "sha256": digest,
+        }
+    if manifest_paths != sorted(set(manifest_paths)):
+        raise ArtifactAuditError(
+            "archived development producer manifest rows are not exact and ordered"
+        )
+    expected_producer[manifest_member] = {
+        "bytes": len(manifest_payload),
+        "sha256": hashlib.sha256(manifest_payload).hexdigest(),
+    }
+    observed_producer = {
+        str(row["path"]): {
+            "bytes": row["bytes"],
+            "sha256": row["sha256"],
+        }
+        for row in members
+        if isinstance(row, Mapping)
+        and isinstance(row.get("path"), str)
+        and cast(str, row["path"]).startswith("producer/")
+    }
+    if not _strict_json_equal(observed_producer, expected_producer):
+        raise ArtifactAuditError(
+            "archived producer member set differs from its manifest"
+        )
+
+
+def _validate_archived_development_semantics(
+    retained: Mapping[str, bytes],
+    *,
+    closure: Mapping[str, object],
+    member_digests: Mapping[str, str],
+    protocol_sha256: object,
+    source: Mapping[str, object],
+) -> None:
+    """Independently bind performance-free qualification and audit evidence."""
+
+    def role_payload(field: str) -> bytes:
+        member = closure.get(field)
+        payload = retained.get(member) if isinstance(member, str) else None
+        if not isinstance(payload, bytes):
+            raise ArtifactAuditError(
+                f"development archive omits retained role {field}"
+            )
+        return payload
+
+    producer_execution = closure.get("producer_execution")
+    qualification = _canonical_json_object_payload(
+        role_payload("result_qualification_member"),
+        label="archived development result qualification",
+    )
+    replicates = qualification.get("replicates")
+    expected_counts = {
+        "episodes": 496,
+        "transitions": 99_200,
+        "predictive_metrics": 12,
+        "policy_runs": 20,
+        "updates": 6,
+        "optimizer_batch_manifests": 5,
+    }
+    if (
+        set(qualification)
+        != {
+            "schema",
+            "experiment_id",
+            "protocol_version",
+            "protocol_sha256",
+            "raw_result_sha256",
+            "lane",
+            "claim_eligible",
+            "replicates",
+            "matrix_contract_sha256",
+            "producer_execution",
+        }
+        or qualification.get("schema")
+        != "prospect.wm001.development-result-qualification.v1"
+        or qualification.get("experiment_id") != "WM-001"
+        or qualification.get("protocol_version") != "1.15.0"
+        or qualification.get("protocol_sha256") != protocol_sha256
+        or qualification.get("raw_result_sha256")
+        != member_digests.get("producer/result.json")
+        or qualification.get("lane") != "development"
+        or qualification.get("claim_eligible") is not False
+        or qualification.get("matrix_contract_sha256")
+        != _DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        or not _strict_json_equal(
+            qualification.get("producer_execution"),
+            producer_execution,
+        )
+        or not isinstance(replicates, list)
+        or len(replicates) != 2
+        or tuple(
+            row.get("master_seed")
+            if isinstance(row, Mapping)
+            else None
+            for row in replicates
+        )
+        != _DEVELOPMENT_SEEDS
+        or any(
+            not isinstance(row, Mapping)
+            or set(row)
+            != {
+                "replicate_id",
+                "master_seed",
+                *expected_counts,
+            }
+            or not isinstance(row.get("replicate_id"), str)
+            or not row.get("replicate_id")
+            or type(row.get("master_seed")) is not int
+            or any(
+                type(row.get(field)) is not int
+                or row.get(field) != expected
+                for field, expected in expected_counts.items()
+            )
+            for row in replicates
+        )
+    ):
+        raise ArtifactAuditError(
+            "archived development result qualification is not exact"
+        )
+
+    audit_payload = role_payload("independent_audit_member")
+    audit = _canonical_json_object_payload(
+        audit_payload,
+        label="archived development independent audit",
+    )
+    counts = audit.get("check_counts")
+    audit_implementation = audit.get("audit_implementation")
+    expected_audit_fields = {
+        "schema",
+        "artifact_root",
+        "result_file",
+        "result_sha256",
+        "lane",
+        "integrity_passed",
+        "engineering_complete",
+        "complete_for_claim",
+        "passed",
+        "check_counts",
+        "audit_implementation",
+        "audit_execution_conformance_verified",
+        "resource_limits_bytes",
+        "custody",
+        "findings",
+        "coverage_gaps",
+        "independence_limitations",
+    }
+    expected_audit_implementation = {
+        "auditor_source_sha256": cast(
+            Mapping[str, object],
+            closure["source"],
+        ).get("auditor_source_sha256"),
+        "bound_auditor_source_sha256": None,
+        "formal_test_report_sha256": None,
+        "coverage_conformance_report_sha256": None,
+        "auditor_source_matches_binding": False,
+        "coverage_conformance_verified": False,
+        "audit_execution_conformance_verified": False,
+    }
+    expected_resource_limits = {
+        "result": _MAX_RESULT_BYTES,
+        "prediction_sidecar": _MAX_PREDICTION_BYTES,
+        "owned_model_state": _MAX_OWNED_MODEL_BYTES,
+        "optimizer_manifest": _MAX_MANIFEST_BYTES,
+        "target_permutation": _MAX_PERMUTATION_BYTES,
+        "restart_evaluation": _MAX_RESTART_EVALUATION_BYTES,
+        "checkpoint_archive": _MAX_CHECKPOINT_BYTES,
+        "source_file": _MAX_SOURCE_FILE_BYTES,
+        "source_snapshot": _MAX_SOURCE_SNAPSHOT_BYTES,
+    }
+    expected_custody = {
+        "producer_manifest_checked": True,
+        "producer_manifest_status": "completed",
+        "producer_manifest_sha256": member_digests.get(
+            "producer/producer-manifest.json"
+        ),
+    }
+    expected_limitations = [
+        _PRODUCER_CUSTODY_INDEPENDENCE_LIMITATION,
+        _PENDULUM_RECONSTRUCTION_INDEPENDENCE_LIMITATION,
+        _OPTIMIZER_RNG_INDEPENDENCE_LIMITATION,
+        _CEM_REPLAY_INDEPENDENCE_LIMITATION,
+        _DEVELOPMENT_EVIDENCE_INDEPENDENCE_LIMITATION,
+    ]
+    if (
+        set(audit) != expected_audit_fields
+        or audit.get("schema")
+        != "prospect.world-model-lifecycle.artifact-audit.v2"
+        or audit.get("artifact_root") != closure.get("producer_root")
+        or audit.get("result_file") != "result.json"
+        or audit.get("result_sha256")
+        != member_digests.get("producer/result.json")
+        or audit.get("lane") != "development"
+        or audit.get("integrity_passed") is not True
+        or audit.get("engineering_complete") is not True
+        or audit.get("complete_for_claim") is not False
+        or audit.get("passed") is not True
+        or not isinstance(counts, Mapping)
+        or set(counts) != {"passed", "failed", "coverage_gaps"}
+        or type(counts.get("passed")) is not int
+        or cast(int, counts["passed"]) <= 0
+        or type(counts.get("failed")) is not int
+        or counts.get("failed") != 0
+        or type(counts.get("coverage_gaps")) is not int
+        or counts.get("coverage_gaps") != 0
+        or audit.get("coverage_gaps") != []
+        or audit.get("findings") != []
+        or audit.get("audit_execution_conformance_verified") is not False
+        or not isinstance(audit_implementation, Mapping)
+        or not _strict_json_equal(
+            audit_implementation,
+            expected_audit_implementation,
+        )
+        or not _strict_json_equal(
+            audit.get("resource_limits_bytes"),
+            expected_resource_limits,
+        )
+        or not _strict_json_equal(
+            audit.get("custody"),
+            expected_custody,
+        )
+        or not _strict_json_equal(
+            audit.get("independence_limitations"),
+            expected_limitations,
+        )
+    ):
+        raise ArtifactAuditError(
+            "archived development independent audit is not passing"
+        )
+
+    receipt_payload = role_payload("audit_reproduction_member")
+    receipt = _canonical_json_object_payload(
+        receipt_payload,
+        label="archived development audit reproduction",
+    )
+    audit_execution = closure.get("audit_execution")
+    if not isinstance(audit_execution, Mapping):
+        raise ArtifactAuditError(
+            "development audit execution identity is absent"
+        )
+    sidecars = {
+        "stderr": role_payload("audit_stderr_member"),
+        "runtime_manifest": role_payload(
+            "audit_runtime_manifest_member"
+        ),
+        "invocation_manifest": role_payload(
+            "audit_invocation_manifest_member"
+        ),
+    }
+    runtime_manifest = _canonical_json_object_payload(
+        sidecars["runtime_manifest"],
+        label="archived development audit runtime manifest",
+    )
+    invocation_manifest = _canonical_json_object_payload(
+        sidecars["invocation_manifest"],
+        label="archived development audit invocation manifest",
+    )
+    receipt_fields = {
+        "schema",
+        "experiment_id",
+        "protocol_version",
+        "supplied_audit_sha256",
+        "reproduced_audit_sha256",
+        "byte_identical",
+        "returncode",
+        "source_mode",
+        "stdout_bytes",
+        "stderr_file",
+        "stderr_bytes",
+        "stderr_sha256",
+        "runtime_manifest_file",
+        "runtime_manifest_bytes",
+        "runtime_manifest_sha256",
+        "invocation_manifest_file",
+        "invocation_manifest_bytes",
+        "invocation_manifest_sha256",
+        "bootstrap_sha256",
+        "runner_source_sha256",
+        "auditor_source_sha256",
+        "support_files",
+        "passed",
+    }
+    if (
+        set(receipt) != receipt_fields
+        or receipt.get("schema")
+        != "prospect.wm001.audit-reproduction.v2"
+        or receipt.get("experiment_id") != "WM-001"
+        or receipt.get("protocol_version") != "1.15.0"
+        or receipt.get("supplied_audit_sha256")
+        != hashlib.sha256(audit_payload).hexdigest()
+        or receipt.get("reproduced_audit_sha256")
+        != hashlib.sha256(audit_payload).hexdigest()
+        or receipt.get("byte_identical") is not True
+        or type(receipt.get("returncode")) is not int
+        or receipt.get("returncode") != 0
+        or receipt.get("source_mode") != "descriptor"
+        or type(receipt.get("stdout_bytes")) is not int
+        or receipt.get("stdout_bytes") != len(audit_payload)
+        or receipt.get("passed") is not True
+        or receipt.get("bootstrap_sha256")
+        != audit_execution.get("bootstrap_sha256")
+        or receipt.get("runner_source_sha256")
+        != audit_execution.get("runner_source_sha256")
+        or receipt.get("auditor_source_sha256")
+        != audit_execution.get("auditor_source_sha256")
+        or not _strict_json_equal(
+            receipt.get("support_files"),
+            audit_execution.get("support_files"),
+        )
+        or hashlib.sha256(receipt_payload).hexdigest()
+        != audit_execution.get("receipt_sha256")
+    ):
+        raise ArtifactAuditError(
+            "archived development audit reproduction is not exact"
+        )
+    for prefix, payload in sidecars.items():
+        member = closure.get(
+            {
+                "stderr": "audit_stderr_member",
+                "runtime_manifest": "audit_runtime_manifest_member",
+                "invocation_manifest": "audit_invocation_manifest_member",
+            }[prefix]
+        )
+        filename = (
+            member.removeprefix("evidence/")
+            if isinstance(member, str)
+            else None
+        )
+        if (
+            type(receipt.get(f"{prefix}_bytes")) is not int
+            or receipt.get(f"{prefix}_bytes") != len(payload)
+            or receipt.get(f"{prefix}_sha256")
+            != hashlib.sha256(payload).hexdigest()
+            or receipt.get(f"{prefix}_file") != filename
+            or receipt.get(f"{prefix}_sha256")
+            != audit_execution.get(f"{prefix}_sha256")
+        ):
+            raise ArtifactAuditError(
+                f"archived development audit {prefix} is not exact"
+            )
+    if not isinstance(producer_execution, Mapping):
+        raise ArtifactAuditError(
+            "development producer execution identity is absent"
+        )
+    implementation_rows = source.get("implementation_files")
+    auditor_row = next(
+        (
+            row
+            for row in implementation_rows
+            if isinstance(row, Mapping)
+            and row.get("path")
+            == "bench/world_model_lifecycle/artifact_audit.py"
+        ),
+        None,
+    ) if isinstance(implementation_rows, list) else None
+    python_executable = producer_execution.get("python_executable")
+    python_version = producer_execution.get("python_version")
+    process_environment = producer_execution.get("process_environment")
+    if (
+        not isinstance(auditor_row, Mapping)
+        or type(auditor_row.get("bytes")) is not int
+        or not _is_sha256(auditor_row.get("sha256"))
+        or not isinstance(python_executable, str)
+        or not isinstance(python_version, str)
+        or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", python_version)
+        is None
+        or not isinstance(process_environment, Mapping)
+        or any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in process_environment.items()
+        )
+    ):
+        raise ArtifactAuditError(
+            "development audit runtime binding is incomplete"
+        )
+    expected_runtime_manifest = {
+        "schema": "prospect.wm001.audit-runtime-manifest.v1",
+        "assurance": _ASSURANCE,
+        "bootstrap_sha256": audit_execution.get("bootstrap_sha256"),
+        "python": {
+            "executable": python_executable,
+            "resolved_executable": str(
+                Path(python_executable).resolve(strict=True)
+            ),
+            "sha256": producer_execution.get(
+                "python_executable_sha256"
+            ),
+            "version": [
+                int(part) for part in python_version.split(".")
+            ],
+        },
+        "required_flags": dict(_PREBINDING_AUDITOR_FLAGS),
+        "source": {
+            "mode": "descriptor",
+            "path": "artifact_audit.py",
+            "bytes": auditor_row.get("bytes"),
+            "sha256": auditor_row.get("sha256"),
+        },
+        "support_files": audit_execution.get("support_files"),
+        "closure_import_roots": producer_execution.get("package_roots"),
+        "standard_library": producer_execution.get("standard_library"),
+        "environment": {
+            key: value
+            for key, value in process_environment.items()
+            if key in _PREBINDING_SHARED_ENVIRONMENT_KEYS
+        },
+        "limits": {
+            "timeout_seconds": 600,
+            "stdout_bytes": 64 << 20,
+            "stderr_bytes": 16 << 20,
+        },
+    }
+    if not _strict_json_equal(
+        runtime_manifest,
+        expected_runtime_manifest,
+    ):
+        raise ArtifactAuditError(
+            "archived development audit runtime differs from its closure"
+        )
+    expected_invocation = {
+        "schema": "prospect.wm001.audit-invocation-manifest.v1",
+        "runtime_manifest_sha256": hashlib.sha256(
+            sidecars["runtime_manifest"]
+        ).hexdigest(),
+        "working_directory": str(Path.cwd()),
+        "auditor_argv": [
+            cast(str, closure["producer_root"]),
+            "--producer-bootstrap",
+            "@captured/producer_bootstrap.py",
+        ],
+    }
+    if not _strict_json_equal(
+        invocation_manifest,
+        expected_invocation,
+    ):
+        raise ArtifactAuditError(
+            "archived development audit invocation differs from its closure"
+        )
+
+
 def _validate_development_qualification(
     payload: bytes,
     *,
@@ -9401,6 +10023,7 @@ def _validate_development_qualification(
     producer_custody = closure.get("producer_custody")
     audit_execution = closure.get("audit_execution")
     archive = closure.get("qualification_archive")
+    producer_root = closure.get("producer_root")
     execution_sources = source.get("execution_source_sha256")
     implementation_rows = source.get("implementation_files")
     if (
@@ -9408,12 +10031,25 @@ def _validate_development_qualification(
         or set(block) != block_fields
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.14.0"
+        or closure.get("protocol_version") != "1.15.0"
         or not isinstance(closure_source, Mapping)
         or not isinstance(producer_execution, Mapping)
         or not isinstance(producer_custody, Mapping)
         or not isinstance(audit_execution, Mapping)
         or not isinstance(archive, Mapping)
+        or not isinstance(producer_root, str)
+        or Path(producer_root)
+        != (
+            Path.cwd()
+            / "bench"
+            / "world_model_lifecycle"
+            / "results"
+            / "development"
+            / "qualification-v1.15.0"
+        )
+        or not Path(producer_root).is_absolute()
+        or Path(producer_root).resolve(strict=False)
+        != Path(producer_root)
         or not isinstance(execution_sources, Mapping)
         or not isinstance(implementation_rows, list)
         or closure.get("engineering_verified") is not True
@@ -9435,7 +10071,10 @@ def _validate_development_qualification(
         "runner_source_sha256": execution_sources.get("audit_runner.py"),
         "auditor_source_sha256": _AUDITOR_SOURCE_SHA256,
     }
-    if set(closure_source) != _DEVELOPMENT_SOURCE_FIELDS or dict(closure_source) != expected_source:
+    if (
+        set(closure_source) != _DEVELOPMENT_SOURCE_FIELDS
+        or not _strict_json_equal(closure_source, expected_source)
+    ):
         raise ArtifactAuditError("development qualification source identity is not exact")
 
     execution_binding = {
@@ -9466,7 +10105,10 @@ def _validate_development_qualification(
     python_version = producer_execution.get("python_version")
     if (
         set(producer_execution) != _DEVELOPMENT_EXECUTION_FIELDS
-        or any(producer_execution.get(field) != expected for field, expected in execution_binding.items())
+        or any(
+            not _strict_json_equal(producer_execution.get(field), expected)
+            for field, expected in execution_binding.items()
+        )
         or not isinstance(python_version, str)
         or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", python_version) is None
         or not _is_sha256(producer_execution.get("runtime_seal_sha256"))
@@ -9482,7 +10124,10 @@ def _validate_development_qualification(
         "launch_bootstrap_sha256": execution_sources.get("launch_bootstrap.py"),
         "package_ownership": dependencies.get("package_ownership"),
     }
-    if set(producer_custody) != _DEVELOPMENT_CUSTODY_FIELDS or dict(producer_custody) != expected_custody:
+    if (
+        set(producer_custody) != _DEVELOPMENT_CUSTODY_FIELDS
+        or not _strict_json_equal(producer_custody, expected_custody)
+    ):
         raise ArtifactAuditError("development producer custody identity is not exact")
 
     implementation_by_path = {row.get("path"): row for row in implementation_rows if isinstance(row, Mapping)}
@@ -9526,7 +10171,10 @@ def _validate_development_qualification(
         or audit_execution.get("bootstrap_sha256") != bound_audit_execution.get("bootstrap_source_sha256")
         or audit_execution.get("runner_source_sha256") != execution_sources.get("audit_runner.py")
         or audit_execution.get("auditor_source_sha256") != _AUDITOR_SOURCE_SHA256
-        or audit_execution.get("support_files") != expected_support_files
+        or not _strict_json_equal(
+            audit_execution.get("support_files"),
+            expected_support_files,
+        )
     ):
         raise ArtifactAuditError("development audit execution identity is not exact")
 
@@ -9572,6 +10220,8 @@ def _validate_development_qualification(
             "members",
         }
         or archive.get("format") != "ustar-uncompressed-v1"
+        or type(archive.get("bytes")) is not int
+        or cast(int, archive.get("bytes")) < 0
         or not isinstance(members, list)
         or not members
         or len(members) > 100_000
@@ -9608,7 +10258,10 @@ def _validate_development_qualification(
 
     expected_block = {
         "closure_schema": closure["schema"],
-        "closure_file": block["closure_file"],
+        "closure_file": (
+            "development-closure-"
+            f"{hashlib.sha256(payload).hexdigest()[:16]}.json"
+        ),
         "closure_bytes": len(payload),
         "closure_sha256": hashlib.sha256(payload).hexdigest(),
         "qualification_archive_file": archive["file"],
@@ -9634,22 +10287,127 @@ def _validate_development_qualification(
         "audit_reproduced": True,
         "performance_values_bound": False,
     }
-    if dict(block) != expected_block:
+    if not _strict_json_equal(block, expected_block):
         raise ArtifactAuditError("development qualification projection differs from its binding")
     runtime_seal_member = producer_custody.get("runtime_seal_member")
+    producer_bootstrap_member = producer_custody.get(
+        "producer_bootstrap_member"
+    )
+    launch_bootstrap_member = producer_custody.get(
+        "launch_bootstrap_member"
+    )
     if (
         not isinstance(runtime_seal_member, str)
         or member_digests.get(runtime_seal_member)
         != producer_execution.get("runtime_seal_sha256")
+        or not isinstance(producer_bootstrap_member, str)
+        or member_digests.get(producer_bootstrap_member)
+        != producer_custody.get("producer_bootstrap_sha256")
+        or not isinstance(launch_bootstrap_member, str)
+        or member_digests.get(launch_bootstrap_member)
+        != producer_custody.get("launch_bootstrap_sha256")
     ):
         raise ArtifactAuditError(
-            "development producer runtime seal is absent from its archive"
+            "development producer custody member is absent from its archive"
         )
+    expected_evidence_members = {
+        str(closure["result_qualification_member"]),
+        str(closure["independent_audit_member"]),
+        str(closure["audit_reproduction_member"]),
+        str(closure["audit_runtime_manifest_member"]),
+        str(closure["audit_invocation_manifest_member"]),
+        str(closure["audit_stderr_member"]),
+        runtime_seal_member,
+        producer_bootstrap_member,
+        launch_bootstrap_member,
+    }
+    observed_evidence_members = {
+        path for path in member_digests if path.startswith("evidence/")
+    }
+    if observed_evidence_members != expected_evidence_members:
+        raise ArtifactAuditError(
+            "development qualification evidence member set is not exact"
+        )
+    retained_members = frozenset(
+        {
+            "producer/producer-manifest.json",
+            *expected_evidence_members,
+        }
+    )
     retained = _verify_development_qualification_archive(
         archive,
         members=members,
-        retain_members=frozenset({runtime_seal_member}),
+        retain_members=retained_members,
     )
+    _validate_archived_development_producer(retained, members)
+    protocol_source_row = implementation_by_path.get(
+        "bench/world_model_lifecycle/protocol.json"
+    )
+    if not isinstance(protocol_source_row, Mapping):
+        raise ArtifactAuditError(
+            "development protocol source is absent from its binding"
+        )
+    _validate_archived_development_semantics(
+        retained,
+        closure=closure,
+        member_digests=member_digests,
+        protocol_sha256=protocol_source_row.get("sha256"),
+        source=source,
+    )
+    if (
+        hashlib.sha256(retained[producer_bootstrap_member]).hexdigest()
+        != producer_custody.get("producer_bootstrap_sha256")
+        or hashlib.sha256(retained[launch_bootstrap_member]).hexdigest()
+        != producer_custody.get("launch_bootstrap_sha256")
+    ):
+        raise ArtifactAuditError(
+            "development producer bootstrap custody differs from its archive"
+        )
+    for member, relative in (
+        (
+            producer_bootstrap_member,
+            "bench/world_model_lifecycle/producer_bootstrap.py",
+        ),
+        (
+            launch_bootstrap_member,
+            "bench/world_model_lifecycle/launch_bootstrap.py",
+        ),
+    ):
+        source_row = implementation_by_path.get(relative)
+        live_path = Path.cwd() / relative
+        try:
+            if (
+                live_path.resolve(strict=True) != live_path
+                or live_path.is_symlink()
+            ):
+                raise ArtifactAuditError(
+                    "live development bootstrap path is aliased"
+                )
+            live_payload, live_bytes, live_digest, live_identity = (
+                _read_stable_regular_file(
+                    live_path,
+                    _MAX_SOURCE_FILE_BYTES,
+                    label=f"live development bootstrap {relative}",
+                    capture_payload=True,
+                )
+            )
+        except OSError as error:
+            raise ArtifactAuditError(
+                "live development bootstrap cannot be resolved"
+            ) from error
+        if (
+            live_payload is None
+            or live_identity[3] != 1
+            or not isinstance(source_row, Mapping)
+            or type(source_row.get("bytes")) is not int
+            or source_row.get("bytes") != live_bytes
+            or source_row.get("sha256") != live_digest
+            or retained[member] != live_payload
+        ):
+            raise ArtifactAuditError(
+                "live development bootstrap differs from its binding "
+                "or archived custody role"
+            )
     archived_runtime_seal_payload = retained.get(runtime_seal_member)
     expected_runtime_seal_payload = (
         _canonical_json_bytes(preformal_runtime_seal) + b"\n"
@@ -9660,6 +10418,11 @@ def _validate_development_qualification(
             label="archived development producer runtime seal",
         )
         if isinstance(archived_runtime_seal_payload, bytes)
+        else None
+    )
+    archived_runtime_python = (
+        archived_runtime_seal.get("python")
+        if isinstance(archived_runtime_seal, Mapping)
         else None
     )
     if (
@@ -9684,8 +10447,24 @@ def _validate_development_qualification(
         or archived_runtime_seal.get("schema")
         != "prospect.wm001.runtime-seal.v1"
         or archived_runtime_seal.get("experiment_id") != "WM-001"
-        or archived_runtime_seal.get("protocol_version") != "1.14.0"
-        or archived_runtime_seal.get("assurance") != _ASSURANCE
+        or archived_runtime_seal.get("protocol_version") != "1.15.0"
+        or not _strict_json_equal(
+            archived_runtime_seal.get("assurance"),
+            _ASSURANCE,
+        )
+        or not isinstance(archived_runtime_python, Mapping)
+        or archived_runtime_python.get("executable")
+        != producer_execution.get("python_executable")
+        or archived_runtime_python.get("sha256")
+        != producer_execution.get("python_executable_sha256")
+        or not _strict_json_equal(
+            archived_runtime_python.get("version"),
+            [
+                int(part)
+                for part in cast(str, producer_execution["python_version"])
+                .split(".")
+            ],
+        )
         or archived_runtime_seal_payload != expected_runtime_seal_payload
         or hashlib.sha256(archived_runtime_seal_payload).hexdigest()
         != producer_execution.get("runtime_seal_sha256")
@@ -9732,9 +10511,9 @@ def preflight_formal_input_package(
         binding.get("schema")
         != "prospect.world-model-lifecycle.formal-binding.v10"
         or binding.get("experiment_id") != "WM-001"
-        or binding.get("assurance") != _ASSURANCE
+        or not _strict_json_equal(binding.get("assurance"), _ASSURANCE)
         or not isinstance(protocol, Mapping)
-        or protocol.get("version") != "1.14.0"
+        or protocol.get("version") != "1.15.0"
         or not all(
             isinstance(value, Mapping)
             for value in (
@@ -9747,7 +10526,7 @@ def preflight_formal_input_package(
         )
     ):
         raise ArtifactAuditError(
-            "prospective formal binding has no complete v1.14 input package"
+            "prospective formal binding has no complete v1.15 input package"
         )
     assert isinstance(source, Mapping)
     assert isinstance(dependencies, Mapping)
@@ -9760,11 +10539,19 @@ def preflight_formal_input_package(
         source.get("test_report_file"),
         label="prospective preformal report",
     )
-    report_payload = _read_bounded(
-        report_path,
-        64 << 20,
-        label="prospective preformal report",
+    report_payload_raw, _, _, report_identity = (
+        _read_stable_regular_file(
+            report_path,
+            64 << 20,
+            label="prospective preformal report",
+            capture_payload=True,
+        )
     )
+    if report_payload_raw is None or report_identity[3] != 1:
+        raise ArtifactAuditError(
+            "prospective preformal report lacks single-link custody"
+        )
+    report_payload = report_payload_raw
     (
         report,
         runtime_conformance,
@@ -9781,11 +10568,19 @@ def preflight_formal_input_package(
         development.get("closure_file"),
         label="prospective development closure",
     )
-    closure_payload = _read_bounded(
-        closure_path,
-        64 << 20,
-        label="prospective development closure",
+    closure_payload_raw, _, _, closure_identity = (
+        _read_stable_regular_file(
+            closure_path,
+            64 << 20,
+            label="prospective development closure",
+            capture_payload=True,
+        )
     )
+    if closure_payload_raw is None or closure_identity[3] != 1:
+        raise ArtifactAuditError(
+            "prospective development closure lacks single-link custody"
+        )
+    closure_payload = closure_payload_raw
     _validate_development_qualification(
         closure_payload,
         block=development,
@@ -9839,7 +10634,7 @@ def preflight_formal_input_package(
     return {
         "schema": "prospect.wm001.formal-input-preflight.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.14.0",
+        "protocol_version": "1.15.0",
         "binding_bytes": binding_bytes,
         "binding_sha256": binding_sha256,
         "preformal_report_sha256": hashlib.sha256(
@@ -9886,7 +10681,8 @@ def _formal_input_preflight_receipt(
         or receipt.get("schema")
         != "prospect.wm001.formal-input-preflight.v1"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.14.0"
+        or receipt.get("protocol_version") != "1.15.0"
+        or type(receipt.get("binding_bytes")) is not int
         or receipt.get("binding_bytes") != len(binding_payload)
         or receipt.get("binding_sha256")
         != hashlib.sha256(binding_payload).hexdigest()
@@ -10015,7 +10811,8 @@ def _verify_development_qualification_archive(
             not stat.S_ISREG(before.st_mode)
             or before.st_nlink != 1
             or before.st_size < 10_240
-            or before.st_size > (40 << 30)
+            or before.st_size
+            > _MAX_DEVELOPMENT_QUALIFICATION_ARCHIVE_BYTES
             or archive.get("bytes") != before.st_size
         ):
             raise ArtifactAuditError("development qualification archive custody is invalid")
@@ -10047,9 +10844,11 @@ def _verify_development_qualification_archive(
                 observed_count = 0
                 observed_total = 0
                 retained: dict[str, bytes] = {}
+                retained_total = 0
+                stream_iterator = iter(stream)
                 for expected, member in zip(
                     members,
-                    stream,
+                    stream_iterator,
                     strict=False,
                 ):
                     if not isinstance(expected, Mapping):
@@ -10085,7 +10884,10 @@ def _verify_development_qualification_archive(
                         member_digest.update(chunk)
                         member_bytes += len(chunk)
                         if retained_payload is not None:
-                            if member_bytes > (64 << 20):
+                            if (
+                                member_bytes
+                                > _MAX_RETAINED_DEVELOPMENT_ARCHIVE_MEMBER_BYTES
+                            ):
                                 raise ArtifactAuditError(
                                     "retained development archive member "
                                     "exceeds its byte limit"
@@ -10095,6 +10897,15 @@ def _verify_development_qualification_archive(
                         raise ArtifactAuditError("development archive member bytes changed")
                     if retained_payload is not None:
                         retained[member.name] = bytes(retained_payload)
+                        retained_total += len(retained_payload)
+                        if (
+                            retained_total
+                            > _MAX_RETAINED_DEVELOPMENT_ARCHIVE_TOTAL_BYTES
+                        ):
+                            raise ArtifactAuditError(
+                                "retained development archive evidence "
+                                "exceeds its total byte limit"
+                            )
                     observed_count += 1
                     observed_total += member_bytes
                     if observed_count > 100_000 or observed_total > (32 << 30):
@@ -10102,7 +10913,7 @@ def _verify_development_qualification_archive(
                 if observed_count != len(members):
                     raise ArtifactAuditError("development archive member count changed")
                 try:
-                    next(iter(stream))
+                    next(stream_iterator)
                 except StopIteration:
                     pass
                 else:
@@ -10783,7 +11594,7 @@ def _validate_audit_execution_conformance(
         }
         or restart_runtime_report.get("schema")
         != _RESTART_RUNTIME_CONFORMANCE_SCHEMA
-        or restart_runtime_report.get("protocol_version") != "1.14.0"
+        or restart_runtime_report.get("protocol_version") != "1.15.0"
         or not _strict_json_equal(
             restart_runtime_report.get("support_files"),
             expected_restart_support,
@@ -11312,17 +12123,18 @@ def _authorization_attempt(
         set(manifest) != _AUTHORIZATION_ATTEMPT_FIELDS
         or manifest.get("schema") != "prospect.wm001.operator-attempt.v1"
         or manifest.get("experiment_id") != "WM-001"
-        or manifest.get("protocol_version") != "1.14.0"
-        or manifest.get("assurance") != _ASSURANCE
+        or manifest.get("protocol_version") != "1.15.0"
+        or not _strict_json_equal(manifest.get("assurance"), _ASSURANCE)
         or manifest.get("kind") != kind
         or manifest.get("lane") != lane
         or manifest.get("status") != "accepted"
         or manifest.get("error") is not None
         or (
             primary is not None
-            and manifest.get("primary") != dict(primary)
+            and not _strict_json_equal(manifest.get("primary"), primary)
         )
         or not isinstance(rows, list)
+        or type(manifest.get("file_count")) is not int
         or manifest.get("file_count") != len(rows)
         or manifest.get("manifest_excludes")
         != [_AUTHORIZATION_TERMINAL]
@@ -11369,7 +12181,7 @@ def _authorization_attempt(
                 }
             )
     if (
-        rows != manifest_rows
+        not _strict_json_equal(rows, manifest_rows)
         or terminal_row
         != next(
             (
@@ -11419,7 +12231,8 @@ def _authorization_referenced_payload(
         raise ArtifactAuditError(f"{label} file reference is unsafe")
     payload = attempt.payloads[filename]
     if (
-        reference.get(f"{prefix}_bytes") != len(payload)
+        type(reference.get(f"{prefix}_bytes")) is not int
+        or reference.get(f"{prefix}_bytes") != len(payload)
         or reference.get(f"{prefix}_sha256")
         != hashlib.sha256(payload).hexdigest()
     ):
@@ -11436,7 +12249,7 @@ def _authorization_development_producer(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.14.0"
+        / "qualification-v1.15.0"
     )
     _authorization_directory(
         producer,
@@ -11482,9 +12295,9 @@ def _authorization_development_audit(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.14"
+        / "operator-v1.15"
         / "audits"
-        / "development-audit-v1.14.0"
+        / "development-audit-v1.15.0"
     )
     attempt = _authorization_attempt(
         audit_path,
@@ -11542,6 +12355,7 @@ def _authorization_development_audit(
             set(receipt) != _AUTHORIZATION_EXECUTION_FIELDS
             or receipt.get("schema")
             != "prospect.wm001.captured-audit-execution.v1"
+            or type(receipt.get("returncode")) is not int
             or receipt.get("returncode") != 0
             or receipt.get("passed") is not True
             or receipt.get("source_mode") != "descriptor"
@@ -11603,12 +12417,14 @@ def _authorization_development_audit(
         or reproduction.get("schema")
         != "prospect.wm001.audit-reproduction.v2"
         or reproduction.get("experiment_id") != "WM-001"
-        or reproduction.get("protocol_version") != "1.14.0"
+        or reproduction.get("protocol_version") != "1.15.0"
         or reproduction.get("supplied_audit_sha256") != audit_digest
         or reproduction.get("reproduced_audit_sha256") != audit_digest
         or reproduction.get("byte_identical") is not True
+        or type(reproduction.get("returncode")) is not int
         or reproduction.get("returncode") != 0
         or reproduction.get("source_mode") != "descriptor"
+        or type(reproduction.get("stdout_bytes")) is not int
         or reproduction.get("stdout_bytes") != len(audit_payload)
         or reproduction.get("passed") is not True
         or primary.get("reproduction_runtime_file")
@@ -11618,8 +12434,10 @@ def _authorization_development_audit(
         or reproduction.get("auditor_source_sha256")
         != second_receipt.get("auditor_source_sha256")
         or not _is_sha256(reproduction.get("runner_source_sha256"))
-        or reproduction.get("support_files")
-        != second_receipt.get("support_files")
+        or not _strict_json_equal(
+            reproduction.get("support_files"),
+            second_receipt.get("support_files"),
+        )
         or _authorization_referenced_payload(
             attempt,
             reproduction,
@@ -11665,7 +12483,7 @@ def _authorization_development_closure(
     closure_path = (
         results
         / "development"
-        / "development-closure-v1.14.0.json"
+        / "development-closure-v1.15.0.json"
     )
     closure_row, closure_payload, _ = _authorization_file_row(
         closure_path,
@@ -11686,13 +12504,16 @@ def _authorization_development_closure(
         or closure.get("schema")
         != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.14.0"
+        or closure.get("protocol_version") != "1.15.0"
         or closure.get("producer_root") != str(producer)
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
         or closure.get("performance_values_bound") is not False
         or not isinstance(development, Mapping)
-        or development.get("closure_bytes") != closure_row["bytes"]
+        or not _strict_json_equal(
+            development.get("closure_bytes"),
+            closure_row["bytes"],
+        )
         or development.get("closure_sha256") != closure_row["sha256"]
     ):
         raise ArtifactAuditError(
@@ -11705,9 +12526,9 @@ def _authorization_development_closure(
     )
     closure_attempt_path = (
         results
-        / "operator-v1.14"
+        / "operator-v1.15"
         / "closures"
-        / "development-closure-v1.14.0"
+        / "development-closure-v1.15.0"
     )
     closure_attempt = _authorization_attempt(
         closure_attempt_path,
@@ -11766,11 +12587,13 @@ def _authorization_development_closure(
         or reference.get("schema")
         != "prospect.wm001.closure-reference.v1"
         or reference.get("experiment_id") != "WM-001"
-        or reference.get("protocol_version") != "1.14.0"
+        or reference.get("protocol_version") != "1.15.0"
         or reference.get("closure_marker") != str(closure_path)
         or reference.get("closure_sha256") != closure_row["sha256"]
-        or reference.get("qualification_archive")
-        != closure.get("qualification_archive")
+        or not _strict_json_equal(
+            reference.get("qualification_archive"),
+            closure.get("qualification_archive"),
+        )
         or reference.get("producer_root") != str(producer)
         or reference.get("audit_attempt")
         != str(development_audit.root)
@@ -11806,6 +12629,74 @@ def _authorization_development_closure(
         if isinstance(members, list)
         else {}
     )
+    producer_digest_by_path = {
+        cast(str, row["path"]): cast(str, row["sha256"])
+        for row in producer_rows
+    }
+
+    def archived_role_digest(field: str) -> object:
+        return member_digests.get(closure.get(field))
+
+    def audit_role_payload(field: str) -> bytes | None:
+        member = closure.get(field)
+        if (
+            not isinstance(member, str)
+            or not member.startswith("evidence/")
+        ):
+            return None
+        return development_audit.payloads.get(
+            member.removeprefix("evidence/")
+        )
+
+    audit_payload = development_audit.payloads.get("independent-audit.json")
+    reproduction_payload = development_audit.payloads.get(
+        "audit-reproduction.json"
+    )
+    runtime_payload = audit_role_payload("audit_runtime_manifest_member")
+    invocation_payload = audit_role_payload(
+        "audit_invocation_manifest_member"
+    )
+    stderr_payload = audit_role_payload("audit_stderr_member")
+    live_role_digests = {
+        "producer_manifest_member": producer_digest_by_path.get(
+            str(producer / _PRODUCER_MANIFEST_NAME)
+        ),
+        "raw_result_member": producer_digest_by_path.get(
+            str(producer / "result.json")
+        ),
+        "independent_audit_member": (
+            hashlib.sha256(audit_payload).hexdigest()
+            if audit_payload is not None
+            else None
+        ),
+        "audit_reproduction_member": (
+            hashlib.sha256(reproduction_payload).hexdigest()
+            if reproduction_payload is not None
+            else None
+        ),
+        "audit_runtime_manifest_member": (
+            hashlib.sha256(runtime_payload).hexdigest()
+            if runtime_payload is not None
+            else None
+        ),
+        "audit_invocation_manifest_member": (
+            hashlib.sha256(invocation_payload).hexdigest()
+            if invocation_payload is not None
+            else None
+        ),
+        "audit_stderr_member": (
+            hashlib.sha256(stderr_payload).hexdigest()
+            if stderr_payload is not None
+            else None
+        ),
+    }
+    if any(
+        digest is None or archived_role_digest(field) != digest
+        for field, digest in live_role_digests.items()
+    ):
+        raise ArtifactAuditError(
+            "development archive roles differ from live closure inputs"
+        )
     if (
         set(fresh)
         != {
@@ -11825,7 +12716,7 @@ def _authorization_development_closure(
         or fresh.get("schema")
         != "prospect.wm001.development-closure-fresh-reopen.v1"
         or fresh.get("experiment_id") != "WM-001"
-        or fresh.get("protocol_version") != "1.14.0"
+        or fresh.get("protocol_version") != "1.15.0"
         or fresh.get("mode") != "fresh-closure-reopen"
         or not _is_sha256(fresh.get("challenge"))
         or type(fresh.get("requesting_process_id")) is not int
@@ -11895,14 +12786,14 @@ def _authorization_preformal_rows(
         report.get("schema")
         != "prospect.wm001.preformal-test-report.v2"
         or report.get("experiment_id") != "WM-001"
-        or report.get("protocol_version") != "1.14.0"
+        or report.get("protocol_version") != "1.15.0"
         or report.get("all_pass") is not True
         or not isinstance(commands, list)
         or len(commands) != len(_PREFORMAL_COMMAND_NAMES)
         or not isinstance(source, Mapping)
     ):
         raise ArtifactAuditError(
-            "canonical preformal report is not an accepted v1.14 report"
+            "canonical preformal report is not an accepted v1.15 report"
         )
     log_rows: list[dict[str, object]] = []
     relative_log_rows: list[dict[str, object]] = []
@@ -11912,9 +12803,11 @@ def _authorization_preformal_rows(
     ):
         if (
             not isinstance(command, Mapping)
+            or type(command.get("ordinal")) is not int
             or command.get("ordinal") != ordinal
             or command.get("name") != command_name
             or command.get("passed") is not True
+            or type(command.get("exit_code")) is not int
             or command.get("exit_code") != 0
         ):
             raise ArtifactAuditError(
@@ -11962,9 +12855,15 @@ def _authorization_preformal_rows(
     if (
         copied_report_payload != report_payload
         or source.get("test_report_file") != _PREFORMAL_REPORT_NAME
-        or source.get("test_report_bytes") != report_row["bytes"]
+        or not _strict_json_equal(
+            source.get("test_report_bytes"),
+            report_row["bytes"],
+        )
         or source.get("test_report_sha256") != report_row["sha256"]
-        or source.get("test_log_files") != relative_log_rows
+        or not _strict_json_equal(
+            source.get("test_log_files"),
+            relative_log_rows,
+        )
     ):
         raise ArtifactAuditError(
             "formal binding preformal projection differs from exact live "
@@ -11996,9 +12895,9 @@ def _validate_formal_authorization_lineage(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.14"
+        / "operator-v1.15"
         / "bindings"
-        / "formal-binding-v1.14.0"
+        / "formal-binding-v1.15.0"
     )
     binding_attempt = _authorization_attempt(
         binding_attempt_path,
@@ -12064,7 +12963,7 @@ def _formal_launch_namespace_is_canonical(
     binding_digest: str,
     launch: Mapping[str, object],
 ) -> bool:
-    """Require the one exact v1.14 formal producer namespace."""
+    """Require the one exact v1.15 formal producer namespace."""
 
     expected_root = (
         Path.cwd()
@@ -12136,10 +13035,10 @@ def _audit_formal_input_package(
             binding.get("schema") == "prospect.world-model-lifecycle.formal-binding.v10"
             and binding.get("experiment_id") == "WM-001",
             code="formal_binding_identity_mismatch",
-            message="formal binding is not the active WM-001 v1.14 identity",
+            message="formal binding is not the active WM-001 v1.15 identity",
         )
         audit.require(
-            binding.get("assurance") == _ASSURANCE,
+            _strict_json_equal(binding.get("assurance"), _ASSURANCE),
             code="formal_binding_assurance_mismatch",
             message=("formal binding omits or overstates the fixed WM-001 trust boundary"),
         )
@@ -12162,16 +13061,16 @@ def _audit_formal_input_package(
         launch_body = dict(launch_raw)
         launch_record_sha256 = launch_body.pop("record_sha256", None)
         execution_for_launch = result.get("execution")
-        protocol_wide_marker = root.parent.parent / "formal-launch-v1.14.0.json"
+        protocol_wide_marker = root.parent.parent / "formal-launch-v1.15.0.json"
         repository = Path.cwd()
         binding_attempt = (
             repository
             / "bench"
             / "world_model_lifecycle"
             / "results"
-            / "operator-v1.14"
+            / "operator-v1.15"
             / "bindings"
-            / "formal-binding-v1.14.0"
+            / "formal-binding-v1.15.0"
         )
         binding_attempt_terminal = binding_attempt / "operator-attempt.json"
         binding_attempt_completion = (
@@ -12180,7 +13079,7 @@ def _audit_formal_input_package(
             / "world_model_lifecycle"
             / "results"
             / "outer-completions"
-            / "v1.14"
+            / "v1.15"
             / (hashlib.sha256(str(binding_attempt_terminal).encode("utf-8")).hexdigest() + ".json")
         )
         binding_attempt_payload = _read_bounded(
@@ -12279,7 +13178,7 @@ def _audit_formal_input_package(
             == launch_payload
             and launch_raw.get("schema") == "prospect.wm001.formal-launch.v2"
             and launch_raw.get("experiment_id") == "WM-001"
-            and launch_raw.get("protocol_version") == "1.14.0"
+            and launch_raw.get("protocol_version") == "1.15.0"
             and launch_raw.get("formal_binding_sha256") == binding_digest
             and launch_raw.get("formal_binding_attempt_path") == str(binding_attempt)
             and launch_raw.get("formal_binding_attempt_manifest_file") == "formal-binding-operator-attempt.json"
@@ -12301,18 +13200,22 @@ def _audit_formal_input_package(
             and binding_attempt_payload == _canonical_json_bytes(binding_attempt_raw) + b"\n"
             and binding_attempt_raw.get("schema") == "prospect.wm001.operator-attempt.v1"
             and binding_attempt_raw.get("experiment_id") == "WM-001"
-            and binding_attempt_raw.get("protocol_version") == "1.14.0"
-            and binding_attempt_raw.get("assurance") == _ASSURANCE
+            and binding_attempt_raw.get("protocol_version") == "1.15.0"
+            and _strict_json_equal(
+                binding_attempt_raw.get("assurance"),
+                _ASSURANCE,
+            )
             and binding_attempt_raw.get("kind") == "binding"
             and binding_attempt_raw.get("lane") is None
             and binding_attempt_raw.get("status") == "accepted"
             and isinstance(binding_attempt_primary, Mapping)
             and binding_attempt_primary.get("binding_file") == "formal-binding.json"
             and isinstance(binding_row, Mapping)
+            and type(binding_row.get("bytes")) is int
             and binding_row.get("bytes") == len(binding_payload)
             and binding_row.get("sha256") == binding_digest
             and (binding_attempt / "formal-binding.json").read_bytes() == binding_payload
-            and launch_raw.get("global_marker_file") == "formal-launch-v1.14.0.json"
+            and launch_raw.get("global_marker_file") == "formal-launch-v1.15.0.json"
             and isinstance(execution_for_launch, Mapping)
             and launch_raw.get("git_commit") == execution_for_launch.get("git_commit")
             and launch_raw.get("git_tree") == execution_for_launch.get("git_tree")
@@ -12321,7 +13224,7 @@ def _audit_formal_input_package(
             and execution_for_launch.get("formal_launch_file") == "formal-launch.json"
             and execution_for_launch.get("formal_launch_sha256") == hashlib.sha256(launch_payload).hexdigest(),
             code="formal_single_launch_binding_mismatch",
-            message=("formal result does not bind the same-inode, version-scoped protocol-wide v1.14 launch claim"),
+            message=("formal result does not bind the same-inode, version-scoped protocol-wide v1.15 launch claim"),
         )
         seal_payload = _read_bounded(
             seal_path,
@@ -12939,7 +13842,7 @@ def _audit_formal_schedule(
     root: Path,
     result: Mapping[str, object],
 ) -> None:
-    """Independently enforce the complete v1.14 formal replicate schedule."""
+    """Independently enforce the complete v1.15 formal replicate schedule."""
 
     if result.get("lane") != "formal":
         return
@@ -12951,7 +13854,7 @@ def _audit_formal_schedule(
         seeds == _FORMAL_SEEDS and replicate_ids == expected_ids,
         code="formal_replicate_schedule_mismatch",
         message=(
-            "formal result does not contain the exact ordered eight v1.14 master seeds and seed-bound replicate IDs"
+            "formal result does not contain the exact ordered eight v1.15 master seeds and seed-bound replicate IDs"
         ),
     )
 
@@ -14019,13 +14922,7 @@ def _declare_current_coverage_gaps(
     verify_custody: bool,
 ) -> None:
     if result.get("lane") != "formal":
-        audit.limitation(
-            (
-                "This is development evidence, not formal claim evidence. "
-                "Protocol 1.4 makes K3-K6 development outcomes "
-                "descriptive and permanently ineligible for capability adjudication."
-            ),
-        )
+        audit.limitation(_DEVELOPMENT_EVIDENCE_INDEPENDENCE_LIMITATION)
     if not verify_custody:
         audit.gap(
             "producer_custody_not_verified",
@@ -14230,9 +15127,9 @@ def audit_artifact(
     except ArtifactAuditError:
         protocol_digest = ""
     audit.require(
-        result.get("protocol_version") == "1.14.0" and result.get("protocol_sha256") == protocol_digest,
+        result.get("protocol_version") == "1.15.0" and result.get("protocol_sha256") == protocol_digest,
         code="result_protocol_binding_mismatch",
-        message="result does not bind the exact WM-001 protocol 1.14.0 bytes",
+        message="result does not bind the exact WM-001 protocol 1.15.0 bytes",
     )
     replicates = _mapping_rows(result.get("replicates"))
     audit.require(
@@ -14707,15 +15604,15 @@ def _prebinding_protocol_component(
         decoded.get("schema") != "prospect.world-model-lifecycle.protocol.v9"
         or not isinstance(experiment, Mapping)
         or experiment.get("id") != "WM-001"
-        or experiment.get("protocol_version") != "1.14.0"
+        or experiment.get("protocol_version") != "1.15.0"
     ):
         _prebinding_fail("protocol_identity_mismatch")
     revision = experiment.get("revision")
     if (
         not isinstance(revision, Mapping)
-        or revision.get("supersedes") != "1.13.0"
+        or revision.get("supersedes") != "1.14.0"
         or revision.get("superseded_protocol_sha256")
-        != _V1130_PROTOCOL_SHA256
+        != _V1140_PROTOCOL_SHA256
     ):
         _prebinding_fail("protocol_lineage_mismatch")
     bindings = decoded.get("bindings")
@@ -15849,7 +16746,7 @@ def audit_prebinding_conformance(
     raw_request_sha256: str | None = None,
     locator_root: Path | None = None,
 ) -> dict[str, object]:
-    """Run all no-outcome WM-001 v1.14 prebinding checks.
+    """Run all no-outcome WM-001 v1.15 prebinding checks.
 
     The report contains semantic identities only.  Filesystem locations,
     descriptor numbers, process IDs, clocks, and outcome/result paths are
@@ -16025,13 +16922,13 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--prebinding-conformance",
         metavar="REQUEST_JSON",
-        help=("run the result-free WM-001 v1.14 conformance request; use '-' for canonical JSON on stdin"),
+        help=("run the result-free WM-001 v1.15 conformance request; use '-' for canonical JSON on stdin"),
     )
     parser.add_argument(
         "--restart-runtime-conformance",
         action="store_true",
         help=(
-            "run the result-free WM-001 v1.14 development/formal "
+            "run the result-free WM-001 v1.15 development/formal "
             "restart-runtime branch conformance"
         ),
     )
