@@ -388,6 +388,17 @@ formal artifact. The v1.10 plan and exact operator sequence are in the
 [v1.10 confirmation plan](wm001-v1100-confirmation-plan.md) and
 [v1.10 operator runbook](wm001-v1100-operator-runbook.md).
 
+Its sole development producer, independent audit, closure transaction, and
+post-finalization sealed-runtime reopen completed. The prospective preformal
+gate then failed after all ten commands had run because the QA-side semantic
+check invoked the full runtime-inventory-bound closure verifier. That verifier
+correctly rejected QA's additional pytest, Ruff, mypy, pip, and support
+packages. The deterministic hidden claim contains the 20 command logs, while
+the canonical report bundle, binding, and formal launch are absent. No
+performance or K value was opened. The terminal disposition and required
+fresh-version repair are recorded in the
+[v1.10 preformal-test failure review](wm001-v1100-preformal-test-failure.md).
+
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget
@@ -395,10 +406,10 @@ formal artifact. The v1.10 plan and exact operator sequence are in the
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocol 1.10 remains prospective until its one development qualification,
-  one formal confirmation, official audit, semantic review, and terminal
-  adjudication complete.
-- The v1.10 custody layer is deliberately not hardened against the repository or
+- Protocol 1.10 is terminally retired without formal authority. A successor
+  must repair and directly test the QA/runtime semantic-composition boundary
+  before any new outcome-producing attempt.
+- The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External
   attestation, read-only media, or an independently operated transparency log
