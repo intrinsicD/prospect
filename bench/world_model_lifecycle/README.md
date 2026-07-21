@@ -18,15 +18,17 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.16.0 is the active prospective successor. It preserves the exact
-v1.4 model, learning algorithm, optimizer, planner, controller, budgets,
-controls, metrics, thresholds, and K0–K7 order. Its scientific-block digest is
-`fa44fd93a672db3905d45a0e99c568985e7e2e5d02d32043c830db413005a5c3`.
-Only its execution and evidence boundary changes: control objects remain
-bounded at 64 MiB, bulk producer files are streamed once under exact descriptor,
-namespace, and size custody, the archived result qualification is terminal-bound
-and independently rejoined, and one accepted-binding outer rehearsal must pass
-before the formal root can be created. Protocol 1.5 is retired
+Protocol 1.16.0 is terminally retired. It preserved the exact v1.4 model,
+learning algorithm, optimizer, planner, controller, budgets, controls, metrics,
+thresholds, and K0–K7 order; separated bounded control parsing from streamed
+bulk custody; and terminal-bound the archived result qualification. It passed
+every authenticated gate through an accepted binding; the operator-recorded
+final stop/go also passed. Its operator-observed exact pre-root accepted-binding
+rehearsal then rejected the real audit terminal because the
+standard-library consumer required a stale fixed reproduction-runtime filename
+instead of the terminal's receipt-linked content-addressed filename. The gate
+failed before child dispatch or formal-root creation, so no formal authority or
+outcome exists. No successor protocol is active. Protocol 1.5 is retired
 after its sole outcome-producing development qualification found that
 Gymnasium's lazy import added two unsealed process variables. That producer
 has no result, outer completion, development closure, binding, or formal
@@ -156,8 +158,18 @@ binding-keyed formal root consumed the sole formal attempt; the subsequent
 pre-producer refusal retired the version. The complete lifecycle claim remains
 unestablished.
 
-Protocols 1.15.0, 1.14.0, 1.13.0, 1.12.0, 1.11.0, 1.10.0, 1.9.0, 1.8.0, 1.7.0,
+Protocols 1.16.0, 1.15.0, 1.14.0, 1.13.0, 1.12.0, 1.11.0, 1.10.0, 1.9.0, 1.8.0, 1.7.0,
 1.6.0, 1.5.0, and 1.4.0 are immutable and retired.
+Protocol 1.16.0 passed its prospective gates, result-free rehearsal,
+development, accepted audit, closure, sealed-runtime reopen, complete preformal
+report and accepted binding; the operator-recorded final stop/go also passed.
+The operator-observed required accepted-binding outer rehearsal then returned
+`1` before child dispatch or formal-root
+creation. The real accepted audit and reproduction receipt name a
+content-addressed reproduction-runtime sidecar; the standard-library consumer
+instead hardcoded the execution-capture filename. No formal marker or outcome
+exists. Its disposition is preserved in the
+[v1.16 accepted-binding rehearsal failure](../../docs/wm001-v1160-accepted-binding-rehearsal-failure.md).
 Protocol 1.15.0 passed its result-free rehearsal, development, accepted audit,
 closure, sealed-runtime reopen, preformal report, accepted binding, and the
 operator-recorded final stop/go gate. The sole formal invocation then returned
@@ -219,8 +231,9 @@ dispositions remain in the
 repair or relabel either attempt. The frozen v1.16 design is the
 [v1.16 confirmation plan](../../docs/wm001-v1160-confirmation-plan.md), with its
 one-shot sequence in the
-[v1.16 operator runbook](../../docs/wm001-v1160-operator-runbook.md). Protocol
-1.16 has no outcome until that prospective lifecycle completes.
+[v1.16 operator runbook](../../docs/wm001-v1160-operator-runbook.md). Its
+terminal pre-root failure and evidence limits are recorded in the
+[v1.16 accepted-binding rehearsal failure](../../docs/wm001-v1160-accepted-binding-rehearsal-failure.md).
 
 ## What the experiment must establish
 
@@ -350,15 +363,15 @@ resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
 
-The v1.16 development rehearsal will use only seeds `3922749719` and
+The retired v1.16 development rehearsal used only seeds `3922749719` and
 `1847570536` and the complete formal budgets. It is useful only for schema, deterministic
 execution, exact arithmetic, audit coverage, restart, and custody validation.
 Its K3–K6 performance values are descriptive, cannot decide whether formal may
 launch, are never claim-eligible, and cannot be relabeled. After the exclusive
-development closure is published, every further v1.16 development run is
+development closure was published, every further v1.16 development run became
 forbidden.
 
-The reserved v1.16 formal seed set is:
+The reserved v1.16 formal seed set was never executed:
 
 ```text
 721000968, 1733386057, 1129257495, 1461304433,
@@ -394,14 +407,16 @@ replicate/task reset requires a new implementation binding. After that reset,
 any such change requires a new protocol version; previous failed attempts
 remain evidence.
 
-## Active v1.16 one-shot runbook
+## Retired v1.16 one-shot runbook — do not execute
 
 The
-[WM-001 v1.16 operator runbook](../../docs/wm001-v1160-operator-runbook.md).
-defines the typed runtime seals, canonical operator paths, outer-completion
+[WM-001 v1.16 operator runbook](../../docs/wm001-v1160-operator-runbook.md)
+historically defines the typed runtime seals, canonical operator paths, outer-completion
 checks, exact development/preformal/binding order, accepted-binding pre-root
 rehearsal, formal producer, official audit, and adjudication sequence. Each
-claim-bearing command is single-use and must never be rerun.
+claim-bearing command was single-use and must never be rerun. The terminal
+rehearsal failure is recorded in the
+[v1.16 failure review](../../docs/wm001-v1160-accepted-binding-rehearsal-failure.md).
 
 ## Retired v1.4 command sketch — do not execute
 

@@ -484,14 +484,18 @@ adjudication exists. The frozen v1.15 plan and operator sequence remain in the
 disposition and fresh-version repair requirements are in the
 [v1.15 formal-invocation failure](wm001-v1150-formal-invocation-failure.md).
 
-Protocol 1.16 is the active prospective successor. It preserves the complete
-scientific system and representation versions, separates bounded control
-parsing from descriptor-streamed bulk evidence, terminal-binds and independently
-rejoins the archived development-result qualification, and requires a
-production-path accepted-binding rehearsal before the formal root can exist.
-Its fresh paths, seeds, environments, review, seal, and one-shot lifecycle are
-defined by the [v1.16 confirmation plan](wm001-v1160-confirmation-plan.md) and
-[v1.16 operator runbook](wm001-v1160-operator-runbook.md).
+Protocol 1.16 repaired the bulk-streaming and result-qualification custody
+boundaries and passed every authenticated gate through accepted binding; the
+operator-recorded final stop/go also passed. Its operator-observed exact
+production-path accepted-binding rehearsal then rejected the real
+audit terminal before child dispatch: the terminal and reproduction receipt
+correctly name a content-addressed runtime sidecar, while the standard-library
+consumer required a stale fixed execution filename. Because the rehearsal
+preceded formal-root creation, no formal authority or outcome exists. Protocol
+1.16 is retired, and its bounded engineering evidence and fresh-version repair
+requirements are recorded in the
+[v1.16 accepted-binding rehearsal failure](wm001-v1160-accepted-binding-rehearsal-failure.md).
+No successor protocol is active.
 
 ## Open engineering boundaries
 
@@ -500,11 +504,14 @@ defined by the [v1.16 confirmation plan](wm001-v1160-confirmation-plan.md) and
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocols 1.10 through 1.15 are terminally retired without formal authority.
-  Protocol 1.16 prospectively retains their archive and authorization repairs,
-  separates bounded control parsing from streamed bulk-evidence hashing, and
-  exercises the exact accepted-binding-to-standard-library formal-custody branch
-  with production-sized evidence before consuming formal authority.
+- Protocols 1.10 through 1.16 are terminally retired without formal authority.
+  Protocol 1.16 confirmed engineering custody through an accepted binding. Its
+  operator-observed pre-root production-path rehearsal exposed a remaining
+  producer/consumer metadata mismatch before formal authority was created, and
+  source audit confirmed that mismatch. A
+  successor must use a fresh version and must validate the real
+  receipt-generated content-addressed audit sidecar rather than a circular
+  fixed-name fixture.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External

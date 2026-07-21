@@ -153,9 +153,16 @@ development result. The fsynced binding-keyed root is consumed and remains
 empty; no formal marker, producer, outcome, audit, review, or adjudication
 exists. Its terminal disposition and evidence caveat are preserved in the
 [v1.15 formal-invocation failure](docs/wm001-v1150-formal-invocation-failure.md).
-Protocol 1.16 is the active prospective successor. It preserves the scientific
-system, separates streamed bulk-producer custody from bounded control parsing,
-terminal-binds the archived result qualification, and requires one exact
-accepted-binding outer rehearsal before formal-root creation. Its plan and
-one-shot sequence are [sealed here](docs/wm001-v1160-confirmation-plan.md) and
-[here](docs/wm001-v1160-operator-runbook.md).
+Protocol 1.16 repaired the streamed bulk-producer and result-qualification
+boundaries and passed its prospective gates, result-free rehearsal,
+development, accepted audit, closure, fresh-runtime reopen, all ten preformal
+commands, accepted binding, and operator-recorded final stop/go checks. Its
+operator-observed exact pre-root accepted-binding rehearsal then exposed a
+separate consumer-contract mismatch:
+the real audit terminal correctly names a content-addressed reproduction-runtime
+sidecar, while the standard-library launcher required the stale fixed execution
+filename. The rehearsal returned `1` before child dispatch or formal-root
+creation. No formal marker, producer, outcome, audit, review, or adjudication
+exists. Its terminal disposition is preserved in the
+[v1.16 accepted-binding rehearsal failure](docs/wm001-v1160-accepted-binding-rehearsal-failure.md).
+No successor protocol is active.
