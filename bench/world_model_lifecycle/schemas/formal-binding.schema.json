@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v9.json",
+  "$id": "https://prospect.local/schemas/wm-001-formal-binding-v10.json",
   "title": "WM-001 formal implementation binding",
   "type": "object",
   "additionalProperties": false,
@@ -23,7 +23,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "prospect.world-model-lifecycle.formal-binding.v9"
+      "const": "prospect.world-model-lifecycle.formal-binding.v10"
     },
     "experiment_id": {
       "const": "WM-001"
@@ -63,7 +63,7 @@
       ],
       "properties": {
         "version": {
-          "const": "1.12.0"
+          "const": "1.13.0"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -177,7 +177,7 @@
       "maxItems": 20,
       "uniqueItems": true,
       "items": {
-        "$ref": "#/$defs/fileDigest"
+        "$ref": "#/$defs/streamFileDigest"
       }
     }
       }
@@ -1067,14 +1067,14 @@
     },
     "formal_replicate_master_seeds": {
       "const": [
-        402304386,
-        1582362517,
-        3717100311,
-        3870324956,
-        2551652339,
-        986753049,
-        4074588580,
-        1996653376
+        140647545,
+        2239253745,
+        3333612762,
+        4269572592,
+        2151457732,
+        4034984701,
+        2426483518,
+        2833322658
       ]
     }
   },
@@ -1104,6 +1104,28 @@
         "bytes": {
           "type": "integer",
           "minimum": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "streamFileDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "bytes",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
         },
         "sha256": {
           "$ref": "#/$defs/sha256"

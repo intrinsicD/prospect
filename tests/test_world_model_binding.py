@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tarfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -167,6 +168,138 @@ def test_formal_binding_schema_requires_exact_gymnasium_defaults() -> None:
     assert environment["properties"]["SDL_AUDIODRIVER"] == {"const": "dsp"}
 
 
+def _schema_example(
+    schema: dict[str, Any],
+    root: dict[str, Any],
+    *,
+    path: tuple[str, ...] = (),
+    item_index: int = 0,
+) -> Any:
+    """Construct one deterministic value satisfying the binding schema shape."""
+
+    reference = schema.get("$ref")
+    if isinstance(reference, str):
+        assert reference.startswith("#/$defs/")
+        definition = root["$defs"][reference.removeprefix("#/$defs/")]
+        return _schema_example(
+            definition,
+            root,
+            path=path,
+            item_index=item_index,
+        )
+    if "const" in schema:
+        return copy.deepcopy(schema["const"])
+    if "enum" in schema:
+        return copy.deepcopy(schema["enum"][0])
+
+    schema_type = schema.get("type")
+    if isinstance(schema_type, list):
+        if "null" in schema_type:
+            return None
+        schema_type = schema_type[0]
+    if schema_type == "object" or "properties" in schema:
+        properties = schema.get("properties", {})
+        return {
+            name: _schema_example(
+                properties[name],
+                root,
+                path=(*path, name),
+                item_index=item_index,
+            )
+            for name in schema.get("required", [])
+        }
+    if schema_type == "array":
+        count = int(schema.get("minItems", 0))
+        return [
+            _schema_example(
+                schema["items"],
+                root,
+                path=(*path, "item"),
+                item_index=index,
+            )
+            for index in range(count)
+        ]
+    if schema_type == "integer":
+        return int(schema.get("minimum", 0))
+    if schema_type == "number":
+        return float(schema.get("minimum", 0.0))
+    if schema_type == "boolean":
+        return False
+    if schema_type == "null":
+        return None
+    assert schema_type == "string"
+    pattern = str(schema.get("pattern", ""))
+    if pattern == "^[0-9a-f]{40}$":
+        return "a" * 40
+    if pattern == "^[0-9a-f]{64}$":
+        return "a" * 64
+    if "development-qualification-[0-9a-f]{16}" in pattern:
+        archive = "development-qualification-" + "a" * 16 + ".tar"
+        if pattern.startswith("^bench/"):
+            return "bench/world_model_lifecycle/results/development/" + archive
+        return archive
+    if pattern.startswith("^/"):
+        return f"/fixture/{item_index}"
+    if schema.get("format") == "date-time":
+        return "2026-07-21T00:00:00Z"
+    if path and path[-1] == "path":
+        return f"fixture-{item_index:02d}.log"
+    return "fixture"
+
+
+def _binding_schema_candidate(
+    log_rows: list[dict[str, object]],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    schema = json.loads(
+        verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
+    )
+    candidate = _schema_example(schema, schema)
+    assert isinstance(candidate, dict)
+    candidate["source"]["implementation_files"] = [
+        {
+            "path": "bench/world_model_lifecycle/binding.py",
+            "bytes": 1,
+            "sha256": hashlib.sha256(b"source").hexdigest(),
+        }
+    ]
+    candidate["source"]["test_log_files"] = copy.deepcopy(log_rows)
+    return schema, candidate
+
+
+def _write_realistic_preformal_logs(
+    directory: Path,
+    *,
+    command_count: int = 10,
+) -> tuple[Path, dict[str, object], list[dict[str, object]]]:
+    directory.mkdir(parents=True)
+    commands: list[dict[str, object]] = []
+    for ordinal in range(1, command_count + 1):
+        references: dict[str, dict[str, object]] = {}
+        for stream, payload in (
+            ("stdout", f"command-{ordinal:02d}: passed\n".encode()),
+            ("stderr", b""),
+        ):
+            filename = f"command-{ordinal:02d}.{stream}.log"
+            (directory / filename).write_bytes(payload)
+            references[stream] = {
+                "file": filename,
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        commands.append(
+            {
+                "ordinal": ordinal,
+                "stdout": references["stdout"],
+                "stderr": references["stderr"],
+            }
+        )
+    report: dict[str, object] = {"commands": commands}
+    report_path = directory / "preformal-report.json"
+    report_path.write_bytes(binding_module.canonical_json_bytes(report) + b"\n")
+    rows = binding_module.preformal_log_rows(report_path, report)
+    return report_path, report, rows
+
+
 def test_record_hash_identity_uses_file_hash_fields_not_repr() -> None:
     value = importlib.metadata.FileHash("sha256=YWJj")
 
@@ -194,42 +327,42 @@ def test_record_hash_decoder_requires_exact_sha256() -> None:
             decode(("sha256", "not+a+valid+digest"))
 
 
-def test_protocol_1120_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (2530568307, 3822916726)
+def test_protocol_1130_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (560818116, 1392377688)
     assert verify_module.FORMAL_SEEDS == (
-        402304386,
-        1582362517,
-        3717100311,
-        3870324956,
-        2551652339,
-        986753049,
-        4074588580,
-        1996653376,
+        140647545,
+        2239253745,
+        3333612762,
+        4269572592,
+        2151457732,
+        4034984701,
+        2426483518,
+        2833322658,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            2530568307,
+            560818116,
             index,
         )
         for index in range(8)
     ] == [
-        1770008625,
-        1546088459,
-        3254398787,
-        455810615,
-        2706650341,
-        3378496144,
-        1101755028,
-        4286871339,
+        1594728968,
+        2042562675,
+        1205182308,
+        2996734088,
+        4160410510,
+        2144011973,
+        3863355028,
+        2862068516,
     ]
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            3822916726,
+            1392377688,
             0,
         )
-        == 2074080641
+        == 899658213
     )
     assert (
         tuple(verify_module.derive_master_seed("development", index) for index in range(2))
@@ -237,8 +370,16 @@ def test_protocol_1120_seed_domain_and_master_seeds_are_exact() -> None:
     )
     assert tuple(verify_module.derive_master_seed("formal", index) for index in range(8)) == verify_module.FORMAL_SEEDS
 
+    protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
+    collision_audit = protocol["seed_schedule"]["master_seed_derivation"]["collision_audit"]
+    assert collision_audit["current_master_seed_count"] == 10
+    assert collision_audit["current_derived_stream_count"] == 1360
+    assert collision_audit["unique_current_derived_stream_count"] == 1360
+    assert collision_audit["prior_master_seed_count"] == 120
+    assert collision_audit["unique_prior_derived_stream_count"] == 16320
 
-def test_protocol_1120_states_the_negative_assurance_boundary() -> None:
+
+def test_protocol_1130_states_the_negative_assurance_boundary() -> None:
     protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
 
     assert protocol["trust_model"] == {
@@ -321,7 +462,7 @@ def test_verify_binding_rejects_rebound_nonempty_conformance_stderr(
             "schema": (
                 "prospect.wm001.restart-runtime-conformance.v1"
             ),
-            "protocol_version": "1.12.0",
+            "protocol_version": "1.13.0",
             "passed": True,
         }
     )
@@ -533,7 +674,7 @@ def test_verify_binding_rejects_rebound_nonempty_conformance_stderr(
     binding_path = tmp_path / "formal-binding.json"
     binding_path.write_bytes(canonical({"fixture": True}))
     binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v9",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "experiment_id": "WM-001",
         "assurance": dict(binding_module.ASSURANCE),
         "protocol": {},
@@ -650,20 +791,20 @@ def test_verify_binding_rejects_rebound_nonempty_conformance_stderr(
         verify_module.verify_binding(binding_path)
 
 
-def test_implementation_manifest_binds_reviewed_v1120_documents() -> None:
+def test_implementation_manifest_binds_reviewed_v1130_documents() -> None:
     paths = {
         str(row["path"])
         for row in binding_module.implementation_files()
     }
 
     assert {
-        "docs/wm001-v1120-confirmation-plan.md",
-        "docs/wm001-v1120-operator-runbook.md",
-        "docs/wm001-v1120-prospective-harness-review.json",
+        "docs/wm001-v1130-confirmation-plan.md",
+        "docs/wm001-v1130-operator-runbook.md",
+        "docs/wm001-v1130-prospective-harness-review.json",
     } <= paths
 
 
-def test_protocol_1120_irrelevant_control_contract_is_bound() -> None:
+def test_protocol_1130_irrelevant_control_contract_is_bound() -> None:
     assert (
         "collect_irrelevant",
         verify_module.TASK_IRRELEVANT,
@@ -730,13 +871,13 @@ def test_result_runtime_must_equal_formal_binding_runtime() -> None:
         )
 
 
-def test_formal_binding_schema_binds_protocol_1120_and_fresh_seeds() -> None:
+def test_formal_binding_schema_binds_protocol_1130_and_fresh_seeds() -> None:
     schema = json.loads(
         verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
 
-    assert schema["$id"].endswith("wm-001-formal-binding-v9.json")
-    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v9"
+    assert schema["$id"].endswith("wm-001-formal-binding-v10.json")
+    assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.formal-binding.v10"
     assert "assurance" in schema["required"]
     assert schema["properties"]["assurance"]["properties"] == {
         "trust_model_id": {
@@ -746,7 +887,7 @@ def test_formal_binding_schema_binds_protocol_1120_and_fresh_seeds() -> None:
         "external_attestation": {"const": False},
         "exclusive_path_use_required": {"const": True},
     }
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.12.0"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.13.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
@@ -783,6 +924,138 @@ def test_formal_binding_schema_binds_protocol_1120_and_fresh_seeds() -> None:
     ]
 
 
+def test_formal_binding_schema_separates_source_and_stream_file_digests() -> None:
+    schema = json.loads(
+        verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
+    )
+    source = schema["properties"]["source"]["properties"]
+
+    assert source["implementation_files"]["items"] == {
+        "$ref": "#/$defs/fileDigest",
+    }
+    assert schema["$defs"]["fileDigest"]["properties"]["bytes"] == {
+        "type": "integer",
+        "minimum": 1,
+    }
+    assert source["test_log_files"]["items"] == {
+        "$ref": "#/$defs/streamFileDigest",
+    }
+    assert schema["$defs"]["streamFileDigest"]["properties"]["bytes"] == {
+        "type": "integer",
+        "minimum": 0,
+    }
+
+
+@pytest.mark.parametrize(
+    ("definition", "minimum", "message"),
+    [
+        (
+            "fileDigest",
+            0,
+            "formal binding fileDigest byte contract is not exact",
+        ),
+        (
+            "streamFileDigest",
+            -1,
+            "formal binding streamFileDigest byte contract is not exact",
+        ),
+    ],
+)
+def test_preclaim_requires_exact_digest_byte_contracts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    definition: str,
+    minimum: int,
+    message: str,
+) -> None:
+    _, _, rows = _write_realistic_preformal_logs(tmp_path / "preformal")
+    schema = json.loads(
+        verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
+    )
+    schema["$defs"][definition]["properties"]["bytes"]["minimum"] = minimum
+    schema_path = tmp_path / "formal-binding.schema.json"
+    schema_path.write_text(json.dumps(schema), encoding="utf-8")
+    monkeypatch.setattr(binding_module, "BINDING_SCHEMA_PATH", schema_path)
+
+    with pytest.raises(RuntimeError, match=message):
+        binding_module.verify_preclaim_log_schema_compatibility(rows)
+
+
+def test_root_binding_schema_accepts_realistic_zero_byte_stderr_logs(
+    tmp_path: Path,
+) -> None:
+    _, _, rows = _write_realistic_preformal_logs(tmp_path / "preformal")
+    schema, candidate = _binding_schema_candidate(rows)
+
+    verify_module._validate_json_schema(
+        candidate,
+        schema,
+        label="synthetic v1.13 formal binding",
+    )
+    assert len(rows) == 20
+    assert all(row["bytes"] > 0 for row in rows[0::2])
+    assert all(
+        row
+        == {
+            "path": row["path"],
+            "bytes": 0,
+            "sha256": hashlib.sha256(b"").hexdigest(),
+        }
+        for row in rows[1::2]
+    )
+
+
+def test_root_binding_schema_rejects_negative_log_bytes_and_zero_source_bytes(
+    tmp_path: Path,
+) -> None:
+    _, _, rows = _write_realistic_preformal_logs(tmp_path / "preformal")
+    schema, candidate = _binding_schema_candidate(rows)
+
+    negative_log = copy.deepcopy(candidate)
+    negative_log["source"]["test_log_files"][1]["bytes"] = -1
+    with pytest.raises(
+        verify_module.Violation,
+        match="violates JSON Schema",
+    ):
+        verify_module._validate_json_schema(
+            negative_log,
+            schema,
+            label="synthetic v1.13 formal binding",
+        )
+
+    empty_source = copy.deepcopy(candidate)
+    empty_source["source"]["implementation_files"][0]["bytes"] = 0
+    with pytest.raises(
+        verify_module.Violation,
+        match="violates JSON Schema",
+    ):
+        verify_module._validate_json_schema(
+            empty_source,
+            schema,
+            label="synthetic v1.13 formal binding",
+        )
+
+
+def test_preformal_log_rows_reject_wrong_empty_stream_digest(
+    tmp_path: Path,
+) -> None:
+    report_path, report, rows = _write_realistic_preformal_logs(
+        tmp_path / "preformal",
+    )
+    binding_module.verify_preclaim_log_schema_compatibility(rows)
+    commands = report["commands"]
+    assert isinstance(commands, list)
+    stderr = commands[0]["stderr"]
+    assert isinstance(stderr, dict)
+    stderr["sha256"] = "f" * 64
+
+    with pytest.raises(
+        RuntimeError,
+        match="preformal report log bytes differ from their reference",
+    ):
+        binding_module.preformal_log_rows(report_path, report)
+
+
 @pytest.mark.parametrize(
     ("observed", "expected"),
     [
@@ -803,7 +1076,7 @@ def test_restart_json_comparison_rejects_python_numeric_aliases(
     assert not verify_module._strict_json_equal(observed, expected)
 
 
-def test_raw_result_schema_binds_v1120_heldout_split_and_formal_counts() -> None:
+def test_raw_result_schema_binds_v1130_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -814,7 +1087,7 @@ def test_raw_result_schema_binds_v1120_heldout_split_and_formal_counts() -> None
 
     assert schema["$id"].endswith("wm-001-raw-result-v9.json")
     assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v9"
-    assert schema["properties"]["protocol_version"]["const"] == "1.12.0"
+    assert schema["properties"]["protocol_version"]["const"] == "1.13.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
@@ -855,7 +1128,7 @@ def test_raw_result_schema_binds_v1120_heldout_split_and_formal_counts() -> None
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v1120_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v1130_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -1092,6 +1365,239 @@ def test_coverage_conformance_rejects_rehashed_boundary_change() -> None:
         verify_module._verify_coverage_conformance_report(report)
 
 
+def _install_generated_binding_fakes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[Path, Path, dict[str, Any], dict[str, Any]]:
+    report_path, report, log_rows = _write_realistic_preformal_logs(
+        tmp_path / "inputs" / "preformal",
+    )
+    schema, candidate = _binding_schema_candidate(log_rows)
+    closure_path = tmp_path / "inputs" / "development-closure.json"
+    closure_path.write_bytes(
+        binding_module.canonical_json_bytes({"fixture": "closure"}) + b"\n",
+    )
+    lockfile = tmp_path / "requirements-wm001.lock"
+    lockfile.write_text("fixture==1 --hash=sha256:" + "a" * 64 + "\n", encoding="utf-8")
+    output_path = tmp_path / "binding-package" / "formal-binding.json"
+
+    dependencies = candidate["dependencies"]
+    runtime = candidate["runtime"]
+    audit_execution = candidate["audit_execution"]
+    development_identity = candidate["development_qualification"]
+    source = candidate["source"]
+    inventory = {
+        "packages": copy.deepcopy(dependencies["packages"]),
+        "package_roots": copy.deepcopy(dependencies["package_roots"]),
+        "standard_library": copy.deepcopy(dependencies["standard_library"]),
+        "package_ownership": copy.deepcopy(dependencies["package_ownership"]),
+    }
+    rehearsal = {
+        "inventory": inventory,
+        "inventory_sha256": hashlib.sha256(
+            binding_module.canonical_json_bytes(inventory),
+        ).hexdigest(),
+        "conformance_sha256": hashlib.sha256(
+            binding_module.canonical_json_bytes(audit_execution),
+        ).hexdigest(),
+        "restart_runtime_conformance_report_sha256": audit_execution[
+            "restart_runtime_conformance_report_sha256"
+        ],
+        "restart_runtime_execution_receipt_sha256": audit_execution[
+            "restart_runtime_execution_receipt_sha256"
+        ],
+        "restart_runtime_support_files": audit_execution[
+            "restart_runtime_support_files"
+        ],
+        "restart_runtime_repeat_count": audit_execution[
+            "restart_runtime_repeat_count"
+        ],
+        "restart_runtime_path_descriptor_equal": audit_execution[
+            "restart_runtime_path_descriptor_equal"
+        ],
+    }
+
+    monkeypatch.setattr(binding_module, "REPO", tmp_path)
+    monkeypatch.setattr(binding_module, "LOCKFILE", lockfile)
+    monkeypatch.setattr(verify_module, "verify_protocol", lambda: {})
+    monkeypatch.setattr(binding_module, "source_is_clean", lambda: True)
+    monkeypatch.setattr(
+        binding_module,
+        "require_formal_python_flags",
+        lambda: copy.deepcopy(runtime["python_flags"]),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "require_formal_process_environment",
+        lambda: copy.deepcopy(runtime["process_environment"]),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "run_pendulum_conformance",
+        lambda **_kwargs: {"passed": True},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "_created_conformance_satisfies_formal_contract",
+        lambda _report: True,
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "run_independent_phase_oscillator_conformance",
+        lambda **_kwargs: {"passed": True},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "run_coverage_conformance",
+        lambda: {"passed": True},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "verify_machine_test_report",
+        lambda path: copy.deepcopy(report),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "verify_development_closure",
+        lambda _path: {"fixture": "closure"},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "_formal_development_identity",
+        lambda *_args, **_kwargs: copy.deepcopy(development_identity),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "implementation_files",
+        lambda: copy.deepcopy(source["implementation_files"]),
+    )
+    monkeypatch.setattr(binding_module, "verify_installed_source_snapshot", lambda: None)
+    monkeypatch.setattr(binding_module, "package_roots", lambda: (tmp_path,))
+    monkeypatch.setattr(
+        binding_module,
+        "package_root_inventory",
+        lambda _root: copy.deepcopy(dependencies["package_roots"][0]),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "standard_library_inventory",
+        lambda: copy.deepcopy(dependencies["standard_library"]),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "package_root_ownership",
+        lambda: copy.deepcopy(dependencies["package_ownership"]),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "installed_package_rows",
+        lambda: copy.deepcopy(dependencies["packages"]),
+    )
+    monkeypatch.setattr(binding_module, "verify_lockfile_rows", lambda _rows: None)
+    monkeypatch.setattr(
+        binding_module,
+        "build_bound_audit_execution",
+        lambda **_kwargs: (copy.deepcopy(audit_execution), {}),
+    )
+    monkeypatch.setattr(
+        preformal_module,
+        "_runtime_bootstrap_conformance_from_report",
+        lambda *_args, **_kwargs: copy.deepcopy(rehearsal),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "git_output",
+        lambda *arguments: (
+            "a" * 40 if arguments == ("rev-parse", "HEAD") else "b" * 40
+        ),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "distribution_sha256",
+        lambda _name: "c" * 64,
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "checkpoint_implementation_sha256",
+        lambda: "d" * 64,
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "manifest_schema_sha256",
+        lambda: "e" * 64,
+    )
+    monkeypatch.setattr(binding_module.torch, "use_deterministic_algorithms", lambda _enabled: None)
+    monkeypatch.setattr(
+        binding_module.torch,
+        "are_deterministic_algorithms_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr(binding_module.torch, "get_num_threads", lambda: 1)
+    monkeypatch.setattr(binding_module.torch, "get_num_interop_threads", lambda: 1)
+
+    return output_path, closure_path, schema, candidate
+
+
+def test_create_formal_binding_root_schema_preflight_accepts_actual_log_rows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_path, closure_path, schema, _ = _install_generated_binding_fakes(
+        tmp_path,
+        monkeypatch,
+    )
+    report_path = tmp_path / "inputs" / "preformal" / "preformal-report.json"
+
+    created = binding_module.create_formal_binding(
+        output_path=output_path,
+        test_report_path=report_path,
+        development_closure_path=closure_path,
+        device="cpu",
+    )
+
+    verify_module._validate_json_schema(
+        created,
+        schema,
+        label="generated v1.13 formal binding",
+    )
+    assert created["source"]["test_log_files"] == binding_module.preformal_log_rows(
+        report_path,
+        binding_module.verify_machine_test_report(report_path),
+    )
+    assert output_path.is_file()
+
+
+def test_create_formal_binding_schema_failure_precedes_all_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_path, closure_path, _, candidate = _install_generated_binding_fakes(
+        tmp_path,
+        monkeypatch,
+    )
+    report_path = tmp_path / "inputs" / "preformal" / "preformal-report.json"
+    invalid_manifest = copy.deepcopy(candidate["source"]["implementation_files"])
+    invalid_manifest[0]["bytes"] = 0
+    monkeypatch.setattr(
+        binding_module,
+        "implementation_files",
+        lambda: copy.deepcopy(invalid_manifest),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="assembled formal binding is incompatible with the root schema",
+    ):
+        binding_module.create_formal_binding(
+            output_path=output_path,
+            test_report_path=report_path,
+            development_closure_path=closure_path,
+            device="cpu",
+        )
+
+    assert not output_path.parent.exists()
+
+
 def test_create_binding_refuses_nonformal_conformance_budget(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1323,9 +1829,9 @@ def _recorded_development_closure_fixture(
     closure: dict[str, object] = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.12.0",
+        "protocol_version": "1.13.0",
         "source": source,
-        "producer_root": str((tmp_path / "qualification-v1.12.0").resolve()),
+        "producer_root": str((tmp_path / "qualification-v1.13.0").resolve()),
         **{
             field: member
             for field, member in role_paths.items()
@@ -1513,7 +2019,7 @@ def test_formal_binding_file_requires_single_link_custody(
 ) -> None:
     binding_path = tmp_path / "formal-binding.json"
     binding_path.write_bytes(_canonical_payload({"fixture": "binding"}))
-    verified = {"schema": "prospect.world-model-lifecycle.formal-binding.v9"}
+    verified = {"schema": "prospect.world-model-lifecycle.formal-binding.v10"}
     monkeypatch.setattr(
         verify_module,
         "verify_binding",
@@ -1554,7 +2060,7 @@ def _producer_custody_fixture(
     seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.12.0",
+        "protocol_version": "1.13.0",
         "assurance": dict(binding_module.ASSURANCE),
         "git_commit": execution["git_commit"],
         "git_tree": execution["git_tree"],
@@ -2485,7 +2991,7 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.12.0",
+        "protocol_version": "1.13.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -2616,7 +3122,7 @@ def test_result_qualification_created_in_one_process_reopens_in_two_others(
     qualification = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.12.0",
+        "protocol_version": "1.13.0",
         "protocol_sha256": binding_module.sha256_file(
             binding_module.PROTOCOL_PATH
         ),
@@ -2732,7 +3238,7 @@ def test_development_closure_creator_rejects_any_alternate_marker_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    canonical = tmp_path / "development-closure-v1.12.0.json"
+    canonical = tmp_path / "development-closure-v1.13.0.json"
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
 
     with pytest.raises(RuntimeError, match="only be published"):
@@ -2750,7 +3256,7 @@ def test_preserved_development_closure_name_must_be_content_addressed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _canonical_payload({"schema": "fixture"})
-    canonical = tmp_path / "development-closure-v1.12.0.json"
+    canonical = tmp_path / "development-closure-v1.13.0.json"
     canonical.write_bytes(payload)
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
     assert binding_module._closure_path_mode(canonical, payload) == "canonical"

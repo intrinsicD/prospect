@@ -45,13 +45,13 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_QUALIFICATION_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.12.0"
+    DEVELOPMENT_RESULTS_ROOT / "qualification-v1.13.0"
 )
 DEVELOPMENT_CLOSURE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.12.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.13.0.json"
 )
 DEVELOPMENT_DIAGNOSTICS_ROOT = (
-    DEVELOPMENT_RESULTS_ROOT / "diagnostics-v1.12.0"
+    DEVELOPMENT_RESULTS_ROOT / "diagnostics-v1.13.0"
 )
 
 
@@ -68,9 +68,9 @@ def _development_lifecycle_paths() -> _DevelopmentLifecyclePaths:
     root = DEVELOPMENT_RESULTS_ROOT
     return _DevelopmentLifecyclePaths(
         results_root=root,
-        qualification=root / "qualification-v1.12.0",
-        closure=root / "development-closure-v1.12.0.json",
-        diagnostics=root / "diagnostics-v1.12.0",
+        qualification=root / "qualification-v1.13.0",
+        closure=root / "development-closure-v1.13.0.json",
+        diagnostics=root / "diagnostics-v1.13.0",
     )
 
 
@@ -149,7 +149,7 @@ def main() -> int:
         if arguments.output is None:
             parser.error(
                 "formal lane requires --output at the exact "
-                "results/formal/<binding-sha256>/confirmation-v1.12.0 path"
+                "results/formal/<binding-sha256>/confirmation-v1.13.0 path"
             )
         expected_binding = FORMAL_BINDING_ATTEMPT_PATH / "formal-binding.json"
         if (
@@ -181,7 +181,7 @@ def main() -> int:
             parser.error(str(error))
         if os.path.lexists(existing_launch_marker):
             print(
-                "WM-001 protocol 1.12 formal launch already consumed; same-version retry is forbidden",
+                "WM-001 protocol 1.13 formal launch already consumed; same-version retry is forbidden",
                 file=sys.stderr,
             )
             return 1
@@ -189,14 +189,14 @@ def main() -> int:
         development_paths = _development_lifecycle_paths()
         if os.path.lexists(development_paths.qualification):
             print(
-                "WM-001 protocol 1.12 development qualification already consumed; "
+                "WM-001 protocol 1.13 development qualification already consumed; "
                 "resume and sibling attempts are forbidden",
                 file=sys.stderr,
             )
             return 1
         if os.path.lexists(development_paths.closure):
             print(
-                "WM-001 protocol 1.12 development is closed; additional same-version rehearsals are forbidden",
+                "WM-001 protocol 1.13 development is closed; additional same-version rehearsals are forbidden",
                 file=sys.stderr,
             )
             return 1

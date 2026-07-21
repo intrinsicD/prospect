@@ -18,7 +18,7 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.12.0 is the active prospective confirmation. It preserves the exact
+Protocol 1.13.0 is the active prospective confirmation. It preserves the exact
 v1.4 model, learning algorithm, optimizer, planner, controller, budgets,
 controls, metrics, thresholds, and K0–K7 order. Its scientific-block digest is
 `fa44fd93a672db3905d45a0e99c568985e7e2e5d02d32043c830db413005a5c3`.
@@ -76,22 +76,31 @@ requires exactly zero stderr bytes. The sealed version was therefore retired
 before a development producer, experience collection, training, or metric
 existed.
 
-Version 1.12 preserves both the scientific system and the zero-stderr
-contract. It replaces every legacy TF32 getter/setter with the explicit
-string-valued `fp32_precision` hierarchy, binds global, CUDA-matmul,
-cuDNN-backend, convolution, and RNN precision identities, makes legacy access
-fatal under warnings-as-errors and a source guard, and requires a separately
-captured real CUDA command-10 subprocess to have zero-byte stderr before the
-development producer may exist.
+Version 1.12 preserved both the scientific system and the zero-stderr
+contract. It replaced every legacy TF32 getter/setter with the explicit
+string-valued `fp32_precision` hierarchy, bound global, CUDA-matmul,
+cuDNN-backend, convolution, and RNN precision identities, and passed its
+result-free rehearsal, development, accepted audit, closure, and complete
+preformal report. Its sole binding then failed because the formal-binding
+schema required every test-log row to be nonempty while all ten successful
+stderr rows were correctly empty. The failed binding was outer-finalized; no
+formal launch occurred.
 
-The v1.12 harness uses a non-editable isolated wheel, complete dependency and
+Version 1.13 preserves every v1.12 runtime repair and changes only the binding
+representation and prospective coverage. Formal-binding v10 separates
+possibly empty stream-file digests from nonempty implementation-file digests.
+The operator validates the actual 20-row log projection before claiming the
+binding attempt, and the producer validates the complete assembled binding
+against the root schema before publishing any sidecar.
+
+The v1.13 harness uses a non-editable isolated wheel, complete dependency and
 package-root inventories, a deterministic module-search path restricted to
 explicit package roots and inventoried standard-library directories, one
 captured descriptor runner, a repository-global cooperative outer-launch lock,
 deterministic same-inode terminal completion, canonical development
 audit/closure/binding attempts, and single-use formal audit and adjudication
 claims. Formal execution accepts only
-`results/operator-v1.12/bindings/formal-binding-v1.12.0/formal-binding.json`
+`results/operator-v1.13/bindings/formal-binding-v1.13.0/formal-binding.json`
 after that attempt is accepted and outer-finalized. A copy or directly created
 binding is not valid authorization.
 
@@ -110,14 +119,19 @@ closure attempt, exact ten-row/20-log preformal report, independent prospective
 harness review, independent formal-input preflight, and canonical binding
 attempt. Development performance remains
 descriptive and permanently claim-ineligible. Creation of the canonical
-qualification root consumes the sole v1.12 development attempt; a failure
+qualification root consumes the sole v1.13 development attempt; a failure
 retires the version rather than authorizing a sibling retry. The complete lifecycle claim
 remains unestablished until the one new eight-seed formal producer is
 outer-finalized, the official independent audit and semantic review accept
 K0–K7, and the terminal adjudication package is accepted and independently
 verified.
 
-Protocols 1.11.0, 1.10.0, 1.9.0, 1.8.0, 1.7.0, 1.6.0, 1.5.0, and 1.4.0 are immutable and retired.
+Protocols 1.12.0, 1.11.0, 1.10.0, 1.9.0, 1.8.0, 1.7.0, 1.6.0, 1.5.0, and 1.4.0 are immutable and retired.
+Protocol 1.12.0 completed development, accepted audit, closure, and preformal,
+but its shared nonempty file-digest schema rejected required zero-byte stderr
+rows during the terminal binding transaction. Its disposition is preserved in
+the
+[v1.12 binding-schema failure](../../docs/wm001-v1120-binding-schema-failure.md).
 Protocol 1.11.0 created and outer-finalized only its runtime seal. Its
 successful result-free rehearsal emitted prohibited nonempty stderr, so no
 development producer or outcome exists and no same-version repair is allowed.
@@ -148,9 +162,9 @@ rejection path then failed to preserve an official rejected package. Protocol
 constant and underspecified endpoint arithmetic. Their exact evidence and
 dispositions remain in the
 [v1.4 results review](../../docs/wm001-v140-formal-results.md) and
-[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.12 does not
+[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.13 does not
 repair or relabel either attempt. The active design is the
-[v1.12 confirmation plan](../../docs/wm001-v1120-confirmation-plan.md).
+[v1.13 confirmation plan](../../docs/wm001-v1130-confirmation-plan.md).
 
 ## What the experiment must establish
 
@@ -280,25 +294,25 @@ resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
 
-The v1.12 development rehearsal uses only seeds `2530568307` and `3822916726`
+The v1.13 development rehearsal uses only seeds `560818116` and `1392377688`
 and the complete formal budgets. It is useful only for schema, deterministic
 execution, exact arithmetic, audit coverage, restart, and custody validation.
 Its K3–K6 performance values are descriptive, cannot decide whether formal may
 launch, are never claim-eligible, and cannot be relabeled. After the exclusive
-development closure is published, every further v1.12 development run is
+development closure is published, every further v1.13 development run is
 forbidden.
 
-The one v1.12 formal execution uses:
+The one v1.13 formal execution uses:
 
 ```text
-402304386, 1582362517, 3717100311, 3870324956,
-2551652339, 986753049, 4074588580, 1996653376
+140647545, 2239253745, 3333612762, 4269572592,
+2151457732, 4034984701, 2426483518, 2833322658
 ```
 
 The launch-time prebinding replay may reset isolated QA-only Pendulum fixtures;
 those resets collect no formal experience, train no model, and do not consume
 the attempt. The first outcome-producing formal replicate/task reset after
-`results/formal/formal-launch-v1.12.0.json` begins the sole attempt. No resume,
+`results/formal/formal-launch-v1.13.0.json` begins the sole attempt. No resume,
 retry, corrected-audit upgrade, early stopping, extra training, exclusion, or
 analysis change is allowed.
 
@@ -321,10 +335,10 @@ replicate/task reset requires a new implementation binding. After that reset,
 any such change requires a new protocol version; previous failed attempts
 remain evidence.
 
-## Active v1.12 runbook
+## Active v1.13 runbook
 
 Use the
-[WM-001 v1.12 operator runbook](../../docs/wm001-v1120-operator-runbook.md).
+[WM-001 v1.13 operator runbook](../../docs/wm001-v1130-operator-runbook.md).
 It defines the typed runtime seals, canonical operator paths, outer-completion
 checks, exact development/preformal/binding order, and the one formal,
 official-audit, and adjudication sequence.
@@ -332,7 +346,7 @@ official-audit, and adjudication sequence.
 ## Retired v1.4 command sketch — do not execute
 
 The commands below document the retired v1.4 workflow and are retained only to
-explain its evidence history. They do not satisfy v1.12 custody and must not be
+explain its evidence history. They do not satisfy v1.13 custody and must not be
 used to launch an experiment.
 
 ### 1. Install and verify the pre-outcome contract

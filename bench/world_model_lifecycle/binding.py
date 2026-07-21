@@ -24,6 +24,11 @@ from pathlib import Path
 from typing import Any, cast
 
 import torch
+from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
+from jsonschema.exceptions import (  # type: ignore[import-untyped]
+    SchemaError,
+    ValidationError,
+)
 from packaging.markers import default_environment
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
@@ -77,7 +82,7 @@ def _repository_root() -> Path:
 REPO = _repository_root()
 LOCKFILE = REPO / "requirements-wm001.lock"
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.12.0.json"
+DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.13.0.json"
 ROOT_DISTRIBUTIONS = (
     "gymnasium",
     "jsonschema",
@@ -235,6 +240,120 @@ def preformal_log_rows(
     return rows
 
 
+def _formal_binding_root_schema() -> dict[str, object]:
+    """Load and meta-validate the exact root schema used by the producer."""
+
+    try:
+        payload = _stable_regular_payload(
+            BINDING_SCHEMA_PATH,
+            label="formal binding root schema",
+        )
+        value = json.loads(payload)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("formal binding root schema is not readable JSON") from error
+    if not isinstance(value, dict):
+        raise RuntimeError("formal binding root schema is not one JSON object")
+    try:
+        Draft202012Validator.check_schema(value)
+    except SchemaError as error:
+        raise RuntimeError("formal binding root schema is invalid") from error
+    return cast(dict[str, object], value)
+
+
+def _formal_binding_source_properties(
+    schema: dict[str, object],
+) -> dict[str, object]:
+    """Return the root source properties without accepting a detached schema."""
+
+    properties = schema.get("properties")
+    source = properties.get("source") if isinstance(properties, dict) else None
+    source_properties = source.get("properties") if isinstance(source, dict) else None
+    if not isinstance(source_properties, dict):
+        raise RuntimeError("formal binding root schema has no source properties")
+    return cast(dict[str, object], source_properties)
+
+
+def verify_preclaim_log_schema_compatibility(
+    log_rows: list[dict[str, object]],
+) -> None:
+    """Prove actual preformal stream rows fit the root binding schema before claim."""
+
+    schema = _formal_binding_root_schema()
+    source_properties = _formal_binding_source_properties(schema)
+    implementation_files_schema = source_properties.get("implementation_files")
+    test_log_files_schema = source_properties.get("test_log_files")
+    if (
+        not isinstance(implementation_files_schema, dict)
+        or implementation_files_schema.get("items")
+        != {"$ref": "#/$defs/fileDigest"}
+    ):
+        raise RuntimeError(
+            "formal binding implementation_files must retain the fileDigest contract"
+        )
+    if (
+        not isinstance(test_log_files_schema, dict)
+        or test_log_files_schema.get("items")
+        != {"$ref": "#/$defs/streamFileDigest"}
+    ):
+        raise RuntimeError(
+            "formal binding test_log_files must use the streamFileDigest contract"
+        )
+    definitions = schema.get("$defs")
+    dialect = schema.get("$schema")
+    if not isinstance(definitions, dict) or not isinstance(dialect, str):
+        raise RuntimeError("formal binding root schema has no reusable definitions")
+    file_digest = definitions.get("fileDigest")
+    stream_file_digest = definitions.get("streamFileDigest")
+    file_properties = (
+        file_digest.get("properties") if isinstance(file_digest, dict) else None
+    )
+    stream_properties = (
+        stream_file_digest.get("properties")
+        if isinstance(stream_file_digest, dict)
+        else None
+    )
+    if (
+        not isinstance(file_properties, dict)
+        or file_properties.get("bytes")
+        != {"type": "integer", "minimum": 1}
+    ):
+        raise RuntimeError(
+            "formal binding fileDigest byte contract is not exact"
+        )
+    if (
+        not isinstance(stream_properties, dict)
+        or stream_properties.get("bytes")
+        != {"type": "integer", "minimum": 0}
+    ):
+        raise RuntimeError(
+            "formal binding streamFileDigest byte contract is not exact"
+        )
+    compatibility_schema: dict[str, object] = {
+        "$schema": dialect,
+        "$defs": definitions,
+        "allOf": [test_log_files_schema],
+    }
+    try:
+        Draft202012Validator.check_schema(compatibility_schema)
+        Draft202012Validator(compatibility_schema).validate(log_rows)
+    except (SchemaError, ValidationError) as error:
+        raise RuntimeError(
+            "preclaim log manifest is incompatible with the formal binding schema"
+        ) from error
+
+
+def _validate_assembled_formal_binding(binding: dict[str, object]) -> None:
+    """Validate the complete producer object against the root schema pre-publication."""
+
+    schema = _formal_binding_root_schema()
+    try:
+        Draft202012Validator(schema).validate(binding)
+    except ValidationError as error:
+        raise RuntimeError(
+            "assembled formal binding is incompatible with the root schema"
+        ) from error
+
+
 def _content_addressed_filename(
     stem: str,
     payload: bytes,
@@ -368,7 +487,7 @@ def build_bound_audit_execution(
     restart_runtime_report_value = dict(restart_runtime_conformance.path_execution.report)
     if (
         restart_runtime_report_value.get("schema") != "prospect.wm001.restart-runtime-conformance.v1"
-        or restart_runtime_report_value.get("protocol_version") != "1.12.0"
+        or restart_runtime_report_value.get("protocol_version") != "1.13.0"
         or restart_runtime_report_value.get("passed") is not True
         or restart_runtime_conformance.path_execution.stdout != restart_runtime_conformance.descriptor_execution.stdout
     ):
@@ -636,9 +755,9 @@ def implementation_files() -> list[dict[str, object]]:
         REPO / "bench" / "world_model_lifecycle" / "protocol.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "raw-result.schema.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "formal-binding.schema.json",
-        REPO / "docs" / "wm001-v1120-confirmation-plan.md",
-        REPO / "docs" / "wm001-v1120-operator-runbook.md",
-        REPO / "docs" / "wm001-v1120-prospective-harness-review.json",
+        REPO / "docs" / "wm001-v1130-confirmation-plan.md",
+        REPO / "docs" / "wm001-v1130-operator-runbook.md",
+        REPO / "docs" / "wm001-v1130-prospective-harness-review.json",
     ]
     unique = sorted(set(candidates))
     return [
@@ -1353,7 +1472,7 @@ def create_audit_reproduction_receipt(
     receipt = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.12.0",
+        "protocol_version": "1.13.0",
         "supplied_audit_sha256": hashlib.sha256(supplied).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(execution.stdout).hexdigest(),
         "byte_identical": True,
@@ -1833,7 +1952,7 @@ def _validate_producer_custody(
         set(runtime_seal) != _DEVELOPMENT_RUNTIME_SEAL_FIELDS
         or runtime_seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or runtime_seal.get("experiment_id") != "WM-001"
-        or runtime_seal.get("protocol_version") != "1.12.0"
+        or runtime_seal.get("protocol_version") != "1.13.0"
         or not _strict_json_equal(runtime_seal.get("assurance"), ASSURANCE)
         or runtime_seal.get("git_commit") != execution["git_commit"]
         or runtime_seal.get("git_tree") != execution["git_tree"]
@@ -1912,7 +2031,7 @@ def _validate_development_audit_evidence(
         set(receipt) != _AUDIT_RECEIPT_FIELDS
         or receipt.get("schema") != "prospect.wm001.audit-reproduction.v2"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.12.0"
+        or receipt.get("protocol_version") != "1.13.0"
         or receipt.get("supplied_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("reproduced_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("byte_identical") is not True
@@ -2113,7 +2232,7 @@ def _result_qualification_payload(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.12.0",
+        "protocol_version": "1.13.0",
         "protocol_sha256": sha256_file(PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -2178,7 +2297,7 @@ def _validate_result_qualification(
         }
         or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.12.0"
+        or value.get("protocol_version") != "1.13.0"
         or value.get("protocol_sha256") != sha256_file(PROTOCOL_PATH)
         or value.get("raw_result_sha256") != archived_result_sha256
         or value.get("lane") != "development"
@@ -2756,7 +2875,7 @@ def verify_development_closure(path: Path) -> dict[str, object]:
         set(closure) != _DEVELOPMENT_CLOSURE_FIELDS
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.12.0"
+        or closure.get("protocol_version") != "1.13.0"
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
         or closure.get("performance_values_bound") is not False
@@ -3035,7 +3154,7 @@ def create_development_closure(
     runtime_manifest_path: Path,
     output_path: Path = DEVELOPMENT_CLOSURE_PATH,
 ) -> dict[str, object]:
-    """Close the sole v1.12 qualification into one self-contained evidence archive."""
+    """Close the sole v1.13 qualification into one self-contained evidence archive."""
 
     from .artifact import verify_producer_manifest
     from .verify import DEVELOPMENT_SEEDS, _verify_formal_matrix, verify_result
@@ -3076,7 +3195,7 @@ def create_development_closure(
         not isinstance(replicates, list)
         or tuple(row.get("master_seed") if isinstance(row, dict) else None for row in replicates) != DEVELOPMENT_SEEDS
     ):
-        raise RuntimeError("development qualification requires exactly both fresh v1.12 seeds")
+        raise RuntimeError("development qualification requires exactly both fresh v1.13 seeds")
     for replicate in replicates:
         assert isinstance(replicate, dict)
         _verify_formal_matrix(
@@ -3199,7 +3318,7 @@ def create_development_closure(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.12.0",
+        "protocol_version": "1.13.0",
         "source": {
             "git_commit": execution["git_commit"],
             "git_tree": execution["git_tree"],
@@ -3372,7 +3491,7 @@ def create_formal_binding(
     if conformance_cases != FORMAL_CONFORMANCE_CASES:
         raise ValueError("formal Pendulum conformance is fixed at exactly 1,024 cases (512 per task)")
     if development_closure_path is None or not development_closure_path.is_file():
-        raise RuntimeError("formal binding requires the immutable v1.12 development closure")
+        raise RuntimeError("formal binding requires the immutable v1.13 development closure")
     if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
         raise RuntimeError("CUDA formal binding requires CUBLAS_WORKSPACE_CONFIG=:4096:8")
     if output_path.exists():
@@ -3407,6 +3526,7 @@ def create_formal_binding(
     coverage_conformance_path = output_path.with_name(coverage_conformance_filename)
     test_report = verify_machine_test_report(test_report_path)
     test_log_rows = preformal_log_rows(test_report_path, test_report)
+    verify_preclaim_log_schema_compatibility(test_log_rows)
     development_closure = verify_development_closure(development_closure_path)
     test_report_bytes = _stable_regular_payload(
         test_report_path,
@@ -3504,11 +3624,11 @@ def create_formal_binding(
             raise FileExistsError(f"refusing to replace formal audit-execution evidence: {candidate}")
     accelerator = torch.cuda.get_device_name(0) if device == "cuda" else None
     binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v9",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "experiment_id": "WM-001",
         "assurance": assurance_record(),
         "protocol": {
-            "version": "1.12.0",
+            "version": "1.13.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),
@@ -3609,6 +3729,7 @@ def create_formal_binding(
         },
         "formal_replicate_master_seeds": list(FORMAL_SEEDS),
     }
+    _validate_assembled_formal_binding(binding)
     if (
         not source_is_clean()
         or git_output("rev-parse", "HEAD") != binding["source"]["git_commit"]
@@ -3985,5 +4106,6 @@ __all__ = (
     "run_bound_preflight_conformance",
     "sha256_file",
     "source_is_clean",
+    "verify_preclaim_log_schema_compatibility",
     "verify_live_binding",
 )

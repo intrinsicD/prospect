@@ -47,6 +47,37 @@ def _write(path: Path, value: object) -> None:
     path.write_bytes(value if isinstance(value, bytes) else _canonical(value))
 
 
+def _write_preformal_logs(
+    report_path: Path,
+    *,
+    command_count: int,
+) -> dict[str, object]:
+    commands: list[dict[str, object]] = []
+    for ordinal in range(1, command_count + 1):
+        streams: dict[str, dict[str, object]] = {}
+        for stream, payload in (
+            ("stdout", f"command-{ordinal:02d}: passed\n".encode()),
+            ("stderr", b""),
+        ):
+            filename = f"command-{ordinal:02d}.{stream}.log"
+            _write(report_path.with_name(filename), payload)
+            streams[stream] = {
+                "file": filename,
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        commands.append(
+            {
+                "ordinal": ordinal,
+                "stdout": streams["stdout"],
+                "stderr": streams["stderr"],
+            }
+        )
+    report: dict[str, object] = {"commands": commands}
+    _write(report_path, report)
+    return report
+
+
 @dataclass(frozen=True)
 class OperatorSpace:
     repo: Path
@@ -72,19 +103,19 @@ def operator_space(
     repo = tmp_path / "repo"
     lifecycle = repo / "bench" / "world_model_lifecycle"
     lifecycle.mkdir(parents=True)
-    _write(lifecycle / "protocol.json", {"version": "1.12.0"})
-    operator_root = lifecycle / "results" / "operator-v1.12"
+    _write(lifecycle / "protocol.json", {"version": "1.13.0"})
+    operator_root = lifecycle / "results" / "operator-v1.13"
     binding_root = operator_root / "bindings"
     audit_root = operator_root / "audits"
     closure_root = operator_root / "closures"
-    completion_root = lifecycle / "results" / "outer-completions" / "v1.12"
-    formal_binding = binding_root / "formal-binding-v1.12.0"
-    development_audit = audit_root / "development-audit-v1.12.0"
-    formal_audit = audit_root / "formal-audit-v1.12.0"
-    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.12.0.json"
-    development_qualification = lifecycle / "results" / "development" / "qualification-v1.12.0"
-    development_closure = lifecycle / "results" / "development" / "development-closure-v1.12.0.json"
-    closure = closure_root / "development-closure-v1.12.0"
+    completion_root = lifecycle / "results" / "outer-completions" / "v1.13"
+    formal_binding = binding_root / "formal-binding-v1.13.0"
+    development_audit = audit_root / "development-audit-v1.13.0"
+    formal_audit = audit_root / "formal-audit-v1.13.0"
+    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.13.0.json"
+    development_qualification = lifecycle / "results" / "development" / "qualification-v1.13.0"
+    development_closure = lifecycle / "results" / "development" / "development-closure-v1.13.0.json"
+    closure = closure_root / "development-closure-v1.13.0"
     registrations: list[tuple[Path, int]] = []
 
     for name, value in {
@@ -128,7 +159,7 @@ def operator_space(
         preformal,
         "PREFORMAL_REPORT_PATH",
         development_qualification.parent
-        / "v1.12.0"
+        / "v1.13.0"
         / "preformal"
         / preformal.PREFORMAL_REPORT_NAME,
     )
@@ -251,7 +282,7 @@ def _patch_finalized_producer(
         _write(
             producer / "formal-binding.json",
             {
-                "schema": "prospect.world-model-lifecycle.formal-binding.v9",
+                "schema": "prospect.world-model-lifecycle.formal-binding.v10",
                 "assurance": dict(ASSURANCE),
             },
         )
@@ -299,7 +330,7 @@ def _write_reproduction_receipt(
     receipt: dict[str, object] = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.12.0",
+        "protocol_version": "1.13.0",
         "supplied_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
         "byte_identical": True,
@@ -519,7 +550,7 @@ def _install_closure_fakes(
     list[tuple[Path, Path, Path]],
 ]:
     marker = space.development_closure
-    archive = marker.with_name("development-qualification-v1.12.0.tar")
+    archive = marker.with_name("development-qualification-v1.13.0.tar")
     calls: list[tuple[Path, Path, Path]] = []
     monkeypatch.setattr(binding, "DEVELOPMENT_CLOSURE_PATH", marker)
 
@@ -572,7 +603,7 @@ def _install_closure_fakes(
     fresh_report = {
         "schema": "prospect.wm001.development-closure-fresh-reopen.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.12.0",
+        "protocol_version": "1.13.0",
         "mode": "fresh-closure-reopen",
         "challenge": "1" * 64,
         "requesting_process_id": 100,
@@ -685,14 +716,14 @@ def test_sibling_binding_or_closure_attempt_is_never_canonical(
         sibling = operator_space.closure_root / "sibling-closure"
     shutil.copytree(canonical, sibling)
 
-    with pytest.raises(OperatorError, match="canonical protocol-1.12"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.13"):
         operator_module.inspect_unfinalized_operator_attempt(sibling)
 
     sibling_terminal = sibling / "operator-attempt.json"
     sibling_completion = operator_module.outer_completion_marker(sibling_terminal)
     sibling_completion.parent.mkdir(parents=True, exist_ok=True)
     os.link(sibling_terminal, sibling_completion)
-    with pytest.raises(OperatorError, match="canonical protocol-1.12"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.13"):
         operator_module.verify_operator_attempt(sibling)
 
 
@@ -809,7 +840,7 @@ def test_operator_namespace_is_durably_created_from_absent_root(
     assert fsynced == [
         results_root.parent,
         results_root,
-        results_root / "operator-v1.12",
+        results_root / "operator-v1.13",
     ]
     assert operator_space.binding_root.is_dir()
 
@@ -952,7 +983,7 @@ def test_development_audit_is_retired_by_closure_marker(
 def test_closure_rejects_noncanonical_development_audit(
     operator_space: OperatorSpace,
 ) -> None:
-    with pytest.raises(OperatorError, match="canonical protocol-1.12 audit"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.13 audit"):
         operator_module.closure_main(
             [
                 "--producer",
@@ -971,7 +1002,7 @@ def test_development_authority_rejects_sibling_qualification_producer(
     operator_space: OperatorSpace,
     entry: str,
 ) -> None:
-    sibling = operator_space.development_qualification.parent / "qualification-v1.12.0-copy"
+    sibling = operator_space.development_qualification.parent / "qualification-v1.13.0-copy"
     if entry == "audit":
         arguments = [
             "development",
@@ -1419,25 +1450,21 @@ def test_development_closure_then_binding_end_to_end(
     assert operator_module.verify_operator_attempt(operator_space.closure) == closure_manifest
 
     report = preformal.PREFORMAL_REPORT_PATH
-    _write(report, {"passed": True})
+    report_value = _write_preformal_logs(report, command_count=10)
     monkeypatch.setattr(
         binding,
         "verify_machine_test_report",
-        lambda path: _load(path),
+        lambda _path: report_value,
     )
-    monkeypatch.setattr(
-        binding,
-        "preformal_log_rows",
-        lambda _path, _report: [],
-    )
+    log_rows = binding.preformal_log_rows(report, report_value)
     expected_binding = {
-        "schema": "prospect.world-model-lifecycle.formal-binding.v9",
+        "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "assurance": dict(ASSURANCE),
         "source": {
             "test_report_file": report.name,
             "test_report_bytes": report.stat().st_size,
             "test_report_sha256": hashlib.sha256(report.read_bytes()).hexdigest(),
-            "test_log_files": [],
+            "test_log_files": log_rows,
         },
         "development_qualification": {
             "closure_bytes": marker.stat().st_size,
@@ -1631,6 +1658,59 @@ def test_binding_rejects_unfinalized_closure_attempt(
     assert not operator_space.formal_binding.exists()
 
 
+def test_binding_rejects_log_manifest_schema_mismatch_before_attempt(
+    operator_space: OperatorSpace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path = preformal.PREFORMAL_REPORT_PATH
+    report = _write_preformal_logs(report_path, command_count=9)
+    _write(operator_space.development_closure, {"fixture": "closure"})
+    operator_space.closure.mkdir(parents=True)
+    monkeypatch.setattr(
+        operator_module,
+        "verify_operator_attempt",
+        lambda _path: {
+            "kind": "closure",
+            "lane": "development",
+            "status": "accepted",
+            "primary": {"closure_reference_file": "closure-reference.json"},
+        },
+    )
+    monkeypatch.setattr(
+        binding,
+        "verify_machine_test_report",
+        lambda _path: report,
+    )
+    monkeypatch.setattr(
+        binding,
+        "verify_development_closure",
+        lambda _path: pytest.fail(
+            "closure verification must follow log-schema preclaim validation"
+        ),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="preclaim log manifest is incompatible with the formal binding schema",
+    ):
+        operator_module.binding_main(
+            [
+                "--output",
+                str(operator_space.formal_binding),
+                "--test-report",
+                str(report_path),
+                "--development-closure",
+                str(operator_space.development_closure),
+                "--closure-attempt",
+                str(operator_space.closure),
+                "--device",
+                "cpu",
+            ]
+        )
+
+    assert not operator_space.formal_binding.exists()
+
+
 def test_binding_failure_preserves_partial_output_atomically(
     operator_space: OperatorSpace,
     monkeypatch: pytest.MonkeyPatch,
@@ -1655,16 +1735,11 @@ def test_binding_failure_preserves_partial_output_atomically(
     )
     _finalize(operator_space.closure)
     report = preformal.PREFORMAL_REPORT_PATH
-    _write(report, {"passed": True})
+    report_value = _write_preformal_logs(report, command_count=10)
     monkeypatch.setattr(
         binding,
         "verify_machine_test_report",
-        lambda path: _load(path),
-    )
-    monkeypatch.setattr(
-        binding,
-        "preformal_log_rows",
-        lambda _path, _report: [],
+        lambda _path: report_value,
     )
 
     def fail_after_partial(**kwargs: object) -> dict[str, object]:

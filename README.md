@@ -113,12 +113,20 @@ experience collection, training, or metric existed. Its terminal disposition
 is preserved in the
 [v1.11 result-free rehearsal failure](docs/wm001-v1110-result-free-rehearsal-failure.md).
 
-Protocol 1.12 is the active prospective confirmation. It preserves the
-scientific system and command-10 zero-stderr contract, replaces every legacy
-TF32 getter/setter with PyTorch 2.9's explicit `fp32_precision` hierarchy,
-binds those precision strings in runtime identity, and adds source,
-warnings-as-errors, and real fresh-subprocess stderr gates. It uses fresh
-seeds, environments, and namespaces and cannot reuse v1.11 evidence. Follow
-the [WM-001 v1.12 operator runbook](docs/wm001-v1120-operator-runbook.md)
-before creating any development evidence, implementation binding, or formal
-attempt.
+Protocol 1.12 repaired the precision/stderr boundary, passed its result-free
+rehearsal, completed development, accepted audit, closure, and all ten
+preformal commands, then failed its sole binding transaction. The
+formal-binding schema required `bytes >= 1` for every test-log row even though
+the ten successful stderr logs were correctly empty. The failed binding was
+outer-finalized and no formal launch occurred. Its terminal disposition is
+preserved in the
+[v1.12 binding-schema failure](docs/wm001-v1120-binding-schema-failure.md).
+
+Protocol 1.13 is the active prospective confirmation. It preserves the
+scientific system and every v1.12 runtime/zero-stderr repair, introduces a
+formal-binding v10 stream digest that permits empty logs without weakening
+nonempty implementation files, and adds producer-to-schema preclaim and
+prepublication validation. It uses fresh seeds, environments, and namespaces
+and cannot reuse v1.12 evidence. Follow the
+[WM-001 v1.13 operator runbook](docs/wm001-v1130-operator-runbook.md) before
+creating any development evidence, implementation binding, or formal attempt.
