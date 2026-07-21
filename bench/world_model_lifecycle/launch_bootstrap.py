@@ -17,6 +17,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 _MAX_CONTROL_BYTES = 64 << 20
+_MAX_PRODUCER_FILE_BYTES = 4 << 30
+_MAX_PRODUCER_TOTAL_BYTES = 16 << 30
+_MAX_PRODUCER_FILES = 100_000
+_MAX_PRODUCER_TREE_ENTRIES = 200_000
 _MAX_RECEIPT_BYTES = 4096
 _OUTER_RECEIPT_SCHEMA = "prospect.wm001.outer-terminal-receipt.v1"
 _OUTER_TRUST_MODEL = "trusted-single-principal-cooperative-lock-v1"
@@ -48,6 +52,9 @@ _PREFORMAL_COMMAND_NAMES = (
     "runtime-bootstrap-inventory-conformance",
 )
 _FORMAL_INPUT_PREFLIGHT_NAME = "formal-input-preflight.json"
+_DEVELOPMENT_RESULT_QUALIFICATION_NAME = (
+    "development-result-qualification.json"
+)
 _FORMAL_INPUT_PREFLIGHT_SCHEMA = (
     "prospect.wm001.formal-input-preflight.v1"
 )
@@ -67,6 +74,7 @@ _RUNTIME_SEAL_FIELDS = {
     "package_roots",
     "package_ownership",
 }
+_DEVELOPMENT_SEEDS = (2388891654, 3201418215)
 _ASSURANCE: dict[str, object] = {
     "trust_model_id": "prospect.wm001.trust-model.v1",
     "tamper_resistant": False,
@@ -230,6 +238,8 @@ def _open_regular(
 ) -> tuple[int, bytes, tuple[int, ...]]:
     _reject_symlink_components(path, label=label)
     flags = os.O_RDONLY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
@@ -246,6 +256,85 @@ def _open_regular(
         os.close(descriptor)
         raise
     return descriptor, payload, identity
+
+
+def _stream_regular_row(
+    path: Path,
+    *,
+    label: str,
+    maximum_bytes: int,
+    expected_nlink: int = 1,
+) -> tuple[dict[str, object], tuple[int, ...]]:
+    """Hash one potentially large file without retaining its payload."""
+
+    _reject_symlink_components(path, label=label)
+    flags = os.O_RDONLY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise LaunchError(f"{label} cannot be opened") from error
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != expected_nlink
+            or before.st_size < 0
+            or before.st_size > maximum_bytes
+        ):
+            raise LaunchError(
+                f"{label} must be a bounded regular file with exactly "
+                f"{expected_nlink} link(s)"
+            )
+        digest = hashlib.sha256()
+        offset = 0
+        while offset < before.st_size:
+            chunk = os.pread(
+                descriptor,
+                min(1 << 20, before.st_size - offset),
+                offset,
+            )
+            if not chunk:
+                raise LaunchError(f"{label} ended while streamed")
+            digest.update(chunk)
+            offset += len(chunk)
+        after = os.fstat(descriptor)
+        current = os.stat(path, follow_symlinks=False)
+        descriptor_path = next(
+            (
+                Path(f"{prefix}{descriptor}")
+                for prefix in ("/proc/self/fd/", "/dev/fd/")
+                if os.path.exists(f"{prefix}{descriptor}")
+            ),
+            None,
+        )
+        same_file = (
+            descriptor_path is not None
+            and os.path.samefile(path, descriptor_path)
+        )
+    except OSError as error:
+        raise LaunchError(f"{label} descriptor cannot be streamed") from error
+    finally:
+        os.close(descriptor)
+    identity = _identity(before)
+    if (
+        not same_file
+        or offset != before.st_size
+        or identity != _identity(after)
+        or identity != _identity(current)
+    ):
+        raise LaunchError(f"{label} changed while streamed")
+    return (
+        {
+            "path": str(path),
+            "bytes": offset,
+            "sha256": digest.hexdigest(),
+        },
+        identity,
+    )
 
 
 def _descriptor_path(descriptor: int) -> str:
@@ -803,6 +892,93 @@ def _recorded_runtime_conformance(
     return value
 
 
+def _recorded_result_qualification(
+    payload: bytes,
+    *,
+    binding: dict[str, object],
+    raw_result_sha256: object,
+) -> dict[str, object]:
+    """Validate the performance-free projection that joins streamed evidence."""
+
+    value = _canonical_object(
+        payload,
+        label="terminal-bound development result qualification",
+    )
+    protocol = binding.get("protocol")
+    development = binding.get("development_qualification")
+    replicates = value.get("replicates")
+    producer_execution = value.get("producer_execution")
+    expected_counts = {
+        "episodes": 496,
+        "transitions": 99_200,
+        "predictive_metrics": 12,
+        "policy_runs": 20,
+        "updates": 6,
+        "optimizer_batch_manifests": 5,
+    }
+    if (
+        set(value)
+        != {
+            "schema",
+            "experiment_id",
+            "protocol_version",
+            "protocol_sha256",
+            "raw_result_sha256",
+            "lane",
+            "claim_eligible",
+            "replicates",
+            "matrix_contract_sha256",
+            "producer_execution",
+        }
+        or value.get("schema")
+        != "prospect.wm001.development-result-qualification.v1"
+        or value.get("experiment_id") != "WM-001"
+        or value.get("protocol_version") != "1.15.0"
+        or not isinstance(protocol, dict)
+        or value.get("protocol_sha256") != protocol.get("sha256")
+        or value.get("raw_result_sha256") != raw_result_sha256
+        or value.get("lane") != "development"
+        or value.get("claim_eligible") is not False
+        or value.get("matrix_contract_sha256")
+        != _DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        or not isinstance(development, dict)
+        or hashlib.sha256(payload).hexdigest()
+        != development.get("result_qualification_sha256")
+        or not isinstance(producer_execution, dict)
+        or _canonical_digest(producer_execution)
+        != development.get("producer_execution_identity_sha256")
+        or not isinstance(replicates, list)
+        or len(replicates) != len(_DEVELOPMENT_SEEDS)
+        or tuple(
+            row.get("master_seed") if isinstance(row, dict) else None
+            for row in replicates
+        )
+        != _DEVELOPMENT_SEEDS
+        or any(
+            not isinstance(row, dict)
+            or set(row)
+            != {
+                "replicate_id",
+                "master_seed",
+                *expected_counts,
+            }
+            or not isinstance(row.get("replicate_id"), str)
+            or not row.get("replicate_id")
+            or type(row.get("master_seed")) is not int
+            or any(
+                type(row.get(field)) is not int
+                or row.get(field) != expected
+                for field, expected in expected_counts.items()
+            )
+            for row in replicates
+        )
+    ):
+        raise LaunchError(
+            "terminal-bound development result qualification is malformed or misbound"
+        )
+    return value
+
+
 def _regular_row(
     path: Path,
     *,
@@ -826,6 +1002,72 @@ def _regular_row(
         )
     finally:
         os.close(descriptor)
+
+
+def _producer_tree_snapshot(
+    root: Path,
+) -> tuple[
+    tuple[int, ...],
+    dict[str, tuple[int, ...]],
+    dict[str, tuple[int, ...]],
+]:
+    """Enumerate a bounded producer tree without following aliases."""
+
+    try:
+        root_metadata = root.lstat()
+    except OSError as error:
+        raise LaunchError("canonical development producer cannot be inspected") from error
+    if root.is_symlink() or not stat.S_ISDIR(root_metadata.st_mode):
+        raise LaunchError("canonical development producer is not a safe directory")
+    files: dict[str, tuple[int, ...]] = {}
+    directories: dict[str, tuple[int, ...]] = {}
+    pending: list[tuple[Path, Path]] = [(root, Path())]
+    entry_count = 0
+    while pending:
+        directory, relative_directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                entries = []
+                for entry in iterator:
+                    entry_count += 1
+                    if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
+                        raise LaunchError(
+                            "canonical development producer tree exceeds its entry limit"
+                        )
+                    entries.append(entry)
+                entries.sort(key=lambda entry: entry.name)
+        except OSError as error:
+            raise LaunchError(
+                "canonical development producer tree cannot be scanned"
+            ) from error
+        for entry in entries:
+            relative_path = relative_directory / entry.name
+            relative = relative_path.as_posix()
+            try:
+                metadata = entry.stat(follow_symlinks=False)
+            except OSError as error:
+                raise LaunchError(
+                    f"canonical development producer entry cannot be inspected: {relative}"
+                ) from error
+            if stat.S_ISLNK(metadata.st_mode):
+                raise LaunchError(
+                    f"canonical development producer contains a symbolic link: {relative}"
+                )
+            if stat.S_ISDIR(metadata.st_mode):
+                directories[relative] = _identity(metadata)
+                pending.append((Path(entry.path), relative_path))
+                continue
+            if not stat.S_ISREG(metadata.st_mode):
+                raise LaunchError(
+                    f"canonical development producer contains a special file: {relative}"
+                )
+            if relative != "producer-manifest.json":
+                files[relative] = _identity(metadata)
+                if len(files) > _MAX_PRODUCER_FILES:
+                    raise LaunchError(
+                        "canonical development producer exceeds its file-count limit"
+                    )
+    return _identity(root_metadata), files, directories
 
 
 def _verify_development_producer(
@@ -891,54 +1133,114 @@ def _verify_development_producer(
         or manifest.get("file_count") != len(rows)
     ):
         raise LaunchError("canonical development producer manifest is malformed")
-    actual_rows: list[dict[str, object]] = []
-    for directory, directory_names, filenames in os.walk(
-        root,
-        topdown=True,
-        followlinks=False,
-    ):
-        current = Path(directory)
-        directory_names.sort()
-        filenames.sort()
-        for name in directory_names:
-            candidate = current / name
-            metadata = os.lstat(candidate)
-            if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
-                raise LaunchError("canonical development producer contains an unsafe directory")
-        for name in filenames:
-            path = current / name
-            if path == manifest_path:
-                continue
-            row, _, _ = _regular_row(
-                path,
-                label=f"canonical development producer file {path.relative_to(root).as_posix()}",
+    if len(rows) > _MAX_PRODUCER_FILES:
+        raise LaunchError(
+            "canonical development producer manifest exceeds its file-count limit"
+        )
+    references: dict[str, tuple[Path, int, str]] = {}
+    total_bytes = 0
+    previous = ""
+    for index, raw_row in enumerate(rows):
+        if not isinstance(raw_row, dict) or set(raw_row) != {
+            "path",
+            "bytes",
+            "sha256",
+        }:
+            raise LaunchError(
+                f"canonical development producer manifest row {index} is malformed"
             )
-            actual_rows.append(
-                {
-                    "path": path.relative_to(root).as_posix(),
-                    "bytes": row["bytes"],
-                    "sha256": row["sha256"],
-                }
+        relative = raw_row.get("path")
+        byte_count = raw_row.get("bytes")
+        digest = raw_row.get("sha256")
+        relative_path = Path(relative) if isinstance(relative, str) else None
+        if (
+            not isinstance(relative, str)
+            or not relative
+            or "\x00" in relative
+            or "\\" in relative
+            or relative == "producer-manifest.json"
+            or relative_path is None
+            or relative_path.is_absolute()
+            or "." in relative_path.parts
+            or ".." in relative_path.parts
+            or relative_path.as_posix() != relative
+            or relative <= previous
+            or type(byte_count) is not int
+            or byte_count < 0
+            or byte_count > _MAX_PRODUCER_FILE_BYTES
+            or not _sha256_string(digest)
+        ):
+            raise LaunchError(
+                f"canonical development producer manifest row {index} has invalid identity"
             )
-    actual_rows.sort(key=lambda row: str(row["path"]))
-    if not _strict_json_equal(rows, actual_rows):
-        raise LaunchError("canonical development producer files differ from its manifest")
-    result_path = root / "result.json"
-    result_row, result_payload, _ = _regular_row(
-        result_path,
-        label="canonical development raw result",
+        total_bytes += byte_count
+        if total_bytes > _MAX_PRODUCER_TOTAL_BYTES:
+            raise LaunchError(
+                "canonical development producer manifest exceeds its aggregate byte limit"
+            )
+        references[relative] = (root / relative_path, byte_count, str(digest))
+        previous = relative
+
+    root_identity, initial_tree, initial_directories = (
+        _producer_tree_snapshot(root)
     )
-    result = _canonical_object(
-        result_payload,
-        label="canonical development raw result",
+    if set(references) != set(initial_tree):
+        raise LaunchError(
+            "canonical development producer files differ from its manifest"
+        )
+    actual_rows: list[dict[str, object]] = []
+    actual_total_bytes = 0
+    result_row: dict[str, object] | None = None
+    for relative, (path, expected_bytes, expected_digest) in references.items():
+        absolute_row, identity = _stream_regular_row(
+            path,
+            label=f"canonical development producer file {relative}",
+            maximum_bytes=_MAX_PRODUCER_FILE_BYTES,
+        )
+        actual_row = {
+            "path": relative,
+            "bytes": absolute_row["bytes"],
+            "sha256": absolute_row["sha256"],
+        }
+        if (
+            identity != initial_tree[relative]
+            or absolute_row["bytes"] != expected_bytes
+            or absolute_row["sha256"] != expected_digest
+        ):
+            raise LaunchError(
+                f"canonical development producer file changed: {relative}"
+            )
+        actual_rows.append(actual_row)
+        actual_total_bytes += int(absolute_row["bytes"])
+        if actual_total_bytes > _MAX_PRODUCER_TOTAL_BYTES:
+            raise LaunchError(
+                "canonical development producer exceeds its aggregate byte limit"
+            )
+        if relative == "result.json":
+            result_row = absolute_row
+    final_root_identity, final_tree, final_directories = (
+        _producer_tree_snapshot(root)
+    )
+    final_manifest_row, final_manifest_payload, final_manifest_identity = (
+        _regular_row(
+            manifest_path,
+            label="canonical development producer manifest",
+            expected_nlink=2,
+        )
     )
     if (
-        result.get("schema") != "prospect.world-model-lifecycle.raw-result.v9"
-        or result.get("experiment_id") != "WM-001"
-        or result.get("protocol_version") != "1.15.0"
-        or result.get("lane") != "development"
+        not _strict_json_equal(rows, actual_rows)
+        or result_row is None
+        or root_identity != final_root_identity
+        or initial_tree != final_tree
+        or initial_directories != final_directories
+        or final_manifest_row != manifest_row
+        or final_manifest_payload != manifest_payload
+        or final_manifest_identity != manifest_identity
     ):
-        raise LaunchError("canonical development raw result is malformed")
+        raise LaunchError(
+            "canonical development producer changed while custody was verified"
+        )
     _verify_completion_inode(
         manifest_path,
         payload=manifest_payload,
@@ -946,6 +1248,7 @@ def _verify_development_producer(
         completion_root=completion_root,
         label="canonical development producer",
     )
+    assert result_row is not None
     return [manifest_row, result_row]
 
 
@@ -1282,6 +1585,17 @@ def _verify_closure_authorization(
         os.close(fresh_descriptor)
     archive = closure.get("qualification_archive")
     members = archive.get("members") if isinstance(archive, dict) else None
+    qualification_member = closure.get("result_qualification_member")
+    qualification_rows = (
+        [
+            row
+            for row in members
+            if isinstance(row, dict)
+            and row.get("path") == qualification_member
+        ]
+        if isinstance(members, list)
+        else []
+    )
     member_digests = (
         {
             row.get("path"): row.get("sha256")
@@ -1295,6 +1609,20 @@ def _verify_closure_authorization(
         "requesting_process_id"
     )
     verifier_process_id = fresh_reopen.get("verifier_process_id")
+    if (
+        qualification_member
+        != "evidence/development-result-qualification.json"
+        or len(qualification_rows) != 1
+        or not _sha256_string(qualification_rows[0].get("sha256"))
+        or development.get("result_qualification_sha256")
+        != qualification_rows[0].get("sha256")
+        or not isinstance(closure.get("producer_execution"), dict)
+        or _canonical_digest(closure["producer_execution"])
+        != development.get("producer_execution_identity_sha256")
+    ):
+        raise LaunchError(
+            "canonical development result qualification differs from its binding"
+        )
     if (
         set(fresh_reopen)
         != {
@@ -1484,6 +1812,7 @@ def _verify_binding_attempt_terminal(
         if len(input_paths) != len(set(input_paths)):
             raise LaunchError("formal binding attempt input identities repeat")
         actual_rows: list[dict[str, object]] = []
+        qualification_payload: bytes | None = None
         for entry in sorted(os.scandir(attempt), key=lambda item: item.name):
             if entry.name == _OPERATOR_TERMINAL:
                 continue
@@ -1500,6 +1829,8 @@ def _verify_binding_attempt_terminal(
                 label=f"formal binding attempt file {entry.name}",
             )
             try:
+                if entry.name == _DEVELOPMENT_RESULT_QUALIFICATION_NAME:
+                    qualification_payload = payload
                 actual_rows.append(
                     {
                         "path": entry.name,
@@ -1526,10 +1857,12 @@ def _verify_binding_attempt_terminal(
         source = binding.get("source")
         dependencies = binding.get("dependencies")
         runtime = binding.get("runtime")
+        development = binding.get("development_qualification")
         if (
             not isinstance(source, dict)
             or not isinstance(dependencies, dict)
             or not isinstance(runtime, dict)
+            or not isinstance(development, dict)
             or not inputs
         ):
             raise LaunchError("formal binding attempt has no authorization inputs")
@@ -1762,6 +2095,17 @@ def _verify_binding_attempt_terminal(
             repository=repository,
             completion_root=completion_root,
             binding=binding,
+        )
+        if qualification_payload is None:
+            raise LaunchError(
+                "formal binding attempt omits the development result qualification"
+            )
+        _recorded_result_qualification(
+            qualification_payload,
+            binding=binding,
+            raw_result_sha256=expected_accepted_closure[
+                "raw_result_sha256"
+            ],
         )
         closure_terminal_row = {
             "path": str(closure_terminal),

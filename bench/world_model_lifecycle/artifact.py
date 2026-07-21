@@ -58,6 +58,9 @@ FORMAL_CONFIRMATION_NAME = "confirmation-v1.15.0"
 FORMAL_BINDING_ATTEMPT_MANIFEST_NAME = "formal-binding-operator-attempt.json"
 FORMAL_BINDING_OUTER_COMPLETION_NAME = "formal-binding-outer-completion.json"
 FORMAL_INPUT_PREFLIGHT_NAME = "formal-input-preflight.json"
+DEVELOPMENT_RESULT_QUALIFICATION_NAME = (
+    "development-result-qualification.json"
+)
 FORMAL_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "formal"
 _UTC_TIMESTAMP = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
@@ -924,12 +927,19 @@ class ProducerAttempt(AbstractContextManager["ProducerAttempt"]):
             label="formal input preflight",
             must_exist=True,
         )
+        development_result_qualification = _canonical_absolute_path(
+            binding_attempt / DEVELOPMENT_RESULT_QUALIFICATION_NAME,
+            label="development result qualification",
+            must_exist=True,
+        )
         if (
             formal_input_preflight.is_symlink()
             or formal_input_preflight.stat().st_nlink != 1
+            or development_result_qualification.is_symlink()
+            or development_result_qualification.stat().st_nlink != 1
         ):
             raise RuntimeError(
-                "formal input preflight lacks single-link custody"
+                "formal input sidecar lacks single-link custody"
             )
         if binding_completion != outer_completion_marker(binding_attempt_manifest):
             raise RuntimeError("formal binding outer-completion path changed")
@@ -954,6 +964,31 @@ class ProducerAttempt(AbstractContextManager["ProducerAttempt"]):
             or not isinstance(audit_execution, dict)
         ):
             raise ValueError("formal binding source/environment/control/coverage/development/audit blocks are invalid")
+        result_qualification_sha256 = development_qualification.get(
+            "result_qualification_sha256"
+        )
+        (
+            result_qualification_payload,
+            result_qualification_metadata,
+        ) = _stable_regular_payload(
+            development_result_qualification,
+            label="development result qualification",
+            maximum_bytes=64 << 20,
+        )
+        if (
+            not isinstance(result_qualification_sha256, str)
+            or re.fullmatch(
+                r"[0-9a-f]{64}", result_qualification_sha256
+            )
+            is None
+            or result_qualification_metadata.st_nlink != 1
+            or hashlib.sha256(result_qualification_payload).hexdigest()
+            != result_qualification_sha256
+        ):
+            raise ValueError(
+                "development result qualification differs from the "
+                "formal binding"
+            )
         test_report = _safe_sibling(
             binding_path,
             source.get("test_report_file"),
@@ -1066,6 +1101,27 @@ class ProducerAttempt(AbstractContextManager["ProducerAttempt"]):
                 or sha256_file(destination) != expected_sha256
             ):
                 raise RuntimeError(f"preserved formal input failed byte verification: {relative}")
+        result_qualification_destination = (
+            self.output_directory
+            / DEVELOPMENT_RESULT_QUALIFICATION_NAME
+        )
+        atomic_write_exclusive(
+            result_qualification_destination,
+            result_qualification_payload,
+        )
+        if (
+            result_qualification_destination.is_symlink()
+            or not result_qualification_destination.is_file()
+            or result_qualification_destination.stat().st_nlink != 1
+            or result_qualification_destination.stat().st_size
+            != len(result_qualification_payload)
+            or sha256_file(result_qualification_destination)
+            != result_qualification_sha256
+        ):
+            raise RuntimeError(
+                "preserved development result qualification failed byte "
+                "verification"
+            )
         return self.output_directory / "formal-binding.json"
 
     def __exit__(

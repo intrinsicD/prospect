@@ -2096,12 +2096,19 @@ def _preflight_package_fixture(
 ) -> tuple[Path, bytes, bytes, list[bytes]]:
     report_payload = b'{"preformal":"bound"}\n'
     closure_payload = b'{"closure":"bound"}\n'
+    result_qualification_payload = (
+        b'{"schema":"prospect.wm001.development-result-qualification.v1"}\n'
+    )
     (tmp_path / artifact_audit._PREFORMAL_REPORT_NAME).write_bytes(
         report_payload
     )
     (tmp_path / "development-closure-v1.15.0.json").write_bytes(
         closure_payload
     )
+    (
+        tmp_path
+        / artifact_audit._DEVELOPMENT_RESULT_QUALIFICATION_NAME
+    ).write_bytes(result_qualification_payload)
     audit_execution = {
         "restart_runtime_conformance_report_sha256": "5" * 64,
         "restart_runtime_execution_receipt_sha256": "6" * 64,
@@ -2120,6 +2127,9 @@ def _preflight_package_fixture(
         ).hexdigest(),
         "producer_manifest_sha256": "7" * 64,
         "raw_result_sha256": "8" * 64,
+        "result_qualification_sha256": hashlib.sha256(
+            result_qualification_payload
+        ).hexdigest(),
     }
     accepted = {
         "development_closure_sha256": development["closure_sha256"],
@@ -2172,10 +2182,14 @@ def _preflight_package_fixture(
         ),
     )
     qualification_calls: list[bytes] = []
+    def validate_qualification(payload: bytes, **_kwargs: object) -> bytes:
+        qualification_calls.append(payload)
+        return result_qualification_payload
+
     monkeypatch.setattr(
         artifact_audit,
         "_validate_development_qualification",
-        lambda payload, **_kwargs: qualification_calls.append(payload),
+        validate_qualification,
     )
     return (
         binding_path,
@@ -2235,6 +2249,37 @@ def test_exact_formal_input_preflight_rejects_cross_link_mismatch(
     with pytest.raises(
         artifact_audit.ArtifactAuditError,
         match="differ from their sealed preformal rehearsal",
+    ):
+        artifact_audit.preflight_formal_input_package(binding_path)
+
+
+@pytest.mark.parametrize("mutation", ["sidecar", "binding-digest"])
+def test_exact_formal_input_preflight_rejects_result_qualification_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    binding_path, _, _, _ = _preflight_package_fixture(
+        tmp_path,
+        monkeypatch,
+    )
+    if mutation == "sidecar":
+        (
+            tmp_path
+            / artifact_audit._DEVELOPMENT_RESULT_QUALIFICATION_NAME
+        ).write_bytes(b'{"substituted":true}\n')
+    else:
+        binding = json.loads(binding_path.read_bytes())
+        binding["development_qualification"][
+            "result_qualification_sha256"
+        ] = "f" * 64
+        binding_path.write_bytes(
+            artifact_audit._canonical_json_bytes(binding) + b"\n"
+        )
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="result qualification differs",
     ):
         artifact_audit.preflight_formal_input_package(binding_path)
 
@@ -3175,14 +3220,19 @@ def test_development_qualification_is_linked_field_for_field(
         preformal_runtime_seal=preformal_runtime_seal,
     )
 
-    artifact_audit._validate_development_qualification(
-        payload,
-        block=block,
-        source=source,
-        dependencies=dependencies,
-        runtime=runtime,
-        bound_audit_execution=bound_audit_execution,
-        preformal_runtime_seal=preformal_runtime_seal,
+    result_qualification_payload = (
+        artifact_audit._validate_development_qualification(
+            payload,
+            block=block,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+            bound_audit_execution=bound_audit_execution,
+            preformal_runtime_seal=preformal_runtime_seal,
+        )
+    )
+    assert hashlib.sha256(result_qualification_payload).hexdigest() == (
+        block["result_qualification_sha256"]
     )
 
     false_status = json.loads(payload)
@@ -3439,6 +3489,22 @@ def test_formal_input_preflight_runs_both_substantive_validators(
         str, development["closure_file"]
     )
     preserved_closure.write_bytes(closure_payload)
+    closure = cast(dict[str, object], json.loads(closure_payload))
+    archive = cast(
+        dict[str, object], closure["qualification_archive"]
+    )
+    result_qualification_member = cast(
+        str, closure["result_qualification_member"]
+    )
+    retained = artifact_audit._verify_development_qualification_archive(
+        archive,
+        members=cast(list[object], archive["members"]),
+        retain_members=frozenset({result_qualification_member}),
+    )
+    (
+        tmp_path
+        / artifact_audit._DEVELOPMENT_RESULT_QUALIFICATION_NAME
+    ).write_bytes(retained[result_qualification_member])
     binding = {
         "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "experiment_id": "WM-001",

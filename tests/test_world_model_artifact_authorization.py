@@ -55,6 +55,20 @@ def _preflight_receipt(binding_payload: bytes) -> bytes:
     )
 
 
+def _binding_payload(result_qualification_payload: bytes) -> bytes:
+    return _canonical(
+        {
+            "schema": "prospect.world-model-lifecycle.formal-binding.v10",
+            "experiment_id": "WM-001",
+            "development_qualification": {
+                "result_qualification_sha256": hashlib.sha256(
+                    result_qualification_payload
+                ).hexdigest(),
+            },
+        }
+    )
+
+
 def _write_attempt(
     path: Path,
     *,
@@ -136,12 +150,14 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
     repository, _ = authorization_space
     artifact_root = repository / "formal-artifact"
     artifact_root.mkdir()
-    binding_payload = _canonical(
+    result_qualification_payload = _canonical(
         {
-            "schema": "prospect.world-model-lifecycle.formal-binding.v10",
-            "experiment_id": "WM-001",
+            "schema": (
+                "prospect.wm001.development-result-qualification.v1"
+            )
         }
     )
+    binding_payload = _binding_payload(result_qualification_payload)
     preformal_path = (
         repository
         / "bench"
@@ -178,6 +194,10 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
     (artifact_root / "formal-input-preflight.json").write_bytes(
         preflight_payload
     )
+    (
+        artifact_root
+        / artifact_audit._DEVELOPMENT_RESULT_QUALIFICATION_NAME
+    ).write_bytes(result_qualification_payload)
     _write_attempt(
         binding_attempt_path,
         kind="binding",
@@ -187,6 +207,9 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
         files={
             "formal-binding.json": binding_payload,
             "formal-input-preflight.json": preflight_payload,
+            artifact_audit._DEVELOPMENT_RESULT_QUALIFICATION_NAME: (
+                result_qualification_payload
+            ),
         },
     )
     monkeypatch.setattr(
@@ -208,14 +231,14 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
             artifact_audit._validate_formal_authorization_lineage(
                 repository=repository,
                 artifact_root=artifact_root,
-                binding={},
+                binding=json.loads(binding_payload),
                 binding_payload=binding_payload,
             )
     else:
         attempt = artifact_audit._validate_formal_authorization_lineage(
             repository=repository,
             artifact_root=artifact_root,
-            binding={},
+            binding=json.loads(binding_payload),
             binding_payload=binding_payload,
         )
         assert attempt.root == binding_attempt_path
@@ -233,12 +256,14 @@ def test_formal_binding_authorization_requires_exact_preflight_receipt(
     repository, _ = authorization_space
     artifact_root = repository / "formal-artifact"
     artifact_root.mkdir()
-    binding_payload = _canonical(
+    result_qualification_payload = _canonical(
         {
-            "schema": "prospect.world-model-lifecycle.formal-binding.v10",
-            "experiment_id": "WM-001",
+            "schema": (
+                "prospect.wm001.development-result-qualification.v1"
+            )
         }
     )
+    binding_payload = _binding_payload(result_qualification_payload)
     preflight_payload = _preflight_receipt(binding_payload)
     live_preflight = preflight_payload
     if mutation == "malformed":
@@ -253,6 +278,10 @@ def test_formal_binding_authorization_requires_exact_preflight_receipt(
     (artifact_root / "formal-input-preflight.json").write_bytes(
         copied_preflight
     )
+    (
+        artifact_root
+        / artifact_audit._DEVELOPMENT_RESULT_QUALIFICATION_NAME
+    ).write_bytes(result_qualification_payload)
     binding_attempt_path = (
         repository
         / "bench"
@@ -262,7 +291,12 @@ def test_formal_binding_authorization_requires_exact_preflight_receipt(
         / "bindings"
         / "formal-binding-v1.15.0"
     )
-    files = {"formal-binding.json": binding_payload}
+    files = {
+        "formal-binding.json": binding_payload,
+        artifact_audit._DEVELOPMENT_RESULT_QUALIFICATION_NAME: (
+            result_qualification_payload
+        ),
+    }
     if mutation != "missing":
         files["formal-input-preflight.json"] = live_preflight
     _write_attempt(
@@ -291,7 +325,93 @@ def test_formal_binding_authorization_requires_exact_preflight_receipt(
         artifact_audit._validate_formal_authorization_lineage(
             repository=repository,
             artifact_root=artifact_root,
-            binding={},
+            binding=json.loads(binding_payload),
+            binding_payload=binding_payload,
+        )
+
+
+@pytest.mark.parametrize("mutation", ["live", "copied", "binding"])
+def test_formal_binding_authorization_requires_exact_result_qualification(
+    authorization_space: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    repository, _ = authorization_space
+    artifact_root = repository / "formal-artifact"
+    artifact_root.mkdir()
+    result_qualification_payload = _canonical(
+        {
+            "schema": (
+                "prospect.wm001.development-result-qualification.v1"
+            )
+        }
+    )
+    live_payload = (
+        b'{"substituted":"live"}\n'
+        if mutation == "live"
+        else result_qualification_payload
+    )
+    copied_payload = (
+        b'{"substituted":"copied"}\n'
+        if mutation == "copied"
+        else result_qualification_payload
+    )
+    bound_payload = (
+        b'{"substituted":"binding"}\n'
+        if mutation == "binding"
+        else result_qualification_payload
+    )
+    binding_payload = _binding_payload(bound_payload)
+    preflight_payload = _preflight_receipt(binding_payload)
+    (artifact_root / "formal-input-preflight.json").write_bytes(
+        preflight_payload
+    )
+    (
+        artifact_root
+        / artifact_audit._DEVELOPMENT_RESULT_QUALIFICATION_NAME
+    ).write_bytes(copied_payload)
+    binding_attempt_path = (
+        repository
+        / "bench"
+        / "world_model_lifecycle"
+        / "results"
+        / "operator-v1.15"
+        / "bindings"
+        / "formal-binding-v1.15.0"
+    )
+    _write_attempt(
+        binding_attempt_path,
+        kind="binding",
+        lane=None,
+        primary={"binding_file": "formal-binding.json"},
+        inputs=[],
+        files={
+            "formal-binding.json": binding_payload,
+            "formal-input-preflight.json": preflight_payload,
+            artifact_audit._DEVELOPMENT_RESULT_QUALIFICATION_NAME: (
+                live_payload
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        artifact_audit,
+        "_authorization_preformal_rows",
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        artifact_audit,
+        "_authorization_development_closure",
+        lambda *_args, **_kwargs: ([], None),
+    )
+
+    with pytest.raises(
+        ArtifactAuditError,
+        match="development result qualification",
+    ):
+        artifact_audit._validate_formal_authorization_lineage(
+            repository=repository,
+            artifact_root=artifact_root,
+            binding=json.loads(binding_payload),
             binding_payload=binding_payload,
         )
 

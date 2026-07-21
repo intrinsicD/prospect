@@ -82,6 +82,10 @@ def _write_preservable_binding(
     oscillator = evidence("oscillator-conformance.json")
     coverage = evidence("coverage-conformance.json")
     closure = evidence("development-closure.json")
+    result_qualification = evidence(
+        artifact_module.DEVELOPMENT_RESULT_QUALIFICATION_NAME,
+        b'{"schema":"prospect.wm001.development-result-qualification.v1"}\n',
+    )
     audit_prefixes = (
         "bootstrap_source",
         "prebinding_request",
@@ -123,6 +127,9 @@ def _write_preservable_binding(
         },
         "development_qualification": {
             "closure_file": closure.name,
+            "result_qualification_sha256": hashlib.sha256(
+                result_qualification.read_bytes()
+            ).hexdigest(),
         },
         "audit_execution": {f"{prefix}_file": path.name for prefix, path in audit_files.items()},
     }
@@ -135,6 +142,7 @@ def _write_preservable_binding(
         oscillator.name,
         coverage.name,
         closure.name,
+        result_qualification.name,
         *(path.name for path in audit_files.values()),
     }
 

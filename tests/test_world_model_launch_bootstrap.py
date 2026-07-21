@@ -79,6 +79,80 @@ def _completion_marker(completion_root: Path, terminal: Path) -> Path:
     return completion_root / (hashlib.sha256(str(terminal).encode("utf-8")).hexdigest() + ".json")
 
 
+def _zero_sha256(byte_count: int) -> str:
+    """Hash sparse-fixture contents without materializing a second large file."""
+
+    digest = hashlib.sha256()
+    block = b"\0" * (1 << 20)
+    remaining = byte_count
+    while remaining:
+        chunk_bytes = min(len(block), remaining)
+        digest.update(block[:chunk_bytes])
+        remaining -= chunk_bytes
+    return digest.hexdigest()
+
+
+def _development_producer(
+    tmp_path: Path,
+    *,
+    files: dict[str, int | bytes],
+) -> tuple[Path, Path, Path]:
+    """Create one outer-finalized producer with sparse or literal members."""
+
+    repository = tmp_path / "repository"
+    results = repository / "bench" / "world_model_lifecycle" / "results"
+    completion_root = results / "outer-completions" / "v1.15"
+    completion_root.mkdir(parents=True)
+    producer = results / "development" / "qualification-v1.15.0"
+    producer.mkdir(parents=True)
+    rows: list[dict[str, object]] = []
+    for relative, value in sorted(files.items()):
+        path = producer / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(value, bytes):
+            path.write_bytes(value)
+            byte_count = len(value)
+            digest = hashlib.sha256(value).hexdigest()
+        else:
+            descriptor = os.open(
+                path,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+            )
+            try:
+                os.ftruncate(descriptor, value)
+            finally:
+                os.close(descriptor)
+            byte_count = value
+            digest = _zero_sha256(value)
+        rows.append(
+            {
+                "path": relative,
+                "bytes": byte_count,
+                "sha256": digest,
+            }
+        )
+    manifest = producer / "producer-manifest.json"
+    manifest.write_bytes(
+        _canonical(
+            {
+                "schema": "prospect.wm001.producer-manifest.v1",
+                "experiment_id": "WM-001",
+                "lane": "development",
+                "status": "completed",
+                "started_at_utc": "2026-01-01T00:00:00Z",
+                "completed_at_utc": "2026-01-01T00:01:00Z",
+                "error": None,
+                "manifest_excludes": ["producer-manifest.json"],
+                "file_count": len(rows),
+                "files": rows,
+            }
+        )
+    )
+    os.link(manifest, _completion_marker(completion_root, manifest))
+    return repository, completion_root, producer
+
+
 @pytest.mark.parametrize(
     "payload",
     (
@@ -301,6 +375,39 @@ def _formal_binding_attempt(
         )
     )
     result_payload = result.read_bytes()
+    producer_execution = {"fixture": "development-execution"}
+    qualification_payload = _canonical(
+        {
+            "schema": (
+                "prospect.wm001.development-result-qualification.v1"
+            ),
+            "experiment_id": "WM-001",
+            "protocol_version": "1.15.0",
+            "protocol_sha256": "e" * 64,
+            "raw_result_sha256": hashlib.sha256(
+                result_payload
+            ).hexdigest(),
+            "lane": "development",
+            "claim_eligible": False,
+            "replicates": [
+                {
+                    "replicate_id": f"development-{master_seed}",
+                    "master_seed": master_seed,
+                    "episodes": 496,
+                    "transitions": 99_200,
+                    "predictive_metrics": 12,
+                    "policy_runs": 20,
+                    "updates": 6,
+                    "optimizer_batch_manifests": 5,
+                }
+                for master_seed in (2388891654, 3201418215)
+            ],
+            "matrix_contract_sha256": (
+                launch_bootstrap._DEVELOPMENT_MATRIX_CONTRACT_SHA256
+            ),
+            "producer_execution": producer_execution,
+        }
+    )
     producer_terminal = producer / "producer-manifest.json"
     producer_terminal.write_bytes(
         _canonical(
@@ -414,6 +521,10 @@ def _formal_binding_attempt(
         "audit_reproduced": True,
         "performance_values_bound": False,
         "producer_root": str(producer),
+        "result_qualification_member": (
+            "evidence/development-result-qualification.json"
+        ),
+        "producer_execution": producer_execution,
         "qualification_archive": {
             "canonical_path": "qualification.tar",
             "members": [
@@ -424,6 +535,14 @@ def _formal_binding_attempt(
                 {
                     "path": "producer/result.json",
                     "sha256": producer_rows[1]["sha256"],
+                },
+                {
+                    "path": (
+                        "evidence/development-result-qualification.json"
+                    ),
+                    "sha256": hashlib.sha256(
+                        qualification_payload
+                    ).hexdigest(),
                 },
             ],
         },
@@ -561,6 +680,10 @@ def _formal_binding_attempt(
     )
 
     binding = dict(binding)
+    protocol = binding.get("protocol")
+    protocol = dict(protocol) if isinstance(protocol, dict) else {}
+    protocol.setdefault("sha256", "e" * 64)
+    binding["protocol"] = protocol
     dependencies = binding.get("dependencies")
     dependencies = (
         dict(dependencies) if isinstance(dependencies, dict) else {}
@@ -613,6 +736,14 @@ def _formal_binding_attempt(
         "raw_result_sha256",
         producer_rows[1]["sha256"],
     )
+    development.setdefault(
+        "result_qualification_sha256",
+        hashlib.sha256(qualification_payload).hexdigest(),
+    )
+    development.setdefault(
+        "producer_execution_identity_sha256",
+        launch_bootstrap._canonical_digest(producer_execution),
+    )
     development.update(
         {
             "closure_bytes": closure.stat().st_size,
@@ -660,6 +791,10 @@ def _formal_binding_attempt(
         }
     )
     preflight_path.write_bytes(preflight_payload)
+    qualification_path = (
+        attempt / "development-result-qualification.json"
+    )
+    qualification_path.write_bytes(qualification_payload)
     terminal = attempt / "operator-attempt.json"
     terminal.write_bytes(
         _canonical(
@@ -689,6 +824,13 @@ def _formal_binding_attempt(
                 "error": None,
                 "files": [
                     {
+                        "path": "development-result-qualification.json",
+                        "bytes": len(qualification_payload),
+                        "sha256": hashlib.sha256(
+                            qualification_payload
+                        ).hexdigest(),
+                    },
+                    {
                         "path": "formal-binding.json",
                         "bytes": len(binding_payload),
                         "sha256": hashlib.sha256(binding_payload).hexdigest(),
@@ -701,7 +843,7 @@ def _formal_binding_attempt(
                         ).hexdigest(),
                     },
                 ],
-                "file_count": 2,
+                "file_count": 3,
                 "manifest_excludes": ["operator-attempt.json"],
             }
         )
@@ -1643,6 +1785,343 @@ def test_outer_rejects_malformed_producer_time_or_numeric_count(
         launch_bootstrap._verify_development_producer(
             repository=repository,
             completion_root=completion_root,
+        )
+
+
+def test_outer_streams_production_scale_five_role_producer_once_per_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    production_files = {
+        "checkpoints/development-2388891654.pt": 78_204_724,
+        "checkpoints/development-3201418215.pt": 78_205_824,
+        "replicates/development-2388891654.json": 160_421_650,
+        "replicates/development-3201418215.json": 160_537_118,
+        "result.json": 320_977_868,
+    }
+    repository, completion_root, producer = _development_producer(
+        tmp_path,
+        files=production_files,
+    )
+    calls: list[str] = []
+    original = launch_bootstrap._stream_regular_row
+
+    def observed(
+        path: Path,
+        *,
+        label: str,
+        maximum_bytes: int,
+        expected_nlink: int = 1,
+    ) -> tuple[dict[str, object], tuple[int, ...]]:
+        calls.append(path.relative_to(producer).as_posix())
+        return original(
+            path,
+            label=label,
+            maximum_bytes=maximum_bytes,
+            expected_nlink=expected_nlink,
+        )
+
+    monkeypatch.setattr(
+        launch_bootstrap,
+        "_stream_regular_row",
+        observed,
+    )
+    rows = launch_bootstrap._verify_development_producer(
+        repository=repository,
+        completion_root=completion_root,
+    )
+
+    assert calls == sorted(production_files)
+    assert len(calls) == len(set(calls)) == 5
+    assert rows[1] == {
+        "path": str(producer / "result.json"),
+        "bytes": production_files["result.json"],
+        "sha256": _zero_sha256(production_files["result.json"]),
+    }
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    (
+        ("boolean-bytes", "manifest row"),
+        ("float-bytes", "manifest row"),
+        ("negative-bytes", "manifest row"),
+        ("file-limit", "manifest row"),
+        ("invalid-digest", "manifest row"),
+        ("duplicate-path", "manifest row"),
+        ("unsorted-paths", "manifest row"),
+    ),
+)
+def test_outer_streaming_manifest_rejects_malformed_identity_metadata(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    repository, completion_root, producer = _development_producer(
+        tmp_path,
+        files={"result.json": b"result", "sidecar.bin": b"sidecar"},
+    )
+    manifest_path = producer / "producer-manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    rows = manifest["files"]
+    if mutation == "boolean-bytes":
+        rows[0]["bytes"] = True
+    elif mutation == "float-bytes":
+        rows[0]["bytes"] = float(rows[0]["bytes"])
+    elif mutation == "negative-bytes":
+        rows[0]["bytes"] = -1
+    elif mutation == "file-limit":
+        rows[0]["bytes"] = launch_bootstrap._MAX_PRODUCER_FILE_BYTES + 1
+    elif mutation == "invalid-digest":
+        rows[0]["sha256"] = "g" * 64
+    elif mutation == "duplicate-path":
+        rows[1]["path"] = rows[0]["path"]
+    elif mutation == "unsorted-paths":
+        rows.reverse()
+    else:  # pragma: no cover - parameter exhaustiveness
+        raise AssertionError(mutation)
+    manifest_path.write_bytes(_canonical(manifest))
+
+    with pytest.raises(launch_bootstrap.LaunchError, match=message):
+        launch_bootstrap._verify_development_producer(
+            repository=repository,
+            completion_root=completion_root,
+        )
+
+
+def test_outer_streaming_manifest_enforces_exact_producer_limits(
+    tmp_path: Path,
+) -> None:
+    assert launch_bootstrap._MAX_PRODUCER_FILE_BYTES == 4 << 30
+    assert launch_bootstrap._MAX_PRODUCER_TOTAL_BYTES == 16 << 30
+    repository, completion_root, producer = _development_producer(
+        tmp_path,
+        files={f"member-{index}.bin": b"x" for index in range(4)}
+        | {"result.json": b"result"},
+    )
+    manifest_path = producer / "producer-manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    for row in manifest["files"]:
+        row["bytes"] = launch_bootstrap._MAX_PRODUCER_FILE_BYTES
+    manifest_path.write_bytes(_canonical(manifest))
+
+    with pytest.raises(
+        launch_bootstrap.LaunchError,
+        match="aggregate byte limit",
+    ):
+        launch_bootstrap._verify_development_producer(
+            repository=repository,
+            completion_root=completion_root,
+        )
+
+
+def test_producer_tree_snapshot_bounds_entries_before_sorting(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "producer"
+    root.mkdir()
+    for index in range(3):
+        (root / f"member-{index}.bin").write_bytes(b"x")
+    monkeypatch.setattr(
+        launch_bootstrap,
+        "_MAX_PRODUCER_TREE_ENTRIES",
+        2,
+    )
+
+    with pytest.raises(
+        launch_bootstrap.LaunchError,
+        match="tree exceeds its entry limit",
+    ):
+        launch_bootstrap._producer_tree_snapshot(root)
+
+
+def test_stream_regular_row_rejects_short_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "large.bin"
+    path.write_bytes(b"abcdefgh")
+    original = os.pread
+
+    def short_read(
+        descriptor: int,
+        count: int,
+        offset: int,
+    ) -> bytes:
+        if offset >= 4:
+            return b""
+        return original(descriptor, min(count, 4), offset)
+
+    monkeypatch.setattr(launch_bootstrap.os, "pread", short_read)
+    with pytest.raises(launch_bootstrap.LaunchError, match="ended while streamed"):
+        launch_bootstrap._stream_regular_row(
+            path,
+            label="short-read fixture",
+            maximum_bytes=1 << 20,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("growth", "shrink", "inode-swap"),
+)
+def test_stream_regular_row_rejects_in_read_path_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    path = tmp_path / "mutable.bin"
+    payload = b"x" * 8192
+    path.write_bytes(payload)
+    original = os.pread
+    mutated = False
+
+    def mutating_read(
+        descriptor: int,
+        count: int,
+        offset: int,
+    ) -> bytes:
+        nonlocal mutated
+        chunk = original(descriptor, count, offset)
+        if not mutated:
+            mutated = True
+            if mutation == "growth":
+                with path.open("ab") as stream:
+                    stream.write(b"y")
+            elif mutation == "shrink":
+                os.truncate(path, len(payload) // 2)
+            else:
+                displaced = path.with_name("displaced.bin")
+                path.rename(displaced)
+                path.write_bytes(payload)
+        return chunk
+
+    monkeypatch.setattr(launch_bootstrap.os, "pread", mutating_read)
+    with pytest.raises(launch_bootstrap.LaunchError):
+        launch_bootstrap._stream_regular_row(
+            path,
+            label=f"{mutation} fixture",
+            maximum_bytes=1 << 20,
+        )
+
+
+def test_stream_regular_row_rejects_symlink_and_hardlink(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "target.bin"
+    target.write_bytes(b"payload")
+    symlink = tmp_path / "symlink.bin"
+    symlink.symlink_to(target)
+    with pytest.raises(
+        launch_bootstrap.LaunchError,
+        match="canonical absolute path|symbolic-link",
+    ):
+        launch_bootstrap._stream_regular_row(
+            symlink,
+            label="symlink fixture",
+            maximum_bytes=1 << 20,
+        )
+
+    hardlink = tmp_path / "hardlink.bin"
+    os.link(target, hardlink)
+    with pytest.raises(launch_bootstrap.LaunchError, match="exactly 1 link"):
+        launch_bootstrap._stream_regular_row(
+            target,
+            label="hardlink fixture",
+            maximum_bytes=1 << 20,
+        )
+
+
+@pytest.mark.parametrize("mutation", ("omitted", "tampered"))
+def test_outer_rejects_missing_or_tampered_terminal_bound_qualification(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    repository, completion_root, _ = _repository_paths(tmp_path)
+    binding_path, _, _ = _formal_binding_attempt(
+        repository,
+        completion_root,
+        binding=_minimal_formal_binding(),
+        terminal_state="finalized",
+    )
+    qualification = binding_path.with_name(
+        "development-result-qualification.json"
+    )
+    if mutation == "omitted":
+        qualification.unlink()
+    else:
+        qualification.write_bytes(qualification.read_bytes() + b"x")
+
+    with pytest.raises(launch_bootstrap.LaunchError):
+        launch_bootstrap._open_typed_runtime_custody(
+            binding_path,
+            repository=repository,
+            completion_root=completion_root,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "schema",
+        "protocol",
+        "raw-result",
+        "lane",
+        "claim-eligible",
+        "master-seed",
+        "budget-count",
+        "producer-execution",
+    ),
+)
+def test_terminal_bound_qualification_rejects_semantic_mutations(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    repository, completion_root, _ = _repository_paths(tmp_path)
+    binding_path, _, _ = _formal_binding_attempt(
+        repository,
+        completion_root,
+        binding=_minimal_formal_binding(),
+        terminal_state="finalized",
+    )
+    binding = json.loads(binding_path.read_bytes())
+    qualification_path = binding_path.with_name(
+        "development-result-qualification.json"
+    )
+    qualification = json.loads(qualification_path.read_bytes())
+    expected_raw_result = qualification["raw_result_sha256"]
+    if mutation == "schema":
+        qualification["schema"] = "prospect.invalid"
+    elif mutation == "protocol":
+        qualification["protocol_version"] = "0.0.0"
+    elif mutation == "raw-result":
+        qualification["raw_result_sha256"] = "0" * 64
+    elif mutation == "lane":
+        qualification["lane"] = "formal"
+    elif mutation == "claim-eligible":
+        qualification["claim_eligible"] = True
+    elif mutation == "master-seed":
+        qualification["replicates"][0]["master_seed"] += 1
+    elif mutation == "budget-count":
+        qualification["replicates"][0]["transitions"] -= 1
+    elif mutation == "producer-execution":
+        qualification["producer_execution"]["fixture"] = "substituted"
+    else:  # pragma: no cover - parameter exhaustiveness
+        raise AssertionError(mutation)
+    payload = _canonical(qualification)
+    binding["development_qualification"][
+        "result_qualification_sha256"
+    ] = hashlib.sha256(payload).hexdigest()
+
+    with pytest.raises(
+        launch_bootstrap.LaunchError,
+        match="qualification is malformed or misbound",
+    ):
+        launch_bootstrap._recorded_result_qualification(
+            payload,
+            binding=binding,
+            raw_result_sha256=expected_raw_result,
         )
 
 

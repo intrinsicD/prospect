@@ -1385,6 +1385,15 @@ def _install_generated_binding_fakes(
     runtime = candidate["runtime"]
     audit_execution = candidate["audit_execution"]
     development_identity = candidate["development_qualification"]
+    result_qualification_payload = (
+        binding_module.canonical_json_bytes(
+            {"fixture": "development-result-qualification"}
+        )
+        + b"\n"
+    )
+    development_identity["result_qualification_sha256"] = (
+        hashlib.sha256(result_qualification_payload).hexdigest()
+    )
     source = candidate["source"]
     inventory = {
         "packages": copy.deepcopy(dependencies["packages"]),
@@ -1459,7 +1468,14 @@ def _install_generated_binding_fakes(
     monkeypatch.setattr(
         binding_module,
         "verify_development_closure",
-        lambda _path: {"fixture": "closure"},
+        lambda _path, *, include_result_qualification=False: (
+            (
+                {"fixture": "closure"},
+                result_qualification_payload,
+            )
+            if include_result_qualification
+            else {"fixture": "closure"}
+        ),
     )
     monkeypatch.setattr(
         binding_module,
@@ -1565,6 +1581,15 @@ def test_create_formal_binding_root_schema_preflight_accepts_actual_log_rows(
         binding_module.verify_canonical_machine_test_report(report_path),
     )
     assert output_path.is_file()
+    result_qualification = output_path.with_name(
+        binding_module.DEVELOPMENT_RESULT_QUALIFICATION_NAME
+    )
+    assert result_qualification.is_file()
+    assert hashlib.sha256(result_qualification.read_bytes()).hexdigest() == (
+        created["development_qualification"][
+            "result_qualification_sha256"
+        ]
+    )
 
 
 def test_create_formal_binding_schema_failure_precedes_all_publication(

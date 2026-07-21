@@ -255,7 +255,9 @@ def _development_closure(producer_root: Path) -> dict[str, object]:
         "evidence/audit-reproduction.json": "b" * 64,
         "evidence/audit-runtime.json": "c" * 64,
         "evidence/audit-stderr.log": "d" * 64,
-        "evidence/development-result-qualification.json": "e" * 64,
+        "evidence/development-result-qualification.json": hashlib.sha256(
+            b'{"fixture":"development-result-qualification"}\n'
+        ).hexdigest(),
         "evidence/independent-audit.json": "f" * 64,
         "evidence/launch-bootstrap.py": "1" * 64,
         "evidence/producer-bootstrap.py": "2" * 64,
@@ -2436,7 +2438,14 @@ def test_create_formal_binding_then_real_verify_binding_preserved_preformal_seam
     monkeypatch.setattr(
         binding_module,
         "verify_development_closure",
-        lambda _path: copy.deepcopy(closure),
+        lambda _path, *, include_result_qualification=False: (
+            (
+                copy.deepcopy(closure),
+                b'{"fixture":"development-result-qualification"}\n',
+            )
+            if include_result_qualification
+            else copy.deepcopy(closure)
+        ),
     )
     monkeypatch.setattr(
         binding_module,
@@ -3434,26 +3443,231 @@ def test_isolated_review_rejects_stale_installed_preformal_bytes(
     assert identity["sha256"] == hashlib.sha256(live.read_bytes()).hexdigest()
 
 
+def _install_captured_descriptor(
+    path: Path,
+    payload: bytes,
+    *,
+    prefix: str,
+    link_count: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> int:
+    path.write_bytes(payload)
+    if link_count == 2:
+        os.link(path, path.with_name(f"{path.name}.completion"))
+    descriptor = os.open(path, os.O_RDONLY)
+    identity = preformal._descriptor_identity(os.fstat(descriptor))
+    monkeypatch.setattr(
+        sys,
+        f"_prospect_wm001_{prefix}_fd",
+        descriptor,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sys,
+        f"_prospect_wm001_{prefix}_payload",
+        payload,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sys,
+        f"_prospect_wm001_{prefix}_identity",
+        identity,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sys,
+        f"_prospect_wm001_{prefix}_sha256",
+        hashlib.sha256(payload).hexdigest(),
+        raising=False,
+    )
+    return descriptor
+
+
+def _formal_runtime_custody() -> dict[str, object]:
+    return {
+        "schema": "prospect.world-model-lifecycle.formal-binding.v10",
+        "experiment_id": "WM-001",
+        "assurance": copy.deepcopy(binding_module.ASSURANCE),
+        "protocol": {
+            "version": "1.15.0",
+            "sha256": "1" * 64,
+            "raw_result_schema_sha256": "2" * 64,
+            "binding_schema_sha256": "3" * 64,
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("custody_kind", "link_count"),
+    (("prospective", 2), ("formal-binding", 1)),
+)
+def test_live_bootstrap_custody_accepts_both_typed_runtime_seals(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    custody_kind: str,
+    link_count: int,
+) -> None:
+    custody = (
+        _runtime_seal(Path(sys.executable))
+        if custody_kind == "prospective"
+        else _formal_runtime_custody()
+    )
+    runtime_payload = _canonical(custody)
+    runtime_descriptor = _install_captured_descriptor(
+        tmp_path / "runtime-custody.json",
+        runtime_payload,
+        prefix="runtime_seal",
+        link_count=link_count,
+        monkeypatch=monkeypatch,
+    )
+    bootstrap_payload = b"captured bootstrap\n"
+    bootstrap_descriptor = _install_captured_descriptor(
+        tmp_path / "producer-bootstrap.py",
+        bootstrap_payload,
+        prefix="bootstrap",
+        link_count=1,
+        monkeypatch=monkeypatch,
+    )
+    recomputations = 0
+
+    def verify_experiment_custody() -> dict[str, object]:
+        nonlocal recomputations
+        recomputations += 1
+        return {"runtime_seal": copy.deepcopy(custody)}
+
+    monkeypatch.setattr(
+        experiment_module,
+        "_verify_live_bootstrap_custody",
+        verify_experiment_custody,
+    )
+    try:
+        assert preformal._verify_live_bootstrap_custody() == custody
+        assert recomputations == 1
+    finally:
+        os.close(bootstrap_descriptor)
+        os.close(runtime_descriptor)
+
+
+@pytest.mark.parametrize(
+    ("custody_kind", "wrong_link_count"),
+    (("prospective", 1), ("formal-binding", 2)),
+)
+def test_live_bootstrap_custody_rejects_cross_typed_link_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    custody_kind: str,
+    wrong_link_count: int,
+) -> None:
+    custody = (
+        _runtime_seal(Path(sys.executable))
+        if custody_kind == "prospective"
+        else _formal_runtime_custody()
+    )
+    descriptor = _install_captured_descriptor(
+        tmp_path / "runtime-custody.json",
+        _canonical(custody),
+        prefix="runtime_seal",
+        link_count=wrong_link_count,
+        monkeypatch=monkeypatch,
+    )
+    try:
+        with pytest.raises(
+            preformal.PreformalEvidenceError,
+            match="custody changed",
+        ):
+            preformal._captured_payload("runtime_seal")
+    finally:
+        os.close(descriptor)
+
+
+@pytest.mark.parametrize(
+    ("custody_kind", "mutation"),
+    (
+        ("prospective", "protocol"),
+        ("prospective", "assurance"),
+        ("formal-binding", "protocol"),
+        ("formal-binding", "assurance"),
+    ),
+)
+def test_runtime_custody_requires_exact_protocol_and_assurance(
+    custody_kind: str,
+    mutation: str,
+) -> None:
+    custody = (
+        _runtime_seal(Path(sys.executable))
+        if custody_kind == "prospective"
+        else _formal_runtime_custody()
+    )
+    if mutation == "protocol":
+        if custody_kind == "prospective":
+            custody["protocol_version"] = "1.14.0"
+        else:
+            custody["protocol"] = {"version": "1.14.0"}
+    else:
+        custody["assurance"] = {
+            **copy.deepcopy(binding_module.ASSURANCE),
+            "tamper_resistant": 0,
+        }
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="custody|runtime seal",
+    ):
+        preformal._runtime_custody_value(_canonical(custody))
+
+
+def test_formal_binding_custody_rejects_recomputed_experiment_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    custody = _formal_runtime_custody()
+    runtime_descriptor = _install_captured_descriptor(
+        tmp_path / "formal-binding.json",
+        _canonical(custody),
+        prefix="runtime_seal",
+        link_count=1,
+        monkeypatch=monkeypatch,
+    )
+    bootstrap_descriptor = _install_captured_descriptor(
+        tmp_path / "producer-bootstrap.py",
+        b"captured bootstrap\n",
+        prefix="bootstrap",
+        link_count=1,
+        monkeypatch=monkeypatch,
+    )
+    monkeypatch.setattr(
+        experiment_module,
+        "_verify_live_bootstrap_custody",
+        lambda: {
+            "runtime_seal": {
+                **copy.deepcopy(custody),
+                "protocol": {"version": "1.14.0"},
+            }
+        },
+    )
+    try:
+        with pytest.raises(
+            preformal.PreformalEvidenceError,
+            match="returned a different captured seal",
+        ):
+            preformal._verify_live_bootstrap_custody()
+    finally:
+        os.close(bootstrap_descriptor)
+        os.close(runtime_descriptor)
+
+
 def test_captured_descriptor_custody_rejects_mutation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     path = tmp_path / "seal.json"
-    marker = tmp_path / "seal-completion.json"
-    payload = b"sealed\n"
-    path.write_bytes(payload)
-    os.link(path, marker)
-    descriptor = os.open(path, os.O_RDONLY)
-    metadata = os.fstat(descriptor)
-    identity = preformal._descriptor_identity(metadata)
-    monkeypatch.setattr(sys, "_prospect_wm001_runtime_seal_fd", descriptor, raising=False)
-    monkeypatch.setattr(sys, "_prospect_wm001_runtime_seal_payload", payload, raising=False)
-    monkeypatch.setattr(sys, "_prospect_wm001_runtime_seal_identity", identity, raising=False)
-    monkeypatch.setattr(
-        sys,
-        "_prospect_wm001_runtime_seal_sha256",
-        hashlib.sha256(payload).hexdigest(),
-        raising=False,
+    payload = _canonical(_runtime_seal(Path(sys.executable)))
+    descriptor = _install_captured_descriptor(
+        path,
+        payload,
+        prefix="runtime_seal",
+        link_count=2,
+        monkeypatch=monkeypatch,
     )
     try:
         assert preformal._captured_payload("runtime_seal") == payload

@@ -22,7 +22,7 @@ import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast, overload
 
 import torch
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
@@ -88,6 +88,7 @@ REPO = _repository_root()
 LOCKFILE = REPO / "requirements-wm001.lock"
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.15.0.json"
+DEVELOPMENT_RESULT_QUALIFICATION_NAME = "development-result-qualification.json"
 ROOT_DISTRIBUTIONS = (
     "gymnasium",
     "jsonschema",
@@ -3904,7 +3905,27 @@ def _repo_artifact_path(raw: object, *, label: str) -> Path:
     return path
 
 
-def verify_development_closure(path: Path) -> dict[str, object]:
+@overload
+def verify_development_closure(
+    path: Path,
+    *,
+    include_result_qualification: Literal[False] = False,
+) -> dict[str, object]: ...
+
+
+@overload
+def verify_development_closure(
+    path: Path,
+    *,
+    include_result_qualification: Literal[True],
+) -> tuple[dict[str, object], bytes]: ...
+
+
+def verify_development_closure(
+    path: Path,
+    *,
+    include_result_qualification: bool = False,
+) -> dict[str, object] | tuple[dict[str, object], bytes]:
     """Stream and semantically reopen canonical or formally preserved evidence."""
 
     closure_path = path if path.is_absolute() else Path.cwd() / path
@@ -4153,6 +4174,11 @@ def verify_development_closure(path: Path) -> dict[str, object]:
         or not _strict_json_equal(audit_execution, expected_audit_execution)
     ):
         raise RuntimeError("development closure identity differs from archived evidence")
+    if include_result_qualification:
+        return (
+            closure,
+            retained["evidence/development-result-qualification.json"],
+        )
     return closure
 
 
@@ -4613,7 +4639,13 @@ def create_formal_binding(
         test_report,
     )
     verify_preclaim_log_schema_compatibility(test_log_rows)
-    development_closure = verify_development_closure(development_closure_path)
+    verified_development = verify_development_closure(
+        development_closure_path,
+        include_result_qualification=True,
+    )
+    if not isinstance(verified_development, tuple):  # pragma: no cover - fixed call contract
+        raise RuntimeError("development qualification projection was not retained")
+    development_closure, result_qualification_payload = verified_development
     test_report_digest = hashlib.sha256(test_report_bytes).hexdigest()
     from .preformal import REPORT_NAME as PREFORMAL_REPORT_NAME
 
@@ -4630,18 +4662,29 @@ def create_formal_binding(
     development_closure_digest = hashlib.sha256(development_closure_bytes).hexdigest()
     development_closure_filename = f"development-closure-{development_closure_digest[:16]}.json"
     preserved_development_closure_path = output_path.with_name(development_closure_filename)
+    preserved_result_qualification_path = output_path.with_name(
+        DEVELOPMENT_RESULT_QUALIFICATION_NAME
+    )
     development_identity = _formal_development_identity(
         development_closure,
         closure_filename=development_closure_filename,
         closure_bytes=len(development_closure_bytes),
         closure_sha256=development_closure_digest,
     )
+    if (
+        hashlib.sha256(result_qualification_payload).hexdigest()
+        != development_identity["result_qualification_sha256"]
+    ):
+        raise RuntimeError(
+            "retained development result qualification differs from its binding identity"
+        )
     for candidate in (
         conformance_path,
         oscillator_conformance_path,
         coverage_conformance_path,
         preserved_test_report_path,
         preserved_development_closure_path,
+        preserved_result_qualification_path,
         *(output_path.with_name(str(row["path"])) for row in test_log_rows),
     ):
         if candidate.exists():
@@ -4832,6 +4875,10 @@ def create_formal_binding(
     atomic_write_exclusive(
         preserved_development_closure_path,
         development_closure_bytes,
+    )
+    atomic_write_exclusive(
+        preserved_result_qualification_path,
+        result_qualification_payload,
     )
     atomic_write_exclusive(conformance_path, conformance_bytes)
     atomic_write_exclusive(

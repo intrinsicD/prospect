@@ -2993,17 +2993,64 @@ def _descriptor_identity(metadata: os.stat_result) -> tuple[int, ...]:
     )
 
 
+def _runtime_custody_value(payload: bytes) -> tuple[dict[str, Any], int]:
+    """Return one protocol-authorized runtime custody object and link count."""
+
+    value = _load_canonical_object(
+        payload,
+        label="captured runtime custody",
+    )
+    schema = value.get("schema")
+    if schema == "prospect.wm001.runtime-seal.v1":
+        if (
+            set(value) != _RUNTIME_SEAL_FIELDS
+            or value.get("experiment_id") != EXPERIMENT_ID
+            or value.get("protocol_version") != PROTOCOL_VERSION
+            or not _strict_json_equal(value.get("assurance"), ASSURANCE)
+        ):
+            raise PreformalEvidenceError(
+                "captured runtime seal is malformed"
+            )
+        return value, _OUTER_FINALIZED_CUSTODY
+    if schema == "prospect.world-model-lifecycle.formal-binding.v10":
+        protocol = value.get("protocol")
+        if (
+            value.get("experiment_id") != EXPERIMENT_ID
+            or not _strict_json_equal(value.get("assurance"), ASSURANCE)
+            or not isinstance(protocol, dict)
+            or set(protocol)
+            != {
+                "version",
+                "sha256",
+                "raw_result_schema_sha256",
+                "binding_schema_sha256",
+            }
+            or protocol.get("version") != PROTOCOL_VERSION
+            or any(
+                not _is_sha256(protocol.get(field))
+                for field in (
+                    "sha256",
+                    "raw_result_schema_sha256",
+                    "binding_schema_sha256",
+                )
+            )
+        ):
+            raise PreformalEvidenceError(
+                "captured formal binding custody is malformed"
+            )
+        return value, _SINGLE_LINK_CUSTODY
+    raise PreformalEvidenceError(
+        "captured runtime custody has an unsupported schema"
+    )
+
+
 def _captured_payload(prefix: str) -> bytes:
     descriptor = getattr(sys, f"_prospect_wm001_{prefix}_fd", None)
     expected_payload = getattr(sys, f"_prospect_wm001_{prefix}_payload", None)
     expected_identity = getattr(sys, f"_prospect_wm001_{prefix}_identity", None)
     expected_sha256 = getattr(sys, f"_prospect_wm001_{prefix}_sha256", None)
-    expected_nlink = {
-        "bootstrap": 1,
-        "runtime_seal": 2,
-    }.get(prefix)
     if (
-        expected_nlink is None
+        prefix not in {"bootstrap", "runtime_seal"}
         or type(descriptor) is not int
         or not isinstance(expected_payload, bytes)
         or not isinstance(expected_identity, tuple)
@@ -3011,6 +3058,9 @@ def _captured_payload(prefix: str) -> bytes:
         or not _is_sha256(expected_sha256)
     ):
         raise PreformalEvidenceError(f"{prefix} descriptor custody is absent")
+    expected_nlink = _SINGLE_LINK_CUSTODY
+    if prefix == "runtime_seal":
+        _, expected_nlink = _runtime_custody_value(expected_payload)
     try:
         before = os.fstat(descriptor)
         payload = os.pread(descriptor, before.st_size + 1, 0)
@@ -3034,15 +3084,7 @@ def _verify_live_bootstrap_custody() -> dict[str, Any]:
 
     runtime_payload = _captured_payload("runtime_seal")
     _captured_payload("bootstrap")
-    seal = _load_canonical_object(runtime_payload, label="captured runtime seal")
-    if (
-        set(seal) != _RUNTIME_SEAL_FIELDS
-        or seal.get("schema") != "prospect.wm001.runtime-seal.v1"
-        or seal.get("experiment_id") != EXPERIMENT_ID
-        or seal.get("protocol_version") != PROTOCOL_VERSION
-        or seal.get("assurance") != ASSURANCE
-    ):
-        raise PreformalEvidenceError("captured runtime seal is malformed")
+    seal, _ = _runtime_custody_value(runtime_payload)
     try:
         live_custody = verify_live_closure()
     except RuntimeError as error:

@@ -7800,6 +7800,9 @@ _PREFORMAL_LOG_PREFIX = "preformal-v1.15.0-command-"
 _PREFORMAL_REVIEW_PATH = "docs/wm001-v1150-prospective-harness-review.json"
 _PREFORMAL_LIVE_RELATIVE_DIRECTORY = Path("v1.15.0") / "preformal"
 _FORMAL_INPUT_PREFLIGHT_NAME = "formal-input-preflight.json"
+_DEVELOPMENT_RESULT_QUALIFICATION_NAME = (
+    "development-result-qualification.json"
+)
 _PREFORMAL_COMMAND_NAMES = (
     "protocol-seal-continuity",
     "ruff",
@@ -9963,7 +9966,7 @@ def _validate_development_qualification(
     runtime: Mapping[str, object],
     bound_audit_execution: Mapping[str, object],
     preformal_runtime_seal: Mapping[str, object],
-) -> None:
+) -> bytes:
     closure = _canonical_json_object_payload(
         payload,
         label="development qualification closure",
@@ -10473,6 +10476,14 @@ def _validate_development_qualification(
             "development producer runtime seal differs from the exact "
             "preformal assured seal"
         )
+    result_qualification_member = closure.get(
+        "result_qualification_member"
+    )
+    if not isinstance(result_qualification_member, str):
+        raise ArtifactAuditError(
+            "development result qualification archive role is invalid"
+        )
+    return retained[result_qualification_member]
 
 
 def preflight_formal_input_package(
@@ -10581,7 +10592,7 @@ def preflight_formal_input_package(
             "prospective development closure lacks single-link custody"
         )
     closure_payload = closure_payload_raw
-    _validate_development_qualification(
+    archived_result_qualification = _validate_development_qualification(
         closure_payload,
         block=development,
         source=source,
@@ -10593,6 +10604,34 @@ def preflight_formal_input_package(
             report["runtime_seal"],
         ),
     )
+    result_qualification_path = _resolve_artifact_file(
+        root,
+        _DEVELOPMENT_RESULT_QUALIFICATION_NAME,
+        label="prospective development result qualification",
+    )
+    (
+        result_qualification_payload,
+        _,
+        result_qualification_sha256,
+        result_qualification_identity,
+    ) = _read_stable_regular_file(
+        result_qualification_path,
+        64 << 20,
+        label="prospective development result qualification",
+        capture_payload=True,
+    )
+    if (
+        result_qualification_payload is None
+        or result_qualification_identity[3] != 1
+        or result_qualification_payload
+        != archived_result_qualification
+        or result_qualification_sha256
+        != development.get("result_qualification_sha256")
+    ):
+        raise ArtifactAuditError(
+            "prospective development result qualification differs from "
+            "its archive or formal binding"
+        )
     if (
         accepted_closure.get("development_closure_sha256")
         != development.get("closure_sha256")
@@ -12935,6 +12974,30 @@ def _validate_formal_authorization_lineage(
             "copied formal input preflight differs from the terminal-bound "
             "binding receipt"
         )
+    development = binding.get("development_qualification")
+    live_result_qualification = binding_attempt.payloads.get(
+        _DEVELOPMENT_RESULT_QUALIFICATION_NAME
+    )
+    if (
+        not isinstance(development, Mapping)
+        or live_result_qualification is None
+        or hashlib.sha256(live_result_qualification).hexdigest()
+        != development.get("result_qualification_sha256")
+    ):
+        raise ArtifactAuditError(
+            "terminal-bound development result qualification differs "
+            "from the formal binding"
+        )
+    _, copied_result_qualification, _ = _authorization_file_row(
+        artifact_root / _DEVELOPMENT_RESULT_QUALIFICATION_NAME,
+        label="copied development result qualification",
+        expected_nlink=1,
+    )
+    if copied_result_qualification != live_result_qualification:
+        raise ArtifactAuditError(
+            "copied development result qualification differs from the "
+            "terminal-bound sidecar"
+        )
     preformal_rows = _authorization_preformal_rows(
         repository,
         artifact_root=artifact_root,
@@ -12999,6 +13062,9 @@ def _audit_formal_input_package(
     launch_path = root / "formal-launch.json"
     binding_attempt_copy = root / "formal-binding-operator-attempt.json"
     binding_completion_copy = root / "formal-binding-outer-completion.json"
+    result_qualification_copy = (
+        root / _DEVELOPMENT_RESULT_QUALIFICATION_NAME
+    )
     lock_path = root / "requirements-wm001.lock"
     seal_path = root / "SEALED_PROTOCOL.sha256"
     required = [
@@ -13006,6 +13072,7 @@ def _audit_formal_input_package(
         launch_path,
         binding_attempt_copy,
         binding_completion_copy,
+        result_qualification_copy,
         lock_path,
         seal_path,
         *fixed_files.values(),
@@ -13533,7 +13600,7 @@ def _audit_formal_input_package(
             64 << 20,
             label="development qualification closure",
         )
-        _validate_development_qualification(
+        archived_result_qualification = _validate_development_qualification(
             development_payload,
             block=development_qualification,
             source=source,
@@ -13545,6 +13612,29 @@ def _audit_formal_input_package(
                 preformal_report["runtime_seal"],
             ),
         )
+        live_result_qualification = authorization_attempt.payloads.get(
+            _DEVELOPMENT_RESULT_QUALIFICATION_NAME
+        )
+        copied_result_qualification = _read_bounded(
+            result_qualification_copy,
+            64 << 20,
+            label="copied development result qualification",
+        )
+        if (
+            live_result_qualification is None
+            or copied_result_qualification
+            != live_result_qualification
+            or copied_result_qualification
+            != archived_result_qualification
+            or hashlib.sha256(copied_result_qualification).hexdigest()
+            != development_qualification.get(
+                "result_qualification_sha256"
+            )
+        ):
+            raise ArtifactAuditError(
+                "formal development result qualification differs across "
+                "the live attempt, copied artifact, archive, or binding"
+            )
         if (
             preformal_accepted_closure_evidence.get(
                 "development_closure_sha256"
