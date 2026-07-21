@@ -1,4 +1,4 @@
-"""Explicit assurance boundary for WM-001 protocol 1.13 evidence."""
+"""Explicit assurance boundary for WM-001 protocol 1.14 evidence."""
 
 from __future__ import annotations
 

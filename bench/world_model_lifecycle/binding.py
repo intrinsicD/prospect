@@ -19,6 +19,7 @@ import sys
 import sysconfig
 import tarfile
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -82,7 +83,7 @@ def _repository_root() -> Path:
 REPO = _repository_root()
 LOCKFILE = REPO / "requirements-wm001.lock"
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.13.0.json"
+DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.14.0.json"
 ROOT_DISTRIBUTIONS = (
     "gymnasium",
     "jsonschema",
@@ -178,8 +179,8 @@ def _load_canonical_json(path: Path, *, label: str) -> dict[str, object]:
     return value
 
 
-def verify_machine_test_report(path: Path) -> dict[str, object]:
-    """Validate the prospective, machine-readable preformal check report."""
+def verify_canonical_machine_test_report(path: Path) -> dict[str, object]:
+    """Validate the sole live, canonical preformal authorization report."""
 
     from .preformal import (
         PreformalEvidenceError,
@@ -195,16 +196,796 @@ def verify_machine_test_report(path: Path) -> dict[str, object]:
         raise RuntimeError("formal test report does not prove the complete fixed preformal check set") from error
 
 
-def preformal_log_rows(
+_BOUND_PREFORMAL_REPORT_FIELDS = frozenset(
+    {
+        "schema",
+        "experiment_id",
+        "protocol_version",
+        "repository_cwd",
+        "device",
+        "qa_environment",
+        "runtime_environment",
+        "git_before",
+        "git_after",
+        "qa_executable_before",
+        "qa_executable_after",
+        "runtime_executable_before",
+        "runtime_executable_after",
+        "qa_closure_before",
+        "qa_closure_after",
+        "runtime_seal",
+        "prospective_review",
+        "input_files_before",
+        "input_files_after",
+        "generator_source_before",
+        "generator_source_after",
+        "identities_stable",
+        "commands",
+        "all_pass",
+    }
+)
+_BOUND_PREFORMAL_COMMAND_FIELDS = frozenset(
+    {
+        "ordinal",
+        "name",
+        "role",
+        "argv",
+        "cwd",
+        "environment_sha256",
+        "exit_code",
+        "passed",
+        "stdout",
+        "stderr",
+    }
+)
+_BOUND_EXECUTABLE_FIELDS = frozenset(
+    {
+        "invocation_path",
+        "invocation_symlink_target",
+        "resolved_path",
+        "bytes",
+        "sha256",
+        "implementation",
+        "version",
+    }
+)
+
+
+def _bound_preformal_executable(
+    value: object,
+    *,
+    label: str,
+) -> dict[str, object]:
+    if not isinstance(value, dict) or set(value) != _BOUND_EXECUTABLE_FIELDS:
+        raise RuntimeError(f"bound preformal {label} executable identity is malformed")
+    invocation = value.get("invocation_path")
+    resolved = value.get("resolved_path")
+    link_target = value.get("invocation_symlink_target")
+    if (
+        not isinstance(invocation, str)
+        or not Path(invocation).is_absolute()
+        or os.path.abspath(invocation) != invocation
+        or not isinstance(resolved, str)
+        or not Path(resolved).is_absolute()
+        or os.path.abspath(resolved) != resolved
+        or (link_target is not None and not isinstance(link_target, str))
+        or type(value.get("bytes")) is not int
+        or cast(int, value["bytes"]) < 1
+        or not isinstance(value.get("sha256"), str)
+        or len(cast(str, value["sha256"])) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in cast(str, value["sha256"])
+        )
+        or value.get("implementation") != "CPython"
+        or not isinstance(value.get("version"), str)
+        or not value.get("version")
+    ):
+        raise RuntimeError(f"bound preformal {label} executable identity is malformed")
+    return value
+
+
+def _bound_preformal_implementation_map(
+    source: Mapping[str, object],
+) -> dict[str, Mapping[str, object]]:
+    rows = source.get("implementation_files")
+    if not isinstance(rows, list) or not rows:
+        raise RuntimeError("bound preformal report has no implementation manifest")
+    mapped: dict[str, Mapping[str, object]] = {}
+    for row in rows:
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {"path", "bytes", "sha256"}
+            or not isinstance(row.get("path"), str)
+            or cast(str, row["path"]) in mapped
+        ):
+            raise RuntimeError("bound preformal implementation manifest is malformed")
+        mapped[cast(str, row["path"])] = row
+    return mapped
+
+
+def _bound_preformal_expected_commands(
+    report: Mapping[str, object],
+    *,
+    implementation: Mapping[str, Mapping[str, object]],
+) -> tuple[tuple[str, str, tuple[str, ...]], ...]:
+    from .preformal import _WM001_MYPY_FILES
+
+    repository = report.get("repository_cwd")
+    qa_identity = report.get("qa_executable_before")
+    runtime_identity = report.get("runtime_executable_before")
+    inputs = report.get("input_files_before")
+    if (
+        not isinstance(repository, str)
+        or not Path(repository).is_absolute()
+        or os.path.abspath(repository) != repository
+        or not isinstance(qa_identity, Mapping)
+        or not isinstance(runtime_identity, Mapping)
+        or not isinstance(inputs, Mapping)
+    ):
+        raise RuntimeError("bound preformal command context is malformed")
+    qa_executable = qa_identity.get("invocation_path")
+    runtime_executable = runtime_identity.get("invocation_path")
+    if not isinstance(qa_executable, str) or not isinstance(runtime_executable, str):
+        raise RuntimeError("bound preformal command executable is malformed")
+
+    input_paths: dict[str, str] = {}
+    for name in (
+        "runtime_seal",
+        "development_closure",
+        "closure_attempt_terminal",
+        "prospective_review",
+    ):
+        identity = inputs.get(name)
+        value = identity.get("path") if isinstance(identity, Mapping) else None
+        if not isinstance(value, str):
+            raise RuntimeError(f"bound preformal {name} path is malformed")
+        input_paths[name] = value
+    closure_attempt = str(Path(input_paths["closure_attempt_terminal"]).parent)
+    epistemic_tests = tuple(
+        sorted(
+            path
+            for path in implementation
+            if path.startswith("tests/test_epistemic_")
+            and path.endswith(".py")
+            and len(Path(path).parts) == 2
+        )
+    )
+    wm001_tests = tuple(
+        sorted(
+            path
+            for path in implementation
+            if path.startswith("tests/test_world_model_")
+            and path.endswith(".py")
+            and len(Path(path).parts) == 2
+        )
+    )
+    if (
+        not epistemic_tests
+        or not wm001_tests
+        or "tests/test_world_model_audit_runner.py" not in wm001_tests
+        or "tests/test_world_model_prebinding_audit.py" not in wm001_tests
+    ):
+        raise RuntimeError("bound preformal implementation manifest lacks the fixed test sets")
+    launch = f"{repository}/bench/world_model_lifecycle/launch_bootstrap.py"
+    bootstrap = f"{repository}/bench/world_model_lifecycle/producer_bootstrap.py"
+    runtime_prefix = (
+        runtime_executable,
+        "-I",
+        "-S",
+        "-B",
+        launch,
+        "--bootstrap",
+        bootstrap,
+        "--runtime-seal",
+        input_paths["runtime_seal"],
+        "preformal-runtime",
+    )
+    return (
+        (
+            "protocol-seal-continuity",
+            "qa",
+            (qa_executable, "-m", "bench.world_model_lifecycle.verify", "protocol"),
+        ),
+        (
+            "ruff",
+            "qa",
+            (qa_executable, "-m", "ruff", "check", "src/prospect", "bench", "tests"),
+        ),
+        ("mypy-core", "qa", (qa_executable, "-m", "mypy")),
+        (
+            "mypy-wm001",
+            "qa",
+            (
+                qa_executable,
+                "-m",
+                "mypy",
+                "--follow-imports=skip",
+                *_WM001_MYPY_FILES,
+            ),
+        ),
+        (
+            "pytest-epistemic",
+            "qa",
+            (qa_executable, "-m", "pytest", "-q", *epistemic_tests),
+        ),
+        (
+            "pytest-wm001",
+            "qa",
+            (qa_executable, "-m", "pytest", "-q", *wm001_tests),
+        ),
+        (
+            "audit-runner-adversarial",
+            "qa",
+            (
+                qa_executable,
+                "-m",
+                "pytest",
+                "-q",
+                "tests/test_world_model_audit_runner.py",
+                "tests/test_world_model_prebinding_audit.py",
+            ),
+        ),
+        (
+            "prospective-harness-review",
+            "qa",
+            (
+                qa_executable,
+                "-I",
+                "-B",
+                "-m",
+                "bench.world_model_lifecycle.preformal",
+                "verify-prospective-review",
+                "--review",
+                input_paths["prospective_review"],
+            ),
+        ),
+        (
+            "runtime-accepted-closure-evidence",
+            "runtime",
+            (
+                *runtime_prefix,
+                "accepted-closure-evidence",
+                "--development-closure",
+                input_paths["development_closure"],
+                "--closure-attempt",
+                closure_attempt,
+            ),
+        ),
+        (
+            "runtime-bootstrap-inventory-conformance",
+            "runtime",
+            (
+                *runtime_prefix,
+                "bootstrap-inventory-conformance",
+                "--device",
+                cast(str, report.get("device")),
+            ),
+        ),
+    )
+
+
+def verify_bound_machine_test_report(
+    path: Path,
+    binding: Mapping[str, object],
+) -> dict[str, object]:
+    """Validate the self-contained preformal projection beside one binding.
+
+    Unlike :func:`verify_canonical_machine_test_report`, this consumer never
+    reopens an absolute origin path recorded by the report. Historical live
+    authorization remains the operator's separate responsibility.
+    """
+
+    from . import preformal
+
+    source = binding.get("source")
+    dependencies = binding.get("dependencies")
+    runtime = binding.get("runtime")
+    development = binding.get("development_qualification")
+    audit_execution = binding.get("audit_execution")
+    if not all(
+        isinstance(value, Mapping)
+        for value in (source, dependencies, runtime, development, audit_execution)
+    ):
+        raise RuntimeError("bound preformal binding context is malformed")
+    assert isinstance(source, Mapping)
+    assert isinstance(dependencies, Mapping)
+    assert isinstance(runtime, Mapping)
+    assert isinstance(development, Mapping)
+    assert isinstance(audit_execution, Mapping)
+    if (
+        not path.is_absolute()
+        or path.name != source.get("test_report_file")
+        or path.name != preformal.REPORT_NAME
+        or path.parent.resolve(strict=True) != path.parent
+    ):
+        raise RuntimeError("bound preformal report is not one safe binding sibling")
+    payload = _stable_regular_payload(path, label="bound preformal report")
+    try:
+        report = preformal._load_canonical_object(
+            payload,
+            label="bound preformal report",
+        )
+    except preformal.PreformalEvidenceError as error:
+        raise RuntimeError("bound preformal report is not canonical JSON") from error
+    if (
+        len(payload) != source.get("test_report_bytes")
+        or hashlib.sha256(payload).hexdigest() != source.get("test_report_sha256")
+    ):
+        raise RuntimeError("bound preformal report bytes differ from the binding")
+    if (
+        set(report) != _BOUND_PREFORMAL_REPORT_FIELDS
+        or report.get("schema") != preformal.SCHEMA
+        or report.get("experiment_id") != preformal.EXPERIMENT_ID
+        or report.get("protocol_version") != preformal.PROTOCOL_VERSION
+        or report.get("device") not in {"cpu", "cuda"}
+        or report.get("device") != runtime.get("device")
+        or report.get("identities_stable") is not True
+        or report.get("all_pass") is not True
+    ):
+        raise RuntimeError("bound preformal report identity or status is invalid")
+
+    repository = report.get("repository_cwd")
+    if repository != str(preformal.REPO):
+        raise RuntimeError("bound preformal repository identity is malformed")
+    try:
+        qa_environment = preformal._environment_from_identity(
+            report.get("qa_environment"),
+            role="qa",
+        )
+        runtime_environment = preformal._environment_from_identity(
+            report.get("runtime_environment"),
+            role="runtime",
+        )
+        preformal._validate_git_identity(report.get("git_before"))
+        preformal._validate_git_identity(report.get("git_after"))
+        qa_closure = preformal._validate_qa_closure(report.get("qa_closure_before"))
+        runtime_closure = preformal._validate_qa_closure(report.get("qa_closure_after"))
+    except preformal.PreformalEvidenceError as error:
+        raise RuntimeError("bound preformal recorded identity is malformed") from error
+    del qa_environment
+    if (
+        runtime_environment != runtime.get("process_environment")
+        or report.get("git_before") != report.get("git_after")
+        or report.get("git_before")
+        != {
+            "commit": source.get("git_commit"),
+            "tree": source.get("git_tree"),
+            "worktree_clean": True,
+        }
+        or qa_closure != runtime_closure
+    ):
+        raise RuntimeError("bound preformal runtime, Git, or QA identity differs")
+
+    qa_executable = _bound_preformal_executable(
+        report.get("qa_executable_before"),
+        label="QA",
+    )
+    runtime_executable = _bound_preformal_executable(
+        report.get("runtime_executable_before"),
+        label="runtime",
+    )
+    if (
+        report.get("qa_executable_after") != qa_executable
+        or report.get("runtime_executable_after") != runtime_executable
+        or runtime_executable.get("invocation_path")
+        != dependencies.get("python_executable")
+        or runtime_executable.get("sha256")
+        != dependencies.get("python_executable_sha256")
+    ):
+        raise RuntimeError("bound preformal executable identity differs from the binding")
+
+    inputs_before = report.get("input_files_before")
+    inputs_after = report.get("input_files_after")
+    if (
+        not isinstance(inputs_before, Mapping)
+        or set(inputs_before) != preformal._PREFORMAL_INPUT_FIELDS
+        or inputs_before != inputs_after
+    ):
+        raise RuntimeError("bound preformal input identities are incomplete or changed")
+    inputs: dict[str, dict[str, object]] = {}
+    try:
+        for name, identity in inputs_before.items():
+            inputs[name] = preformal._validate_file_identity(
+                identity,
+                label=name,
+            )
+    except preformal.PreformalEvidenceError as error:
+        raise RuntimeError("bound preformal input identity is malformed") from error
+    from .operator import outer_completion_marker
+
+    closure_terminal = preformal.CLOSURE_ATTEMPT_PATH / "operator-attempt.json"
+    expected_input_paths = {
+        "closure_attempt_terminal": str(closure_terminal),
+        "closure_outer_completion": str(
+            outer_completion_marker(closure_terminal)
+        ),
+        "development_closure": str(preformal.DEVELOPMENT_CLOSURE_PATH),
+        "launch_bootstrap": str(preformal.LAUNCH_BOOTSTRAP_PATH),
+        "producer_bootstrap": str(preformal.PRODUCER_BOOTSTRAP_PATH),
+        "prospective_review": str(preformal.REVIEW_PATH),
+        "runtime_seal": str(preformal.RUNTIME_SEAL_PATH),
+    }
+    if any(
+        inputs[name].get("path") != expected_path
+        for name, expected_path in expected_input_paths.items()
+    ):
+        raise RuntimeError("bound preformal input path is not canonical v1.14")
+
+    implementation = _bound_preformal_implementation_map(source)
+    generator = implementation.get(preformal.SOURCE_RELATIVE_PATH)
+    launch = implementation.get("bench/world_model_lifecycle/launch_bootstrap.py")
+    producer = implementation.get("bench/world_model_lifecycle/producer_bootstrap.py")
+    review_row = implementation.get(preformal.REVIEW_RELATIVE_PATH)
+    generator_before = report.get("generator_source_before")
+    review = report.get("prospective_review")
+    if (
+        not isinstance(generator, Mapping)
+        or generator_before != generator
+        or report.get("generator_source_after") != generator
+        or not isinstance(launch, Mapping)
+        or not isinstance(producer, Mapping)
+        or not isinstance(review_row, Mapping)
+        or not isinstance(review, Mapping)
+    ):
+        raise RuntimeError("bound preformal source projection differs from the binding")
+    for name, relative, row in (
+        ("launch_bootstrap", "bench/world_model_lifecycle/launch_bootstrap.py", launch),
+        ("producer_bootstrap", "bench/world_model_lifecycle/producer_bootstrap.py", producer),
+    ):
+        identity = inputs[name]
+        if (
+            identity.get("path") != str(Path(repository) / relative)
+            or identity.get("bytes") != row.get("bytes")
+            or identity.get("sha256") != row.get("sha256")
+        ):
+            raise RuntimeError(f"bound preformal {name} differs from the binding")
+    if (
+        inputs["prospective_review"].get("bytes") != review_row.get("bytes")
+        or inputs["prospective_review"].get("sha256")
+        != review_row.get("sha256")
+    ):
+        raise RuntimeError("bound preformal prospective_review differs from the binding")
+    review_rows = review.get("implementation_files")
+    expected_review_rows = [
+        dict(row)
+        for relative, row in sorted(implementation.items())
+        if relative != preformal.REVIEW_RELATIVE_PATH
+    ]
+    reviewer = review.get("reviewer")
+    findings = review.get("findings")
+    finding_ids: list[str] = []
+    if isinstance(findings, list):
+        for finding in findings:
+            if (
+                not isinstance(finding, Mapping)
+                or set(finding) != {"id", "severity", "summary", "resolution"}
+                or not isinstance(finding.get("id"), str)
+                or not finding.get("id")
+                or finding.get("severity")
+                not in {"blocker", "major", "minor", "note"}
+                or not isinstance(finding.get("summary"), str)
+                or not finding.get("summary")
+                or finding.get("resolution")
+                not in {"resolved", "informational"}
+            ):
+                raise RuntimeError(
+                    "bound preformal prospective review finding is malformed"
+                )
+            finding_ids.append(cast(str, finding["id"]))
+    review_payload = canonical_json_bytes(dict(review)) + b"\n"
+    if (
+        set(review) != preformal._REVIEW_FIELDS
+        or not _strict_json_equal(review_rows, expected_review_rows)
+        or review.get("implementation_manifest_sha256")
+        != hashlib.sha256(canonical_json_bytes(expected_review_rows)).hexdigest()
+        or not isinstance(reviewer, Mapping)
+        or set(reviewer) != {"kind", "identifier"}
+        or reviewer.get("kind") != "independent-adversarial-referee"
+        or not isinstance(reviewer.get("identifier"), str)
+        or not reviewer.get("identifier")
+        or cast(str, reviewer["identifier"]).strip()
+        != reviewer["identifier"]
+        or not isinstance(findings, list)
+        or finding_ids != sorted(finding_ids)
+        or len(finding_ids) != len(set(finding_ids))
+        or inputs["prospective_review"].get("bytes") != len(review_payload)
+        or inputs["prospective_review"].get("sha256")
+        != hashlib.sha256(review_payload).hexdigest()
+        or review.get("schema") != preformal.REVIEW_SCHEMA
+        or review.get("experiment_id") != preformal.EXPERIMENT_ID
+        or review.get("protocol_version") != preformal.PROTOCOL_VERSION
+        or review.get("disposition") != "accepted"
+        or review.get("unresolved_blockers") != []
+    ):
+        raise RuntimeError("bound preformal prospective review is malformed or misbound")
+
+    seal = report.get("runtime_seal")
+    if not isinstance(seal, Mapping):
+        raise RuntimeError("bound preformal runtime seal is malformed")
+    seal_python = seal.get("python")
+    seal_payload = canonical_json_bytes(dict(seal)) + b"\n"
+    execution_sources = source.get("execution_source_sha256")
+    python_version = (
+        seal_python.get("version")
+        if isinstance(seal_python, Mapping)
+        else None
+    )
+    if (
+        set(seal) != preformal._RUNTIME_SEAL_FIELDS
+        or seal.get("schema") != "prospect.wm001.runtime-seal.v1"
+        or seal.get("experiment_id") != preformal.EXPERIMENT_ID
+        or seal.get("protocol_version") != preformal.PROTOCOL_VERSION
+        or not _strict_json_equal(seal.get("assurance"), ASSURANCE)
+        or seal.get("git_commit") != source.get("git_commit")
+        or seal.get("git_tree") != source.get("git_tree")
+        or seal.get("worktree_clean") is not True
+        or not _strict_json_equal(
+            seal.get("required_flags"),
+            preformal._RUNTIME_FLAGS,
+        )
+        or not _strict_json_equal(
+            seal.get("process_environment"),
+            runtime_environment,
+        )
+        or not isinstance(seal_python, Mapping)
+        or set(seal_python)
+        != {"executable", "resolved_executable", "sha256", "version"}
+        or not isinstance(python_version, list)
+        or len(python_version) != 3
+        or any(
+            type(item) is not int or item < 0
+            for item in python_version
+        )
+        or ".".join(str(item) for item in python_version)
+        != runtime_executable.get("version")
+        or seal_python.get("executable") != runtime_executable.get("invocation_path")
+        or seal_python.get("resolved_executable") != runtime_executable.get("resolved_path")
+        or seal_python.get("sha256") != runtime_executable.get("sha256")
+        or not _strict_json_equal(
+            seal.get("standard_library"),
+            dependencies.get("standard_library"),
+        )
+        or not _strict_json_equal(
+            seal.get("package_roots"),
+            dependencies.get("package_roots"),
+        )
+        or not _strict_json_equal(
+            seal.get("package_ownership"),
+            dependencies.get("package_ownership"),
+        )
+        or not isinstance(execution_sources, Mapping)
+        or seal.get("bootstrap_source_sha256")
+        != execution_sources.get("producer_bootstrap.py")
+        or inputs["runtime_seal"].get("bytes") != len(seal_payload)
+        or inputs["runtime_seal"].get("sha256")
+        != hashlib.sha256(seal_payload).hexdigest()
+    ):
+        raise RuntimeError("bound preformal runtime seal differs from the binding")
+    if (
+        inputs["development_closure"].get("bytes")
+        != development.get("closure_bytes")
+        or inputs["development_closure"].get("sha256")
+        != development.get("closure_sha256")
+        or inputs["closure_attempt_terminal"].get("bytes")
+        != inputs["closure_outer_completion"].get("bytes")
+        or inputs["closure_attempt_terminal"].get("sha256")
+        != inputs["closure_outer_completion"].get("sha256")
+    ):
+        raise RuntimeError("bound preformal closure identity differs from the binding")
+
+    expected_commands = _bound_preformal_expected_commands(
+        report,
+        implementation=implementation,
+    )
+    commands = report.get("commands")
+    if not isinstance(commands, list) or len(commands) != len(expected_commands):
+        raise RuntimeError("bound preformal command set is incomplete")
+    environment_digests = {
+        "qa": cast(str, cast(Mapping[str, object], report["qa_environment"])["sha256"]),
+        "runtime": cast(
+            str,
+            cast(Mapping[str, object], report["runtime_environment"])["sha256"],
+        ),
+    }
+    log_rows: list[dict[str, object]] = []
+    expected_names: set[str] = {path.name}
+    total_log_bytes = 0
+    for ordinal, (command, expected) in enumerate(
+        zip(commands, expected_commands, strict=True),
+        start=1,
+    ):
+        name, role, argv = expected
+        if (
+            not isinstance(command, Mapping)
+            or set(command) != _BOUND_PREFORMAL_COMMAND_FIELDS
+            or type(command.get("ordinal")) is not int
+            or command.get("ordinal") != ordinal
+            or command.get("name") != name
+            or command.get("role") != role
+            or command.get("argv") != list(argv)
+            or command.get("cwd") != repository
+            or command.get("environment_sha256") != environment_digests[role]
+            or type(command.get("exit_code")) is not int
+            or command.get("exit_code") != 0
+            or command.get("passed") is not True
+        ):
+            raise RuntimeError(f"bound preformal command {ordinal} differs from its fixed contract")
+        for stream in ("stdout", "stderr"):
+            reference = command.get(stream)
+            if (
+                not isinstance(reference, Mapping)
+                or set(reference) != {"file", "bytes", "sha256"}
+                or not isinstance(reference.get("file"), str)
+                or type(reference.get("bytes")) is not int
+                or cast(int, reference["bytes"]) < 0
+                or not isinstance(reference.get("sha256"), str)
+            ):
+                raise RuntimeError(f"bound preformal command {ordinal} {stream} reference is malformed")
+            filename = cast(str, reference["file"])
+            digest = cast(str, reference["sha256"])
+            expected_filename = preformal._log_filename(
+                ordinal,
+                name,
+                stream,
+                digest,
+            )
+            if (
+                filename != expected_filename
+                or Path(filename).name != filename
+                or filename in {".", ".."}
+                or filename in expected_names
+            ):
+                raise RuntimeError(f"bound preformal command {ordinal} {stream} filename is unsafe")
+            log_payload = _stable_regular_payload(
+                path.parent / filename,
+                label=f"bound preformal command {ordinal} {stream}",
+            )
+            total_log_bytes += len(log_payload)
+            if (
+                total_log_bytes > 512 << 20
+                or len(log_payload) != reference.get("bytes")
+                or hashlib.sha256(log_payload).hexdigest() != digest
+            ):
+                raise RuntimeError(f"bound preformal command {ordinal} {stream} bytes changed")
+            expected_names.add(filename)
+            log_rows.append(
+                {
+                    "path": filename,
+                    "bytes": len(log_payload),
+                    "sha256": digest,
+                }
+            )
+    if source.get("test_log_files") != log_rows or len(log_rows) != 20:
+        raise RuntimeError("bound preformal command-log custody differs from the report")
+    actual_names = {
+        candidate.name
+        for candidate in path.parent.iterdir()
+        if candidate.name.startswith(preformal._EVIDENCE_PREFIX)
+        or candidate.name.startswith(f".{preformal._EVIDENCE_PREFIX}")
+    }
+    if actual_names != expected_names:
+        raise RuntimeError("bound preformal evidence has missing or extra reserved members")
+
+    accepted_rows = [
+        command
+        for command in commands
+        if isinstance(command, Mapping)
+        and command.get("name") == "runtime-accepted-closure-evidence"
+    ]
+    if len(accepted_rows) != 1:
+        raise RuntimeError("bound preformal report lacks one accepted-closure receipt")
+    accepted_stderr = accepted_rows[0].get("stderr")
+    empty_digest = hashlib.sha256(b"").hexdigest()
+    if accepted_stderr != {
+        "file": preformal._log_filename(
+            9,
+            "runtime-accepted-closure-evidence",
+            "stderr",
+            empty_digest,
+        ),
+        "bytes": 0,
+        "sha256": empty_digest,
+    }:
+        raise RuntimeError(
+            "bound preformal accepted-closure stderr is not exactly empty"
+        )
+    accepted_stdout = accepted_rows[0].get("stdout")
+    if not isinstance(accepted_stdout, Mapping) or not isinstance(
+        accepted_stdout.get("file"),
+        str,
+    ):
+        raise RuntimeError("bound preformal accepted-closure receipt is malformed")
+    accepted_payload = _stable_regular_payload(
+        path.parent / cast(str, accepted_stdout["file"]),
+        label="bound preformal accepted-closure receipt",
+    )
+    try:
+        accepted = preformal._load_canonical_object(
+            accepted_payload,
+            label="bound preformal accepted-closure receipt",
+        )
+    except preformal.PreformalEvidenceError as error:
+        raise RuntimeError("bound preformal accepted-closure receipt is not canonical") from error
+    accepted_fields = {
+        "schema",
+        "mode",
+        "passed",
+        "development_closure_sha256",
+        "producer_manifest_sha256",
+        "raw_result_sha256",
+        "closure_attempt_manifest_sha256",
+        "closure_outer_completion_sha256",
+    }
+    if (
+        set(accepted) != accepted_fields
+        or accepted.get("schema")
+        != "prospect.wm001.preformal-runtime-check.v1"
+        or accepted.get("mode") != "accepted-closure-evidence"
+        or accepted.get("passed") is not True
+        or accepted.get("development_closure_sha256")
+        != development.get("closure_sha256")
+        or accepted.get("producer_manifest_sha256")
+        != development.get("producer_manifest_sha256")
+        or accepted.get("raw_result_sha256")
+        != development.get("raw_result_sha256")
+        or accepted.get("closure_attempt_manifest_sha256")
+        != inputs["closure_attempt_terminal"].get("sha256")
+        or accepted.get("closure_outer_completion_sha256")
+        != inputs["closure_outer_completion"].get("sha256")
+    ):
+        raise RuntimeError("bound preformal accepted-closure receipt differs from the binding")
+
+    try:
+        rehearsal = preformal._runtime_bootstrap_conformance_from_report(
+            path.parent,
+            report,
+        )
+    except preformal.PreformalEvidenceError as error:
+        raise RuntimeError("bound preformal runtime rehearsal is malformed") from error
+    inventory = {
+        "packages": dependencies.get("packages"),
+        "package_roots": dependencies.get("package_roots"),
+        "standard_library": dependencies.get("standard_library"),
+        "package_ownership": dependencies.get("package_ownership"),
+    }
+    if (
+        rehearsal.get("inventory") != inventory
+        or rehearsal.get("inventory_sha256")
+        != hashlib.sha256(canonical_json_bytes(inventory)).hexdigest()
+        or rehearsal.get("conformance_sha256")
+        != hashlib.sha256(canonical_json_bytes(dict(audit_execution))).hexdigest()
+        or rehearsal.get("restart_runtime_conformance_report_sha256")
+        != audit_execution.get("restart_runtime_conformance_report_sha256")
+        or rehearsal.get("restart_runtime_execution_receipt_sha256")
+        != audit_execution.get("restart_runtime_execution_receipt_sha256")
+        or rehearsal.get("restart_runtime_support_files")
+        != audit_execution.get("restart_runtime_support_files")
+        or rehearsal.get("restart_runtime_repeat_count")
+        != audit_execution.get("restart_runtime_repeat_count")
+        or rehearsal.get("restart_runtime_path_descriptor_equal")
+        != audit_execution.get("restart_runtime_path_descriptor_equal")
+    ):
+        raise RuntimeError("bound preformal runtime rehearsal differs from the binding")
+    return cast(dict[str, object], report)
+
+
+def _capture_preformal_logs(
     report_path: Path,
     report: dict[str, object],
-) -> list[dict[str, object]]:
-    """Return the exact ordered stdout/stderr custody rows from report v2."""
+) -> tuple[list[dict[str, object]], list[bytes]]:
+    """Capture exact ordered report-log identities and payloads once."""
 
     commands = report.get("commands")
     if not isinstance(commands, list):
         raise RuntimeError("preformal report command block is invalid")
+    directory = report_path.parent
+    if directory.resolve(strict=True) != directory:
+        raise RuntimeError("preformal report directory is missing or aliased")
     rows: list[dict[str, object]] = []
+    payloads: list[bytes] = []
+    seen: set[str] = set()
+    total_bytes = 0
     for command in commands:
         if not isinstance(command, dict):
             raise RuntimeError("preformal report command row is invalid")
@@ -214,16 +995,33 @@ def preformal_log_rows(
                 not isinstance(reference, dict)
                 or set(reference) != {"file", "bytes", "sha256"}
                 or not isinstance(reference.get("file"), str)
+                or type(reference.get("bytes")) is not int
+                or cast(int, reference["bytes"]) < 0
+                or not isinstance(reference.get("sha256"), str)
+                or len(cast(str, reference["sha256"])) != 64
+                or any(
+                    character not in "0123456789abcdef"
+                    for character in cast(str, reference["sha256"])
+                )
             ):
                 raise RuntimeError("preformal report log reference is invalid")
             filename = str(reference["file"])
-            path = report_path.parent / filename
+            path = directory / filename
+            if (
+                not filename
+                or Path(filename).name != filename
+                or filename in {".", ".."}
+                or filename in seen
+                or path.parent != directory
+            ):
+                raise RuntimeError("preformal report log is not one safe sibling")
             payload = _stable_regular_payload(
                 path,
                 label=f"preformal report {stream} log",
             )
+            total_bytes += len(payload)
             if (
-                path.parent != report_path.parent
+                total_bytes > 512 << 20
                 or len(payload) != reference.get("bytes")
                 or hashlib.sha256(payload).hexdigest() != reference.get("sha256")
             ):
@@ -235,8 +1033,18 @@ def preformal_log_rows(
                     "sha256": hashlib.sha256(payload).hexdigest(),
                 }
             )
-    if len({str(row["path"]) for row in rows}) != len(rows):
-        raise RuntimeError("preformal report contains duplicate log filenames")
+            payloads.append(payload)
+            seen.add(filename)
+    return rows, payloads
+
+
+def preformal_log_rows(
+    report_path: Path,
+    report: dict[str, object],
+) -> list[dict[str, object]]:
+    """Return the exact ordered stdout/stderr custody rows from report v2."""
+
+    rows, _ = _capture_preformal_logs(report_path, report)
     return rows
 
 
@@ -487,7 +1295,7 @@ def build_bound_audit_execution(
     restart_runtime_report_value = dict(restart_runtime_conformance.path_execution.report)
     if (
         restart_runtime_report_value.get("schema") != "prospect.wm001.restart-runtime-conformance.v1"
-        or restart_runtime_report_value.get("protocol_version") != "1.13.0"
+        or restart_runtime_report_value.get("protocol_version") != "1.14.0"
         or restart_runtime_report_value.get("passed") is not True
         or restart_runtime_conformance.path_execution.stdout != restart_runtime_conformance.descriptor_execution.stdout
     ):
@@ -755,9 +1563,9 @@ def implementation_files() -> list[dict[str, object]]:
         REPO / "bench" / "world_model_lifecycle" / "protocol.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "raw-result.schema.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "formal-binding.schema.json",
-        REPO / "docs" / "wm001-v1130-confirmation-plan.md",
-        REPO / "docs" / "wm001-v1130-operator-runbook.md",
-        REPO / "docs" / "wm001-v1130-prospective-harness-review.json",
+        REPO / "docs" / "wm001-v1140-confirmation-plan.md",
+        REPO / "docs" / "wm001-v1140-operator-runbook.md",
+        REPO / "docs" / "wm001-v1140-prospective-harness-review.json",
     ]
     unique = sorted(set(candidates))
     return [
@@ -1472,7 +2280,7 @@ def create_audit_reproduction_receipt(
     receipt = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "supplied_audit_sha256": hashlib.sha256(supplied).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(execution.stdout).hexdigest(),
         "byte_identical": True,
@@ -1952,7 +2760,7 @@ def _validate_producer_custody(
         set(runtime_seal) != _DEVELOPMENT_RUNTIME_SEAL_FIELDS
         or runtime_seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or runtime_seal.get("experiment_id") != "WM-001"
-        or runtime_seal.get("protocol_version") != "1.13.0"
+        or runtime_seal.get("protocol_version") != "1.14.0"
         or not _strict_json_equal(runtime_seal.get("assurance"), ASSURANCE)
         or runtime_seal.get("git_commit") != execution["git_commit"]
         or runtime_seal.get("git_tree") != execution["git_tree"]
@@ -2031,7 +2839,7 @@ def _validate_development_audit_evidence(
         set(receipt) != _AUDIT_RECEIPT_FIELDS
         or receipt.get("schema") != "prospect.wm001.audit-reproduction.v2"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.13.0"
+        or receipt.get("protocol_version") != "1.14.0"
         or receipt.get("supplied_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("reproduced_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("byte_identical") is not True
@@ -2232,7 +3040,7 @@ def _result_qualification_payload(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "protocol_sha256": sha256_file(PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -2297,7 +3105,7 @@ def _validate_result_qualification(
         }
         or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.13.0"
+        or value.get("protocol_version") != "1.14.0"
         or value.get("protocol_sha256") != sha256_file(PROTOCOL_PATH)
         or value.get("raw_result_sha256") != archived_result_sha256
         or value.get("lane") != "development"
@@ -2875,7 +3683,7 @@ def verify_development_closure(path: Path) -> dict[str, object]:
         set(closure) != _DEVELOPMENT_CLOSURE_FIELDS
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.13.0"
+        or closure.get("protocol_version") != "1.14.0"
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
         or closure.get("performance_values_bound") is not False
@@ -3154,7 +3962,7 @@ def create_development_closure(
     runtime_manifest_path: Path,
     output_path: Path = DEVELOPMENT_CLOSURE_PATH,
 ) -> dict[str, object]:
-    """Close the sole v1.13 qualification into one self-contained evidence archive."""
+    """Close the sole v1.14 qualification into one self-contained evidence archive."""
 
     from .artifact import verify_producer_manifest
     from .verify import DEVELOPMENT_SEEDS, _verify_formal_matrix, verify_result
@@ -3195,7 +4003,7 @@ def create_development_closure(
         not isinstance(replicates, list)
         or tuple(row.get("master_seed") if isinstance(row, dict) else None for row in replicates) != DEVELOPMENT_SEEDS
     ):
-        raise RuntimeError("development qualification requires exactly both fresh v1.13 seeds")
+        raise RuntimeError("development qualification requires exactly both fresh v1.14 seeds")
     for replicate in replicates:
         assert isinstance(replicate, dict)
         _verify_formal_matrix(
@@ -3318,7 +4126,7 @@ def create_development_closure(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "source": {
             "git_commit": execution["git_commit"],
             "git_tree": execution["git_tree"],
@@ -3491,7 +4299,7 @@ def create_formal_binding(
     if conformance_cases != FORMAL_CONFORMANCE_CASES:
         raise ValueError("formal Pendulum conformance is fixed at exactly 1,024 cases (512 per task)")
     if development_closure_path is None or not development_closure_path.is_file():
-        raise RuntimeError("formal binding requires the immutable v1.13 development closure")
+        raise RuntimeError("formal binding requires the immutable v1.14 development closure")
     if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
         raise RuntimeError("CUDA formal binding requires CUBLAS_WORKSPACE_CONFIG=:4096:8")
     if output_path.exists():
@@ -3524,16 +4332,21 @@ def create_formal_binding(
     coverage_conformance_digest = hashlib.sha256(coverage_conformance_bytes).hexdigest()
     coverage_conformance_filename = f"coverage-conformance-{coverage_conformance_digest[:16]}.json"
     coverage_conformance_path = output_path.with_name(coverage_conformance_filename)
-    test_report = verify_machine_test_report(test_report_path)
-    test_log_rows = preformal_log_rows(test_report_path, test_report)
-    verify_preclaim_log_schema_compatibility(test_log_rows)
-    development_closure = verify_development_closure(development_closure_path)
+    test_report = verify_canonical_machine_test_report(test_report_path)
     test_report_bytes = _stable_regular_payload(
         test_report_path,
         label="formal binding test report",
     )
-    if not test_report_bytes:
-        raise RuntimeError("formal binding test report must not be empty")
+    if test_report_bytes != canonical_json_bytes(test_report) + b"\n":
+        raise RuntimeError(
+            "formal binding test report changed after canonical verification"
+        )
+    test_log_rows, test_log_payloads = _capture_preformal_logs(
+        test_report_path,
+        test_report,
+    )
+    verify_preclaim_log_schema_compatibility(test_log_rows)
+    development_closure = verify_development_closure(development_closure_path)
     test_report_digest = hashlib.sha256(test_report_bytes).hexdigest()
     from .preformal import REPORT_NAME as PREFORMAL_REPORT_NAME
 
@@ -3543,6 +4356,10 @@ def create_formal_binding(
         development_closure_path,
         label="formal binding development closure",
     )
+    if development_closure_bytes != canonical_json_bytes(development_closure) + b"\n":
+        raise RuntimeError(
+            "formal binding development closure changed after verification"
+        )
     development_closure_digest = hashlib.sha256(development_closure_bytes).hexdigest()
     development_closure_filename = f"development-closure-{development_closure_digest[:16]}.json"
     preserved_development_closure_path = output_path.with_name(development_closure_filename)
@@ -3628,7 +4445,7 @@ def create_formal_binding(
         "experiment_id": "WM-001",
         "assurance": assurance_record(),
         "protocol": {
-            "version": "1.13.0",
+            "version": "1.14.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),
@@ -3738,16 +4555,13 @@ def create_formal_binding(
         raise RuntimeError("source changed while the formal implementation binding was assembled")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_exclusive(preserved_test_report_path, test_report_bytes)
-    for row in test_log_rows:
-        origin = test_report_path.parent / str(row["path"])
+    for row, log_payload in zip(
+        test_log_rows,
+        test_log_payloads,
+        strict=True,
+    ):
         destination = output_path.with_name(str(row["path"]))
-        atomic_write_exclusive(
-            destination,
-            _stable_regular_payload(
-                origin,
-                label="formal binding preformal log",
-            ),
-        )
+        atomic_write_exclusive(destination, log_payload)
     atomic_write_exclusive(
         preserved_development_closure_path,
         development_closure_bytes,
@@ -4106,6 +4920,8 @@ __all__ = (
     "run_bound_preflight_conformance",
     "sha256_file",
     "source_is_clean",
+    "verify_bound_machine_test_report",
+    "verify_canonical_machine_test_report",
     "verify_preclaim_log_schema_compatibility",
     "verify_live_binding",
 )

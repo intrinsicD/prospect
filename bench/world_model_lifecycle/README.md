@@ -18,7 +18,7 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.13.0 is the active prospective confirmation. It preserves the exact
+Protocol 1.14.0 is the active prospective confirmation. It preserves the exact
 v1.4 model, learning algorithm, optimizer, planner, controller, budgets,
 controls, metrics, thresholds, and K0–K7 order. Its scientific-block digest is
 `fa44fd93a672db3905d45a0e99c568985e7e2e5d02d32043c830db413005a5c3`.
@@ -86,21 +86,34 @@ schema required every test-log row to be nonempty while all ten successful
 stderr rows were correctly empty. The failed binding was outer-finalized; no
 formal launch occurred.
 
-Version 1.13 preserves every v1.12 runtime repair and changes only the binding
-representation and prospective coverage. Formal-binding v10 separates
-possibly empty stream-file digests from nonempty implementation-file digests.
-The operator validates the actual 20-row log projection before claiming the
-binding attempt, and the producer validates the complete assembled binding
-against the root schema before publishing any sidecar.
+Version 1.13 preserved every v1.12 runtime repair. Formal-binding v10 separated
+possibly empty stream-file digests from nonempty implementation-file digests,
+the operator validated the actual 20-row log projection before claiming the
+binding attempt, and the producer validated the complete assembled binding
+against the root schema. It passed command 10, development, accepted audit,
+closure, and all ten preformal commands. Its strict binding consumer then used
+the canonical live-bundle report verifier for the preserved report copy in the
+mixed binding staging directory. That verifier requires the original path and
+an exclusive report-plus-logs directory, so the sole binding attempt failed
+before acceptance and was outer-finalized. No formal launch occurred.
 
-The v1.13 harness uses a non-editable isolated wheel, complete dependency and
+Version 1.14 preserves formal-binding v10, raw-result v9, and the unchanged
+scientific system. It gives the canonical development bundle and the preserved
+binding copy explicit verifier roles that independently enforce the same fixed
+command, input, environment, semantic, and stream-byte contract. The preserved
+role permits declared non-preformal binding sidecars but rejects missing,
+changed, aliased, or additional preformal-named evidence. A real
+producer-to-strict-consumer archive regression covers the mixed staging package
+before another one-shot binding is allowed.
+
+The v1.14 harness uses a non-editable isolated wheel, complete dependency and
 package-root inventories, a deterministic module-search path restricted to
 explicit package roots and inventoried standard-library directories, one
 captured descriptor runner, a repository-global cooperative outer-launch lock,
 deterministic same-inode terminal completion, canonical development
 audit/closure/binding attempts, and single-use formal audit and adjudication
 claims. Formal execution accepts only
-`results/operator-v1.13/bindings/formal-binding-v1.13.0/formal-binding.json`
+`results/operator-v1.14/bindings/formal-binding-v1.14.0/formal-binding.json`
 after that attempt is accepted and outer-finalized. A copy or directly created
 binding is not valid authorization.
 
@@ -119,14 +132,21 @@ closure attempt, exact ten-row/20-log preformal report, independent prospective
 harness review, independent formal-input preflight, and canonical binding
 attempt. Development performance remains
 descriptive and permanently claim-ineligible. Creation of the canonical
-qualification root consumes the sole v1.13 development attempt; a failure
-retires the version rather than authorizing a sibling retry. The complete lifecycle claim
-remains unestablished until the one new eight-seed formal producer is
-outer-finalized, the official independent audit and semantic review accept
-K0–K7, and the terminal adjudication package is accepted and independently
-verified.
+qualification root consumes the sole v1.14 development attempt; a failure
+retires the version rather than authorizing a sibling retry. The complete
+lifecycle claim remains unestablished until the one new eight-seed formal
+producer is outer-finalized, the official independent audit and semantic
+review accept K0–K7, and the terminal adjudication package is accepted and
+independently verified.
 
-Protocols 1.12.0, 1.11.0, 1.10.0, 1.9.0, 1.8.0, 1.7.0, 1.6.0, 1.5.0, and 1.4.0 are immutable and retired.
+Protocols 1.13.0, 1.12.0, 1.11.0, 1.10.0, 1.9.0, 1.8.0, 1.7.0, 1.6.0,
+1.5.0, and 1.4.0 are immutable and retired.
+Protocol 1.13.0 completed development, accepted audit, closure, and preformal,
+but its strict binding consumer sent the preserved report copy through the
+canonical live-bundle verifier. The valid mixed binding package was rejected
+before binding acceptance and no formal launch occurred. Its disposition is
+preserved in the
+[v1.13 binding-verifier failure](../../docs/wm001-v1130-binding-verifier-failure.md).
 Protocol 1.12.0 completed development, accepted audit, closure, and preformal,
 but its shared nonempty file-digest schema rejected required zero-byte stderr
 rows during the terminal binding transaction. Its disposition is preserved in
@@ -162,9 +182,9 @@ rejection path then failed to preserve an official rejected package. Protocol
 constant and underspecified endpoint arithmetic. Their exact evidence and
 dispositions remain in the
 [v1.4 results review](../../docs/wm001-v140-formal-results.md) and
-[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.13 does not
+[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.14 does not
 repair or relabel either attempt. The active design is the
-[v1.13 confirmation plan](../../docs/wm001-v1130-confirmation-plan.md).
+[v1.14 confirmation plan](../../docs/wm001-v1140-confirmation-plan.md).
 
 ## What the experiment must establish
 
@@ -294,25 +314,25 @@ resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
 
-The v1.13 development rehearsal uses only seeds `560818116` and `1392377688`
+The v1.14 development rehearsal uses only seeds `630481329` and `2204125221`
 and the complete formal budgets. It is useful only for schema, deterministic
 execution, exact arithmetic, audit coverage, restart, and custody validation.
 Its K3–K6 performance values are descriptive, cannot decide whether formal may
 launch, are never claim-eligible, and cannot be relabeled. After the exclusive
-development closure is published, every further v1.13 development run is
+development closure is published, every further v1.14 development run is
 forbidden.
 
-The one v1.13 formal execution uses:
+The one v1.14 formal execution uses:
 
 ```text
-140647545, 2239253745, 3333612762, 4269572592,
-2151457732, 4034984701, 2426483518, 2833322658
+900802928, 2035185068, 3817247901, 14769188,
+2670334085, 2866408483, 671156171, 333753598
 ```
 
 The launch-time prebinding replay may reset isolated QA-only Pendulum fixtures;
 those resets collect no formal experience, train no model, and do not consume
 the attempt. The first outcome-producing formal replicate/task reset after
-`results/formal/formal-launch-v1.13.0.json` begins the sole attempt. No resume,
+`results/formal/formal-launch-v1.14.0.json` begins the sole attempt. No resume,
 retry, corrected-audit upgrade, early stopping, extra training, exclusion, or
 analysis change is allowed.
 
@@ -335,10 +355,10 @@ replicate/task reset requires a new implementation binding. After that reset,
 any such change requires a new protocol version; previous failed attempts
 remain evidence.
 
-## Active v1.13 runbook
+## Active v1.14 runbook
 
 Use the
-[WM-001 v1.13 operator runbook](../../docs/wm001-v1130-operator-runbook.md).
+[WM-001 v1.14 operator runbook](../../docs/wm001-v1140-operator-runbook.md).
 It defines the typed runtime seals, canonical operator paths, outer-completion
 checks, exact development/preformal/binding order, and the one formal,
 official-audit, and adjudication sequence.
@@ -346,7 +366,7 @@ official-audit, and adjudication sequence.
 ## Retired v1.4 command sketch — do not execute
 
 The commands below document the retired v1.4 workflow and are retained only to
-explain its evidence history. They do not satisfy v1.13 custody and must not be
+explain its evidence history. They do not satisfy v1.14 custody and must not be
 used to launch an experiment.
 
 ### 1. Install and verify the pre-outcome contract

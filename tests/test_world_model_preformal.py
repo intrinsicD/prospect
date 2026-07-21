@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -10,9 +11,12 @@ from typing import Any
 
 import pytest
 
+from bench.world_model_lifecycle import audit_runner as audit_runner_module
+from bench.world_model_lifecycle import binding as binding_module
 from bench.world_model_lifecycle import experiment as experiment_module
 from bench.world_model_lifecycle import operator as operator_module
 from bench.world_model_lifecycle import preformal
+from bench.world_model_lifecycle import verify as verify_module
 
 _GIT_IDENTITY = {
     "commit": "a" * 40,
@@ -42,6 +46,82 @@ def _isolated_outer_completion_root(
 
 def _canonical(value: object) -> bytes:
     return preformal._canonical_json_bytes(value) + b"\n"
+
+
+def _binding_schema_example(
+    schema: dict[str, Any],
+    root: dict[str, Any],
+    *,
+    path: tuple[str, ...] = (),
+    item_index: int = 0,
+) -> Any:
+    reference = schema.get("$ref")
+    if isinstance(reference, str):
+        return _binding_schema_example(
+            root["$defs"][reference.removeprefix("#/$defs/")],
+            root,
+            path=path,
+            item_index=item_index,
+        )
+    if "const" in schema:
+        return copy.deepcopy(schema["const"])
+    if "enum" in schema:
+        return copy.deepcopy(schema["enum"][0])
+    schema_type = schema.get("type")
+    if isinstance(schema_type, list):
+        if "null" in schema_type:
+            return None
+        schema_type = schema_type[0]
+    if schema_type == "object" or "properties" in schema:
+        properties = schema.get("properties", {})
+        return {
+            name: _binding_schema_example(
+                properties[name],
+                root,
+                path=(*path, name),
+                item_index=item_index,
+            )
+            for name in schema.get("required", [])
+        }
+    if schema_type == "array":
+        return [
+            _binding_schema_example(
+                schema["items"],
+                root,
+                path=(*path, "item"),
+                item_index=index,
+            )
+            for index in range(int(schema.get("minItems", 0)))
+        ]
+    if schema_type == "integer":
+        return int(schema.get("minimum", 0))
+    if schema_type == "number":
+        return float(schema.get("minimum", 0.0))
+    if schema_type == "boolean":
+        return False
+    if schema_type == "null":
+        return None
+    assert schema_type == "string"
+    pattern = str(schema.get("pattern", ""))
+    if pattern == "^[0-9a-f]{40}$":
+        return "a" * 40
+    if pattern == "^[0-9a-f]{64}$":
+        return "a" * 64
+    if "development-qualification-[0-9a-f]{16}" in pattern:
+        archive = "development-qualification-" + "a" * 16 + ".tar"
+        if pattern.startswith("^bench/"):
+            return (
+                "bench/world_model_lifecycle/results/development/"
+                + archive
+            )
+        return archive
+    if pattern.startswith("^/"):
+        return f"/fixture/{item_index}"
+    if schema.get("format") == "date-time":
+        return "2026-07-21T00:00:00Z"
+    if path and path[-1] == "path":
+        return f"fixture-{item_index:02d}.log"
+    return "fixture"
 
 
 def _read_report(path: Path) -> dict[str, Any]:
@@ -100,7 +180,7 @@ def _fresh_identity_conformance() -> dict[str, object]:
     return {
         "schema": "prospect.wm001.fresh-runtime-identity-conformance.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "mode": "fresh-identity-conformance",
         "challenge": "7" * 64,
         "requesting_process_id": 101,
@@ -190,7 +270,7 @@ def _development_closure(producer_root: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "source": {
             "git_commit": "a" * 40,
             "git_tree": "b" * 40,
@@ -361,13 +441,18 @@ def _qa_closure() -> dict[str, object]:
     return closure
 
 
-def _review() -> dict[str, object]:
+def _review(
+    implementation_files: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    rows = [] if implementation_files is None else copy.deepcopy(implementation_files)
     return {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
-        "implementation_files": [],
-        "implementation_manifest_sha256": hashlib.sha256(b"[]").hexdigest(),
+        "protocol_version": "1.14.0",
+        "implementation_files": rows,
+        "implementation_manifest_sha256": hashlib.sha256(
+            preformal._canonical_json_bytes(rows)
+        ).hexdigest(),
         "reviewer": {
             "kind": "independent-adversarial-referee",
             "identifier": "test-referee",
@@ -383,7 +468,7 @@ def _runtime_seal(runtime_executable: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
             "tamper_resistant": False,
@@ -603,7 +688,7 @@ def _prepare_generation(
     *,
     failed_command: str | None = None,
 ) -> tuple[Path, list[str], dict[str, Path]]:
-    directory = tmp_path / "v1.13.0" / "preformal"
+    directory = tmp_path / "v1.14.0" / "preformal"
     monkeypatch.setattr(
         preformal,
         "PREFORMAL_REPORT_PATH",
@@ -735,6 +820,568 @@ def _generate(report_path: Path, inputs: dict[str, Path]) -> Path:
         closure_attempt=inputs["closure_attempt"],
         prospective_review=inputs["prospective_review"],
     )
+
+
+def _projection_implementation_rows() -> list[dict[str, object]]:
+    relative_paths = {
+        preformal.SOURCE_RELATIVE_PATH,
+        "bench/world_model_lifecycle/launch_bootstrap.py",
+        "bench/world_model_lifecycle/producer_bootstrap.py",
+        *preformal._test_files("test_epistemic_*.py", label="epistemic"),
+        *preformal._test_files("test_world_model_*.py", label="WM-001"),
+    }
+    rows: list[dict[str, object]] = []
+    for relative in sorted(relative_paths):
+        payload = (preformal.REPO / relative).read_bytes()
+        rows.append(
+            {
+                "path": relative,
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        )
+    return rows
+
+
+def _prepare_preserved_preformal_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[Path, dict[str, object], dict[str, bytes]]:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    inventory = _result_free_inventory()
+    audit_execution: dict[str, object] = {
+        "restart_runtime_conformance_report_sha256": "3" * 64,
+        "restart_runtime_execution_receipt_sha256": "4" * 64,
+        "restart_runtime_support_files": [
+            "producer_bootstrap.py",
+            "protocol.json",
+            "schemas/raw-result.schema.json",
+        ],
+        "restart_runtime_repeat_count": 3,
+        "restart_runtime_path_descriptor_equal": True,
+    }
+    runtime_receipt = _runtime_conformance()
+    runtime_receipt["inventory"] = inventory
+    runtime_receipt["inventory_sha256"] = hashlib.sha256(
+        preformal._canonical_json_bytes(inventory)
+    ).hexdigest()
+    runtime_receipt["conformance_sha256"] = hashlib.sha256(
+        preformal._canonical_json_bytes(audit_execution)
+    ).hexdigest()
+    for name in (
+        "restart_runtime_conformance_report_sha256",
+        "restart_runtime_execution_receipt_sha256",
+        "restart_runtime_support_files",
+        "restart_runtime_repeat_count",
+        "restart_runtime_path_descriptor_equal",
+    ):
+        runtime_receipt[name] = copy.deepcopy(audit_execution[name])
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "_runtime_conformance",
+        lambda device="cpu": {**copy.deepcopy(runtime_receipt), "device": device},
+    )
+
+    implementation_without_review = _projection_implementation_rows()
+    review = _review(implementation_without_review)
+    review_path = inputs["prospective_review"]
+    review_path.write_bytes(_canonical(review))
+    monkeypatch.setattr(
+        preformal,
+        "verify_prospective_review",
+        lambda _path: copy.deepcopy(review),
+    )
+
+    seal_path = inputs["runtime_seal"]
+    seal = json.loads(seal_path.read_bytes())
+    seal["standard_library"] = inventory["standard_library"]
+    seal["package_roots"] = inventory["package_roots"]
+    seal["package_ownership"] = inventory["package_ownership"]
+    seal_path.write_bytes(_canonical(seal))
+    monkeypatch.setattr(
+        preformal,
+        "_validated_runtime_seal",
+        lambda _path, *, runtime_executable: (
+            copy.deepcopy(seal),
+            dict(_RUNTIME_ENVIRONMENT),
+        ),
+    )
+
+    _generate(report_path, inputs)
+    report = binding_module.verify_canonical_machine_test_report(report_path)
+    assert report == _read_report(report_path)
+    report_payload = report_path.read_bytes()
+    log_rows, log_payloads = binding_module._capture_preformal_logs(
+        report_path,
+        report,
+    )
+    assert len(log_rows) == len(log_payloads) == 20
+    snapshot = {
+        report_path.name: report_payload,
+        **{
+            str(row["path"]): payload
+            for row, payload in zip(log_rows, log_payloads, strict=True)
+        },
+    }
+    assert len(snapshot) == 21
+
+    review_payload = review_path.read_bytes()
+    implementation_rows = sorted(
+        [
+            *implementation_without_review,
+            {
+                "path": preformal.REVIEW_RELATIVE_PATH,
+                "bytes": len(review_payload),
+                "sha256": hashlib.sha256(review_payload).hexdigest(),
+            },
+        ],
+        key=lambda row: str(row["path"]),
+    )
+    assert report["prospective_review"] == review
+    assert report["generator_source_before"] == next(
+        row
+        for row in implementation_rows
+        if row["path"] == preformal.SOURCE_RELATIVE_PATH
+    )
+    execution_sources = {
+        filename: binding_module.sha256_file(
+            Path(binding_module.__file__).with_name(filename)
+        )
+        for filename in binding_module.EXECUTION_SOURCE_FILES
+    }
+    execution_sources["producer_bootstrap.py"] = seal[
+        "bootstrap_source_sha256"
+    ]
+
+    package = report_path.parent.parent / "binding-package"
+    package.mkdir()
+    for filename, payload in snapshot.items():
+        (package / filename).write_bytes(payload)
+    assert {
+        path.name: path.read_bytes()
+        for path in package.iterdir()
+        if path.is_file()
+    } == snapshot
+    copied_report = package / report_path.name
+    copied_report_payload = copied_report.read_bytes()
+    copied_report_value = _read_report(copied_report)
+    copied_log_rows = binding_module.preformal_log_rows(
+        copied_report,
+        copied_report_value,
+    )
+    assert copied_log_rows == log_rows
+    accepted_row = next(
+        row
+        for row in copied_report_value["commands"]
+        if row["name"] == "runtime-accepted-closure-evidence"
+    )
+    accepted_receipt = json.loads(
+        (package / accepted_row["stdout"]["file"]).read_bytes()
+    )
+    runtime_executable = copied_report_value["runtime_executable_before"]
+    source: dict[str, object] = {
+        "git_commit": copied_report_value["git_before"]["commit"],
+        "git_tree": copied_report_value["git_before"]["tree"],
+        "worktree_clean": True,
+        "implementation_files": implementation_rows,
+        "execution_source_sha256": execution_sources,
+        "test_report_file": copied_report.name,
+        "test_report_bytes": len(copied_report_payload),
+        "test_report_sha256": hashlib.sha256(
+            copied_report_payload
+        ).hexdigest(),
+        "test_log_files": copied_log_rows,
+    }
+    binding: dict[str, object] = {
+        "source": source,
+        "dependencies": {
+            **inventory,
+            "python_executable": runtime_executable["invocation_path"],
+            "python_executable_sha256": runtime_executable["sha256"],
+        },
+        "runtime": {
+            "device": copied_report_value["device"],
+            "process_environment": dict(_RUNTIME_ENVIRONMENT),
+        },
+        "development_qualification": {
+            "closure_bytes": copied_report_value["input_files_before"][
+                "development_closure"
+            ]["bytes"],
+            "closure_sha256": accepted_receipt[
+                "development_closure_sha256"
+            ],
+            "producer_manifest_sha256": accepted_receipt[
+                "producer_manifest_sha256"
+            ],
+            "raw_result_sha256": accepted_receipt["raw_result_sha256"],
+        },
+        "audit_execution": audit_execution,
+    }
+    (package / "formal-binding.json").write_bytes(b"{}\n")
+    (package / "coverage-conformance-fixture.json").write_bytes(b"{}\n")
+    return copied_report, binding, snapshot
+
+
+def _refresh_preserved_projection_binding(
+    report_path: Path,
+    binding: dict[str, object],
+) -> dict[str, Any]:
+    report = _read_report(report_path)
+    payload = report_path.read_bytes()
+    source = binding["source"]
+    assert isinstance(source, dict)
+    source["test_report_bytes"] = len(payload)
+    source["test_report_sha256"] = hashlib.sha256(payload).hexdigest()
+    source["test_log_files"] = binding_module.preformal_log_rows(
+        report_path,
+        report,
+    )
+    return report
+
+
+def _strict_audit_execution_fixture(
+    *,
+    repository: Path,
+    inventory: dict[str, object],
+) -> tuple[dict[str, object], dict[str, bytes]]:
+    python_path = Path(sys.executable)
+    python_identity = {
+        "executable": sys.executable,
+        "resolved_executable": str(python_path.resolve(strict=True)),
+        "sha256": hashlib.sha256(python_path.read_bytes()).hexdigest(),
+        "version": list(sys.version_info[:3]),
+    }
+    bootstrap = audit_runner_module.bootstrap_source_bytes()
+    bootstrap_sha256 = hashlib.sha256(bootstrap).hexdigest()
+    auditor = verify_module.HERE / "artifact_audit.py"
+    auditor_sha256 = hashlib.sha256(auditor.read_bytes()).hexdigest()
+    request_identity = "1" * 64
+    request_payload = _canonical(
+        {"schema": "prospect.wm001.prebinding-conformance-request.v2"}
+    )
+    path_runtime = {
+        "source": {"mode": "path"},
+        "support_files": [],
+        "python": python_identity,
+    }
+    descriptor_runtime = copy.deepcopy(path_runtime)
+    descriptor_runtime["source"]["mode"] = "descriptor"
+    path_runtime_payload = _canonical(path_runtime)
+    descriptor_runtime_payload = _canonical(descriptor_runtime)
+    path_invocation_payload = _canonical(
+        {
+            "runtime_manifest_sha256": hashlib.sha256(
+                path_runtime_payload
+            ).hexdigest()
+        }
+    )
+    descriptor_invocation_payload = _canonical(
+        {
+            "runtime_manifest_sha256": hashlib.sha256(
+                descriptor_runtime_payload
+            ).hexdigest()
+        }
+    )
+    conformance_payload = _canonical(
+        {
+            "schema": "prospect.wm001.prebinding-conformance.v2",
+            "request_sha256": request_identity,
+            "passed": True,
+        }
+    )
+    empty_stream = {
+        "bytes": 0,
+        "sha256": hashlib.sha256(b"").hexdigest(),
+    }
+    repeat_count = 3
+    modes = ["path"] * repeat_count + ["descriptor"] * repeat_count
+
+    def execution_row(
+        ordinal: int,
+        mode: str,
+    ) -> dict[str, object]:
+        runtime_payload = (
+            path_runtime_payload
+            if mode == "path"
+            else descriptor_runtime_payload
+        )
+        invocation_payload = (
+            path_invocation_payload
+            if mode == "path"
+            else descriptor_invocation_payload
+        )
+        return {
+            "ordinal": ordinal,
+            "source_mode": mode,
+            "returncode": 0,
+            "stdout": {
+                "bytes": len(conformance_payload),
+                "sha256": hashlib.sha256(conformance_payload).hexdigest(),
+            },
+            "stderr": dict(empty_stream),
+            "runtime_manifest": {
+                "bytes": len(runtime_payload),
+                "sha256": hashlib.sha256(runtime_payload).hexdigest(),
+            },
+            "invocation_manifest": {
+                "bytes": len(invocation_payload),
+                "sha256": hashlib.sha256(invocation_payload).hexdigest(),
+            },
+            "bootstrap_sha256": bootstrap_sha256,
+            "auditor_source_sha256": auditor_sha256,
+            "support_files": [],
+            "auditor_report_passed": True,
+        }
+
+    prebinding_rows = [
+        execution_row(ordinal, mode)
+        for ordinal, mode in enumerate(modes, start=1)
+    ]
+    prebinding_receipt_payload = _canonical(
+        {
+            "schema": "prospect.wm001.audit-conformance-receipt.v1",
+            "repeat_count": repeat_count,
+            "execution_count": len(prebinding_rows),
+            "executions": prebinding_rows,
+            "report_sha256": hashlib.sha256(conformance_payload).hexdigest(),
+            "path_descriptor_byte_identical": True,
+            "execution_conformance_passed": True,
+        }
+    )
+    support_sources = (
+        ("producer_bootstrap.py", verify_module.HERE / "producer_bootstrap.py"),
+        ("protocol.json", verify_module.PROTOCOL_PATH),
+        (
+            "schemas/raw-result.schema.json",
+            verify_module.RESULT_SCHEMA_PATH,
+        ),
+    )
+    support_rows = [
+        {
+            "path": relative,
+            "bytes": source.stat().st_size,
+            "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        }
+        for relative, source in support_sources
+    ]
+    safe_environment = {
+        name: value
+        for name, value in _RUNTIME_ENVIRONMENT.items()
+        if name != "PATH"
+    }
+    outcome_runtime = {
+        "schema": "prospect.wm001.audit-runtime-manifest.v1",
+        "assurance": copy.deepcopy(binding_module.ASSURANCE),
+        "bootstrap_sha256": bootstrap_sha256,
+        "python": python_identity,
+        "required_flags": dict(preformal._RUNTIME_FLAGS),
+        "source": {
+            "mode": "descriptor",
+            "path": "artifact_audit.py",
+            "bytes": auditor.stat().st_size,
+            "sha256": auditor_sha256,
+        },
+        "support_files": support_rows,
+        "closure_import_roots": inventory["package_roots"],
+        "standard_library": inventory["standard_library"],
+        "environment": safe_environment,
+        "limits": {
+            "timeout_seconds": 600,
+            "stdout_bytes": 64 << 20,
+            "stderr_bytes": 16 << 20,
+        },
+    }
+    outcome_runtime_payload = _canonical(outcome_runtime)
+    restart_report = {
+        "schema": "prospect.wm001.restart-runtime-conformance.v1",
+        "protocol_version": "1.14.0",
+        "support_files": support_rows,
+        "branches": {
+            "development": {
+                "source_block_present": False,
+                "captured_bootstrap_bound": True,
+                "passed": True,
+            },
+            "formal": {
+                "source_block_present": True,
+                "source_snapshot_bound": True,
+                "captured_bootstrap_bound": True,
+                "passed": True,
+            },
+        },
+        "negative_cases": [
+            {"case_id": case_id, "rejected": True}
+            for case_id in (
+                "missing-bootstrap-support",
+                "extra-bootstrap-support",
+                "mutated-bootstrap-identity",
+                "development-formal-branch-substitution",
+                "formal-development-branch-substitution",
+            )
+        ],
+        "failure_code": None,
+        "passed": True,
+    }
+    restart_report_payload = _canonical(restart_report)
+    path_restart_runtime = copy.deepcopy(outcome_runtime)
+    path_restart_runtime["source"]["mode"] = "path"
+    restart_runtime_payloads = {
+        "path": _canonical(path_restart_runtime),
+        "descriptor": outcome_runtime_payload,
+    }
+    restart_arguments = [
+        "--restart-runtime-conformance",
+        "--producer-bootstrap",
+        "@captured/producer_bootstrap.py",
+        "--expected-producer-bootstrap-sha256",
+        support_rows[0]["sha256"],
+    ]
+    restart_invocation_payloads = {
+        mode: _canonical(
+            {
+                "schema": "prospect.wm001.audit-invocation-manifest.v1",
+                "runtime_manifest_sha256": hashlib.sha256(
+                    runtime_payload
+                ).hexdigest(),
+                "working_directory": str(repository),
+                "auditor_argv": restart_arguments,
+            }
+        )
+        for mode, runtime_payload in restart_runtime_payloads.items()
+    }
+    restart_rows = [
+        {
+            "ordinal": ordinal,
+            "source_mode": mode,
+            "returncode": 0,
+            "stdout": {
+                "bytes": len(restart_report_payload),
+                "sha256": hashlib.sha256(restart_report_payload).hexdigest(),
+            },
+            "stderr": dict(empty_stream),
+            "runtime_manifest": {
+                "bytes": len(restart_runtime_payloads[mode]),
+                "sha256": hashlib.sha256(
+                    restart_runtime_payloads[mode]
+                ).hexdigest(),
+            },
+            "invocation_manifest": {
+                "bytes": len(restart_invocation_payloads[mode]),
+                "sha256": hashlib.sha256(
+                    restart_invocation_payloads[mode]
+                ).hexdigest(),
+            },
+            "bootstrap_sha256": bootstrap_sha256,
+            "auditor_source_sha256": auditor_sha256,
+            "support_files": support_rows,
+            "auditor_report_passed": True,
+        }
+        for ordinal, mode in enumerate(modes, start=1)
+    ]
+    restart_receipt_payload = _canonical(
+        {
+            "schema": "prospect.wm001.audit-conformance-receipt.v1",
+            "repeat_count": repeat_count,
+            "execution_count": len(restart_rows),
+            "executions": restart_rows,
+            "report_sha256": hashlib.sha256(
+                restart_report_payload
+            ).hexdigest(),
+            "path_descriptor_byte_identical": True,
+            "execution_conformance_passed": True,
+        }
+    )
+    prefixed_payloads = {
+        "bootstrap_source": bootstrap,
+        "prebinding_request": request_payload,
+        "prebinding_path_runtime_manifest": path_runtime_payload,
+        "prebinding_descriptor_runtime_manifest": descriptor_runtime_payload,
+        "prebinding_path_invocation_manifest": path_invocation_payload,
+        "prebinding_descriptor_invocation_manifest": (
+            descriptor_invocation_payload
+        ),
+        "prebinding_conformance_report": conformance_payload,
+        "prebinding_execution_receipt": prebinding_receipt_payload,
+        "outcome_runtime_manifest": outcome_runtime_payload,
+        "restart_runtime_conformance_report": restart_report_payload,
+        "restart_runtime_execution_receipt": restart_receipt_payload,
+    }
+    stems = {
+        "bootstrap_source": ("audit-bootstrap", ".py"),
+        "prebinding_request": ("audit-prebinding-request", ".json"),
+        "prebinding_path_runtime_manifest": (
+            "audit-prebinding-path-runtime",
+            ".json",
+        ),
+        "prebinding_descriptor_runtime_manifest": (
+            "audit-prebinding-descriptor-runtime",
+            ".json",
+        ),
+        "prebinding_path_invocation_manifest": (
+            "audit-prebinding-path-invocation",
+            ".json",
+        ),
+        "prebinding_descriptor_invocation_manifest": (
+            "audit-prebinding-descriptor-invocation",
+            ".json",
+        ),
+        "prebinding_conformance_report": (
+            "audit-prebinding-conformance",
+            ".json",
+        ),
+        "prebinding_execution_receipt": (
+            "audit-prebinding-execution-receipt",
+            ".json",
+        ),
+        "outcome_runtime_manifest": ("audit-outcome-runtime", ".json"),
+        "restart_runtime_conformance_report": (
+            "audit-restart-runtime-conformance",
+            ".json",
+        ),
+        "restart_runtime_execution_receipt": (
+            "audit-restart-runtime-execution-receipt",
+            ".json",
+        ),
+    }
+    payloads: dict[str, bytes] = {}
+    block: dict[str, object] = {
+        "runner_source_sha256": hashlib.sha256(
+            (verify_module.HERE / "audit_runner.py").read_bytes()
+        ).hexdigest(),
+        "auditor_source_sha256": auditor_sha256,
+        "adjudicator_source_sha256": hashlib.sha256(
+            (verify_module.HERE / "adjudication.py").read_bytes()
+        ).hexdigest(),
+        "prebinding_request_identity_sha256": request_identity,
+        "restart_runtime_support_files": [row[0] for row in support_sources],
+        "restart_runtime_repeat_count": repeat_count,
+        "restart_runtime_path_descriptor_equal": True,
+        "outcome_source_mode": "descriptor",
+        "outcome_support_files": [row[0] for row in support_sources],
+        "outcome_argv_role": [
+            "<canonical-producer-root>",
+            "--producer-bootstrap",
+            "<captured-producer-bootstrap>",
+        ],
+        "outcome_working_directory": str(repository),
+        "interpreter_flags": ["-I", "-S", "-B"],
+        "repeat_count": repeat_count,
+        "path_descriptor_equal": True,
+        "passed": True,
+    }
+    for prefix, payload in prefixed_payloads.items():
+        stem, suffix = stems[prefix]
+        filename = binding_module._content_addressed_filename(
+            stem,
+            payload,
+            suffix,
+        )
+        payloads[filename] = payload
+        block[f"{prefix}_file"] = filename
+        block[f"{prefix}_bytes"] = len(payload)
+        block[f"{prefix}_sha256"] = hashlib.sha256(payload).hexdigest()
+    assert len(payloads) == 11
+    return block, payloads
 
 
 def test_test_discovery_rejects_untracked_or_ignored_matching_file(
@@ -1030,6 +1677,782 @@ def test_generates_and_strictly_verifies_exact_preformal_evidence(
         if path.name.startswith(preformal.LOG_PREFIX)
     }
     assert len(logs) == 20
+
+
+def test_preserved_preformal_bound_projection_accepts_mixed_sidecars_without_ambient_origins(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, snapshot = (
+        _prepare_preserved_preformal_projection(tmp_path, monkeypatch)
+    )
+    assert len(snapshot) == 21
+
+    with pytest.raises(
+        RuntimeError,
+        match="complete fixed preformal check set",
+    ):
+        binding_module.verify_canonical_machine_test_report(copied_report)
+
+    def forbidden_ambient(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("bound verifier reopened ambient origin evidence")
+
+    for name in (
+        "_capture_qa_closure",
+        "_executable_identity",
+        "_file_identity",
+        "_git_identity",
+        "_source_identity",
+        "_validated_runtime_seal",
+        "_verified_closure_member_digests",
+        "verify_prospective_review",
+        "verify_recorded_preformal_report",
+    ):
+        monkeypatch.setattr(preformal, name, forbidden_ambient)
+
+    verified = binding_module.verify_bound_machine_test_report(
+        copied_report,
+        binding,
+    )
+    assert verified["all_pass"] is True
+
+
+def test_preserved_preformal_bound_projection_rejects_extra_reserved_member(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    (copied_report.parent / "preformal-unbound.log").write_bytes(b"extra")
+
+    with pytest.raises(RuntimeError, match="extra reserved members"):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+def test_preserved_preformal_bound_projection_rejects_log_tamper(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    source = binding["source"]
+    first_log = copied_report.parent / source["test_log_files"][0]["path"]
+    first_log.write_bytes(first_log.read_bytes() + b"tampered")
+
+    with pytest.raises(RuntimeError, match="bytes changed"):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        pytest.param("missing", id="missing"),
+        pytest.param("symlink", id="symlink"),
+        pytest.param("hardlink", id="hardlink"),
+    ),
+)
+def test_preserved_preformal_bound_projection_rejects_missing_or_aliased_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    source = binding["source"]
+    first_log = copied_report.parent / source["test_log_files"][0]["path"]
+    payload = first_log.read_bytes()
+    first_log.unlink()
+    if mutation != "missing":
+        alias_source = tmp_path / f"{mutation}-source.log"
+        alias_source.write_bytes(payload)
+        if mutation == "symlink":
+            first_log.symlink_to(alias_source)
+        else:
+            first_log.hardlink_to(alias_source)
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "missing, aliased, or non-canonical"
+            if mutation != "hardlink"
+            else "1-link custody contract"
+        ),
+    ):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+def test_preserved_preformal_bound_projection_rejects_reordered_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    report = _read_report(copied_report)
+    report["commands"][0], report["commands"][1] = (
+        report["commands"][1],
+        report["commands"][0],
+    )
+    _rewrite_report(copied_report, report)
+    _refresh_preserved_projection_binding(copied_report, binding)
+
+    with pytest.raises(RuntimeError, match="command 1 differs"):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+@pytest.mark.parametrize("mutation", ("reordered", "duplicate"))
+def test_preserved_preformal_bound_projection_rejects_changed_log_manifest_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    source = binding["source"]
+    logs = source["test_log_files"]
+    if mutation == "reordered":
+        logs[0], logs[1] = logs[1], logs[0]
+    else:
+        logs[1] = copy.deepcopy(logs[0])
+
+    with pytest.raises(RuntimeError, match="command-log custody differs"):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+def test_preserved_preformal_bound_projection_rejects_noncanonical_report_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    report = _read_report(copied_report)
+    payload = (json.dumps(report, indent=2) + "\n").encode()
+    copied_report.write_bytes(payload)
+    source = binding["source"]
+    source["test_report_bytes"] = len(payload)
+    source["test_report_sha256"] = hashlib.sha256(payload).hexdigest()
+
+    with pytest.raises(RuntimeError, match="not canonical JSON"):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+def test_preserved_preformal_bound_projection_rejects_rehashed_closure_substitution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    report = _read_report(copied_report)
+    accepted_row = next(
+        row
+        for row in report["commands"]
+        if row["name"] == "runtime-accepted-closure-evidence"
+    )
+    old_log = copied_report.parent / accepted_row["stdout"]["file"]
+    receipt = json.loads(old_log.read_bytes())
+    receipt["producer_manifest_sha256"] = "0" * 64
+    payload = _canonical(receipt)
+    digest = hashlib.sha256(payload).hexdigest()
+    filename = preformal._log_filename(
+        accepted_row["ordinal"],
+        accepted_row["name"],
+        "stdout",
+        digest,
+    )
+    old_log.unlink()
+    (copied_report.parent / filename).write_bytes(payload)
+    accepted_row["stdout"] = {
+        "file": filename,
+        "bytes": len(payload),
+        "sha256": digest,
+    }
+    _rewrite_report(copied_report, report)
+    _refresh_preserved_projection_binding(copied_report, binding)
+
+    with pytest.raises(
+        RuntimeError,
+        match="accepted-closure receipt differs from the binding",
+    ):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+def test_preserved_preformal_bound_projection_rejects_boolean_ordinal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    report = _read_report(copied_report)
+    report["commands"][0]["ordinal"] = True
+    _rewrite_report(copied_report, report)
+    _refresh_preserved_projection_binding(copied_report, binding)
+
+    with pytest.raises(RuntimeError, match="command 1 differs"):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+def test_preserved_preformal_bound_projection_rejects_command_9_stderr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    report = _read_report(copied_report)
+    accepted = next(
+        row
+        for row in report["commands"]
+        if row["name"] == "runtime-accepted-closure-evidence"
+    )
+    old_path = copied_report.parent / accepted["stderr"]["file"]
+    diagnostic = b"unexpected runtime diagnostic\n"
+    digest = hashlib.sha256(diagnostic).hexdigest()
+    filename = preformal._log_filename(
+        accepted["ordinal"],
+        accepted["name"],
+        "stderr",
+        digest,
+    )
+    old_path.unlink()
+    (copied_report.parent / filename).write_bytes(diagnostic)
+    accepted["stderr"] = {
+        "file": filename,
+        "bytes": len(diagnostic),
+        "sha256": digest,
+    }
+    _rewrite_report(copied_report, report)
+    _refresh_preserved_projection_binding(copied_report, binding)
+
+    with pytest.raises(RuntimeError, match="accepted-closure stderr"):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+@pytest.mark.parametrize(
+    ("target", "message"),
+    (
+        pytest.param("repository", "repository identity", id="repository"),
+        pytest.param("runtime-seal", "input path", id="input"),
+        pytest.param("review", "input path", id="review"),
+    ),
+)
+def test_preserved_preformal_bound_projection_rejects_rebound_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target: str,
+    message: str,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    report = _read_report(copied_report)
+    if target == "repository":
+        report["repository_cwd"] = str(tmp_path / "alternate-repository")
+    else:
+        input_name = "runtime_seal" if target == "runtime-seal" else "prospective_review"
+        for inputs in (
+            report["input_files_before"],
+            report["input_files_after"],
+        ):
+            inputs[input_name]["path"] = str(tmp_path / f"alternate-{target}")
+    _rewrite_report(copied_report, report)
+    _refresh_preserved_projection_binding(copied_report, binding)
+
+    with pytest.raises(RuntimeError, match=message):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("extra-field", "python-version", "python-version-bool"),
+)
+def test_preserved_preformal_bound_projection_rejects_rehashed_seal_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    report = _read_report(copied_report)
+    seal = report["runtime_seal"]
+    if mutation == "extra-field":
+        seal["unexpected"] = True
+    elif mutation == "python-version-bool":
+        seal["python"]["version"][0] = True
+    else:
+        seal["python"]["version"] = [0, 0, 0]
+    seal_payload = _canonical(seal)
+    seal_identity = {
+        "bytes": len(seal_payload),
+        "sha256": hashlib.sha256(seal_payload).hexdigest(),
+    }
+    for inputs in (
+        report["input_files_before"],
+        report["input_files_after"],
+    ):
+        inputs["runtime_seal"].update(seal_identity)
+    _rewrite_report(copied_report, report)
+    _refresh_preserved_projection_binding(copied_report, binding)
+
+    with pytest.raises(RuntimeError, match="runtime seal differs"):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+def test_preserved_preformal_bound_projection_rejects_reordered_review_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_report, binding, _ = _prepare_preserved_preformal_projection(
+        tmp_path,
+        monkeypatch,
+    )
+    report = _read_report(copied_report)
+    review = report["prospective_review"]
+    rows = review["implementation_files"]
+    rows[0], rows[1] = rows[1], rows[0]
+    review["implementation_manifest_sha256"] = hashlib.sha256(
+        preformal._canonical_json_bytes(rows)
+    ).hexdigest()
+    review_payload = _canonical(review)
+    review_identity = {
+        "bytes": len(review_payload),
+        "sha256": hashlib.sha256(review_payload).hexdigest(),
+    }
+    for inputs in (
+        report["input_files_before"],
+        report["input_files_after"],
+    ):
+        inputs["prospective_review"].update(review_identity)
+    implementation_rows = binding["source"]["implementation_files"]
+    review_row = next(
+        row
+        for row in implementation_rows
+        if row["path"] == preformal.REVIEW_RELATIVE_PATH
+    )
+    review_row.update(review_identity)
+    _rewrite_report(copied_report, report)
+    _refresh_preserved_projection_binding(copied_report, binding)
+
+    with pytest.raises(
+        RuntimeError,
+        match="prospective review is malformed or misbound",
+    ):
+        binding_module.verify_bound_machine_test_report(
+            copied_report,
+            binding,
+        )
+
+
+def test_capture_preformal_logs_retains_once_captured_bytes_after_origin_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stdout = tmp_path / "command.stdout.log"
+    stderr = tmp_path / "command.stderr.log"
+    stdout_payload = b"captured stdout\n"
+    stdout.write_bytes(stdout_payload)
+    stderr.write_bytes(b"")
+    report = {
+        "commands": [
+            {
+                "stdout": {
+                    "file": stdout.name,
+                    "bytes": len(stdout_payload),
+                    "sha256": hashlib.sha256(stdout_payload).hexdigest(),
+                },
+                "stderr": {
+                    "file": stderr.name,
+                    "bytes": 0,
+                    "sha256": hashlib.sha256(b"").hexdigest(),
+                },
+            }
+        ]
+    }
+    report_path = tmp_path / "report.json"
+    report_path.write_bytes(_canonical(report))
+    original_reader = binding_module._stable_regular_payload
+    mutated = False
+
+    def read_then_mutate(
+        path: Path,
+        *,
+        label: str,
+        expected_nlink: int = 1,
+    ) -> bytes:
+        nonlocal mutated
+        payload = original_reader(
+            path,
+            label=label,
+            expected_nlink=expected_nlink,
+        )
+        if path == stdout and not mutated:
+            stdout.write_bytes(b"changed after capture\n")
+            mutated = True
+        return payload
+
+    monkeypatch.setattr(
+        binding_module,
+        "_stable_regular_payload",
+        read_then_mutate,
+    )
+    rows, payloads = binding_module._capture_preformal_logs(
+        report_path,
+        report,
+    )
+
+    assert mutated is True
+    assert stdout.read_bytes() != stdout_payload
+    assert rows[0] == {
+        "path": stdout.name,
+        "bytes": len(stdout_payload),
+        "sha256": hashlib.sha256(stdout_payload).hexdigest(),
+    }
+    assert payloads == [stdout_payload, b""]
+
+
+def test_create_formal_binding_then_real_verify_binding_preserved_preformal_seam(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    inventory = _result_free_inventory()
+    package_names = [
+        "python",
+        *sorted(verify_module.REQUIRED_PACKAGES - {"python"}),
+    ]
+    inventory["packages"] = [
+        {
+            "name": name,
+            "version": "3.12.0" if name == "python" else "1.0",
+            "distribution_sha256": f"{index + 1:x}" * 64,
+            "declared_file_count": 1,
+            "editable": False,
+        }
+        for index, name in enumerate(package_names)
+    ]
+    fixture_repository = tmp_path / "strict-repository"
+    fixture_repository.mkdir()
+    audit_execution, audit_payloads = _strict_audit_execution_fixture(
+        repository=fixture_repository,
+        inventory=inventory,
+    )
+
+    implementation_without_review = _projection_implementation_rows()
+    review = _review(implementation_without_review)
+    inputs["prospective_review"].write_bytes(_canonical(review))
+    monkeypatch.setattr(
+        preformal,
+        "verify_prospective_review",
+        lambda _path: copy.deepcopy(review),
+    )
+
+    seal_path = inputs["runtime_seal"]
+    seal = json.loads(seal_path.read_bytes())
+    seal["standard_library"] = inventory["standard_library"]
+    seal["package_roots"] = inventory["package_roots"]
+    seal["package_ownership"] = inventory["package_ownership"]
+    seal_path.write_bytes(_canonical(seal))
+    monkeypatch.setattr(
+        preformal,
+        "_validated_runtime_seal",
+        lambda _path, *, runtime_executable: (
+            copy.deepcopy(seal),
+            dict(_RUNTIME_ENVIRONMENT),
+        ),
+    )
+
+    runtime_receipt = _runtime_conformance()
+    runtime_receipt["inventory"] = inventory
+    runtime_receipt["inventory_sha256"] = hashlib.sha256(
+        preformal._canonical_json_bytes(inventory)
+    ).hexdigest()
+    runtime_receipt["conformance_sha256"] = hashlib.sha256(
+        preformal._canonical_json_bytes(audit_execution)
+    ).hexdigest()
+    for name in (
+        "restart_runtime_conformance_report_sha256",
+        "restart_runtime_execution_receipt_sha256",
+        "restart_runtime_support_files",
+        "restart_runtime_repeat_count",
+        "restart_runtime_path_descriptor_equal",
+    ):
+        runtime_receipt[name] = audit_execution[name]
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "_runtime_conformance",
+        lambda device="cpu": {
+            **copy.deepcopy(runtime_receipt),
+            "device": device,
+        },
+    )
+    _generate(report_path, inputs)
+    canonical_report = binding_module.verify_canonical_machine_test_report(
+        report_path
+    )
+    review_payload = inputs["prospective_review"].read_bytes()
+    implementation_rows = sorted(
+        [
+            *implementation_without_review,
+            {
+                "path": preformal.REVIEW_RELATIVE_PATH,
+                "bytes": len(review_payload),
+                "sha256": hashlib.sha256(review_payload).hexdigest(),
+            },
+        ],
+        key=lambda row: str(row["path"]),
+    )
+    assert canonical_report["prospective_review"] == review
+    for row in implementation_without_review:
+        relative = str(row["path"])
+        destination = fixture_repository / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((preformal.REPO / relative).read_bytes())
+    review_destination = (
+        fixture_repository / preformal.REVIEW_RELATIVE_PATH
+    )
+    review_destination.parent.mkdir(parents=True, exist_ok=True)
+    review_destination.write_bytes(review_payload)
+
+    closure = json.loads(inputs["development_closure"].read_bytes())
+    lockfile = fixture_repository / "requirements-wm001.lock"
+    lockfile.write_text(
+        "fixture==1 --hash=sha256:" + "a" * 64 + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "binding-package" / "formal-binding.json"
+
+    monkeypatch.setattr(binding_module, "REPO", fixture_repository)
+    monkeypatch.setattr(verify_module, "REPO", fixture_repository)
+    monkeypatch.setattr(binding_module, "LOCKFILE", lockfile)
+    monkeypatch.setattr(
+        verify_module,
+        "verify_protocol",
+        lambda: {
+            "lanes": {
+                "formal": {
+                    "master_seeds": list(verify_module.FORMAL_SEEDS),
+                }
+            }
+        },
+    )
+    monkeypatch.setattr(binding_module, "source_is_clean", lambda: True)
+    monkeypatch.setattr(
+        binding_module,
+        "require_formal_python_flags",
+        lambda: dict(preformal._RUNTIME_FLAGS),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "require_formal_process_environment",
+        lambda: dict(_RUNTIME_ENVIRONMENT),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "run_pendulum_conformance",
+        lambda **_kwargs: {"passed": True},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "_created_conformance_satisfies_formal_contract",
+        lambda _report: True,
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "run_independent_phase_oscillator_conformance",
+        lambda **_kwargs: {"passed": True},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "run_coverage_conformance",
+        lambda: {"passed": True},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "verify_development_closure",
+        lambda _path: copy.deepcopy(closure),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "implementation_files",
+        lambda: copy.deepcopy(implementation_rows),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "verify_installed_source_snapshot",
+        lambda: None,
+    )
+    monkeypatch.setattr(binding_module, "package_roots", lambda: (tmp_path,))
+    monkeypatch.setattr(
+        binding_module,
+        "package_root_inventory",
+        lambda _root: copy.deepcopy(inventory["package_roots"][0]),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "standard_library_inventory",
+        lambda: copy.deepcopy(inventory["standard_library"]),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "package_root_ownership",
+        lambda: copy.deepcopy(inventory["package_ownership"]),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "installed_package_rows",
+        lambda: copy.deepcopy(inventory["packages"]),
+    )
+    monkeypatch.setattr(binding_module, "verify_lockfile_rows", lambda _rows: None)
+    monkeypatch.setattr(
+        binding_module,
+        "build_bound_audit_execution",
+        lambda **_kwargs: (
+            copy.deepcopy(audit_execution),
+            copy.deepcopy(audit_payloads),
+        ),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "git_output",
+        lambda *arguments: (
+            _GIT_IDENTITY["commit"]
+            if arguments == ("rev-parse", "HEAD")
+            else _GIT_IDENTITY["tree"]
+        ),
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "distribution_sha256",
+        lambda _name: "c" * 64,
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "checkpoint_implementation_sha256",
+        lambda: "d" * 64,
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "manifest_schema_sha256",
+        lambda: "e" * 64,
+    )
+    monkeypatch.setattr(
+        binding_module.torch,
+        "use_deterministic_algorithms",
+        lambda _enabled: None,
+    )
+    monkeypatch.setattr(
+        binding_module.torch,
+        "are_deterministic_algorithms_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr(binding_module.torch, "get_num_threads", lambda: 1)
+    monkeypatch.setattr(
+        binding_module.torch,
+        "get_num_interop_threads",
+        lambda: 1,
+    )
+
+    created = binding_module.create_formal_binding(
+        output_path=output,
+        test_report_path=report_path,
+        development_closure_path=inputs["development_closure"],
+        device="cpu",
+    )
+    schema = json.loads(
+        verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8")
+    )
+    verify_module._validate_json_schema(
+        created,
+        schema,
+        label="created preserved-preformal binding",
+    )
+    monkeypatch.setattr(
+        verify_module,
+        "_verify_pendulum_conformance_report",
+        lambda _report: None,
+    )
+    monkeypatch.setattr(
+        verify_module,
+        "_expected_oscillator_conformance",
+        lambda: {"passed": True},
+    )
+    monkeypatch.setattr(
+        verify_module,
+        "_verify_bound_coverage_runtime_identity",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        verify_module,
+        "_verify_coverage_conformance_report",
+        lambda *_args, **_kwargs: None,
+    )
+    member_digests = {
+        str(row["path"]): str(row["sha256"])
+        for row in closure["qualification_archive"]["members"]
+    }
+    monkeypatch.setattr(
+        verify_module,
+        "_recorded_development_closure_identity",
+        lambda _path: (
+            copy.deepcopy(closure),
+            copy.deepcopy(created["development_qualification"]),
+            copy.deepcopy(member_digests),
+        ),
+    )
+
+    verified = verify_module.verify_binding(output)
+    assert verified == created
 
 
 def test_recorded_report_verifier_uses_explicit_qa_not_caller(
@@ -1746,7 +3169,7 @@ def test_versioned_preformal_bundle_ignores_retained_prior_version_evidence(
         return rows
 
     before = legacy_fingerprint()
-    bundle_root = legacy_root / "v1.13.0" / "preformal"
+    bundle_root = legacy_root / "v1.14.0" / "preformal"
     bundle_root.parent.mkdir(parents=True)
     fixture_root = tmp_path / "fixture"
     fixture_root.mkdir()
@@ -1806,7 +3229,7 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     review = {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -1839,15 +3262,15 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
         preformal.verify_prospective_review(path)
 
 
-def test_prospective_manifest_binds_v1130_plan_and_runbook() -> None:
+def test_prospective_manifest_binds_v1140_plan_and_runbook() -> None:
     paths = {
         str(row["path"])
         for row in preformal._implementation_files()
     }
 
     assert {
-        "docs/wm001-v1130-confirmation-plan.md",
-        "docs/wm001-v1130-operator-runbook.md",
+        "docs/wm001-v1140-confirmation-plan.md",
+        "docs/wm001-v1140-operator-runbook.md",
     } <= paths
 
 
@@ -2028,7 +3451,7 @@ def test_fresh_closure_reopen_executes_inherited_seal_descriptors(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "mode": "fresh-closure-reopen",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -2131,7 +3554,7 @@ def test_fresh_closure_reopen_validator_uses_archive_member_digests(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "mode": "fresh-closure-reopen",
         "challenge": "7" * 64,
         "requesting_process_id": 101,
@@ -2188,7 +3611,7 @@ def test_fresh_identity_conformance_uses_nested_descriptor_child(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "mode": "fresh-identity-conformance",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -2466,7 +3889,7 @@ def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.13.0",
+        "protocol_version": "1.14.0",
         "mode": "fresh-identity-conformance",
         "challenge": "7" * 64,
         "requesting_process_id": 101,

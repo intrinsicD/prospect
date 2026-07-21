@@ -123,19 +123,19 @@ def test_installed_runner_derives_qualification_from_canonical_git_worktree(
         lifecycle
         / "results"
         / "development"
-        / "qualification-v1.13.0"
+        / "qualification-v1.14.0"
     )
     assert module.DEVELOPMENT_CLOSURE_PATH == (
         lifecycle
         / "results"
         / "development"
-        / "development-closure-v1.13.0.json"
+        / "development-closure-v1.14.0.json"
     )
     assert module.DEVELOPMENT_DIAGNOSTICS_ROOT == (
         lifecycle
         / "results"
         / "development"
-        / "diagnostics-v1.13.0"
+        / "diagnostics-v1.14.0"
     )
 
 
@@ -144,7 +144,7 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.13.0"
+    qualification = root / "qualification-v1.14.0"
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
 
     assert (
@@ -171,9 +171,9 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
         )
     for reserved in (
         qualification,
-        root / "development-closure-v1.13.0.json",
-        root / "v1.13.0" / "preformal",
-        tmp_path / "operator-v1.13" / "bindings" / "formal-binding-v1.13.0",
+        root / "development-closure-v1.14.0.json",
+        root / "v1.14.0" / "preformal",
+        tmp_path / "operator-v1.14" / "bindings" / "formal-binding-v1.14.0",
     ):
         with pytest.raises(
             ValueError,
@@ -188,7 +188,7 @@ def test_only_no_override_development_run_can_occupy_qualification_path(
         None,
         seed_override=True,
         diagnostic_stamp="stamp",
-    ) == (root / "diagnostics-v1.13.0" / "diagnostic-stamp")
+    ) == (root / "diagnostics-v1.14.0" / "diagnostic-stamp")
 
 
 def test_existing_qualification_consumes_all_development_entrypoints(
@@ -197,7 +197,7 @@ def test_existing_qualification_consumes_all_development_entrypoints(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.13.0"
+    qualification = root / "qualification-v1.14.0"
     qualification.mkdir(parents=True)
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
     monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
@@ -213,7 +213,7 @@ def test_runtime_custody_refusal_precedes_producer_root_creation(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.13.0"
+    qualification = root / "qualification-v1.14.0"
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)
     monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     monkeypatch.setattr(
@@ -252,8 +252,8 @@ def test_existing_closure_consumes_development_before_runtime_custody(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     root = tmp_path / "development"
-    qualification = root / "qualification-v1.13.0"
-    closure = root / "development-closure-v1.13.0.json"
+    qualification = root / "qualification-v1.14.0"
+    closure = root / "development-closure-v1.14.0.json"
     root.mkdir(parents=True)
     closure.write_text("{}\n", encoding="utf-8")
     monkeypatch.setattr(run, "DEVELOPMENT_RESULTS_ROOT", root)

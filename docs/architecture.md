@@ -448,16 +448,31 @@ contradiction: `source.test_log_files` reused a digest definition requiring
 launch occurred. Its disposition is recorded in the
 [v1.12 binding-schema failure](wm001-v1120-binding-schema-failure.md).
 
-Protocol 1.13 is the fresh prospective successor. It preserves the same
-scientific system and all v1.12 runtime custody, introduces formal-binding v10
-with distinct nonempty implementation-file and possibly empty stream-file
-digests, validates the actual 20-row stream projection before claiming the
-binding attempt, and validates the complete assembled binding before any
-sidecar publication. It uses fresh paths, environments, seeds, wheel, lock,
-schemas, seal, prospective review, and evidence claims. The plan and exact
-operator sequence are in the
-[v1.13 confirmation plan](wm001-v1130-confirmation-plan.md) and
-[v1.13 operator runbook](wm001-v1130-operator-runbook.md).
+Protocol 1.13 preserved the same scientific system and all v1.12 runtime
+custody, introduced formal-binding v10, validated the actual 20-row stream
+projection, and validated the complete assembled binding against its root
+schema. It passed command 10, development, accepted audit, closure, and all ten
+preformal commands. Its strict binding consumer then passed the preserved
+report copy to the canonical live-bundle verifier. That role requires the
+original development/preformal path and an exclusive report-plus-logs
+directory, so it correctly rejected the mixed binding staging directory. The
+sole binding attempt failed before acceptance and was outer-finalized; no
+formal launch occurred. Its disposition is recorded in the
+[v1.13 binding-verifier failure](wm001-v1130-binding-verifier-failure.md).
+
+Protocol 1.14 is the fresh prospective successor. It preserves the scientific
+system, formal-binding v10, raw-result v9, and every existing runtime and
+stream/schema repair. The canonical role remains path-exclusive. A separate
+preserved role validates the exact report and referenced 20 logs inside the
+binding package while permitting declared non-preformal sidecars and rejecting
+additional preformal-named evidence. Both roles independently enforce the same
+fixed command, input, environment, semantic, and stream-byte contract, and a
+real mixed-package producer-to-strict-consumer regression binds the
+distinction. It uses fresh
+paths, environments, seeds, wheel, lock, schemas, seal, prospective review,
+and evidence claims. The plan and exact operator sequence are in the
+[v1.14 confirmation plan](wm001-v1140-confirmation-plan.md) and
+[v1.14 operator runbook](wm001-v1140-operator-runbook.md).
 
 ## Open engineering boundaries
 
@@ -466,11 +481,11 @@ operator sequence are in the
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocols 1.10, 1.11, and 1.12 are terminally retired without formal
-  authority. Protocol 1.13 is the fresh prospective successor and must pass its
-  formal-binding stream/schema compatibility, recorded-versus-live,
-  warning-free precision, and exact command-10 stderr gates before any new
-  outcome-producing attempt.
+- Protocols 1.10 through 1.13 are terminally retired without formal authority.
+  Protocol 1.14 is the fresh prospective successor and must pass its
+  canonical-versus-preserved report-role regression, formal-binding
+  stream/schema compatibility, recorded-versus-live, warning-free precision,
+  and exact command-10 stderr gates before any new outcome-producing attempt.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External

@@ -122,11 +122,22 @@ outer-finalized and no formal launch occurred. Its terminal disposition is
 preserved in the
 [v1.12 binding-schema failure](docs/wm001-v1120-binding-schema-failure.md).
 
-Protocol 1.13 is the active prospective confirmation. It preserves the
-scientific system and every v1.12 runtime/zero-stderr repair, introduces a
-formal-binding v10 stream digest that permits empty logs without weakening
-nonempty implementation files, and adds producer-to-schema preclaim and
-prepublication validation. It uses fresh seeds, environments, and namespaces
-and cannot reuse v1.12 evidence. Follow the
-[WM-001 v1.13 operator runbook](docs/wm001-v1130-operator-runbook.md) before
+Protocol 1.13 repaired the stream/schema contradiction, passed command 10,
+completed development, accepted audit, closure, and all ten preformal
+commands, and assembled a root-schema-valid binding package. Its strict
+consumer then applied the canonical live-bundle report verifier to the
+preserved report inside the mixed binding directory. That role correctly
+rejected the copied path and additional binding sidecars. The failed binding
+was outer-finalized and no formal launch occurred. Its terminal disposition is
+preserved in the
+[v1.13 binding-verifier failure](docs/wm001-v1130-binding-verifier-failure.md).
+
+Protocol 1.14 is the active prospective confirmation. It preserves the
+scientific system, formal-binding v10, raw-result v9, and every prior runtime,
+schema, and zero-stderr repair. It separates canonical live-bundle validation
+from preserved binding-package validation while requiring both roles to
+enforce the same fixed semantic and stream-byte contract, and adds a real
+producer-to-strict-consumer archive regression. It uses fresh seeds,
+environments, and namespaces and cannot reuse v1.13 evidence. Follow the
+[WM-001 v1.14 operator runbook](docs/wm001-v1140-operator-runbook.md) before
 creating any development evidence, implementation binding, or formal attempt.

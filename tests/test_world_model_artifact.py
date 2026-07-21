@@ -149,7 +149,7 @@ def _write_minimal_formal_binding(path: Path, *, git_commit: str) -> str:
             "external_attestation": False,
             "exclusive_path_use_required": True,
         },
-        "protocol": {"version": "1.13.0"},
+        "protocol": {"version": "1.14.0"},
         "source": {
             "git_commit": git_commit,
             "git_tree": "2" * 40,
@@ -320,7 +320,7 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
     assert copied["formal_binding_sha256"] == first_digest
     assert copied["attempt_directory"] == FORMAL_CONFIRMATION_NAME
     assert copied["schema"] == "prospect.wm001.formal-launch.v2"
-    assert copied["protocol_version"] == "1.13.0"
+    assert copied["protocol_version"] == "1.14.0"
     assert copied["global_marker_file"] == FORMAL_LAUNCH_MARKER_NAME
     assert marker.read_bytes() == producer_record.read_bytes()
     assert os.path.samefile(marker, producer_record)
@@ -430,7 +430,7 @@ def test_formal_launch_claim_rejects_noncanonical_output(tmp_path: Path) -> None
     for output in invalid_outputs:
         with pytest.raises(
             ValueError,
-            match="results/formal/<binding-sha256>/confirmation-v1.13.0",
+            match="results/formal/<binding-sha256>/confirmation-v1.14.0",
         ):
             formal_launch_marker_path(
                 binding,
@@ -606,6 +606,35 @@ def test_completed_attempt_tees_logs_and_manifests_every_file(tmp_path: Path) ->
     with pytest.raises(FileExistsError):
         with ProducerAttempt(output, lane="development"):
             pass
+
+
+def test_formal_attempt_accepts_exclusively_prepared_binding_root(
+    tmp_path: Path,
+) -> None:
+    formal_results = tmp_path / "results" / "formal"
+    formal_results.mkdir(parents=True)
+    binding_root = formal_results / ("a" * 64)
+    output = binding_root / FORMAL_CONFIRMATION_NAME
+
+    with pytest.raises(ValueError, match="producer output parent"):
+        with ProducerAttempt(output, lane="formal"):
+            pass
+    assert not binding_root.exists()
+    assert not output.exists()
+
+    os.mkdir(binding_root)
+    descriptor = os.open(formal_results, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+    with ProducerAttempt(output, lane="formal"):
+        pass
+
+    assert binding_root.is_dir()
+    assert not binding_root.is_symlink()
+    assert _read_json(output / MANIFEST_NAME)["status"] == "completed"
 
 
 def test_public_producer_verifier_requires_same_inode_outer_completion(
@@ -859,7 +888,7 @@ def test_formal_cli_refuses_noncanonical_or_omitted_output_before_custody(
         "formal_preflight",
     ),
 )
-def test_formal_cli_preclaim_failures_leave_v113_marker_absent(
+def test_formal_cli_preclaim_failures_leave_v114_marker_absent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     failure_stage: str,
@@ -1120,7 +1149,7 @@ def test_experiment_entrypoint_refuses_unowned_or_existing_output(
         )
 
     development = experiment_module.ExperimentConfig.development(
-        master_seeds=(560818116,),
+        master_seeds=(630481329,),
         device="cpu",
     )
     assert (
