@@ -27,3 +27,10 @@ sessions:
     events_count: 9
     claims_touched: []
     open_threads: 1
+  - id: "2026-07-21_001"
+    date: "2026-07-21"
+    summary: "Retired WM-001 v1.15 after its accepted binding reached a production-scale formal-custody failure before producer dispatch."
+    turn_count: 1
+    events_count: 7
+    claims_touched: [C03]
+    open_threads: 1

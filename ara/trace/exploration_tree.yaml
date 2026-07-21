@@ -410,3 +410,96 @@ tree:
     also_depends_on: [N17]
     status: resolved
     children: []
+  - id: N19
+    type: experiment
+    title: "Execute the sealed WM-001 v1.15 lifecycle"
+    provenance: ai-executed
+    timestamp: "2026-07-21T17:03+02:00"
+    result: >-
+      The final sealed harness passed 753 tests, Ruff, both mypy scopes,
+      prospective review, exact runtime/source/lock checks, result-free command
+      10, development, accepted development audit, closure, fresh-runtime
+      reopen, ten-command preformal, accepted binding, and the operator-recorded
+      stop/go sequence. The sole formal invocation then returned 1 before
+      producer custody. The binding-keyed root is empty and no formal marker,
+      producer, result, audit, review, or adjudication exists.
+    evidence:
+      - "git:30df10bb3ed14741ee01a06a7d47d3ba005d8db7"
+      - "docs/wm001-v1150-prospective-harness-review.json"
+      - "docs/wm001-v1150-formal-invocation-failure.md"
+      - "bench/world_model_lifecycle/results/operator-v1.15/bindings/formal-binding-v1.15.0"
+      - "bench/world_model_lifecycle/results/formal/5282325024dd19a32607d9ad3b70067ccd06f52bbf44d1a7bd76f856e5df99de"
+    also_depends_on: [N18]
+    status: resolved
+    children: []
+  - id: N20
+    type: dead_end
+    title: "Use the generic control reader for live formal custody"
+    provenance: ai-executed
+    timestamp: "2026-07-21T17:03+02:00"
+    hypothesis: >-
+      Passing closure, independent formal-input audit, accepted binding, and
+      stop/go verification established that the standard-library launcher
+      could reopen the real development producer before formal dispatch.
+    failure_mode: >-
+      launch_bootstrap reused its 64 MiB materializing control reader while
+      reconstructing every live producer row. It rejected the first sorted
+      bulk file, result.json at 320,977,868 bytes, before subprocess dispatch.
+      Four additional producer files also exceed 64 MiB, so a result-only
+      exception would fail again.
+    lesson: >-
+      Every distinct evidence consumer must stream all bulk producer rows under
+      stable descriptor and exact namespace custody, and the exact accepted-
+      binding outer path must be rehearsed with production-scale roles before
+      consuming formal authority.
+    evidence:
+      - "bench/world_model_lifecycle/launch_bootstrap.py"
+      - "tests/test_world_model_launch_bootstrap.py"
+      - "docs/wm001-v1150-formal-invocation-failure.md"
+    also_depends_on: [N19]
+    status: resolved
+    children: []
+  - id: N21
+    type: decision
+    title: "Retire WM-001 v1.15 without formal authority"
+    provenance: ai-executed
+    timestamp: "2026-07-21T17:03+02:00"
+    choice: >-
+      Preserve the accepted development-through-binding evidence and consumed
+      empty formal root, do not retry or remove it, do not create an ineligible
+      formal audit or adjudication, and permit only a fresh-version engineering
+      repair with unchanged scientific semantics.
+    alternatives:
+      - "Retry the same binding-keyed formal root after fixing the launcher."
+      - "Treat development outcomes as formal capability evidence."
+      - "Run formal audit or adjudication without a producer terminal."
+      - "Retire v1.15 and require fresh prospective authority."
+    evidence:
+      - N19
+      - N20
+      - "docs/wm001-v1150-operator-runbook.md"
+      - "docs/wm001-v1150-formal-invocation-failure.md"
+    also_depends_on: [N19, N20]
+    status: resolved
+    children: []
+  - id: N22
+    type: experiment
+    title: "Adversarially audit the v1.15 terminal claims"
+    provenance: ai-executed
+    timestamp: "2026-07-21T17:03+02:00"
+    result: >-
+      Independent protocol, state, cause, and results referees confirmed the
+      engineering chain through accepted binding and the 64 MiB launcher
+      diagnosis. They narrowed the formal-refusal evidence to operator
+      diagnostics because no producer terminal exists, retired every v1.15
+      learning, improvement, retention, restart, launchability, and K0-K7
+      claim, and left Prospect's general capability unresolved. No development
+      outcome value or formal outcome was opened.
+    evidence:
+      - "docs/wm001-v1150-formal-invocation-failure.md"
+      - "bench/world_model_lifecycle/launch_bootstrap.py"
+      - "bench/world_model_lifecycle/artifact_audit.py"
+      - "tests/test_world_model_launch_bootstrap.py"
+    also_depends_on: [N19, N20, N21]
+    status: resolved
+    children: []

@@ -226,3 +226,57 @@ observations:
     promoted_to: "logic/solution/constraints.md:R07"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O14
+    timestamp: "2026-07-21T17:03+02:00"
+    provenance: ai-suggested
+    content: >-
+      Large-evidence custody is a per-consumer obligation: every live producer
+      namespace reader must stream each file once under no-follow descriptor,
+      stable path/inode, exact size/digest, typed manifest, and aggregate-bound
+      checks. A passing streamed closure or archive reader does not establish
+      that a separate formal launcher scales.
+    context: >-
+      WM-001 v1.15 passed closure and independent formal-input streaming but the
+      standard-library launcher's separate live scan materialized a
+      320,977,868-byte result through its 64 MiB control reader.
+    potential_type: constraint
+    bound_to: [N19, N20, N22]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R08"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O15
+    timestamp: "2026-07-21T17:03+02:00"
+    provenance: ai-suggested
+    content: >-
+      WM-001 v1.15 establishes engineering qualification through accepted
+      binding but no formal capability result. No formal producer or outcome
+      exists, development is claim-ineligible, and the failure supplies no
+      evidence that Prospect generally has or lacks the desired capability.
+    context: >-
+      The sole formal invocation failed before producer custody and the
+      adversarial results audit retired all v1.15 scientific claims.
+    potential_type: claim
+    bound_to: [N19, N21, N22]
+    promoted: true
+    promoted_to: "logic/claims.md:C03"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O16
+    timestamp: "2026-07-21T17:03+02:00"
+    provenance: ai-suggested
+    content: >-
+      A successor should terminal-bind the existing development-result
+      qualification projection, rejoin it to one streamed raw-result digest,
+      and run the existing result-free accepted-binding outer path with all
+      production-scale roles before creating the formal root.
+    context: >-
+      Small launch fixtures and neighboring verifiers missed the v1.15
+      production-size failure; the existing outer preformal-runtime route can
+      exercise the exact custody branch without an outcome-producing run.
+    potential_type: heuristic
+    bound_to: [N20, N21, N22]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H02"
+    crystallized_via: artifact-commitment
+    stale: false

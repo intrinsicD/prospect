@@ -1,0 +1,104 @@
+session:
+  id: "2026-07-21_001"
+  date: "2026-07-21"
+  started: "2026-07-21T17:03+02:00"
+  last_turn: "2026-07-21T17:03+02:00"
+  turn_count: 1
+  summary: "Retired WM-001 v1.15 after its accepted binding reached a production-scale formal-custody failure before producer dispatch."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: N19
+    routing: direct
+    provenance: ai-executed
+    summary: "Executed the sealed v1.15 lifecycle through accepted binding; the sole formal invocation returned 1 before producer custody."
+  - turn: 1
+    type: dead_end
+    id: N20
+    routing: direct
+    provenance: ai-executed
+    summary: "The formal launcher reused a 64 MiB materializing control reader for five production files that exceed that bound."
+  - turn: 1
+    type: decision
+    id: N21
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired v1.15 without retry, formal audit, adjudication, or scientific interpretation."
+  - turn: 1
+    type: experiment
+    id: N22
+    routing: direct
+    provenance: ai-executed
+    summary: "Adversarial referees confirmed the engineering diagnosis and retired every v1.15 capability claim."
+  - turn: 1
+    type: constraint
+    id: O14
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized per-consumer streamed bulk-evidence custody as R08 through artifact commitment."
+  - turn: 1
+    type: claim
+    id: O15
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the absence of any v1.15 formal capability result as C03 through artifact commitment."
+  - turn: 1
+    type: heuristic
+    id: O16
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized exact accepted-binding preclaim rehearsal and result-qualification reuse as H02."
+
+ai_actions:
+  - turn: 1
+    action: >-
+      Sealed the v1.15 harness at commit 30df10b after 753 tests and static,
+      environment, source, seed, archive, and authorization gates; executed
+      its one-shot runtime seal, rehearsal, development, audit, closure,
+      preformal, binding, stop/go, and formal-invocation sequence without
+      opening development outcomes.
+    provenance: ai-executed
+    files_changed:
+      - "bench/world_model_lifecycle/"
+      - "tests/"
+      - "docs/wm001-v1150-confirmation-plan.md"
+      - "docs/wm001-v1150-operator-runbook.md"
+      - "docs/wm001-v1150-prospective-harness-review.json"
+      - "requirements-wm001.lock"
+  - turn: 1
+    action: >-
+      Ran independent protocol, state, cause, and results audits; authored the
+      terminal v1.15 failure record; changed repository status surfaces from
+      prospective to retired; and preserved authenticated-versus-diagnostic
+      evidence boundaries.
+    provenance: ai-executed
+    files_changed:
+      - "docs/wm001-v1150-formal-invocation-failure.md"
+      - "README.md"
+      - "bench/world_model_lifecycle/README.md"
+      - "docs/architecture.md"
+      - "ara/"
+
+claims_touched:
+  - id: C03
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: >-
+      The user required the repaired harness to be checked thoroughly before
+      the next immutable move, then requested completion, appropriate commits,
+      merge to main, and remote push.
+  - turn: 1
+    excerpt: >-
+      The precommitted one-shot rule makes the fsynced binding-keyed root
+      terminal even though the launcher failed before producing an
+      authenticated formal manifest.
+
+open_threads:
+  - "Decide whether to build a fresh successor with per-consumer streamed producer custody and an exact accepted-binding preclaim rehearsal."
+
+ai_suggestions_pending:
+  - "Reuse the terminal-bound development-result qualification, enforce exact 4 GiB per-file and 16 GiB aggregate live-producer limits, and exercise the existing result-free binding path before formal-root creation."

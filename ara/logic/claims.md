@@ -55,3 +55,27 @@
 - **Tags**: world-model, causal-learning, behavior, retention, persistence,
   exact-coverage, bounded-evidence, unaccepted
 - **From staging**: O10
+
+## C03: WM-001 v1.15 has no formal capability result
+
+- **Statement**: WM-001 protocol 1.15.0 completed engineering qualification
+  through an accepted, outer-finalized binding, but its sole formal invocation
+  failed before producer custody. No v1.15 formal marker, producer, outcome,
+  audit, review, or adjudication exists; development is permanently
+  claim-ineligible. The attempt therefore establishes no learning,
+  improvement, retention, restart, or threshold result and does not show that
+  Prospect generally has or lacks the desired capability.
+- **Status**: supported
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A preexisting authenticated v1.15 formal producer
+  terminal and independently accepted adjudication package are demonstrated
+  without reusing, removing, or retrying the consumed binding-keyed root.
+- **Proof**:
+  [`docs/wm001-v1150-formal-invocation-failure.md`,
+  `bench/world_model_lifecycle/results/operator-v1.15/bindings/formal-binding-v1.15.0`,
+  N19, N21, N22]
+- **Dependencies**: []
+- **Architecture/constraint refs**: [A01, A02, R03, R07, R08]
+- **Tags**: world-model, no-formal-result, claim-ineligible, unresolved-capability
+- **From staging**: O15

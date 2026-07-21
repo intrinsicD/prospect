@@ -95,3 +95,21 @@
   [N11, N12, N13,
   `bench/world_model_lifecycle/results/operator-v1.7/closures/development-closure-v1.7.0`]
 - **From staging**: O13
+
+## R08: Stream bulk evidence at every independent consumer
+
+- **Statement**: Every consumer that reconstructs a live producer namespace
+  must stream each bulk file exactly once under canonical no-follow path,
+  regular-file/link, pre/post descriptor identity, post-read path-to-descriptor,
+  exact size/SHA-256, typed sorted manifest, namespace-equality, per-file, and
+  aggregate limits. Passing one streamed closure or archive reader does not
+  establish that a separate launcher or auditor scales.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Code refs**:
+  [`bench/world_model_lifecycle/launch_bootstrap.py`,
+  `bench/world_model_lifecycle/artifact_audit.py`,
+  pending: fresh successor implementation and production-scale integration test]
+- **Evidence**: [N19, N20, N22,
+  `docs/wm001-v1150-formal-invocation-failure.md`]
+- **From staging**: O14
