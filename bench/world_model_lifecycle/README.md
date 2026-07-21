@@ -18,15 +18,15 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.15.0 is retired without formal authority. It preserved the exact
+Protocol 1.16.0 is the active prospective successor. It preserves the exact
 v1.4 model, learning algorithm, optimizer, planner, controller, budgets,
 controls, metrics, thresholds, and K0–K7 order. Its scientific-block digest is
 `fa44fd93a672db3905d45a0e99c568985e7e2e5d02d32043c830db413005a5c3`.
-Only its execution and evidence boundary changed. It passed development through
-accepted binding and the operator-recorded final stop/go gate, but its sole
-formal invocation returned `1` before producer custody. The diagnostic
-traceback identifies reuse of a 64 MiB control-file reader for a
-320,977,868-byte result. Protocol 1.5 is retired
+Only its execution and evidence boundary changes: control objects remain
+bounded at 64 MiB, bulk producer files are streamed once under exact descriptor,
+namespace, and size custody, the archived result qualification is terminal-bound
+and independently rejoined, and one accepted-binding outer rehearsal must pass
+before the formal root can be created. Protocol 1.5 is retired
 after its sole outcome-producing development qualification found that
 Gymnasium's lazy import added two unsealed process variables. That producer
 has no result, outer completion, development closure, binding, or formal
@@ -215,11 +215,12 @@ rejection path then failed to preserve an official rejected package. Protocol
 constant and underspecified endpoint arithmetic. Their exact evidence and
 dispositions remain in the
 [v1.4 results review](../../docs/wm001-v140-formal-results.md) and
-[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.15 does not
-repair or relabel either attempt. The frozen v1.15 design is the
-[v1.15 confirmation plan](../../docs/wm001-v1150-confirmation-plan.md), and its
-terminal state is the
-[v1.15 formal-invocation failure](../../docs/wm001-v1150-formal-invocation-failure.md).
+[v1.3 results review](../../docs/wm001-v130-formal-results.md); v1.16 does not
+repair or relabel either attempt. The frozen v1.16 design is the
+[v1.16 confirmation plan](../../docs/wm001-v1160-confirmation-plan.md), with its
+one-shot sequence in the
+[v1.16 operator runbook](../../docs/wm001-v1160-operator-runbook.md). Protocol
+1.16 has no outcome until that prospective lifecycle completes.
 
 ## What the experiment must establish
 
@@ -349,27 +350,27 @@ resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
 
-The v1.15 development rehearsal used only seeds `2388891654` and `3201418215`
-and the complete formal budgets. It is useful only for schema, deterministic
+The v1.16 development rehearsal will use only seeds `3922749719` and
+`1847570536` and the complete formal budgets. It is useful only for schema, deterministic
 execution, exact arithmetic, audit coverage, restart, and custody validation.
 Its K3–K6 performance values are descriptive, cannot decide whether formal may
 launch, are never claim-eligible, and cannot be relabeled. After the exclusive
-development closure is published, every further v1.15 development run is
+development closure is published, every further v1.16 development run is
 forbidden.
 
-The reserved v1.15 formal seed set, which was never executed, was:
+The reserved v1.16 formal seed set is:
 
 ```text
-2465968807, 3494485289, 1615601571, 2220840580,
-280448223, 597199725, 712207456, 1727907751
+721000968, 1733386057, 1129257495, 1461304433,
+345413014, 76587833, 404195464, 3550251066
 ```
 
-The launch-time prebinding replay could reset isolated QA-only Pendulum fixtures;
+The launch-time prebinding replay may reset isolated QA-only Pendulum fixtures;
 those resets collect no formal experience, train no model, and do not consume
-the attempt. No outcome-producing formal reset or formal marker occurred. The
-earlier fsynced creation of the binding-keyed root nevertheless consumed the
-sole attempt under the frozen runbook. No resume, retry, corrected-audit
-upgrade, extra training, exclusion, or analysis change is allowed.
+the attempt. The accepted-binding rehearsal must complete before the
+binding-keyed formal root exists. Once a development or formal claim path is
+created, no resume, retry, corrected-audit upgrade, extra training, exclusion,
+or analysis change is allowed.
 
 There are two pre-outcome bindings:
 
@@ -382,7 +383,10 @@ There are two pre-outcome bindings:
    restart-runtime branch report plus complete repeated path/descriptor
    execution receipt already sealed by the preformal rehearsal. The binding
    attempt also preserves `formal-input-preflight.json`, produced by the exact
-   independent formal consumer and recomputed when the attempt is verified.
+   independent formal consumer and recomputed when the attempt is verified,
+   plus the exact archived `development-result-qualification.json` sidecar.
+   The launcher and formal auditor rejoin that sidecar to the streamed result,
+   archive, formal copy, and existing binding digest.
 
 Changing scientific semantics requires a new protocol version. Changing bound
 source, dependencies, or runtime before the first outcome-producing formal
@@ -390,14 +394,14 @@ replicate/task reset requires a new implementation binding. After that reset,
 any such change requires a new protocol version; previous failed attempts
 remain evidence.
 
-## Frozen v1.15 runbook — do not execute
+## Active v1.16 one-shot runbook
 
 The
-[WM-001 v1.15 operator runbook](../../docs/wm001-v1150-operator-runbook.md).
+[WM-001 v1.16 operator runbook](../../docs/wm001-v1160-operator-runbook.md).
 defines the typed runtime seals, canonical operator paths, outer-completion
-checks, exact development/preformal/binding order, and the retired formal,
-official-audit, and adjudication sequence. It is retained as evidence history;
-none of its one-shot commands may be rerun.
+checks, exact development/preformal/binding order, accepted-binding pre-root
+rehearsal, formal producer, official audit, and adjudication sequence. Each
+claim-bearing command is single-use and must never be rerun.
 
 ## Retired v1.4 command sketch — do not execute
 

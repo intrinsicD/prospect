@@ -132,7 +132,7 @@ class Harness:
         claim = {
             "schema": "prospect.wm001.formal-audit-claim.v1",
             "experiment_id": "WM-001",
-            "protocol_version": "1.15.0",
+            "protocol_version": "1.16.0",
             "claim_status": "consumed",
             "attempt_path": str(self.audit_attempt),
             "marker_path": str(self.audit_claim_marker),
@@ -238,7 +238,7 @@ class Harness:
             failure = {
                 "schema": "prospect.wm001.operator-execution-failure.v2",
                 "experiment_id": "WM-001",
-                "protocol_version": "1.15.0",
+                "protocol_version": "1.16.0",
                 "kind": "audit",
                 "lane": "formal",
                 "phase": "audit_execution",
@@ -271,7 +271,7 @@ class Harness:
         manifest = {
             "schema": "prospect.wm001.operator-attempt.v1",
             "experiment_id": "WM-001",
-            "protocol_version": "1.15.0",
+            "protocol_version": "1.16.0",
             "assurance": adjudication.assurance_record(),
             "kind": "audit",
             "lane": "formal",
@@ -317,7 +317,7 @@ class Harness:
             "fatal_findings": ([{"code": "terminal-rejection"}] if disposition == "rejected" else []),
             "conclusion": "fixture semantic review",
         }
-        return_path = self.tmp_path / "artifacts" / "wm001-reviews" / "formal-v1.15.0.json"
+        return_path = self.tmp_path / "artifacts" / "wm001-reviews" / "formal-v1.16.0.json"
         _write(return_path, review)
         return return_path
 
@@ -448,11 +448,11 @@ def harness(
         source_payloads=source_payloads,
         bootstrap_payload=bootstrap_payload,
     )
-    audit_attempt = tmp_path / "operator" / "audits" / "formal-audit-v1.15.0"
-    audit_claim = tmp_path / "formal" / "formal-audit-v1.15.0.json"
-    package = tmp_path / "adjudication" / "formal-adjudication-v1.15.0"
-    adjudication_marker = tmp_path / "formal" / "formal-adjudication-v1.15.0.json"
-    outer_root = tmp_path / "outer-completions" / "v1.15"
+    audit_attempt = tmp_path / "operator" / "audits" / "formal-audit-v1.16.0"
+    audit_claim = tmp_path / "formal" / "formal-audit-v1.16.0.json"
+    package = tmp_path / "adjudication" / "formal-adjudication-v1.16.0"
+    adjudication_marker = tmp_path / "formal" / "formal-adjudication-v1.16.0.json"
+    outer_root = tmp_path / "outer-completions" / "v1.16"
     value = Harness(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
@@ -477,7 +477,7 @@ def harness(
     monkeypatch.setattr(
         adjudication,
         "FORMAL_SEMANTIC_REVIEW_PATH",
-        tmp_path / "artifacts" / "wm001-reviews" / "formal-v1.15.0.json",
+        tmp_path / "artifacts" / "wm001-reviews" / "formal-v1.16.0.json",
     )
     monkeypatch.setattr(operator_module, "FORMAL_AUDIT_ATTEMPT_PATH", audit_attempt)
     monkeypatch.setattr(operator_module, "FORMAL_AUDIT_CLAIM_MARKER", audit_claim)
@@ -541,9 +541,9 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
 
     repo = tmp_path / "repo"
     lifecycle = repo / "bench" / "world_model_lifecycle"
-    binding_root = lifecycle / "results" / "operator-v1.15" / "bindings"
-    binding_attempt = binding_root / "formal-binding-v1.15.0"
-    completion_root = lifecycle / "results" / "outer-completions" / "v1.15"
+    binding_root = lifecycle / "results" / "operator-v1.16" / "bindings"
+    binding_attempt = binding_root / "formal-binding-v1.16.0"
+    completion_root = lifecycle / "results" / "outer-completions" / "v1.16"
     binding_root.mkdir(parents=True)
     monkeypatch.setattr(operator_module, "REPO", repo)
     monkeypatch.setattr(adjudication, "REPO", repo)
@@ -633,7 +633,7 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
     record: dict[str, object] = {
         "schema": "prospect.wm001.formal-launch.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.15.0",
+        "protocol_version": "1.16.0",
         "formal_binding_sha256": binding_sha256,
         "formal_binding_attempt_path": str(binding_attempt),
         "formal_binding_attempt_manifest_file": (FORMAL_BINDING_ATTEMPT_MANIFEST_NAME),
@@ -684,7 +684,7 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
     copied_completion.write_bytes(b"forged completion\n")
     with pytest.raises(
         AdjudicationError,
-        match="unique v1.15 launch record",
+        match="unique v1.16 launch record",
     ):
         adjudication._verify_launch(  # noqa: SLF001
             root=producer,
@@ -719,7 +719,7 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
 
     with pytest.raises(
         AdjudicationError,
-        match="unique v1.15 launch record",
+        match="unique v1.16 launch record",
     ):
         adjudication._verify_launch(  # noqa: SLF001
             root=sibling,
@@ -963,7 +963,7 @@ def test_preclaim_staging_mutation_does_not_consume_or_replay(
     assert not harness.adjudication_marker.exists()
     assert harness.replay_calls == []
     assert not harness.package.exists()
-    assert list(harness.package.parent.glob(".formal-adjudication-v1.15.0.staging-*")) == []
+    assert list(harness.package.parent.glob(".formal-adjudication-v1.16.0.staging-*")) == []
 
 
 def test_crash_after_claim_consumes_version_without_replay(
@@ -1262,7 +1262,7 @@ def test_marker_only_explicit_recovery_is_zero_replay_and_single_use(
     with pytest.raises(KeyboardInterrupt):
         harness.create(review, "accepted")
 
-    holders = list(harness.package.parent.glob(".formal-adjudication-v1.15.0.staging-*/" + ADJUDICATION_CLAIM_NAME))
+    holders = list(harness.package.parent.glob(".formal-adjudication-v1.16.0.staging-*/" + ADJUDICATION_CLAIM_NAME))
     assert len(holders) == 1
     shutil.rmtree(holders[0].parent)
     assert harness.adjudication_marker.stat().st_nlink == 1
@@ -1300,7 +1300,7 @@ def test_recovery_cli_is_zero_replay_and_outer_finalizes(
     verify_adjudication_package(harness.package)
 
 
-def test_older_marker_does_not_consume_v115(harness: Harness) -> None:
+def test_older_marker_does_not_consume_v116(harness: Harness) -> None:
     harness.make_attempt()
     review = harness.review(disposition="accepted")
     harness.install_replay()

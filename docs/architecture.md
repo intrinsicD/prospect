@@ -478,11 +478,20 @@ identifies a separate standard-library custody defect: the launcher reused its
 therefore rejected the authenticated 320,977,868-byte `result.json`. The
 fsynced binding-keyed root was consumed, but no formal
 marker, confirmation directory, producer, outcome, audit, review, or
-adjudication exists. The plan and frozen operator sequence remain in the
+adjudication exists. The frozen v1.15 plan and operator sequence remain in the
 [v1.15 confirmation plan](wm001-v1150-confirmation-plan.md) and
 [v1.15 operator runbook](wm001-v1150-operator-runbook.md); the terminal
 disposition and fresh-version repair requirements are in the
 [v1.15 formal-invocation failure](wm001-v1150-formal-invocation-failure.md).
+
+Protocol 1.16 is the active prospective successor. It preserves the complete
+scientific system and representation versions, separates bounded control
+parsing from descriptor-streamed bulk evidence, terminal-binds and independently
+rejoins the archived development-result qualification, and requires a
+production-path accepted-binding rehearsal before the formal root can exist.
+Its fresh paths, seeds, environments, review, seal, and one-shot lifecycle are
+defined by the [v1.16 confirmation plan](wm001-v1160-confirmation-plan.md) and
+[v1.16 operator runbook](wm001-v1160-operator-runbook.md).
 
 ## Open engineering boundaries
 
@@ -492,10 +501,10 @@ disposition and fresh-version repair requirements are in the
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
 - Protocols 1.10 through 1.15 are terminally retired without formal authority.
-  A fresh successor must retain the v1.15 archive and authorization repairs,
-  separate bounded control parsing from streamed bulk-evidence hashing, and
-  exercise the exact accepted-binding-to-standard-library formal-custody branch
-  with a production-sized result before consuming formal authority.
+  Protocol 1.16 prospectively retains their archive and authorization repairs,
+  separates bounded control parsing from streamed bulk-evidence hashing, and
+  exercises the exact accepted-binding-to-standard-library formal-custody branch
+  with production-sized evidence before consuming formal authority.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External
