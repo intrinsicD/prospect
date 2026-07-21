@@ -14,8 +14,15 @@ from pathlib import Path
 
 import pytest
 
-from bench.world_model_lifecycle import artifact_audit, producer_bootstrap
+from bench.world_model_lifecycle import (
+    artifact_audit,
+    producer_bootstrap,
+)
+from bench.world_model_lifecycle import (
+    audit_runner as audit_runner_module,
+)
 from bench.world_model_lifecycle import binding as binding_module
+from bench.world_model_lifecycle import preformal as preformal_module
 from bench.world_model_lifecycle import verify as verify_module
 from bench.world_model_lifecycle.assurance import TRUST_MODEL_STATEMENT
 from bench.world_model_lifecycle.planning import run_pendulum_conformance
@@ -187,42 +194,42 @@ def test_record_hash_decoder_requires_exact_sha256() -> None:
             decode(("sha256", "not+a+valid+digest"))
 
 
-def test_protocol_1110_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (670819759, 624845448)
+def test_protocol_1120_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (2530568307, 3822916726)
     assert verify_module.FORMAL_SEEDS == (
-        3391764770,
-        20596598,
-        999954271,
-        2371040464,
-        2073495343,
-        962058337,
-        2170781413,
-        3523651983,
+        402304386,
+        1582362517,
+        3717100311,
+        3870324956,
+        2551652339,
+        986753049,
+        4074588580,
+        1996653376,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            670819759,
+            2530568307,
             index,
         )
         for index in range(8)
     ] == [
-        282174066,
-        2860664389,
-        3977248474,
-        155527586,
-        117085153,
-        1967274654,
-        4124878978,
-        2676511189,
+        1770008625,
+        1546088459,
+        3254398787,
+        455810615,
+        2706650341,
+        3378496144,
+        1101755028,
+        4286871339,
     ]
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            624845448,
+            3822916726,
             0,
         )
-        == 1321974417
+        == 2074080641
     )
     assert (
         tuple(verify_module.derive_master_seed("development", index) for index in range(2))
@@ -231,7 +238,7 @@ def test_protocol_1110_seed_domain_and_master_seeds_are_exact() -> None:
     assert tuple(verify_module.derive_master_seed("formal", index) for index in range(8)) == verify_module.FORMAL_SEEDS
 
 
-def test_protocol_1110_states_the_negative_assurance_boundary() -> None:
+def test_protocol_1120_states_the_negative_assurance_boundary() -> None:
     protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
 
     assert protocol["trust_model"] == {
@@ -243,20 +250,420 @@ def test_protocol_1110_states_the_negative_assurance_boundary() -> None:
     }
 
 
-def test_implementation_manifest_binds_reviewed_v1110_documents() -> None:
+@pytest.mark.parametrize(
+    "receipt_prefix",
+    (
+        "prebinding_execution_receipt",
+        "restart_runtime_execution_receipt",
+    ),
+)
+def test_verify_binding_rejects_rebound_nonempty_conformance_stderr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    receipt_prefix: str,
+) -> None:
+    def canonical(value: object) -> bytes:
+        return (
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+            + b"\n"
+        )
+
+    bootstrap_payload = audit_runner_module.bootstrap_source_bytes()
+    bootstrap_sha256 = hashlib.sha256(
+        bootstrap_payload
+    ).hexdigest()
+    conformance_payload = canonical(
+        {
+            "schema": "prospect.wm001.prebinding-conformance.v2",
+            "request_sha256": "1" * 64,
+            "passed": True,
+        }
+    )
+    path_runtime_value = {
+        "source": {"mode": "path"},
+        "support_files": [],
+    }
+    descriptor_runtime_value = {
+        "source": {"mode": "descriptor"},
+        "support_files": [],
+    }
+    path_runtime_payload = canonical(path_runtime_value)
+    descriptor_runtime_payload = canonical(
+        descriptor_runtime_value
+    )
+    path_invocation_payload = canonical(
+        {
+            "runtime_manifest_sha256": hashlib.sha256(
+                path_runtime_payload
+            ).hexdigest(),
+        }
+    )
+    descriptor_invocation_payload = canonical(
+        {
+            "runtime_manifest_sha256": hashlib.sha256(
+                descriptor_runtime_payload
+            ).hexdigest(),
+        }
+    )
+    outcome_runtime_value = {
+        "source": {"mode": "descriptor"},
+        "support_files": [],
+    }
+    outcome_runtime_payload = canonical(outcome_runtime_value)
+    restart_report_payload = canonical(
+        {
+            "schema": (
+                "prospect.wm001.restart-runtime-conformance.v1"
+            ),
+            "protocol_version": "1.12.0",
+            "passed": True,
+        }
+    )
+    repeat_count = 3
+    modes = [
+        *("path" for _ in range(repeat_count)),
+        *("descriptor" for _ in range(repeat_count)),
+    ]
+    empty_stderr = {
+        "bytes": 0,
+        "sha256": hashlib.sha256(b"").hexdigest(),
+    }
+    auditor_sha256 = "2" * 64
+
+    def prebinding_row(
+        ordinal: int,
+        mode: str,
+    ) -> dict[str, object]:
+        runtime_payload = (
+            path_runtime_payload
+            if mode == "path"
+            else descriptor_runtime_payload
+        )
+        invocation_payload = (
+            path_invocation_payload
+            if mode == "path"
+            else descriptor_invocation_payload
+        )
+        return {
+            "ordinal": ordinal,
+            "source_mode": mode,
+            "returncode": 0,
+            "stdout": {
+                "bytes": len(conformance_payload),
+                "sha256": hashlib.sha256(
+                    conformance_payload
+                ).hexdigest(),
+            },
+            "stderr": dict(empty_stderr),
+            "runtime_manifest": {
+                "bytes": len(runtime_payload),
+                "sha256": hashlib.sha256(
+                    runtime_payload
+                ).hexdigest(),
+            },
+            "invocation_manifest": {
+                "bytes": len(invocation_payload),
+                "sha256": hashlib.sha256(
+                    invocation_payload
+                ).hexdigest(),
+            },
+            "bootstrap_sha256": bootstrap_sha256,
+            "auditor_source_sha256": auditor_sha256,
+            "support_files": [],
+            "auditor_report_passed": True,
+        }
+
+    prebinding_rows = [
+        prebinding_row(ordinal, mode)
+        for ordinal, mode in enumerate(modes, start=1)
+    ]
+    prebinding_receipt = {
+        "schema": "prospect.wm001.audit-conformance-receipt.v1",
+        "repeat_count": repeat_count,
+        "execution_count": len(prebinding_rows),
+        "executions": prebinding_rows,
+        "report_sha256": hashlib.sha256(
+            conformance_payload
+        ).hexdigest(),
+        "path_descriptor_byte_identical": True,
+        "execution_conformance_passed": True,
+    }
+    path_restart_runtime_value = copy.deepcopy(
+        outcome_runtime_value
+    )
+    path_restart_runtime_value["source"]["mode"] = "path"
+    path_restart_runtime_payload = canonical(
+        path_restart_runtime_value
+    )
+    restart_runtime_payloads = {
+        "path": path_restart_runtime_payload,
+        "descriptor": outcome_runtime_payload,
+    }
+    restart_arguments = [
+        "--restart-runtime-conformance",
+        "--producer-bootstrap",
+        "@captured/producer_bootstrap.py",
+        "--expected-producer-bootstrap-sha256",
+        hashlib.sha256(
+            (
+                verify_module.HERE
+                / "producer_bootstrap.py"
+            ).read_bytes()
+        ).hexdigest(),
+    ]
+    restart_invocation_payloads = {
+        mode: canonical(
+            {
+                "schema": (
+                    "prospect.wm001.audit-invocation-manifest.v1"
+                ),
+                "runtime_manifest_sha256": hashlib.sha256(
+                    runtime_payload
+                ).hexdigest(),
+                "working_directory": str(verify_module.REPO),
+                "auditor_argv": restart_arguments,
+            }
+        )
+        for mode, runtime_payload in (
+            restart_runtime_payloads.items()
+        )
+    }
+    restart_rows = [
+        {
+            "ordinal": ordinal,
+            "source_mode": mode,
+            "returncode": 0,
+            "stdout": {
+                "bytes": len(restart_report_payload),
+                "sha256": hashlib.sha256(
+                    restart_report_payload
+                ).hexdigest(),
+            },
+            "stderr": dict(empty_stderr),
+            "runtime_manifest": {
+                "bytes": len(restart_runtime_payloads[mode]),
+                "sha256": hashlib.sha256(
+                    restart_runtime_payloads[mode]
+                ).hexdigest(),
+            },
+            "invocation_manifest": {
+                "bytes": len(
+                    restart_invocation_payloads[mode]
+                ),
+                "sha256": hashlib.sha256(
+                    restart_invocation_payloads[mode]
+                ).hexdigest(),
+            },
+            "bootstrap_sha256": bootstrap_sha256,
+            "auditor_source_sha256": auditor_sha256,
+            "support_files": [],
+            "auditor_report_passed": True,
+        }
+        for ordinal, mode in enumerate(modes, start=1)
+    ]
+    restart_receipt = {
+        "schema": "prospect.wm001.audit-conformance-receipt.v1",
+        "repeat_count": repeat_count,
+        "execution_count": len(restart_rows),
+        "executions": restart_rows,
+        "report_sha256": hashlib.sha256(
+            restart_report_payload
+        ).hexdigest(),
+        "path_descriptor_byte_identical": True,
+        "execution_conformance_passed": True,
+    }
+    request_payload = canonical(
+        {
+            "schema": (
+                "prospect.wm001.prebinding-conformance-request.v2"
+            )
+        }
+    )
+    evidence = {
+        "bootstrap_source": bootstrap_payload,
+        "prebinding_request": request_payload,
+        "prebinding_path_runtime_manifest": path_runtime_payload,
+        "prebinding_descriptor_runtime_manifest": (
+            descriptor_runtime_payload
+        ),
+        "prebinding_path_invocation_manifest": (
+            path_invocation_payload
+        ),
+        "prebinding_descriptor_invocation_manifest": (
+            descriptor_invocation_payload
+        ),
+        "prebinding_conformance_report": conformance_payload,
+        "prebinding_execution_receipt": canonical(
+            prebinding_receipt
+        ),
+        "outcome_runtime_manifest": outcome_runtime_payload,
+        "restart_runtime_conformance_report": (
+            restart_report_payload
+        ),
+        "restart_runtime_execution_receipt": canonical(
+            restart_receipt
+        ),
+    }
+    audit_execution: dict[str, object] = {
+        "bootstrap_source_sha256": bootstrap_sha256,
+        "auditor_source_sha256": auditor_sha256,
+        "repeat_count": repeat_count,
+        "restart_runtime_repeat_count": repeat_count,
+    }
+    for prefix, payload in evidence.items():
+        sibling = tmp_path / f"{prefix}.json"
+        sibling.write_bytes(payload)
+        audit_execution[f"{prefix}_file"] = sibling.name
+        audit_execution[f"{prefix}_bytes"] = len(payload)
+        audit_execution[f"{prefix}_sha256"] = (
+            hashlib.sha256(payload).hexdigest()
+        )
+    report_path = tmp_path / str(
+        audit_execution["prebinding_conformance_report_file"]
+    )
+    assert report_path.read_bytes() == conformance_payload
+    test_report = tmp_path / "preformal-report.json"
+    test_report.write_bytes(canonical({"passed": True}))
+    binding_path = tmp_path / "formal-binding.json"
+    binding_path.write_bytes(canonical({"fixture": True}))
+    binding = {
+        "schema": "prospect.world-model-lifecycle.formal-binding.v9",
+        "experiment_id": "WM-001",
+        "assurance": dict(binding_module.ASSURANCE),
+        "protocol": {},
+        "source": {
+            "implementation_files": [],
+            "execution_source_sha256": {},
+            "test_report_file": test_report.name,
+            "test_log_files": [],
+        },
+        "dependencies": {
+            "lockfile": "requirements-wm001.lock",
+            "python_executable": sys.executable,
+            "standard_library": {},
+            "package_roots": [],
+            "package_ownership": {},
+            "packages": [],
+        },
+        "runtime": {"process_environment": {}},
+        "audit_execution": audit_execution,
+    }
+
+    monkeypatch.setattr(verify_module, "verify_protocol", lambda: {})
+    monkeypatch.setattr(
+        verify_module,
+        "_load_json",
+        lambda path: binding if path == binding_path else {},
+    )
+    monkeypatch.setattr(
+        verify_module,
+        "_validate_json_schema",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        verify_module,
+        "_parse_timestamp",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        verify_module,
+        "_verify_implementation_manifest",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "verify_machine_test_report",
+        lambda _path: {},
+    )
+    monkeypatch.setattr(
+        binding_module,
+        "preformal_log_rows",
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        preformal_module,
+        "_runtime_bootstrap_conformance_from_report",
+        lambda *_args, **_kwargs: {},
+    )
+
+    target_message = (
+        "bound prebinding receipt does not preserve every execution identity"
+        if receipt_prefix == "prebinding_execution_receipt"
+        else (
+            "bound restart-runtime receipt does not preserve every exact "
+            "path and descriptor execution"
+        )
+    )
+
+    class ReachedReceiptGate(Exception):
+        pass
+
+    def require_target(condition: bool, message: str) -> None:
+        if message != target_message:
+            return
+        if not condition:
+            raise verify_module.Violation(message)
+        raise ReachedReceiptGate
+
+    monkeypatch.setattr(
+        verify_module,
+        "_require",
+        require_target,
+    )
+    with pytest.raises(ReachedReceiptGate):
+        verify_module.verify_binding(binding_path)
+
+    changed = (
+        prebinding_receipt
+        if receipt_prefix == "prebinding_execution_receipt"
+        else restart_receipt
+    )
+    diagnostic = b"internally consistent torch warning\n"
+    stderr_identity = {
+        "bytes": len(diagnostic),
+        "sha256": hashlib.sha256(diagnostic).hexdigest(),
+    }
+    for row in changed["executions"]:
+        row["stderr"] = dict(stderr_identity)
+    changed_payload = canonical(changed)
+    changed_path = tmp_path / str(
+        audit_execution[f"{receipt_prefix}_file"]
+    )
+    changed_path.write_bytes(changed_payload)
+    audit_execution[f"{receipt_prefix}_bytes"] = len(
+        changed_payload
+    )
+    audit_execution[f"{receipt_prefix}_sha256"] = (
+        hashlib.sha256(changed_payload).hexdigest()
+    )
+
+    with pytest.raises(
+        verify_module.Violation,
+        match=target_message,
+    ):
+        verify_module.verify_binding(binding_path)
+
+
+def test_implementation_manifest_binds_reviewed_v1120_documents() -> None:
     paths = {
         str(row["path"])
         for row in binding_module.implementation_files()
     }
 
     assert {
-        "docs/wm001-v1110-confirmation-plan.md",
-        "docs/wm001-v1110-operator-runbook.md",
-        "docs/wm001-v1110-prospective-harness-review.json",
+        "docs/wm001-v1120-confirmation-plan.md",
+        "docs/wm001-v1120-operator-runbook.md",
+        "docs/wm001-v1120-prospective-harness-review.json",
     } <= paths
 
 
-def test_protocol_1110_irrelevant_control_contract_is_bound() -> None:
+def test_protocol_1120_irrelevant_control_contract_is_bound() -> None:
     assert (
         "collect_irrelevant",
         verify_module.TASK_IRRELEVANT,
@@ -323,7 +730,7 @@ def test_result_runtime_must_equal_formal_binding_runtime() -> None:
         )
 
 
-def test_formal_binding_schema_binds_protocol_1110_and_fresh_seeds() -> None:
+def test_formal_binding_schema_binds_protocol_1120_and_fresh_seeds() -> None:
     schema = json.loads(
         verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -339,7 +746,7 @@ def test_formal_binding_schema_binds_protocol_1110_and_fresh_seeds() -> None:
         "external_attestation": {"const": False},
         "exclusive_path_use_required": {"const": True},
     }
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.11.0"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.12.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
@@ -396,7 +803,7 @@ def test_restart_json_comparison_rejects_python_numeric_aliases(
     assert not verify_module._strict_json_equal(observed, expected)
 
 
-def test_raw_result_schema_binds_v1110_heldout_split_and_formal_counts() -> None:
+def test_raw_result_schema_binds_v1120_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -407,7 +814,7 @@ def test_raw_result_schema_binds_v1110_heldout_split_and_formal_counts() -> None
 
     assert schema["$id"].endswith("wm-001-raw-result-v9.json")
     assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v9"
-    assert schema["properties"]["protocol_version"]["const"] == "1.11.0"
+    assert schema["properties"]["protocol_version"]["const"] == "1.12.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
@@ -448,7 +855,7 @@ def test_raw_result_schema_binds_v1110_heldout_split_and_formal_counts() -> None
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v1110_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v1120_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -916,9 +1323,9 @@ def _recorded_development_closure_fixture(
     closure: dict[str, object] = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "source": source,
-        "producer_root": str((tmp_path / "qualification-v1.11.0").resolve()),
+        "producer_root": str((tmp_path / "qualification-v1.12.0").resolve()),
         **{
             field: member
             for field, member in role_paths.items()
@@ -1147,7 +1554,7 @@ def _producer_custody_fixture(
     seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "assurance": dict(binding_module.ASSURANCE),
         "git_commit": execution["git_commit"],
         "git_tree": execution["git_tree"],
@@ -2078,7 +2485,7 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -2209,7 +2616,7 @@ def test_result_qualification_created_in_one_process_reopens_in_two_others(
     qualification = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "protocol_sha256": binding_module.sha256_file(
             binding_module.PROTOCOL_PATH
         ),
@@ -2325,7 +2732,7 @@ def test_development_closure_creator_rejects_any_alternate_marker_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    canonical = tmp_path / "development-closure-v1.11.0.json"
+    canonical = tmp_path / "development-closure-v1.12.0.json"
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
 
     with pytest.raises(RuntimeError, match="only be published"):
@@ -2343,7 +2750,7 @@ def test_preserved_development_closure_name_must_be_content_addressed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _canonical_payload({"schema": "fixture"})
-    canonical = tmp_path / "development-closure-v1.11.0.json"
+    canonical = tmp_path / "development-closure-v1.12.0.json"
     canonical.write_bytes(payload)
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
     assert binding_module._closure_path_mode(canonical, payload) == "canonical"

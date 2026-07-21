@@ -1877,6 +1877,10 @@ def run_source_mode_conformance(
     path_execution = path_executions[0]
     descriptor_execution = descriptor_executions[0]
     executions = (*path_executions, *descriptor_executions)
+    if any(execution.stderr for execution in executions):
+        raise AuditRunnerError(
+            "source-mode conformance requires exactly empty stderr for every execution"
+        )
     for execution in executions[1:]:
         if (
             execution.returncode != path_execution.returncode

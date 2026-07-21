@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import ast
 import copy
 import hashlib
 import io
 import json
 import os
 import subprocess
+import sys
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -18,6 +20,141 @@ HERE = Path(__file__).resolve().parents[1]
 WM001 = HERE / "bench" / "world_model_lifecycle"
 PROTOCOL = WM001 / "protocol.json"
 SCIENTIFIC_SOURCES = {name: WM001 / name for name in artifact_audit._PREBINDING_SCIENTIFIC_SOURCES}
+
+
+def test_lifecycle_sources_do_not_access_legacy_torch_tf32_apis() -> None:
+    forbidden_attributes = {
+        "allow_tf32",
+        "get_float32_matmul_precision",
+        "set_float32_matmul_precision",
+        "_get_cublas_allow_tf32",
+        "_set_cublas_allow_tf32",
+        "_get_cudnn_allow_tf32",
+        "_set_cudnn_allow_tf32",
+    }
+    forbidden_string_literals = {
+        *forbidden_attributes,
+        "cudnn_allow_tf32",
+        "cuda_matmul_allow_tf32",
+        "float32_matmul_precision",
+    }
+    forbidden_source_fragments = (
+        ".allow_tf32",
+        "get_float32_matmul_precision",
+        "set_float32_matmul_precision",
+    )
+    violations: list[tuple[str, int, str]] = []
+    for source_path in sorted(WM001.glob("*.py")):
+        source = source_path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(source_path))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Attribute)
+                and node.attr in forbidden_attributes
+            ):
+                violations.append(
+                    (source_path.name, node.lineno, node.attr)
+                )
+            elif (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and node.value in forbidden_string_literals
+            ):
+                violations.append(
+                    (source_path.name, node.lineno, node.value)
+                )
+        for fragment in forbidden_source_fragments:
+            if fragment in source:
+                violations.append((source_path.name, 0, fragment))
+
+    assert violations == []
+
+
+def test_torch_29_runtime_precision_identity_is_warning_free_and_silent() -> None:
+    script = r"""
+import torch
+
+from bench.world_model_lifecycle import artifact_audit, experiment
+
+assert torch.__version__.split("+", 1)[0] == "2.9.0"
+
+def forbidden(*_args, **_kwargs):
+    raise AssertionError("legacy TF32 API was accessed")
+
+for name in (
+    "_get_cublas_allow_tf32",
+    "_set_cublas_allow_tf32",
+    "_get_cudnn_allow_tf32",
+    "_set_cudnn_allow_tf32",
+):
+    setattr(torch._C, name, forbidden)
+torch.get_float32_matmul_precision = forbidden
+torch.set_float32_matmul_precision = forbidden
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+experiment.configure_determinism(1120, device=device)
+identity = artifact_audit._prebinding_live_runtime_identity(device)
+expected = {
+    "global_fp32_precision": str(torch.backends.fp32_precision),
+    "cudnn_fp32_precision": str(torch.backends.cudnn.fp32_precision),
+    "cudnn_conv_fp32_precision": str(
+        torch.backends.cudnn.conv.fp32_precision
+    ),
+    "cudnn_rnn_fp32_precision": str(
+        torch.backends.cudnn.rnn.fp32_precision
+    ),
+    "cuda_matmul_fp32_precision": str(
+        torch.backends.cuda.matmul.fp32_precision
+    ),
+}
+assert {name: identity[name] for name in expected} == expected
+assert identity["cuda_matmul_fp32_precision"] == "ieee"
+assert identity["cudnn_conv_fp32_precision"] == "ieee"
+assert identity["cudnn_rnn_fp32_precision"] == "ieee"
+assert not {
+    "cudnn_allow_tf32",
+    "cuda_matmul_allow_tf32",
+    "float32_matmul_precision",
+}.intersection(identity)
+
+if device == "cuda":
+    size = 256
+    left = torch.eye(size, dtype=torch.float32, device="cuda")
+    right = torch.linspace(
+        -1.234567,
+        2.345678,
+        steps=size * size,
+        dtype=torch.float32,
+        device="cuda",
+    ).reshape(size, size)
+    ieee = left @ right
+    torch.cuda.synchronize()
+    assert torch.equal(ieee, right)
+    torch.backends.cuda.matmul.fp32_precision = "tf32"
+    reduced = left @ right
+    torch.cuda.synchronize()
+    assert not torch.equal(reduced, right)
+"""
+    environment = {
+        **os.environ,
+        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "LAZY_LEGACY_OP": "False",
+    }
+    completed = subprocess.run(
+        (sys.executable, "-W", "error", "-c", script),
+        cwd=HERE,
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8",
+        errors="replace",
+    )
+    assert completed.stdout == b""
+    assert completed.stderr == b""
 
 
 def _python_row() -> dict[str, object]:
@@ -70,7 +207,7 @@ def test_independent_preformal_contract_matches_live_producer_contract() -> None
         runtime_seal_path=str(
             preformal.REPO
             / "bench/world_model_lifecycle/results/development/"
-            "runtime-seal-v1.11.0.json"
+            "runtime-seal-v1.12.0.json"
         ),
         development_closure_path=str(
             preformal.DEVELOPMENT_CLOSURE_PATH
@@ -179,10 +316,15 @@ def test_active_protocol_seed_universe_has_no_declared_collision() -> None:
     assert audit.passed_checks == 1
 
 
-def test_prebinding_protocol_requires_exact_v1100_supersession_lineage(
+def test_prebinding_protocol_requires_exact_v1110_supersession_lineage(
     tmp_path: Path,
 ) -> None:
     protocol = json.loads(PROTOCOL.read_text(encoding="utf-8"))
+    revision = protocol["experiment"]["revision"]
+    assert revision["supersedes"] == "1.11.0"
+    assert revision["superseded_protocol_sha256"] == (
+        artifact_audit._V1110_PROTOCOL_SHA256
+    )
     protocol["experiment"]["revision"]["superseded_protocol_sha256"] = "0" * 64
     changed = tmp_path / "protocol.json"
     changed.write_bytes(artifact_audit._canonical_json_bytes(protocol) + b"\n")
@@ -210,7 +352,10 @@ def test_complete_prebinding_request_passes_without_outcome(
 
     report = artifact_audit.audit_prebinding_conformance(request)
 
-    assert report["schema"] == "prospect.wm001.prebinding-conformance.v1"
+    assert request["schema"] == (
+        "prospect.wm001.prebinding-conformance-request.v2"
+    )
+    assert report["schema"] == "prospect.wm001.prebinding-conformance.v2"
     assert report["passed"] is True
     assert all(component["passed"] is True for component in _components(report).values())
     encoded = artifact_audit._canonical_json_bytes(report) + b"\n"
@@ -637,7 +782,7 @@ def _preformal_v2_fixture(
     review: dict[str, object] = {
         "schema": "prospect.wm001.prospective-harness-review.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "implementation_files": reviewed_files,
         "implementation_manifest_sha256": hashlib.sha256(
             artifact_audit._canonical_json_bytes(reviewed_files)
@@ -773,7 +918,7 @@ def _preformal_v2_fixture(
     runtime_seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -806,7 +951,7 @@ def _preformal_v2_fixture(
         / "development"
     )
     development_root.mkdir(parents=True)
-    runtime_seal_path = development_root / "runtime-seal-v1.11.0.json"
+    runtime_seal_path = development_root / "runtime-seal-v1.12.0.json"
     runtime_seal_path.write_bytes(runtime_seal_payload)
     runtime_seal_completion = (
         repository
@@ -814,7 +959,7 @@ def _preformal_v2_fixture(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.11"
+        / "v1.12"
         / (
             hashlib.sha256(
                 str(runtime_seal_path).encode("utf-8")
@@ -827,7 +972,7 @@ def _preformal_v2_fixture(
     development_closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "producer_manifest_member": "producer/producer-manifest.json",
         "raw_result_member": "producer/result.json",
         "qualification_archive": {
@@ -849,7 +994,7 @@ def _preformal_v2_fixture(
         artifact_audit._canonical_json_bytes(development_closure) + b"\n"
     )
     development_path = (
-        development_root / "development-closure-v1.11.0.json"
+        development_root / "development-closure-v1.12.0.json"
     )
     development_path.write_bytes(development_payload)
     closure_terminal = (
@@ -857,9 +1002,9 @@ def _preformal_v2_fixture(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.11"
+        / "operator-v1.12"
         / "closures"
-        / "development-closure-v1.11.0"
+        / "development-closure-v1.12.0"
         / "operator-attempt.json"
     )
     closure_terminal.parent.mkdir(parents=True)
@@ -871,7 +1016,7 @@ def _preformal_v2_fixture(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.11"
+        / "v1.12"
         / (
             hashlib.sha256(
                 str(closure_terminal).encode("utf-8")
@@ -1008,7 +1153,7 @@ def _preformal_v2_fixture(
                         "fresh-runtime-identity-conformance.v1"
                     ),
                     "experiment_id": "WM-001",
-                    "protocol_version": "1.11.0",
+                    "protocol_version": "1.12.0",
                     "mode": "fresh-identity-conformance",
                     "challenge": "7" * 64,
                     "requesting_process_id": 101,
@@ -1116,7 +1261,7 @@ def _preformal_v2_fixture(
     report: dict[str, Any] = {
         "schema": "prospect.wm001.preformal-test-report.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "repository_cwd": repository_cwd,
         "device": "cpu",
         "qa_environment": qa_environment_identity,
@@ -1891,7 +2036,7 @@ def _preflight_package_fixture(
     (tmp_path / artifact_audit._PREFORMAL_REPORT_NAME).write_bytes(
         report_payload
     )
-    (tmp_path / "development-closure-v1.11.0.json").write_bytes(
+    (tmp_path / "development-closure-v1.12.0.json").write_bytes(
         closure_payload
     )
     audit_execution = {
@@ -1906,7 +2051,7 @@ def _preflight_package_fixture(
         "restart_runtime_path_descriptor_equal": True,
     }
     development = {
-        "closure_file": "development-closure-v1.11.0.json",
+        "closure_file": "development-closure-v1.12.0.json",
         "closure_sha256": hashlib.sha256(
             closure_payload
         ).hexdigest(),
@@ -1940,7 +2085,7 @@ def _preflight_package_fixture(
         "schema": "prospect.world-model-lifecycle.formal-binding.v9",
         "experiment_id": "WM-001",
         "assurance": dict(artifact_audit._ASSURANCE),
-        "protocol": {"version": "1.11.0"},
+        "protocol": {"version": "1.12.0"},
         "source": {
             "test_report_file": artifact_audit._PREFORMAL_REPORT_NAME,
         },
@@ -2530,7 +2675,7 @@ def _development_qualification_fixture(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "source": closure_source,
         "producer_root": ("/repo/bench/world_model_lifecycle/results/development/run"),
         **role_members,
@@ -2646,7 +2791,7 @@ def test_development_qualification_is_linked_field_for_field(
     preformal_runtime_seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -2888,7 +3033,7 @@ def test_formal_input_preflight_runs_both_substantive_validators(
         "schema": "prospect.world-model-lifecycle.formal-binding.v9",
         "experiment_id": "WM-001",
         "assurance": dict(artifact_audit._ASSURANCE),
-        "protocol": {"version": "1.11.0"},
+        "protocol": {"version": "1.12.0"},
         "source": source,
         "dependencies": dependencies,
         "runtime": runtime,
@@ -3237,7 +3382,7 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
                 "schema": (
                     "prospect.wm001.restart-runtime-conformance.v1"
                 ),
-                "protocol_version": "1.11.0",
+                "protocol_version": "1.12.0",
                 "support_files": support_rows(outcome_supports),
                 "branches": {
                     "development": {
@@ -3518,6 +3663,69 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
         verify_live_outcome_runtime=False,
     )
 
+    nonempty_prebinding_receipt = json.loads(
+        execution_receipt_payload
+    )
+    nonempty_stderr = b"torch precision warning\n"
+    nonempty_stderr_identity = {
+        "bytes": len(nonempty_stderr),
+        "sha256": hashlib.sha256(nonempty_stderr).hexdigest(),
+    }
+    for row in nonempty_prebinding_receipt["executions"]:
+        row["stderr"] = dict(nonempty_stderr_identity)
+    nonempty_prebinding_payload = (
+        artifact_audit._canonical_json_bytes(
+            nonempty_prebinding_receipt
+        )
+        + b"\n"
+    )
+    nonempty_prebinding_digest = hashlib.sha256(
+        nonempty_prebinding_payload
+    ).hexdigest()
+    nonempty_prebinding_block = dict(block)
+    nonempty_prebinding_block[
+        "prebinding_execution_receipt_file"
+    ] = (
+        "audit-prebinding-execution-receipt-"
+        f"{nonempty_prebinding_digest[:16]}.json"
+    )
+    nonempty_prebinding_block[
+        "prebinding_execution_receipt_bytes"
+    ] = len(nonempty_prebinding_payload)
+    nonempty_prebinding_block[
+        "prebinding_execution_receipt_sha256"
+    ] = nonempty_prebinding_digest
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="prebinding execution receipt does not prove",
+    ):
+        artifact_audit._validate_audit_execution_conformance(
+            block=nonempty_prebinding_block,
+            bootstrap_payload=bootstrap_payload,
+            request_payload=request_payload,
+            path_runtime_manifest_payload=path_runtime_payload,
+            descriptor_runtime_manifest_payload=(
+                descriptor_runtime_payload
+            ),
+            path_invocation_manifest_payload=(
+                path_invocation_payload
+            ),
+            descriptor_invocation_manifest_payload=(
+                descriptor_invocation_payload
+            ),
+            report_payload=report_payload,
+            execution_receipt_payload=nonempty_prebinding_payload,
+            outcome_runtime_manifest_payload=outcome_runtime_payload,
+            restart_runtime_report_payload=restart_report_payload,
+            restart_runtime_receipt_payload=restart_receipt_payload,
+            dependencies=dependencies,
+            runtime=runtime,
+            source=source,
+            root=tmp_path,
+            preformal_repository_cwd=working_directory,
+            verify_live_outcome_runtime=False,
+        )
+
     changed_invocation = json.loads(path_invocation_payload)
     changed_invocation["auditor_argv"] = []
     changed_invocation_payload = artifact_audit._canonical_json_bytes(changed_invocation) + b"\n"
@@ -3757,6 +3965,42 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
             root=tmp_path,
             preformal_repository_cwd=working_directory,
             verify_live_outcome_runtime=False,
+        )
+
+    nonempty_restart_receipt = json.loads(
+        restart_receipt_payload
+    )
+    for row in nonempty_restart_receipt["executions"]:
+        row["stderr"] = dict(nonempty_stderr_identity)
+    nonempty_restart_payload = (
+        artifact_audit._canonical_json_bytes(
+            nonempty_restart_receipt
+        )
+        + b"\n"
+    )
+    nonempty_restart_digest = hashlib.sha256(
+        nonempty_restart_payload
+    ).hexdigest()
+    nonempty_restart_block = dict(block)
+    nonempty_restart_block[
+        "restart_runtime_execution_receipt_file"
+    ] = (
+        "audit-restart-runtime-execution-receipt-"
+        f"{nonempty_restart_digest[:16]}.json"
+    )
+    nonempty_restart_block[
+        "restart_runtime_execution_receipt_bytes"
+    ] = len(nonempty_restart_payload)
+    nonempty_restart_block[
+        "restart_runtime_execution_receipt_sha256"
+    ] = nonempty_restart_digest
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="restart-runtime execution receipt does not prove",
+    ):
+        validate_restart_evidence(
+            changed_block=nonempty_restart_block,
+            changed_receipt_payload=nonempty_restart_payload,
         )
 
     boolean_report = json.loads(restart_report_payload)

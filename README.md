@@ -104,12 +104,21 @@ exception before report publication, consuming the hidden claim without
 authorizing a binding or formal launch. No v1.10 performance value was opened
 or used.
 
-Protocol 1.11 is the active prospective confirmation. It separates recorded
-QA evidence checks from live sealed-runtime checks, makes command 9
-environment-neutral on the QA side, records command 10's complete inventory
-and fresh-child receipt so both hashes are independently reproducible, and
-cross-links those objects through binding, audit, and launch. It uses fresh
-seeds, environments, and namespaces while preserving the scientific system.
-Follow the
-[WM-001 v1.11 operator runbook](docs/wm001-v1110-operator-runbook.md) before
-creating any development evidence, implementation binding, or formal attempt.
+Protocol 1.11 repaired that composition class and passed its sealed static
+gates. Its result-free command-10 rehearsal completed semantically, but
+PyTorch 2.9 emitted a benign deprecation warning on stderr when the harness
+accessed legacy TF32 precision APIs. Command 10 requires exactly zero stderr
+bytes, so the sealed version was retired before any development producer,
+experience collection, training, or metric existed. Its terminal disposition
+is preserved in the
+[v1.11 result-free rehearsal failure](docs/wm001-v1110-result-free-rehearsal-failure.md).
+
+Protocol 1.12 is the active prospective confirmation. It preserves the
+scientific system and command-10 zero-stderr contract, replaces every legacy
+TF32 getter/setter with PyTorch 2.9's explicit `fp32_precision` hierarchy,
+binds those precision strings in runtime identity, and adds source,
+warnings-as-errors, and real fresh-subprocess stderr gates. It uses fresh
+seeds, environments, and namespaces and cannot reuse v1.11 evidence. Follow
+the [WM-001 v1.12 operator runbook](docs/wm001-v1120-operator-runbook.md)
+before creating any development evidence, implementation binding, or formal
+attempt.

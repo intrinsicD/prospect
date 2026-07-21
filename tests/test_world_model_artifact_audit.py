@@ -171,7 +171,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
     seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "assurance": dict(artifact_audit_module._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -1117,13 +1117,13 @@ def test_formal_launch_namespace_requires_exact_confirmation_name(
         / "results"
         / "formal"
         / binding_digest
-        / "confirmation-v1.11.0"
+        / "confirmation-v1.12.0"
     )
 
     assert artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical,
         binding_digest=binding_digest,
-        launch={"attempt_directory": "confirmation-v1.11.0"},
+        launch={"attempt_directory": "confirmation-v1.12.0"},
     )
     assert not artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical.with_name("wrong-child"),
@@ -1571,11 +1571,11 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     owned_state = runtime.owner.snapshot_state()
     parameter_sha256 = runtime.digest
     model_version = runtime.version
-    master_seed = 670819759
+    master_seed = 2530568307
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.11.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.12.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
@@ -2056,7 +2056,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     result: dict[str, Any] = {
         "schema": "prospect.world-model-lifecycle.raw-result.v9",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),
@@ -2886,6 +2886,107 @@ def test_standalone_cem_replay_matches_producer_actions_exactly(
         np.float32(math.inf),
     )
     assert not np.array_equal(replayed, tampered)
+
+
+@pytest.mark.skipif(
+    not torch.cuda.is_available(),
+    reason="CUDA is required to exercise the Torch 2.9 precision leaves",
+)
+def test_standalone_cem_replay_restores_torch29_precision_leaves(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    previous_deterministic = (
+        torch.are_deterministic_algorithms_enabled()
+    )
+    previous_precision = (
+        str(torch.backends.cuda.matmul.fp32_precision),
+        str(torch.backends.cudnn.conv.fp32_precision),
+        str(torch.backends.cudnn.rnn.fp32_precision),
+    )
+    expected_precision = ("tf32", "tf32", "ieee")
+    states = np.asarray(
+        [[[1.0, 0.0, 0.0]]],
+        dtype=np.float32,
+    )
+
+    def observed_precision() -> tuple[str, str, str]:
+        return (
+            str(torch.backends.cuda.matmul.fp32_precision),
+            str(torch.backends.cudnn.conv.fp32_precision),
+            str(torch.backends.cudnn.rnn.fp32_precision),
+        )
+
+    try:
+        torch.backends.cuda.matmul.fp32_precision = (
+            expected_precision[0]
+        )
+        torch.backends.cudnn.conv.fp32_precision = (
+            expected_precision[1]
+        )
+        torch.backends.cudnn.rnn.fp32_precision = (
+            expected_precision[2]
+        )
+        replayed, _, _ = _replay_cem_action_trace(
+            observed_states=states,
+            context=0.0,
+            seed=99173,
+            device="cuda",
+            model_tensors=None,
+        )
+
+        assert replayed.shape == (1, 1, 1)
+        assert observed_precision() == expected_precision
+        assert (
+            torch.are_deterministic_algorithms_enabled()
+            is previous_deterministic
+        )
+
+        def fail_after_precision_configuration(
+            *_args: object,
+            **_kwargs: object,
+        ) -> torch.Tensor:
+            assert observed_precision() == (
+                "ieee",
+                "ieee",
+                "ieee",
+            )
+            raise RuntimeError("forced CEM failure")
+
+        monkeypatch.setattr(
+            torch,
+            "randn",
+            fail_after_precision_configuration,
+        )
+        with pytest.raises(
+            ArtifactAuditError,
+            match="CEM action replay failed: forced CEM failure",
+        ):
+            _replay_cem_action_trace(
+                observed_states=states,
+                context=0.0,
+                seed=99173,
+                device="cuda",
+                model_tensors=None,
+            )
+        assert observed_precision() == expected_precision
+        assert (
+            torch.are_deterministic_algorithms_enabled()
+            is previous_deterministic
+        )
+    finally:
+        torch.backends.cuda.matmul.fp32_precision = (
+            previous_precision[0]
+        )
+        torch.backends.cudnn.conv.fp32_precision = (
+            previous_precision[1]
+        )
+        torch.backends.cudnn.rnn.fp32_precision = (
+            previous_precision[2]
+        )
+        torch.use_deterministic_algorithms(
+            previous_deterministic
+        )
 
 
 def _rejected_probe_fixture(

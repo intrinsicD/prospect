@@ -1,7 +1,7 @@
 """End-to-end WM-001 experiment harness.
 
 This module executes the sealed causal sequence.  Formal configuration is
-accepted only at the exact protocol budgets; the v1.11 development rehearsal
+accepted only at the exact protocol budgets; the v1.12 development rehearsal
 uses the same budgets but remains permanently claim-ineligible.
 """
 
@@ -693,9 +693,10 @@ def configure_determinism(seed: int, *, device: str) -> None:
     torch.use_deterministic_algorithms(True)
     torch.backends.cudnn.benchmark = False
     if hasattr(torch.backends, "cuda"):
-        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cuda.matmul.fp32_precision = "ieee"
     if hasattr(torch.backends, "cudnn"):
-        torch.backends.cudnn.allow_tf32 = False
+        torch.backends.cudnn.conv.fp32_precision = "ieee"
+        torch.backends.cudnn.rnn.fp32_precision = "ieee"
     if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
         raise RuntimeError("deterministic CUDA requires CUBLAS_WORKSPACE_CONFIG=:4096:8 before Python starts")
 
@@ -2676,7 +2677,7 @@ def run_experiment(
     result: dict[str, object] = {
         "schema": "prospect.world-model-lifecycle.raw-result.v9",
         "experiment_id": "WM-001",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "protocol_sha256": PROTOCOL_SHA256,
         "lane": config.lane,
         "claim_eligible": config.lane == "formal",

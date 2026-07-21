@@ -427,10 +427,28 @@ independent formal-input consumer cross-links recorded Python versions rather
 than comparing them with its ambient QA interpreter, and requires exact
 true/true/false development-closure status.
 
-Protocol 1.11 uses fresh paths, environments, seeds, schemas, seal, prospective
-review, binding, and evidence claims. The plan and exact operator sequence are
-in the [v1.11 confirmation plan](wm001-v1110-confirmation-plan.md) and
-[v1.11 operator runbook](wm001-v1110-operator-runbook.md).
+Protocol 1.11 used fresh paths, environments, seeds, schemas, seal, and
+prospective review. Its sealed result-free command-10 rehearsal completed the
+intended inventory, fresh-child, and branch-exact semantics, but PyTorch 2.9
+emitted a benign deprecation `UserWarning` on stderr when legacy TF32
+getters/setters were accessed. Because command 10 requires exactly zero stderr
+bytes and sealed executable bytes cannot be repaired in place, v1.11 is
+terminal without a development producer, collected experience, training, or
+metric. Its disposition is recorded in the
+[v1.11 result-free rehearsal failure](wm001-v1110-result-free-rehearsal-failure.md).
+
+Protocol 1.12 is the fresh prospective successor. It preserves the same
+scientific system and zero-stderr contract while moving runtime configuration,
+independent CUDA replay, and runtime identity to PyTorch 2.9's explicit
+string-valued `fp32_precision` hierarchy. The bound identity distinguishes the
+global, CUDA-matmul, cuDNN-backend, convolution, and RNN settings. Static source
+inspection, warnings-as-errors execution, repeated receipt-level stderr checks,
+and a separately captured real CUDA command-10 subprocess make any legacy
+precision access or warning fatal before a development producer may exist.
+Version 1.12 uses fresh paths, environments, seeds, wheel, lock, schemas, seal,
+prospective review, and evidence claims. The plan and exact operator sequence
+are in the [v1.12 confirmation plan](wm001-v1120-confirmation-plan.md) and
+[v1.12 operator runbook](wm001-v1120-operator-runbook.md).
 
 ## Open engineering boundaries
 
@@ -439,9 +457,10 @@ in the [v1.11 confirmation plan](wm001-v1110-confirmation-plan.md) and
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocol 1.10 is terminally retired without formal authority. Protocol 1.11
-  is the fresh prospective successor and must pass its recorded-versus-live
-  cross-environment gates before any new outcome-producing attempt.
+- Protocols 1.10 and 1.11 are terminally retired without formal authority.
+  Protocol 1.12 is the fresh prospective successor and must pass its
+  recorded-versus-live, warning-free precision, and exact command-10 stderr
+  gates before any new outcome-producing attempt.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External

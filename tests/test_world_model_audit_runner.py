@@ -106,7 +106,7 @@ def test_restart_runtime_conformance_is_result_free_repeated_and_adversarial(
     receipt = json.loads(conformance_receipt_bytes(conformance))
     assert report == {
         "schema": "prospect.wm001.restart-runtime-conformance.v1",
-        "protocol_version": "1.11.0",
+        "protocol_version": "1.12.0",
         "support_files": [
             {
                 "path": path,
@@ -148,6 +148,19 @@ def test_restart_runtime_conformance_is_result_free_repeated_and_adversarial(
     assert [
         row["source_mode"] for row in receipt["executions"]
     ] == ["path"] * 3 + ["descriptor"] * 3
+    empty_stderr = {
+        "bytes": 0,
+        "sha256": hashlib.sha256(b"").hexdigest(),
+    }
+    executions = (
+        *conformance.path_executions,
+        *conformance.descriptor_executions,
+    )
+    assert all(execution.stderr == b"" for execution in executions)
+    assert all(
+        row["stderr"] == empty_stderr
+        for row in receipt["executions"]
+    )
     assert all(
         row["stdout"]
         == receipt["executions"][0]["stdout"]
@@ -274,6 +287,23 @@ def test_source_mode_conformance_rejects_process_dependent_reports(
             auditor,
             working_directory=tmp_path,
             repeat_count=2,
+        )
+
+
+def test_source_mode_conformance_rejects_any_nonempty_stderr(
+    tmp_path: Path,
+) -> None:
+    auditor = _write_auditor(
+        tmp_path / "stderr.py",
+        "sys.stderr.buffer.write(b'unexpected warning\\n')\n"
+        "emit({'passed': True})",
+    )
+
+    with pytest.raises(AuditRunnerError, match="stderr"):
+        run_source_mode_conformance(
+            auditor,
+            working_directory=tmp_path,
+            repeat_count=1,
         )
 
 
