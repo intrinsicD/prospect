@@ -97,13 +97,19 @@ preformal suite then exposed a runner test whose closure path was not isolated
 from live lifecycle state. The failed report retired v1.9 before binding or
 formal launch; no K3–K6 value was opened or used.
 
-Protocol 1.10 is the active prospective confirmation. It makes runner paths
-root-derived, creates preformal evidence in a fresh nested version-owned
-bundle through a nonretryable hidden claim and atomic directory publication,
-reports command, identity, and semantic runtime-output failures separately and
-truthfully, removes the obsolete public development-evidence runtime mode, and
-independently preflights the exact formal input package before accepting or
-outer-launching a binding. It uses fresh seeds, environments, and namespaces
-while preserving the scientific system. Follow the
-[WM-001 v1.10 operator runbook](docs/wm001-v1100-operator-runbook.md) before
+Protocol 1.10 completed development, audit, closure, and sealed reopen, but its
+preformal QA process re-entered a live runtime-only inventory verifier after
+all ten commands had run. The expected QA-only packages caused an ordinary
+exception before report publication, consuming the hidden claim without
+authorizing a binding or formal launch. No v1.10 performance value was opened
+or used.
+
+Protocol 1.11 is the active prospective confirmation. It separates recorded
+QA evidence checks from live sealed-runtime checks, makes command 9
+environment-neutral on the QA side, records command 10's complete inventory
+and fresh-child receipt so both hashes are independently reproducible, and
+cross-links those objects through binding, audit, and launch. It uses fresh
+seeds, environments, and namespaces while preserving the scientific system.
+Follow the
+[WM-001 v1.11 operator runbook](docs/wm001-v1110-operator-runbook.md) before
 creating any development evidence, implementation binding, or formal attempt.

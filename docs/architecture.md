@@ -399,6 +399,39 @@ performance or K value was opened. The terminal disposition and required
 fresh-version repair are recorded in the
 [v1.10 preformal-test failure review](wm001-v1100-preformal-test-failure.md).
 
+Protocol 1.11.0 preserves the same scientific system and repairs the full
+cross-environment composition class before another outcome is permitted. Live
+closure creation/reopen, binding creation, and formal launch still recompute
+the exact package closure, package-root and standard-library inventories,
+ownership, executable, source, flags, and process environment under sealed
+runtime custody. Downstream QA roles instead authenticate canonical recorded
+objects and their cross-links; they do not replay a live-runtime predicate
+whose precondition cannot hold in the deliberately larger QA environment.
+`verify_live_binding` remains the explicit ambient guard and is tested to fail
+under QA-only inventory.
+
+Command 9's QA consumer now parses the exact closure schema, safe ordered
+archive-member projection, fixed roles, custody digests, accepted-attempt
+terminal and same-inode completion, and runtime receipt without importing the
+live closure verifier. Ordinary semantic exceptions become named failed checks
+and a truthful nonzero report-generation envelope; interrupts and other
+`BaseException` subclasses still propagate.
+
+Command 10 now records the complete canonical runtime package/root/
+standard-library/ownership inventory and complete fresh-child identity receipt,
+not only opaque hashes. The preformal producer, formal-binding producer,
+central verifier, independent auditor, and standard-library launcher all
+require a zero exit, passing status, empty stderr, exact typed objects,
+recomputed hashes, and equality with the binding's dependency custody. The
+independent formal-input consumer cross-links recorded Python versions rather
+than comparing them with its ambient QA interpreter, and requires exact
+true/true/false development-closure status.
+
+Protocol 1.11 uses fresh paths, environments, seeds, schemas, seal, prospective
+review, binding, and evidence claims. The plan and exact operator sequence are
+in the [v1.11 confirmation plan](wm001-v1110-confirmation-plan.md) and
+[v1.11 operator runbook](wm001-v1110-operator-runbook.md).
+
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget
@@ -406,9 +439,9 @@ fresh-version repair are recorded in the
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocol 1.10 is terminally retired without formal authority. A successor
-  must repair and directly test the QA/runtime semantic-composition boundary
-  before any new outcome-producing attempt.
+- Protocol 1.10 is terminally retired without formal authority. Protocol 1.11
+  is the fresh prospective successor and must pass its recorded-versus-live
+  cross-environment gates before any new outcome-producing attempt.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External

@@ -1,4 +1,4 @@
-"""Trusted, immutable preformal test evidence for WM-001 protocol 1.10."""
+"""Trusted, immutable preformal test evidence for WM-001 protocol 1.11."""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ from .assurance import ASSURANCE
 
 SCHEMA = "prospect.wm001.preformal-test-report.v2"
 EXPERIMENT_ID = "WM-001"
-PROTOCOL_VERSION = "1.10.0"
-REPORT_NAME = "preformal-test-report-v1.10.0.json"
+PROTOCOL_VERSION = "1.11.0"
+REPORT_NAME = "preformal-test-report-v1.11.0.json"
 PREFORMAL_REPORT_NAME = REPORT_NAME
-LOG_PREFIX = "preformal-v1.10.0-command-"
+LOG_PREFIX = "preformal-v1.11.0-command-"
 _EVIDENCE_PREFIX = "preformal-"
 SOURCE_RELATIVE_PATH = "bench/world_model_lifecycle/preformal.py"
-REVIEW_RELATIVE_PATH = "docs/wm001-v1100-prospective-harness-review.json"
+REVIEW_RELATIVE_PATH = "docs/wm001-v1110-prospective-harness-review.json"
 REVIEW_SCHEMA = "prospect.wm001.prospective-harness-review.v1"
 
 
@@ -60,22 +60,22 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_CLOSURE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.10.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.11.0.json"
 )
 RUNTIME_SEAL_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "runtime-seal-v1.10.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "runtime-seal-v1.11.0.json"
 )
 PREFORMAL_BUNDLE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "v1.10.0" / "preformal"
+    DEVELOPMENT_RESULTS_ROOT / "v1.11.0" / "preformal"
 )
 CLOSURE_ATTEMPT_PATH = (
     REPO
     / "bench"
     / "world_model_lifecycle"
     / "results"
-    / "operator-v1.10"
+    / "operator-v1.11"
     / "closures"
-    / "development-closure-v1.10.0"
+    / "development-closure-v1.11.0"
 )
 PREFORMAL_REPORT_PATH = PREFORMAL_BUNDLE_PATH / REPORT_NAME
 LAUNCH_BOOTSTRAP_PATH = REPO / "bench/world_model_lifecycle/launch_bootstrap.py"
@@ -195,6 +195,9 @@ _FRESH_CLOSURE_REOPEN_SCHEMA = (
 _FRESH_IDENTITY_CONFORMANCE_SCHEMA = (
     "prospect.wm001.fresh-runtime-identity-conformance.v1"
 )
+_DEVELOPMENT_MATRIX_CONTRACT_SHA256 = (
+    "09a232a4a58c2690665cbef928936b49fbb28d7134405c8eb696a63371591b84"
+)
 _FRESH_CLOSURE_REOPEN_TIMEOUT_SECONDS = 3_600
 _FRESH_CLOSURE_REOPEN_MAX_OUTPUT_BYTES = 64 << 10
 _PREFORMAL_INPUT_NLINKS = {
@@ -207,6 +210,77 @@ _PREFORMAL_INPUT_NLINKS = {
     "runtime_seal": _OUTER_FINALIZED_CUSTODY,
 }
 _PREFORMAL_INPUT_FIELDS = frozenset(_PREFORMAL_INPUT_NLINKS)
+_DEVELOPMENT_CLOSURE_FIELDS = frozenset(
+    {
+        "schema",
+        "experiment_id",
+        "protocol_version",
+        "source",
+        "producer_root",
+        "producer_manifest_member",
+        "raw_result_member",
+        "result_qualification_member",
+        "independent_audit_member",
+        "audit_reproduction_member",
+        "audit_runtime_manifest_member",
+        "audit_invocation_manifest_member",
+        "audit_stderr_member",
+        "producer_execution",
+        "producer_custody",
+        "audit_execution",
+        "qualification_archive",
+        "engineering_verified",
+        "audit_reproduced",
+        "performance_values_bound",
+    }
+)
+_DEVELOPMENT_EXECUTION_FIELDS = frozenset(
+    {
+        "git_commit",
+        "git_tree",
+        "worktree_clean",
+        "dependency_lock_sha256",
+        "python_executable",
+        "python_executable_sha256",
+        "python_version",
+        "platform",
+        "machine",
+        "device",
+        "python_flags",
+        "process_environment",
+        "accelerator",
+        "thread_count",
+        "interop_thread_count",
+        "cuda_runtime",
+        "cuda_driver",
+        "cublas_workspace_config",
+        "deterministic_algorithms",
+        "runtime_seal_sha256",
+        "runtime_seal_descriptor_custody",
+        "producer_bootstrap_sha256",
+        "bootstrap_descriptor_custody",
+        "package_roots",
+        "standard_library",
+    }
+)
+_DEVELOPMENT_FIXED_ROLE_MEMBERS = {
+    "producer_manifest_member": "producer/producer-manifest.json",
+    "raw_result_member": "producer/result.json",
+    "result_qualification_member": (
+        "evidence/development-result-qualification.json"
+    ),
+    "independent_audit_member": "evidence/independent-audit.json",
+    "audit_reproduction_member": "evidence/audit-reproduction.json",
+}
+_DEVELOPMENT_PRODUCER_CUSTODY_MEMBERS = {
+    "runtime_seal_member": "evidence/producer-runtime-seal.json",
+    "producer_bootstrap_member": "evidence/producer-bootstrap.py",
+    "launch_bootstrap_member": "evidence/launch-bootstrap.py",
+}
+_MAX_QUALIFICATION_MEMBERS = 100_000
+_MAX_QUALIFICATION_MEMBER_BYTES = 4 << 30
+_MAX_QUALIFICATION_TOTAL_MEMBER_BYTES = 32 << 30
+_MAX_QUALIFICATION_ARCHIVE_BYTES = 40 << 30
 
 
 class PreformalEvidenceError(RuntimeError):
@@ -865,8 +939,8 @@ def _implementation_files(*, environment: dict[str, str] | None = None) -> list[
         REPO / "bench/world_model_lifecycle/protocol.json",
         REPO / "bench/world_model_lifecycle/schemas/raw-result.schema.json",
         REPO / "bench/world_model_lifecycle/schemas/formal-binding.schema.json",
-        REPO / "docs/wm001-v1100-confirmation-plan.md",
-        REPO / "docs/wm001-v1100-operator-runbook.md",
+        REPO / "docs/wm001-v1110-confirmation-plan.md",
+        REPO / "docs/wm001-v1110-operator-runbook.md",
     ]
     rows: list[dict[str, object]] = []
     for path in sorted(set(candidates)):
@@ -1000,7 +1074,7 @@ def required_commands(
     prospective_review_path: Path = REVIEW_PATH,
     device: str = "cpu",
 ) -> tuple[CommandSpec, ...]:
-    """Return the fixed, ordered v1.10 preformal command contract."""
+    """Return the fixed, ordered v1.11 preformal command contract."""
 
     if device not in {"cpu", "cuda"}:
         raise PreformalEvidenceError("preformal device must be cpu or cuda")
@@ -1282,7 +1356,7 @@ def generate_preformal_report(
         raise PreformalEvidenceError("preformal report path must not contain aliases")
     if output != PREFORMAL_REPORT_PATH:
         raise PreformalEvidenceError(
-            "preformal report must use the sole canonical protocol-1.10 "
+            "preformal report must use the sole canonical protocol-1.11 "
             f"path {PREFORMAL_REPORT_PATH}"
         )
     final_directory = output.parent
@@ -1298,11 +1372,11 @@ def generate_preformal_report(
     )
     if runtime_seal_path != RUNTIME_SEAL_PATH:
         raise PreformalEvidenceError(
-            "runtime seal must use its canonical v1.10 path"
+            "runtime seal must use its canonical v1.11 path"
         )
     if development_closure_path != DEVELOPMENT_CLOSURE_PATH:
         raise PreformalEvidenceError(
-            "development closure must use its canonical v1.10 path"
+            "development closure must use its canonical v1.11 path"
         )
     if closure_attempt_path != CLOSURE_ATTEMPT_PATH:
         raise PreformalEvidenceError(
@@ -1545,46 +1619,441 @@ def _validate_file_identity(identity: object, *, label: str) -> dict[str, object
     return identity
 
 
+def _is_git_object_id(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 40
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _is_safe_archive_member(value: object) -> bool:
+    if (
+        not isinstance(value, str)
+        or not value
+        or "\x00" in value
+        or "\\" in value
+    ):
+        return False
+    path = Path(value)
+    return (
+        not path.is_absolute()
+        and path.as_posix() == value
+        and len(path.parts) >= 2
+        and "." not in path.parts
+        and ".." not in path.parts
+        and path.parts[0] in {"evidence", "producer"}
+    )
+
+
+def _validate_support_rows(value: object) -> bool:
+    if not isinstance(value, list):
+        return False
+    paths: list[str] = []
+    for row in value:
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "bytes", "sha256"}
+            or not isinstance(row.get("path"), str)
+            or not cast(str, row["path"])
+            or "\x00" in cast(str, row["path"])
+            or "\\" in cast(str, row["path"])
+            or Path(cast(str, row["path"])).is_absolute()
+            or Path(cast(str, row["path"])).as_posix() != row["path"]
+            or "." in Path(cast(str, row["path"])).parts
+            or ".." in Path(cast(str, row["path"])).parts
+            or type(row.get("bytes")) is not int
+            or cast(int, row["bytes"]) < 0
+            or not _is_sha256(row.get("sha256"))
+        ):
+            return False
+        paths.append(cast(str, row["path"]))
+    return paths == sorted(paths) and len(paths) == len(set(paths))
+
+
 def _verified_closure_member_digests(
     development_closure: Path,
 ) -> tuple[dict[str, object], str, str]:
-    """Return verified producer/result member digests from one closure."""
+    """Parse one sealed closure without re-entering runtime verification.
 
-    from .binding import verify_development_closure
+    Command 9 already performed the expensive runtime/live-inventory verification.
+    This QA-side check independently parses the exact immutable closure bytes and
+    validates every structural and archive-member identity needed to bind that
+    runtime receipt.  In particular, it never compares the runtime package
+    inventory to the intentionally different QA environment.
+    """
 
     closure_path = _canonical_existing_file(
         development_closure,
         label="development closure with archived member identities",
     )
-    closure = verify_development_closure(closure_path)
-    archive = closure.get("qualification_archive")
-    members = archive.get("members") if isinstance(archive, dict) else None
-    if not isinstance(members, list):
+    closure = _load_canonical_object(
+        _read_regular(
+            closure_path,
+            label="development closure with archived member identities",
+            expected_nlink=_SINGLE_LINK_CUSTODY,
+        ),
+        label="development closure with archived member identities",
+    )
+    if (
+        set(closure) != _DEVELOPMENT_CLOSURE_FIELDS
+        or closure.get("schema")
+        != "prospect.wm001.development-closure.v2"
+        or closure.get("experiment_id") != EXPERIMENT_ID
+        or closure.get("protocol_version") != PROTOCOL_VERSION
+        or closure.get("engineering_verified") is not True
+        or closure.get("audit_reproduced") is not True
+        or closure.get("performance_values_bound") is not False
+    ):
         raise PreformalEvidenceError(
-            "verified development closure has no archive members"
+            "development closure identity or status is invalid"
         )
 
-    def archived_member_sha256(role: str) -> str:
-        member = closure.get(role)
-        matches = [
-            row.get("sha256")
-            for row in members
-            if isinstance(row, dict) and row.get("path") == member
-        ]
-        if (
+    source = closure.get("source")
+    execution = closure.get("producer_execution")
+    producer_custody = closure.get("producer_custody")
+    audit_execution = closure.get("audit_execution")
+    archive = closure.get("qualification_archive")
+    producer_root_raw = closure.get("producer_root")
+    source_sha256_fields = {
+        "dependency_lock_sha256",
+        "producer_bootstrap_sha256",
+        "launch_bootstrap_sha256",
+        "runner_source_sha256",
+        "auditor_source_sha256",
+    }
+    if (
+        not isinstance(source, dict)
+        or set(source)
+        != {
+            "git_commit",
+            "git_tree",
+            "worktree_clean",
+            *source_sha256_fields,
+        }
+        or not _is_git_object_id(source.get("git_commit"))
+        or not _is_git_object_id(source.get("git_tree"))
+        or source.get("worktree_clean") is not True
+        or any(not _is_sha256(source.get(field)) for field in source_sha256_fields)
+        or not isinstance(execution, dict)
+        or set(execution) != _DEVELOPMENT_EXECUTION_FIELDS
+        or not isinstance(producer_custody, dict)
+        or set(producer_custody)
+        != {
+            "runtime_seal_member",
+            "runtime_seal_sha256",
+            "producer_bootstrap_member",
+            "producer_bootstrap_sha256",
+            "launch_bootstrap_member",
+            "launch_bootstrap_sha256",
+            "package_ownership",
+        }
+        or not isinstance(producer_custody.get("package_ownership"), dict)
+        or not isinstance(audit_execution, dict)
+        or set(audit_execution)
+        != {
+            "receipt_sha256",
+            "runtime_manifest_sha256",
+            "invocation_manifest_sha256",
+            "stderr_sha256",
+            "bootstrap_sha256",
+            "runner_source_sha256",
+            "auditor_source_sha256",
+            "support_files",
+            "source_mode",
+        }
+        or audit_execution.get("source_mode") != "descriptor"
+        or not _validate_support_rows(audit_execution.get("support_files"))
+        or not isinstance(archive, dict)
+        or set(archive)
+        != {
+            "format",
+            "file",
+            "canonical_path",
+            "bytes",
+            "sha256",
+            "members",
+        }
+        or not isinstance(producer_root_raw, str)
+        or not producer_root_raw
+        or "\x00" in producer_root_raw
+    ):
+        raise PreformalEvidenceError(
+            "development closure structural identity is malformed"
+        )
+
+    producer_root = Path(producer_root_raw)
+    if (
+        not producer_root.is_absolute()
+        or Path(os.path.abspath(producer_root)) != producer_root
+        or producer_root.resolve(strict=False) != producer_root
+    ):
+        raise PreformalEvidenceError(
+            "development closure producer root is unsafe"
+        )
+
+    execution_sha256_fields = {
+        "dependency_lock_sha256",
+        "python_executable_sha256",
+        "runtime_seal_sha256",
+        "producer_bootstrap_sha256",
+    }
+    python_executable = execution.get("python_executable")
+    process_environment = execution.get("process_environment")
+    package_roots = execution.get("package_roots")
+    if (
+        not _is_git_object_id(execution.get("git_commit"))
+        or not _is_git_object_id(execution.get("git_tree"))
+        or execution.get("worktree_clean") is not True
+        or any(
+            not _is_sha256(execution.get(field))
+            for field in execution_sha256_fields
+        )
+        or not isinstance(python_executable, str)
+        or not python_executable
+        or "\x00" in python_executable
+        or not Path(python_executable).is_absolute()
+        or Path(os.path.abspath(python_executable)) != Path(python_executable)
+        or not isinstance(execution.get("python_version"), str)
+        or not execution.get("python_version")
+        or not isinstance(execution.get("platform"), str)
+        or not execution.get("platform")
+        or not isinstance(execution.get("machine"), str)
+        or not execution.get("machine")
+        or execution.get("device") not in {"cpu", "cuda"}
+        or execution.get("python_flags") != _RUNTIME_FLAGS
+        or not isinstance(process_environment, dict)
+        or any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in process_environment.items()
+        )
+        or execution.get("deterministic_algorithms") is not True
+        or execution.get("runtime_seal_descriptor_custody") is not True
+        or execution.get("bootstrap_descriptor_custody") is not True
+        or type(execution.get("thread_count")) is not int
+        or cast(int, execution["thread_count"]) <= 0
+        or type(execution.get("interop_thread_count")) is not int
+        or cast(int, execution["interop_thread_count"]) <= 0
+        or not isinstance(package_roots, list)
+        or len(package_roots) != 1
+        or not isinstance(package_roots[0], dict)
+        or not isinstance(execution.get("standard_library"), dict)
+    ):
+        raise PreformalEvidenceError(
+            "development closure producer execution is malformed"
+        )
+    _environment_from_identity(
+        _environment_identity(cast(dict[str, str], process_environment)),
+        role="runtime",
+    )
+    device = cast(str, execution["device"])
+    accelerator = execution.get("accelerator")
+    cuda_runtime = execution.get("cuda_runtime")
+    cuda_driver = execution.get("cuda_driver")
+    workspace = execution.get("cublas_workspace_config")
+    if (
+        (
+            device == "cpu"
+            and (
+                accelerator is not None
+                or not (
+                    cuda_runtime is None
+                    or isinstance(cuda_runtime, str)
+                )
+                or cuda_driver is not None
+                or workspace is not None
+            )
+        )
+        or (
+            device == "cuda"
+            and (
+                not isinstance(accelerator, str)
+                or not accelerator
+                or not isinstance(cuda_runtime, str)
+                or not cuda_runtime
+                or not isinstance(cuda_driver, str)
+                or not cuda_driver
+                or workspace != ":4096:8"
+            )
+        )
+    ):
+        raise PreformalEvidenceError(
+            "development closure accelerator identity is malformed"
+        )
+
+    if any(
+        closure.get(field) != expected
+        for field, expected in _DEVELOPMENT_FIXED_ROLE_MEMBERS.items()
+    ):
+        raise PreformalEvidenceError(
+            "development closure fixed archive roles changed"
+        )
+    sidecar_fields = (
+        "audit_runtime_manifest_member",
+        "audit_invocation_manifest_member",
+        "audit_stderr_member",
+    )
+    sidecar_members = [closure.get(field) for field in sidecar_fields]
+    if (
+        any(
             not isinstance(member, str)
-            or len(matches) != 1
-            or not _is_sha256(matches[0])
+            or not member.startswith("evidence/")
+            or not _is_safe_archive_member(member)
+            or Path(member).name != member.removeprefix("evidence/")
+            for member in sidecar_members
+        )
+        or len(set(cast(list[str], sidecar_members))) != len(sidecar_members)
+    ):
+        raise PreformalEvidenceError(
+            "development closure audit sidecar roles are unsafe"
+        )
+    if any(
+        producer_custody.get(field) != expected
+        for field, expected in _DEVELOPMENT_PRODUCER_CUSTODY_MEMBERS.items()
+    ):
+        raise PreformalEvidenceError(
+            "development closure producer-custody roles changed"
+        )
+    producer_custody_sha256_fields = {
+        "runtime_seal_sha256",
+        "producer_bootstrap_sha256",
+        "launch_bootstrap_sha256",
+    }
+    audit_sha256_fields = {
+        "receipt_sha256",
+        "runtime_manifest_sha256",
+        "invocation_manifest_sha256",
+        "stderr_sha256",
+        "bootstrap_sha256",
+        "runner_source_sha256",
+        "auditor_source_sha256",
+    }
+    if (
+        any(
+            not _is_sha256(producer_custody.get(field))
+            for field in producer_custody_sha256_fields
+        )
+        or any(
+            not _is_sha256(audit_execution.get(field))
+            for field in audit_sha256_fields
+        )
+    ):
+        raise PreformalEvidenceError(
+            "development closure custody digests are malformed"
+        )
+
+    archive_sha256 = archive.get("sha256")
+    archive_file = archive.get("file")
+    archive_relative = archive.get("canonical_path")
+    members = archive.get("members")
+    expected_archive_prefix = (
+        DEVELOPMENT_RESULTS_ROOT.relative_to(REPO).as_posix()
+    )
+    if (
+        archive.get("format") != "ustar-uncompressed-v1"
+        or not _is_sha256(archive_sha256)
+        or not isinstance(archive_file, str)
+        or archive_file
+        != f"development-qualification-{cast(str, archive_sha256)[:16]}.tar"
+        or Path(archive_file).name != archive_file
+        or not isinstance(archive_relative, str)
+        or archive_relative != f"{expected_archive_prefix}/{archive_file}"
+        or Path(archive_relative).is_absolute()
+        or Path(archive_relative).as_posix() != archive_relative
+        or "." in Path(archive_relative).parts
+        or ".." in Path(archive_relative).parts
+        or type(archive.get("bytes")) is not int
+        or not 0 <= cast(int, archive["bytes"]) <= _MAX_QUALIFICATION_ARCHIVE_BYTES
+        or not isinstance(members, list)
+        or not 1 <= len(members) <= _MAX_QUALIFICATION_MEMBERS
+    ):
+        raise PreformalEvidenceError(
+            "development qualification archive identity is malformed"
+        )
+
+    member_paths: list[str] = []
+    member_digests: dict[str, str] = {}
+    total_member_bytes = 0
+    for member in members:
+        if (
+            not isinstance(member, dict)
+            or set(member) != {"path", "bytes", "sha256"}
+            or not _is_safe_archive_member(member.get("path"))
+            or type(member.get("bytes")) is not int
+            or not 0
+            <= cast(int, member["bytes"])
+            <= _MAX_QUALIFICATION_MEMBER_BYTES
+            or not _is_sha256(member.get("sha256"))
         ):
             raise PreformalEvidenceError(
-                f"verified development closure has no unique {role}"
+                "development qualification archive member is malformed"
             )
-        return cast(str, matches[0])
+        member_path = cast(str, member["path"])
+        member_paths.append(member_path)
+        member_digests[member_path] = cast(str, member["sha256"])
+        total_member_bytes += cast(int, member["bytes"])
+    if (
+        member_paths != sorted(member_paths)
+        or len(member_paths) != len(set(member_paths))
+        or total_member_bytes > _MAX_QUALIFICATION_TOTAL_MEMBER_BYTES
+    ):
+        raise PreformalEvidenceError(
+            "development qualification archive members are unordered or duplicated"
+        )
+
+    role_members = {
+        **{
+            field: cast(str, closure[field])
+            for field in _DEVELOPMENT_FIXED_ROLE_MEMBERS
+        },
+        **{
+            field: cast(str, closure[field])
+            for field in sidecar_fields
+        },
+        **{
+            field: cast(str, producer_custody[field])
+            for field in _DEVELOPMENT_PRODUCER_CUSTODY_MEMBERS
+        },
+    }
+    if (
+        len(set(role_members.values())) != len(role_members)
+        or any(
+            member_paths.count(member) != 1
+            for member in role_members.values()
+        )
+    ):
+        raise PreformalEvidenceError(
+            "development closure role has no unique archive member"
+        )
+
+    custody_member_digest_fields = {
+        "runtime_seal_member": "runtime_seal_sha256",
+        "producer_bootstrap_member": "producer_bootstrap_sha256",
+        "launch_bootstrap_member": "launch_bootstrap_sha256",
+    }
+    audit_member_digest_fields = {
+        "audit_reproduction_member": "receipt_sha256",
+        "audit_runtime_manifest_member": "runtime_manifest_sha256",
+        "audit_invocation_manifest_member": "invocation_manifest_sha256",
+        "audit_stderr_member": "stderr_sha256",
+    }
+    if any(
+        member_digests[cast(str, producer_custody[member_field])]
+        != producer_custody[digest_field]
+        for member_field, digest_field in custody_member_digest_fields.items()
+    ) or any(
+        member_digests[cast(str, closure[member_field])]
+        != audit_execution[digest_field]
+        for member_field, digest_field in audit_member_digest_fields.items()
+    ):
+        raise PreformalEvidenceError(
+            "development closure role digest differs from its archive member"
+        )
 
     return (
         closure,
-        archived_member_sha256("producer_manifest_member"),
-        archived_member_sha256("raw_result_member"),
+        member_digests[cast(str, closure["producer_manifest_member"])],
+        member_digests[cast(str, closure["raw_result_member"])],
     )
 
 
@@ -1621,6 +2090,7 @@ def _accepted_closure_evidence_from_report(
         or not _is_sha256(stdout_reference.get("sha256"))
         or not isinstance(stderr_reference, Mapping)
         or set(stderr_reference) != {"file", "bytes", "sha256"}
+        or type(stderr_reference.get("bytes")) is not int
         or stderr_reference.get("bytes") != 0
         or stderr_reference.get("sha256") != _sha256(b"")
     ):
@@ -1713,6 +2183,192 @@ def _accepted_closure_evidence_from_report(
     return value
 
 
+def _validate_recorded_result_free_inventory(
+    value: object,
+) -> dict[str, object]:
+    """Validate a recorded runtime inventory without reading the QA runtime."""
+
+    if not isinstance(value, dict) or set(value) != {
+        "packages",
+        "package_roots",
+        "standard_library",
+        "package_ownership",
+    }:
+        raise PreformalEvidenceError(
+            "bootstrap conformance inventory has wrong fields"
+        )
+    packages = value.get("packages")
+    package_roots = value.get("package_roots")
+    standard_library = value.get("standard_library")
+    package_ownership = value.get("package_ownership")
+    package_fields = {
+        "name",
+        "version",
+        "distribution_sha256",
+        "declared_file_count",
+        "editable",
+    }
+    if not isinstance(packages, list) or not packages:
+        raise PreformalEvidenceError(
+            "bootstrap conformance package inventory is absent"
+        )
+    names: list[str] = []
+    for row in packages:
+        if (
+            not isinstance(row, dict)
+            or set(row) != package_fields
+            or not isinstance(row.get("name"), str)
+            or re.fullmatch(
+                r"[a-z0-9]+(?:-[a-z0-9]+)*",
+                cast(str, row.get("name")),
+            )
+            is None
+            or not isinstance(row.get("version"), str)
+            or not row.get("version")
+            or "\0" in cast(str, row.get("version"))
+            or not _is_sha256(row.get("distribution_sha256"))
+            or type(row.get("declared_file_count")) is not int
+            or cast(int, row.get("declared_file_count")) <= 0
+            or row.get("editable") is not False
+        ):
+            raise PreformalEvidenceError(
+                "bootstrap conformance package row is malformed"
+            )
+        names.append(cast(str, row["name"]))
+    if (
+        names[0] != "python"
+        or names[1:] != sorted(names[1:])
+        or len(names) != len(set(names))
+        or re.fullmatch(
+            r"[0-9]+\.[0-9]+\.[0-9]+",
+            cast(str, packages[0]["version"]),
+        )
+        is None
+    ):
+        raise PreformalEvidenceError(
+            "bootstrap conformance packages are duplicated or unordered"
+        )
+
+    root_fields = {
+        "semantics_id",
+        "path",
+        "file_count",
+        "directory_count",
+        "total_bytes",
+        "inventory_sha256",
+    }
+
+    def valid_root(row: object, *, semantics_id: str) -> bool:
+        if not isinstance(row, dict) or set(row) != root_fields:
+            return False
+        path = row.get("path")
+        return bool(
+            row.get("semantics_id") == semantics_id
+            and isinstance(path, str)
+            and "\0" not in path
+            and Path(path).is_absolute()
+            and os.path.abspath(path) == path
+            and type(row.get("file_count")) is int
+            and cast(int, row["file_count"]) > 0
+            and type(row.get("directory_count")) is int
+            and cast(int, row["directory_count"]) >= 0
+            and type(row.get("total_bytes")) is int
+            and cast(int, row["total_bytes"]) >= 0
+            and _is_sha256(row.get("inventory_sha256"))
+        )
+
+    if (
+        not isinstance(package_roots, list)
+        or len(package_roots) != 1
+        or not valid_root(
+            package_roots[0],
+            semantics_id="prospect.wm001.package-root.v2",
+        )
+        or not valid_root(
+            standard_library,
+            semantics_id="prospect.wm001.standard-library.v2",
+        )
+        or not isinstance(package_ownership, dict)
+        or set(package_ownership)
+        != {
+            "semantics_id",
+            "root",
+            "file_count",
+            "directory_count",
+            "shared_file_count",
+            "identity_sha256",
+        }
+        or package_ownership.get("semantics_id")
+        != "prospect.wm001.package-ownership.v1"
+        or package_ownership.get("root")
+        != cast(dict[str, object], package_roots[0]).get("path")
+        or package_ownership.get("file_count")
+        != cast(dict[str, object], package_roots[0]).get("file_count")
+        or package_ownership.get("directory_count")
+        != cast(dict[str, object], package_roots[0]).get(
+            "directory_count"
+        )
+        or type(package_ownership.get("shared_file_count")) is not int
+        or cast(int, package_ownership["shared_file_count"]) < 0
+        or cast(int, package_ownership["shared_file_count"])
+        > cast(int, package_ownership["file_count"])
+        or not _is_sha256(package_ownership.get("identity_sha256"))
+    ):
+        raise PreformalEvidenceError(
+            "bootstrap conformance root inventory is malformed"
+        )
+    return value
+
+
+def _validate_recorded_fresh_identity_conformance(
+    value: object,
+) -> dict[str, object]:
+    """Validate a retained fresh-child receipt without starting a child."""
+
+    fields = {
+        "schema",
+        "experiment_id",
+        "protocol_version",
+        "mode",
+        "challenge",
+        "requesting_process_id",
+        "verifier_process_id",
+        "matrix_contract_sha256",
+        "passed",
+    }
+    requesting_process_id = (
+        value.get("requesting_process_id")
+        if isinstance(value, dict)
+        else None
+    )
+    verifier_process_id = (
+        value.get("verifier_process_id")
+        if isinstance(value, dict)
+        else None
+    )
+    if (
+        not isinstance(value, dict)
+        or set(value) != fields
+        or value.get("schema") != _FRESH_IDENTITY_CONFORMANCE_SCHEMA
+        or value.get("experiment_id") != EXPERIMENT_ID
+        or value.get("protocol_version") != PROTOCOL_VERSION
+        or value.get("mode") != "fresh-identity-conformance"
+        or not _is_sha256(value.get("challenge"))
+        or type(requesting_process_id) is not int
+        or cast(int, requesting_process_id) <= 0
+        or type(verifier_process_id) is not int
+        or cast(int, verifier_process_id) <= 0
+        or requesting_process_id == verifier_process_id
+        or value.get("matrix_contract_sha256")
+        != _DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        or value.get("passed") is not True
+    ):
+        raise PreformalEvidenceError(
+            "bootstrap conformance fresh identity report is malformed"
+        )
+    return value
+
+
 def _runtime_bootstrap_conformance_from_report(
     directory: Path,
     report: Mapping[str, object],
@@ -1735,16 +2391,39 @@ def _runtime_bootstrap_conformance_from_report(
         raise PreformalEvidenceError(
             "preformal report lacks one bootstrap conformance command"
         )
-    reference = matches[0].get("stdout")
+    row = matches[0]
+    reference = row.get("stdout")
+    stderr_reference = row.get("stderr")
     if (
-        not isinstance(reference, Mapping)
+        row.get("exit_code") != 0
+        or row.get("passed") is not True
+        or not isinstance(reference, Mapping)
         or set(reference) != {"file", "bytes", "sha256"}
         or type(reference.get("bytes")) is not int
         or cast(int, reference.get("bytes")) < 1
         or not _is_sha256(reference.get("sha256"))
+        or reference.get("file")
+        != _log_filename(
+            10,
+            "runtime-bootstrap-inventory-conformance",
+            "stdout",
+            cast(str, reference.get("sha256")),
+        )
+        or not isinstance(stderr_reference, Mapping)
+        or set(stderr_reference) != {"file", "bytes", "sha256"}
+        or type(stderr_reference.get("bytes")) is not int
+        or stderr_reference.get("bytes") != 0
+        or stderr_reference.get("sha256") != _sha256(b"")
+        or stderr_reference.get("file")
+        != _log_filename(
+            10,
+            "runtime-bootstrap-inventory-conformance",
+            "stderr",
+            _sha256(b""),
+        )
     ):
         raise PreformalEvidenceError(
-            "bootstrap conformance stdout reference is malformed"
+            "bootstrap conformance stream references are malformed"
         )
     path = _safe_sibling(
         directory,
@@ -1762,9 +2441,28 @@ def _runtime_bootstrap_conformance_from_report(
         raise PreformalEvidenceError(
             "bootstrap conformance stdout identity changed"
         )
+    stderr_path = _safe_sibling(
+        directory,
+        stderr_reference.get("file"),
+        label="bootstrap conformance stderr",
+    )
+    stderr_payload = _read_regular(
+        stderr_path,
+        label="bootstrap conformance stderr",
+    )
+    if stderr_payload:
+        raise PreformalEvidenceError(
+            "bootstrap conformance stderr is not empty"
+        )
     value = _load_canonical_object(
         payload,
         label="bootstrap conformance stdout",
+    )
+    inventory = _validate_recorded_result_free_inventory(
+        value.get("inventory")
+    )
+    fresh_identity = _validate_recorded_fresh_identity_conformance(
+        value.get("fresh_runtime_identity_conformance")
     )
     if (
         set(value)
@@ -1773,8 +2471,10 @@ def _runtime_bootstrap_conformance_from_report(
             "mode",
             "device",
             "passed",
+            "inventory",
             "inventory_sha256",
             "conformance_sha256",
+            "fresh_runtime_identity_conformance",
             "fresh_runtime_identity_conformance_sha256",
             "restart_runtime_conformance_report_sha256",
             "restart_runtime_execution_receipt_sha256",
@@ -1800,6 +2500,10 @@ def _runtime_bootstrap_conformance_from_report(
                 "restart_runtime_execution_receipt_sha256",
             )
         )
+        or value.get("inventory_sha256")
+        != _sha256(_canonical_json_bytes(inventory))
+        or value.get("fresh_runtime_identity_conformance_sha256")
+        != _sha256(_canonical_json_bytes(fresh_identity))
         or value.get("restart_runtime_support_files")
         != [
             "producer_bootstrap.py",
@@ -1856,13 +2560,17 @@ def _semantic_failure_checks(
             continue
         try:
             verifier(directory, report)
-        except PreformalEvidenceError:
+        except Exception:
             failures.append(failure_name)
     return failures
 
 
-def verify_preformal_report(report_path: Path) -> dict[str, Any]:
-    """Strictly reopen and independently validate a passing v1.10 report."""
+def _verify_preformal_report(
+    report_path: Path,
+    *,
+    require_live_qa_identity: bool,
+) -> dict[str, Any]:
+    """Validate a report, optionally reopening its intentionally larger QA closure."""
 
     lexical = report_path if report_path.is_absolute() else Path.cwd() / report_path
     absolute = Path(os.path.abspath(report_path))
@@ -1914,7 +2622,26 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
         role="runtime",
     )
     git = _git_identity(environment=qa_environment)
-    qa_executable = _executable_identity()
+    qa_before = report.get("qa_executable_before")
+    qa_after = report.get("qa_executable_after")
+    if (
+        not isinstance(qa_before, dict)
+        or qa_before != qa_after
+        or not isinstance(qa_before.get("invocation_path"), str)
+        or not isinstance(qa_before.get("implementation"), str)
+        or not isinstance(qa_before.get("version"), str)
+    ):
+        raise PreformalEvidenceError(
+            "preformal QA executable identity is invalid"
+        )
+    qa_executable = _executable_identity(
+        cast(str, qa_before["invocation_path"]),
+        implementation=cast(str, qa_before["implementation"]),
+        version=cast(str, qa_before["version"]),
+    )
+    live_qa_executable = (
+        _executable_identity() if require_live_qa_identity else None
+    )
     runtime_before = report.get("runtime_executable_before")
     runtime_after = report.get("runtime_executable_after")
     if (
@@ -2027,6 +2754,10 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
         or report.get("git_after") != git
         or report.get("qa_executable_before") != qa_executable
         or report.get("qa_executable_after") != qa_executable
+        or (
+            require_live_qa_identity
+            and live_qa_executable != qa_executable
+        )
         or runtime_before != runtime_executable
         or report.get("qa_closure_after") != qa_closure
         or qa_closure != live_qa_closure
@@ -2138,6 +2869,26 @@ def verify_preformal_report(report_path: Path) -> dict[str, Any]:
     if actual_evidence != {*expected_logs, REPORT_NAME}:
         raise PreformalEvidenceError("preformal evidence file set has missing or extra members")
     return report
+
+
+def verify_recorded_preformal_report(
+    report_path: Path,
+) -> dict[str, Any]:
+    """Validate a report against its explicit QA path, not the caller's interpreter."""
+
+    return _verify_preformal_report(
+        report_path,
+        require_live_qa_identity=False,
+    )
+
+
+def verify_preformal_report(report_path: Path) -> dict[str, Any]:
+    """Validate a report and prove the caller is its recorded QA environment."""
+
+    return _verify_preformal_report(
+        report_path,
+        require_live_qa_identity=True,
+    )
 
 
 def _descriptor_identity(metadata: os.stat_result) -> tuple[int, ...]:
@@ -2772,8 +3523,10 @@ def _runtime_bootstrap_inventory_conformance(device: str) -> dict[str, object]:
         "mode": "bootstrap-inventory-conformance",
         "device": device,
         "passed": True,
+        "inventory": inventory,
         "inventory_sha256": _sha256(_canonical_json_bytes(inventory)),
         "conformance_sha256": _sha256(_canonical_json_bytes(execution)),
+        "fresh_runtime_identity_conformance": fresh_identity,
         "fresh_runtime_identity_conformance_sha256": _sha256(
             _canonical_json_bytes(fresh_identity)
         ),
@@ -3012,6 +3765,7 @@ __all__ = (
     "runtime_main",
     "validate_fresh_closure_reopen_report",
     "verify_preformal_report",
+    "verify_recorded_preformal_report",
     "verify_prospective_review",
 )
 

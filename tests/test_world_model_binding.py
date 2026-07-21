@@ -187,42 +187,42 @@ def test_record_hash_decoder_requires_exact_sha256() -> None:
             decode(("sha256", "not+a+valid+digest"))
 
 
-def test_protocol_1100_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (1647437737, 1156509260)
+def test_protocol_1110_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (670819759, 624845448)
     assert verify_module.FORMAL_SEEDS == (
-        3363134750,
-        2153178322,
-        2277484641,
-        572614265,
-        3119775486,
-        3121614244,
-        3646941950,
-        827253974,
+        3391764770,
+        20596598,
+        999954271,
+        2371040464,
+        2073495343,
+        962058337,
+        2170781413,
+        3523651983,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            1647437737,
+            670819759,
             index,
         )
         for index in range(8)
     ] == [
-        2992267997,
-        3343129330,
-        1643143937,
-        2256808159,
-        3913917818,
-        1332951778,
-        1670949655,
-        1964726863,
+        282174066,
+        2860664389,
+        3977248474,
+        155527586,
+        117085153,
+        1967274654,
+        4124878978,
+        2676511189,
     ]
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            1156509260,
+            624845448,
             0,
         )
-        == 367275784
+        == 1321974417
     )
     assert (
         tuple(verify_module.derive_master_seed("development", index) for index in range(2))
@@ -231,7 +231,7 @@ def test_protocol_1100_seed_domain_and_master_seeds_are_exact() -> None:
     assert tuple(verify_module.derive_master_seed("formal", index) for index in range(8)) == verify_module.FORMAL_SEEDS
 
 
-def test_protocol_1100_states_the_negative_assurance_boundary() -> None:
+def test_protocol_1110_states_the_negative_assurance_boundary() -> None:
     protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
 
     assert protocol["trust_model"] == {
@@ -243,20 +243,20 @@ def test_protocol_1100_states_the_negative_assurance_boundary() -> None:
     }
 
 
-def test_implementation_manifest_binds_reviewed_v1100_documents() -> None:
+def test_implementation_manifest_binds_reviewed_v1110_documents() -> None:
     paths = {
         str(row["path"])
         for row in binding_module.implementation_files()
     }
 
     assert {
-        "docs/wm001-v1100-confirmation-plan.md",
-        "docs/wm001-v1100-operator-runbook.md",
-        "docs/wm001-v1100-prospective-harness-review.json",
+        "docs/wm001-v1110-confirmation-plan.md",
+        "docs/wm001-v1110-operator-runbook.md",
+        "docs/wm001-v1110-prospective-harness-review.json",
     } <= paths
 
 
-def test_protocol_1100_irrelevant_control_contract_is_bound() -> None:
+def test_protocol_1110_irrelevant_control_contract_is_bound() -> None:
     assert (
         "collect_irrelevant",
         verify_module.TASK_IRRELEVANT,
@@ -323,7 +323,7 @@ def test_result_runtime_must_equal_formal_binding_runtime() -> None:
         )
 
 
-def test_formal_binding_schema_binds_protocol_1100_and_fresh_seeds() -> None:
+def test_formal_binding_schema_binds_protocol_1110_and_fresh_seeds() -> None:
     schema = json.loads(
         verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -339,7 +339,7 @@ def test_formal_binding_schema_binds_protocol_1100_and_fresh_seeds() -> None:
         "external_attestation": {"const": False},
         "exclusive_path_use_required": {"const": True},
     }
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.10.0"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.11.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
@@ -396,7 +396,7 @@ def test_restart_json_comparison_rejects_python_numeric_aliases(
     assert not verify_module._strict_json_equal(observed, expected)
 
 
-def test_raw_result_schema_binds_v1100_heldout_split_and_formal_counts() -> None:
+def test_raw_result_schema_binds_v1110_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -407,7 +407,7 @@ def test_raw_result_schema_binds_v1100_heldout_split_and_formal_counts() -> None
 
     assert schema["$id"].endswith("wm-001-raw-result-v9.json")
     assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v9"
-    assert schema["properties"]["protocol_version"]["const"] == "1.10.0"
+    assert schema["properties"]["protocol_version"]["const"] == "1.11.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
@@ -448,7 +448,7 @@ def test_raw_result_schema_binds_v1100_heldout_split_and_formal_counts() -> None
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v1100_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v1110_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -781,8 +781,323 @@ def test_live_binding_rechecks_complete_implementation_manifest(
         )
 
 
+def test_live_binding_rejects_qa_runtime_package_inventory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_digests = {
+        filename: binding_module.sha256_file(
+            Path(binding_module.__file__).with_name(filename)
+        )
+        for filename in binding_module.EXECUTION_SOURCE_FILES
+    }
+    binding = {
+        "source": {
+            "git_commit": "1" * 40,
+            "git_tree": "2" * 40,
+            "implementation_files": [],
+            "execution_source_sha256": source_digests,
+        },
+        "dependencies": {
+            "packages": [{"name": "runtime-only", "version": "1"}],
+        },
+    }
+    binding_path = tmp_path / "formal-binding.json"
+    binding_path.write_bytes(_canonical_payload({"fixture": "binding"}))
+    monkeypatch.setattr(verify_module, "verify_binding", lambda _path: binding)
+    monkeypatch.setattr(binding_module, "implementation_files", lambda: [])
+    monkeypatch.setattr(binding_module, "source_is_clean", lambda: True)
+    monkeypatch.setattr(
+        binding_module,
+        "git_output",
+        lambda *arguments: (
+            "1" * 40 if arguments == ("rev-parse", "HEAD") else "2" * 40
+        ),
+    )
+    monkeypatch.setattr(binding_module, "require_formal_python_flags", lambda: None)
+    monkeypatch.setattr(binding_module, "require_formal_process_environment", lambda: None)
+    monkeypatch.setattr(binding_module, "verify_installed_source_snapshot", lambda: None)
+    monkeypatch.setattr(binding_module, "installed_package_rows", lambda: [])
+    monkeypatch.setattr(binding_module, "verify_lockfile_rows", lambda _rows: None)
+
+    with pytest.raises(RuntimeError, match="installed package closure"):
+        binding_module.verify_live_binding(binding_path, device="cpu")
+
+
 def _canonical_payload(value: object) -> bytes:
     return bytes(binding_module.canonical_json_bytes(value)) + b"\n"
+
+
+def _recorded_development_closure_fixture(
+    tmp_path: Path,
+) -> tuple[Path, dict[str, object], dict[str, str]]:
+    role_paths = {
+        "producer_manifest_member": "producer/producer-manifest.json",
+        "raw_result_member": "producer/result.json",
+        "result_qualification_member": "evidence/development-result-qualification.json",
+        "independent_audit_member": "evidence/independent-audit.json",
+        "audit_reproduction_member": "evidence/audit-reproduction.json",
+        "audit_runtime_manifest_member": "evidence/development-audit-runtime-fixture.json",
+        "audit_invocation_manifest_member": "evidence/development-audit-invocation-fixture.json",
+        "audit_stderr_member": "evidence/development-audit-stderr-fixture.log",
+        "runtime_seal_member": "evidence/producer-runtime-seal.json",
+        "producer_bootstrap_member": "evidence/producer-bootstrap.py",
+        "launch_bootstrap_member": "evidence/launch-bootstrap.py",
+    }
+    digests = {
+        member: hashlib.sha256(member.encode("utf-8")).hexdigest()
+        for member in role_paths.values()
+    }
+    def digest(label: str) -> str:
+        return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+    source: dict[str, object] = {
+        "git_commit": "a" * 40,
+        "git_tree": "b" * 40,
+        "worktree_clean": True,
+        "dependency_lock_sha256": digest("lock"),
+        "producer_bootstrap_sha256": digests[role_paths["producer_bootstrap_member"]],
+        "launch_bootstrap_sha256": digests[role_paths["launch_bootstrap_member"]],
+        "runner_source_sha256": digest("runner"),
+        "auditor_source_sha256": digest("auditor"),
+    }
+    execution: dict[str, object] = {
+        "git_commit": source["git_commit"],
+        "git_tree": source["git_tree"],
+        "worktree_clean": True,
+        "dependency_lock_sha256": source["dependency_lock_sha256"],
+        "python_executable": "/sealed-runtime/bin/python",
+        "python_executable_sha256": digest("python"),
+        "python_version": "3.12.11",
+        "platform": "sealed-runtime-platform",
+        "machine": "sealed-runtime-machine",
+        "device": "cpu",
+        "python_flags": {"isolated": 1},
+        "process_environment": {"LC_ALL": "C.UTF-8"},
+        "accelerator": None,
+        "thread_count": 1,
+        "interop_thread_count": 1,
+        "cuda_runtime": None,
+        "cuda_driver": None,
+        "cublas_workspace_config": None,
+        "deterministic_algorithms": True,
+        "runtime_seal_sha256": digests[role_paths["runtime_seal_member"]],
+        "runtime_seal_descriptor_custody": True,
+        "producer_bootstrap_sha256": source["producer_bootstrap_sha256"],
+        "bootstrap_descriptor_custody": True,
+        "package_roots": [{"identity": "runtime-only-package-root"}],
+        "standard_library": {"identity": "runtime-only-standard-library"},
+    }
+    custody: dict[str, object] = {
+        "runtime_seal_member": role_paths["runtime_seal_member"],
+        "runtime_seal_sha256": execution["runtime_seal_sha256"],
+        "producer_bootstrap_member": role_paths["producer_bootstrap_member"],
+        "producer_bootstrap_sha256": source["producer_bootstrap_sha256"],
+        "launch_bootstrap_member": role_paths["launch_bootstrap_member"],
+        "launch_bootstrap_sha256": source["launch_bootstrap_sha256"],
+        "package_ownership": {"identity": "runtime-only-package-ownership"},
+    }
+    audit_execution: dict[str, object] = {
+        "receipt_sha256": digests[role_paths["audit_reproduction_member"]],
+        "runtime_manifest_sha256": digests[role_paths["audit_runtime_manifest_member"]],
+        "invocation_manifest_sha256": digests[role_paths["audit_invocation_manifest_member"]],
+        "stderr_sha256": digests[role_paths["audit_stderr_member"]],
+        "bootstrap_sha256": digest("audit-bootstrap"),
+        "runner_source_sha256": source["runner_source_sha256"],
+        "auditor_source_sha256": source["auditor_source_sha256"],
+        "support_files": [
+            {"path": "producer_bootstrap.py", "bytes": 1, "sha256": digest("support-producer")},
+            {"path": "protocol.json", "bytes": 1, "sha256": digest("support-protocol")},
+            {"path": "schemas/raw-result.schema.json", "bytes": 1, "sha256": digest("support-schema")},
+        ],
+        "source_mode": "descriptor",
+    }
+    archive_digest = digest("qualification-archive")
+    closure: dict[str, object] = {
+        "schema": "prospect.wm001.development-closure.v2",
+        "experiment_id": "WM-001",
+        "protocol_version": "1.11.0",
+        "source": source,
+        "producer_root": str((tmp_path / "qualification-v1.11.0").resolve()),
+        **{
+            field: member
+            for field, member in role_paths.items()
+            if field not in {"runtime_seal_member", "producer_bootstrap_member", "launch_bootstrap_member"}
+        },
+        "producer_execution": execution,
+        "producer_custody": custody,
+        "audit_execution": audit_execution,
+        "qualification_archive": {
+            "format": "ustar-uncompressed-v1",
+            "file": f"development-qualification-{archive_digest[:16]}.tar",
+            "canonical_path": (
+                "bench/world_model_lifecycle/results/development/"
+                f"development-qualification-{archive_digest[:16]}.tar"
+            ),
+            "bytes": 1024,
+            "sha256": archive_digest,
+            "members": [
+                {"path": member, "bytes": 1, "sha256": digests[member]}
+                for member in sorted(role_paths.values())
+            ],
+        },
+        "engineering_verified": True,
+        "audit_reproduced": True,
+        "performance_values_bound": False,
+    }
+    path = tmp_path / "development-closure-fixture.json"
+    path.write_bytes(_canonical_payload(closure))
+    return path, closure, digests
+
+
+def test_recorded_closure_and_coverage_verifiers_ignore_qa_ambient_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closure_path, closure, digests = _recorded_development_closure_fixture(tmp_path)
+    coverage_report = binding_module.run_coverage_conformance()
+    recorded_runtime = {
+        "semantics_id": verify_module.COVERAGE_SEMANTICS,
+        "python_executable": "/sealed-runtime/bin/python",
+        "python_implementation": "CPython",
+        "python_version": "3.12.11",
+        "platform": "sealed-runtime-platform",
+        "machine": "sealed-runtime-machine",
+    }
+    coverage_report.update(recorded_runtime)
+    _rehash_conformance(coverage_report)
+    dependencies = {
+        "python_executable": recorded_runtime["python_executable"],
+        "python_executable_sha256": "c" * 64,
+    }
+    runtime = {
+        "platform": recorded_runtime["platform"],
+        "machine": recorded_runtime["machine"],
+    }
+    bound_python = {
+        "executable": recorded_runtime["python_executable"],
+        "resolved_executable": recorded_runtime["python_executable"],
+        "sha256": dependencies["python_executable_sha256"],
+        "version": [3, 12, 11],
+    }
+
+    def forbidden() -> str:
+        raise AssertionError("recorded verifier consulted QA ambient identity")
+
+    monkeypatch.setattr(verify_module.sys, "executable", "/qa/bin/python")
+    monkeypatch.setattr(verify_module.platform, "python_implementation", forbidden)
+    monkeypatch.setattr(verify_module.platform, "python_version", forbidden)
+    monkeypatch.setattr(verify_module.platform, "platform", forbidden)
+    monkeypatch.setattr(verify_module.platform, "machine", forbidden)
+
+    observed, identity, member_digests = (
+        verify_module._recorded_development_closure_identity(closure_path)
+    )
+    verify_module._verify_bound_coverage_runtime_identity(
+        recorded_runtime,
+        dependencies=dependencies,
+        runtime=runtime,
+        bound_python=bound_python,
+    )
+    verify_module._verify_coverage_conformance_report(
+        coverage_report,
+        recorded_runtime=recorded_runtime,
+    )
+
+    assert observed == closure
+    assert identity["producer_manifest_sha256"] == digests["producer/producer-manifest.json"]
+    assert member_digests["producer/result.json"] == digests["producer/result.json"]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        pytest.param("unsafe-member", id="unsafe-member"),
+        pytest.param("duplicate-member", id="duplicate-member"),
+        pytest.param("custody-digest", id="custody-digest"),
+        pytest.param("status", id="status"),
+    ],
+)
+def test_recorded_closure_verifier_rejects_cross_link_mutations(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    closure_path, closure, _ = _recorded_development_closure_fixture(tmp_path)
+    mutated = copy.deepcopy(closure)
+    archive = mutated["qualification_archive"]
+    assert isinstance(archive, dict)
+    members = archive["members"]
+    assert isinstance(members, list)
+    if mutation == "unsafe-member":
+        members[0]["path"] = "../escape"
+    elif mutation == "duplicate-member":
+        members[1]["path"] = members[0]["path"]
+    elif mutation == "custody-digest":
+        custody = mutated["producer_custody"]
+        assert isinstance(custody, dict)
+        custody["runtime_seal_sha256"] = "0" * 64
+    else:
+        mutated["audit_reproduced"] = False
+    closure_path.write_bytes(_canonical_payload(mutated))
+
+    with pytest.raises(verify_module.Violation, match="recorded development"):
+        verify_module._recorded_development_closure_identity(closure_path)
+
+
+def test_recorded_accepted_closure_receipt_rejects_digest_substitution(
+    tmp_path: Path,
+) -> None:
+    closure_path, closure, digests = _recorded_development_closure_fixture(tmp_path)
+    closure_payload = closure_path.read_bytes()
+    receipt = {
+        "schema": "prospect.wm001.preformal-runtime-check.v1",
+        "mode": "accepted-closure-evidence",
+        "passed": True,
+        "development_closure_sha256": hashlib.sha256(closure_payload).hexdigest(),
+        "producer_manifest_sha256": digests["producer/producer-manifest.json"],
+        "raw_result_sha256": digests["producer/result.json"],
+        "closure_attempt_manifest_sha256": "d" * 64,
+        "closure_outer_completion_sha256": "d" * 64,
+    }
+    stdout = tmp_path / "accepted-closure.stdout.json"
+    stderr = tmp_path / "accepted-closure.stderr.log"
+    stdout.write_bytes(_canonical_payload(receipt))
+    stderr.write_bytes(b"")
+    report_path = tmp_path / "preformal-report.json"
+    report = {
+        "commands": [
+            {
+                "name": "runtime-accepted-closure-evidence",
+                "stdout": {
+                    "file": stdout.name,
+                    "bytes": stdout.stat().st_size,
+                    "sha256": hashlib.sha256(stdout.read_bytes()).hexdigest(),
+                },
+                "stderr": {
+                    "file": stderr.name,
+                    "bytes": 0,
+                    "sha256": hashlib.sha256(b"").hexdigest(),
+                },
+            }
+        ]
+    }
+    report_path.write_bytes(_canonical_payload(report))
+    verify_module._recorded_accepted_closure_receipt(
+        report_path,
+        report,
+        closure_sha256=receipt["development_closure_sha256"],
+        producer_manifest_sha256=receipt["producer_manifest_sha256"],
+        raw_result_sha256=receipt["raw_result_sha256"],
+    )
+
+    with pytest.raises(verify_module.Violation, match="recorded closure"):
+        verify_module._recorded_accepted_closure_receipt(
+            report_path,
+            report,
+            closure_sha256=receipt["development_closure_sha256"],
+            producer_manifest_sha256=receipt["producer_manifest_sha256"],
+            raw_result_sha256="0" * 64,
+        )
 
 
 def test_formal_binding_file_requires_single_link_custody(
@@ -832,7 +1147,7 @@ def _producer_custody_fixture(
     seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "assurance": dict(binding_module.ASSURANCE),
         "git_commit": execution["git_commit"],
         "git_tree": execution["git_tree"],
@@ -1763,7 +2078,7 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -1894,7 +2209,7 @@ def test_result_qualification_created_in_one_process_reopens_in_two_others(
     qualification = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "protocol_sha256": binding_module.sha256_file(
             binding_module.PROTOCOL_PATH
         ),
@@ -2010,7 +2325,7 @@ def test_development_closure_creator_rejects_any_alternate_marker_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    canonical = tmp_path / "development-closure-v1.10.0.json"
+    canonical = tmp_path / "development-closure-v1.11.0.json"
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
 
     with pytest.raises(RuntimeError, match="only be published"):
@@ -2028,7 +2343,7 @@ def test_preserved_development_closure_name_must_be_content_addressed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _canonical_payload({"schema": "fixture"})
-    canonical = tmp_path / "development-closure-v1.10.0.json"
+    canonical = tmp_path / "development-closure-v1.11.0.json"
     canonical.write_bytes(payload)
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
     assert binding_module._closure_path_mode(canonical, payload) == "canonical"

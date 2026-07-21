@@ -136,6 +136,15 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
     dependencies = {
         "python_executable": "/isolated/bin/python",
         "python_executable_sha256": "d" * 64,
+        "packages": [
+            {
+                "name": "python",
+                "version": "3.12.7",
+                "distribution_sha256": "d" * 64,
+                "declared_file_count": 1,
+                "editable": False,
+            }
+        ],
         "standard_library": {"inventory_sha256": "e" * 64},
         "package_roots": [{"inventory_sha256": "f" * 64}],
         "package_ownership": {"inventory_sha256": "0" * 64},
@@ -162,7 +171,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
     seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "assurance": dict(artifact_audit_module._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -171,11 +180,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
             "executable": dependencies["python_executable"],
             "resolved_executable": "/isolated/bin/python3.12",
             "sha256": dependencies["python_executable_sha256"],
-            "version": [
-                artifact_audit_module.sys.version_info.major,
-                artifact_audit_module.sys.version_info.minor,
-                artifact_audit_module.sys.version_info.micro,
-            ],
+            "version": [3, 12, 7],
         },
         "required_flags": runtime["python_flags"],
         "process_environment": runtime["process_environment"],
@@ -186,6 +191,12 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
         "package_roots": dependencies["package_roots"],
         "package_ownership": dependencies["package_ownership"],
     }
+    runtime_executable = {
+        "invocation_path": dependencies["python_executable"],
+        "resolved_path": "/isolated/bin/python3.12",
+        "sha256": dependencies["python_executable_sha256"],
+        "version": "3.12.7",
+    }
 
     assert (
         artifact_audit_module._preformal_runtime_seal(
@@ -193,6 +204,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
             source=source,
             dependencies=dependencies,
             runtime=runtime,
+            runtime_executable=runtime_executable,
         )
         == seal
     )
@@ -205,6 +217,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
             source=source,
             dependencies=dependencies,
             runtime=runtime,
+            runtime_executable=runtime_executable,
         )
 
     overstated = dict(seal)
@@ -218,6 +231,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
             source=source,
             dependencies=dependencies,
             runtime=runtime,
+            runtime_executable=runtime_executable,
         )
 
 
@@ -1103,13 +1117,13 @@ def test_formal_launch_namespace_requires_exact_confirmation_name(
         / "results"
         / "formal"
         / binding_digest
-        / "confirmation-v1.10.0"
+        / "confirmation-v1.11.0"
     )
 
     assert artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical,
         binding_digest=binding_digest,
-        launch={"attempt_directory": "confirmation-v1.10.0"},
+        launch={"attempt_directory": "confirmation-v1.11.0"},
     )
     assert not artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical.with_name("wrong-child"),
@@ -1557,11 +1571,11 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     owned_state = runtime.owner.snapshot_state()
     parameter_sha256 = runtime.digest
     model_version = runtime.version
-    master_seed = 1647437737
+    master_seed = 670819759
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.10.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.11.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
@@ -2042,7 +2056,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     result: dict[str, Any] = {
         "schema": "prospect.world-model-lifecycle.raw-result.v9",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),

@@ -70,7 +70,7 @@ def test_independent_preformal_contract_matches_live_producer_contract() -> None
         runtime_seal_path=str(
             preformal.REPO
             / "bench/world_model_lifecycle/results/development/"
-            "runtime-seal-v1.10.0.json"
+            "runtime-seal-v1.11.0.json"
         ),
         development_closure_path=str(
             preformal.DEVELOPMENT_CLOSURE_PATH
@@ -179,7 +179,7 @@ def test_active_protocol_seed_universe_has_no_declared_collision() -> None:
     assert audit.passed_checks == 1
 
 
-def test_prebinding_protocol_requires_exact_v19_supersession_lineage(
+def test_prebinding_protocol_requires_exact_v1100_supersession_lineage(
     tmp_path: Path,
 ) -> None:
     protocol = json.loads(PROTOCOL.read_text(encoding="utf-8"))
@@ -637,7 +637,7 @@ def _preformal_v2_fixture(
     review: dict[str, object] = {
         "schema": "prospect.wm001.prospective-harness-review.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "implementation_files": reviewed_files,
         "implementation_manifest_sha256": hashlib.sha256(
             artifact_audit._canonical_json_bytes(reviewed_files)
@@ -729,13 +729,51 @@ def _preformal_v2_fixture(
         repository,
     )
     repository_cwd = str(repository)
-    standard_library = {"identity": "stdlib"}
-    package_roots = [{"identity": "package-root"}]
-    package_ownership = {"identity": "ownership"}
+    packages = [
+        {
+            "name": "python",
+            "version": executable_identity["version"],
+            "distribution_sha256": executable_digest,
+            "declared_file_count": 1,
+            "editable": False,
+        },
+        {
+            "name": "prospect",
+            "version": "0.1.0",
+            "distribution_sha256": "7" * 64,
+            "declared_file_count": 5,
+            "editable": False,
+        },
+    ]
+    package_root = {
+        "semantics_id": "prospect.wm001.package-root.v2",
+        "path": "/runtime/site-packages",
+        "file_count": 7,
+        "directory_count": 3,
+        "total_bytes": 70,
+        "inventory_sha256": "6" * 64,
+    }
+    standard_library = {
+        "semantics_id": "prospect.wm001.standard-library.v2",
+        "path": "/runtime/stdlib",
+        "file_count": 11,
+        "directory_count": 4,
+        "total_bytes": 110,
+        "inventory_sha256": "8" * 64,
+    }
+    package_roots = [package_root]
+    package_ownership = {
+        "semantics_id": "prospect.wm001.package-ownership.v1",
+        "root": package_root["path"],
+        "file_count": package_root["file_count"],
+        "directory_count": package_root["directory_count"],
+        "shared_file_count": 0,
+        "identity_sha256": "0" * 64,
+    }
     runtime_seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -768,7 +806,7 @@ def _preformal_v2_fixture(
         / "development"
     )
     development_root.mkdir(parents=True)
-    runtime_seal_path = development_root / "runtime-seal-v1.10.0.json"
+    runtime_seal_path = development_root / "runtime-seal-v1.11.0.json"
     runtime_seal_path.write_bytes(runtime_seal_payload)
     runtime_seal_completion = (
         repository
@@ -776,7 +814,7 @@ def _preformal_v2_fixture(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.10"
+        / "v1.11"
         / (
             hashlib.sha256(
                 str(runtime_seal_path).encode("utf-8")
@@ -789,7 +827,7 @@ def _preformal_v2_fixture(
     development_closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "producer_manifest_member": "producer/producer-manifest.json",
         "raw_result_member": "producer/result.json",
         "qualification_archive": {
@@ -811,7 +849,7 @@ def _preformal_v2_fixture(
         artifact_audit._canonical_json_bytes(development_closure) + b"\n"
     )
     development_path = (
-        development_root / "development-closure-v1.10.0.json"
+        development_root / "development-closure-v1.11.0.json"
     )
     development_path.write_bytes(development_payload)
     closure_terminal = (
@@ -819,9 +857,9 @@ def _preformal_v2_fixture(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.10"
+        / "operator-v1.11"
         / "closures"
-        / "development-closure-v1.10.0"
+        / "development-closure-v1.11.0"
         / "operator-attempt.json"
     )
     closure_terminal.parent.mkdir(parents=True)
@@ -833,7 +871,7 @@ def _preformal_v2_fixture(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.10"
+        / "v1.11"
         / (
             hashlib.sha256(
                 str(closure_terminal).encode("utf-8")
@@ -958,6 +996,28 @@ def _preformal_v2_fixture(
                 name == "runtime-bootstrap-inventory-conformance"
                 and stream == "stdout"
             ):
+                inventory = {
+                    "packages": packages,
+                    "package_roots": package_roots,
+                    "standard_library": standard_library,
+                    "package_ownership": package_ownership,
+                }
+                fresh_identity = {
+                    "schema": (
+                        "prospect.wm001."
+                        "fresh-runtime-identity-conformance.v1"
+                    ),
+                    "experiment_id": "WM-001",
+                    "protocol_version": "1.11.0",
+                    "mode": "fresh-identity-conformance",
+                    "challenge": "7" * 64,
+                    "requesting_process_id": 101,
+                    "verifier_process_id": 202,
+                    "matrix_contract_sha256": (
+                        artifact_audit._DEVELOPMENT_MATRIX_CONTRACT_SHA256
+                    ),
+                    "passed": True,
+                }
                 log_payload = (
                     artifact_audit._canonical_json_bytes(
                     {
@@ -969,10 +1029,22 @@ def _preformal_v2_fixture(
                         ),
                         "device": "cpu",
                         "passed": True,
-                        "inventory_sha256": "1" * 64,
+                        "inventory": inventory,
+                        "inventory_sha256": hashlib.sha256(
+                            artifact_audit._canonical_json_bytes(
+                                inventory
+                            )
+                        ).hexdigest(),
                         "conformance_sha256": "2" * 64,
+                        "fresh_runtime_identity_conformance": (
+                            fresh_identity
+                        ),
                         "fresh_runtime_identity_conformance_sha256": (
-                            "9" * 64
+                            hashlib.sha256(
+                                artifact_audit._canonical_json_bytes(
+                                    fresh_identity
+                                )
+                            ).hexdigest()
                         ),
                         "restart_runtime_conformance_report_sha256": (
                             "3" * 64
@@ -995,6 +1067,11 @@ def _preformal_v2_fixture(
                     )
                     + b"\n"
                 )
+            elif (
+                name == "runtime-bootstrap-inventory-conformance"
+                and stream == "stderr"
+            ):
+                log_payload = b""
             else:
                 log_payload = f"{ordinal}:{name}:{stream}\n".encode()
             digest = hashlib.sha256(log_payload).hexdigest()
@@ -1039,7 +1116,7 @@ def _preformal_v2_fixture(
     report: dict[str, Any] = {
         "schema": "prospect.wm001.preformal-test-report.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "repository_cwd": repository_cwd,
         "device": "cpu",
         "qa_environment": qa_environment_identity,
@@ -1076,6 +1153,7 @@ def _preformal_v2_fixture(
         "lockfile_sha256": "4" * 64,
         "python_executable": str(executable),
         "python_executable_sha256": executable_digest,
+        "packages": packages,
         "standard_library": standard_library,
         "package_roots": package_roots,
         "package_ownership": package_ownership,
@@ -1430,6 +1508,146 @@ def test_v2_machine_test_receipt_rejects_command9_nonempty_stderr(
         )
 
 
+def test_v2_machine_test_receipt_rejects_command10_nonempty_stderr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, source, dependencies, runtime, report = _preformal_v2_fixture(
+        tmp_path,
+        monkeypatch,
+    )
+    _replace_preformal_v2_log(
+        tmp_path,
+        report=report,
+        source=source,
+        command_index=9,
+        stream="stderr",
+        payload=b"unexpected runtime diagnostic\n",
+    )
+    payload = _rewrite_preformal_v2_report(tmp_path, report, source)
+
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="runtime bootstrap conformance",
+    ):
+        artifact_audit._validate_preformal_test_report_v2(
+            payload,
+            root=tmp_path,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("inventory", "inventory-digest", "fresh-report"),
+)
+def test_v2_machine_test_receipt_rejects_command10_identity_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    _, source, dependencies, runtime, report = _preformal_v2_fixture(
+        tmp_path,
+        monkeypatch,
+    )
+    row = report["commands"][9]
+    value = json.loads((tmp_path / row["stdout"]["file"]).read_bytes())
+    if mutation == "inventory":
+        value["inventory"]["packages"][1]["version"] = "changed"
+        value["inventory_sha256"] = hashlib.sha256(
+            artifact_audit._canonical_json_bytes(value["inventory"])
+        ).hexdigest()
+    elif mutation == "inventory-digest":
+        value["inventory_sha256"] = "f" * 64
+    else:
+        value["fresh_runtime_identity_conformance"]["challenge"] = "x"
+        value["fresh_runtime_identity_conformance_sha256"] = (
+            hashlib.sha256(
+                artifact_audit._canonical_json_bytes(
+                    value["fresh_runtime_identity_conformance"]
+                )
+            ).hexdigest()
+        )
+    _replace_preformal_v2_log(
+        tmp_path,
+        report=report,
+        source=source,
+        command_index=9,
+        stream="stdout",
+        payload=artifact_audit._canonical_json_bytes(value) + b"\n",
+    )
+    payload = _rewrite_preformal_v2_report(tmp_path, report, source)
+
+    with pytest.raises(artifact_audit.ArtifactAuditError):
+        artifact_audit._validate_preformal_test_report_v2(
+            payload,
+            root=tmp_path,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+        )
+
+
+def test_v2_runtime_version_uses_recorded_runtime_not_ambient_qa(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, source, dependencies, runtime, report = _preformal_v2_fixture(
+        tmp_path,
+        monkeypatch,
+    )
+    report["runtime_executable_before"]["version"] = "9.8.7"
+    report["runtime_executable_after"]["version"] = "9.8.7"
+    report["runtime_seal"]["python"]["version"] = [9, 8, 7]
+    dependencies["packages"][0]["version"] = "9.8.7"
+    command10 = report["commands"][9]
+    command10_value = json.loads(
+        (tmp_path / command10["stdout"]["file"]).read_bytes()
+    )
+    command10_value["inventory"]["packages"][0]["version"] = "9.8.7"
+    command10_value["inventory_sha256"] = hashlib.sha256(
+        artifact_audit._canonical_json_bytes(
+            command10_value["inventory"]
+        )
+    ).hexdigest()
+    _replace_preformal_v2_log(
+        tmp_path,
+        report=report,
+        source=source,
+        command_index=9,
+        stream="stdout",
+        payload=(
+            artifact_audit._canonical_json_bytes(command10_value) + b"\n"
+        ),
+    )
+    runtime_seal_path = Path(
+        report["input_files_before"]["runtime_seal"]["path"]
+    )
+    runtime_seal_payload = (
+        artifact_audit._canonical_json_bytes(report["runtime_seal"])
+        + b"\n"
+    )
+    runtime_seal_path.write_bytes(runtime_seal_payload)
+    for side in ("before", "after"):
+        report[f"input_files_{side}"]["runtime_seal"].update(
+            {
+                "bytes": len(runtime_seal_payload),
+                "sha256": hashlib.sha256(runtime_seal_payload).hexdigest(),
+            }
+        )
+    payload = _rewrite_preformal_v2_report(tmp_path, report, source)
+
+    artifact_audit._validate_preformal_test_report_v2(
+        payload,
+        root=tmp_path,
+        source=source,
+        dependencies=dependencies,
+        runtime=runtime,
+    )
+
+
 def test_v2_machine_test_receipt_rejects_changed_command(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1673,7 +1891,7 @@ def _preflight_package_fixture(
     (tmp_path / artifact_audit._PREFORMAL_REPORT_NAME).write_bytes(
         report_payload
     )
-    (tmp_path / "development-closure-v1.10.0.json").write_bytes(
+    (tmp_path / "development-closure-v1.11.0.json").write_bytes(
         closure_payload
     )
     audit_execution = {
@@ -1688,7 +1906,7 @@ def _preflight_package_fixture(
         "restart_runtime_path_descriptor_equal": True,
     }
     development = {
-        "closure_file": "development-closure-v1.10.0.json",
+        "closure_file": "development-closure-v1.11.0.json",
         "closure_sha256": hashlib.sha256(
             closure_payload
         ).hexdigest(),
@@ -1722,7 +1940,7 @@ def _preflight_package_fixture(
         "schema": "prospect.world-model-lifecycle.formal-binding.v9",
         "experiment_id": "WM-001",
         "assurance": dict(artifact_audit._ASSURANCE),
-        "protocol": {"version": "1.10.0"},
+        "protocol": {"version": "1.11.0"},
         "source": {
             "test_report_file": artifact_audit._PREFORMAL_REPORT_NAME,
         },
@@ -2312,7 +2530,7 @@ def _development_qualification_fixture(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "source": closure_source,
         "producer_root": ("/repo/bench/world_model_lifecycle/results/development/run"),
         **role_members,
@@ -2428,7 +2646,7 @@ def test_development_qualification_is_linked_field_for_field(
     preformal_runtime_seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -2471,6 +2689,22 @@ def test_development_qualification_is_linked_field_for_field(
         bound_audit_execution=bound_audit_execution,
         preformal_runtime_seal=preformal_runtime_seal,
     )
+
+    false_status = json.loads(payload)
+    false_status["engineering_verified"] = False
+    with pytest.raises(
+        artifact_audit.ArtifactAuditError,
+        match="closure differs from its binding",
+    ):
+        artifact_audit._validate_development_qualification(
+            artifact_audit._canonical_json_bytes(false_status) + b"\n",
+            block=block,
+            source=source,
+            dependencies=dependencies,
+            runtime=runtime,
+            bound_audit_execution=bound_audit_execution,
+            preformal_runtime_seal=preformal_runtime_seal,
+        )
 
     overstated_runtime_seal = {
         **preformal_runtime_seal,
@@ -2654,7 +2888,7 @@ def test_formal_input_preflight_runs_both_substantive_validators(
         "schema": "prospect.world-model-lifecycle.formal-binding.v9",
         "experiment_id": "WM-001",
         "assurance": dict(artifact_audit._ASSURANCE),
-        "protocol": {"version": "1.10.0"},
+        "protocol": {"version": "1.11.0"},
         "source": source,
         "dependencies": dependencies,
         "runtime": runtime,
@@ -3003,7 +3237,7 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
                 "schema": (
                     "prospect.wm001.restart-runtime-conformance.v1"
                 ),
-                "protocol_version": "1.10.0",
+                "protocol_version": "1.11.0",
                 "support_files": support_rows(outcome_supports),
                 "branches": {
                     "development": {

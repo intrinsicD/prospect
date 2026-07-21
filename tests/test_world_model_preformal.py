@@ -50,17 +50,87 @@ def _read_report(path: Path) -> dict[str, Any]:
     return value
 
 
+def _result_free_inventory() -> dict[str, object]:
+    root = {
+        "semantics_id": "prospect.wm001.package-root.v2",
+        "path": "/runtime/site-packages",
+        "file_count": 7,
+        "directory_count": 3,
+        "total_bytes": 70,
+        "inventory_sha256": "a" * 64,
+    }
+    return {
+        "packages": [
+            {
+                "name": "python",
+                "version": "3.12.0",
+                "distribution_sha256": "b" * 64,
+                "declared_file_count": 1,
+                "editable": False,
+            },
+            {
+                "name": "prospect",
+                "version": "0.1.0",
+                "distribution_sha256": "c" * 64,
+                "declared_file_count": 5,
+                "editable": False,
+            },
+        ],
+        "package_roots": [root],
+        "standard_library": {
+            "semantics_id": "prospect.wm001.standard-library.v2",
+            "path": "/runtime/stdlib",
+            "file_count": 11,
+            "directory_count": 4,
+            "total_bytes": 110,
+            "inventory_sha256": "d" * 64,
+        },
+        "package_ownership": {
+            "semantics_id": "prospect.wm001.package-ownership.v1",
+            "root": root["path"],
+            "file_count": root["file_count"],
+            "directory_count": root["directory_count"],
+            "shared_file_count": 0,
+            "identity_sha256": "e" * 64,
+        },
+    }
+
+
+def _fresh_identity_conformance() -> dict[str, object]:
+    return {
+        "schema": "prospect.wm001.fresh-runtime-identity-conformance.v1",
+        "experiment_id": "WM-001",
+        "protocol_version": "1.11.0",
+        "mode": "fresh-identity-conformance",
+        "challenge": "7" * 64,
+        "requesting_process_id": 101,
+        "verifier_process_id": 202,
+        "matrix_contract_sha256": (
+            preformal._DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        ),
+        "passed": True,
+    }
+
+
 def _runtime_conformance(
     device: str = "cpu",
 ) -> dict[str, object]:
+    inventory = _result_free_inventory()
+    fresh_identity = _fresh_identity_conformance()
     return {
         "schema": "prospect.wm001.preformal-runtime-check.v1",
         "mode": "bootstrap-inventory-conformance",
         "device": device,
         "passed": True,
-        "inventory_sha256": "1" * 64,
+        "inventory": inventory,
+        "inventory_sha256": hashlib.sha256(
+            preformal._canonical_json_bytes(inventory)
+        ).hexdigest(),
         "conformance_sha256": "2" * 64,
-        "fresh_runtime_identity_conformance_sha256": "9" * 64,
+        "fresh_runtime_identity_conformance": fresh_identity,
+        "fresh_runtime_identity_conformance_sha256": hashlib.sha256(
+            preformal._canonical_json_bytes(fresh_identity)
+        ).hexdigest(),
         "restart_runtime_conformance_report_sha256": "3" * 64,
         "restart_runtime_execution_receipt_sha256": "4" * 64,
         "restart_runtime_support_files": [
@@ -96,6 +166,157 @@ def _accepted_closure_evidence(
         "closure_outer_completion_sha256": hashlib.sha256(
             closure_completion.read_bytes()
         ).hexdigest(),
+    }
+
+
+def _development_closure(producer_root: Path) -> dict[str, object]:
+    member_digests = {
+        "evidence/audit-invocation.json": "a" * 64,
+        "evidence/audit-reproduction.json": "b" * 64,
+        "evidence/audit-runtime.json": "c" * 64,
+        "evidence/audit-stderr.log": "d" * 64,
+        "evidence/development-result-qualification.json": "e" * 64,
+        "evidence/independent-audit.json": "f" * 64,
+        "evidence/launch-bootstrap.py": "1" * 64,
+        "evidence/producer-bootstrap.py": "2" * 64,
+        "evidence/producer-runtime-seal.json": "3" * 64,
+        "producer/producer-manifest.json": "5" * 64,
+        "producer/result.json": "6" * 64,
+    }
+    archive_sha256 = "9" * 64
+    archive_file = (
+        f"development-qualification-{archive_sha256[:16]}.tar"
+    )
+    return {
+        "schema": "prospect.wm001.development-closure.v2",
+        "experiment_id": "WM-001",
+        "protocol_version": "1.11.0",
+        "source": {
+            "git_commit": "a" * 40,
+            "git_tree": "b" * 40,
+            "worktree_clean": True,
+            "dependency_lock_sha256": "1" * 64,
+            "producer_bootstrap_sha256": "2" * 64,
+            "launch_bootstrap_sha256": "3" * 64,
+            "runner_source_sha256": "4" * 64,
+            "auditor_source_sha256": "5" * 64,
+        },
+        "producer_root": str(producer_root),
+        "producer_manifest_member": (
+            "producer/producer-manifest.json"
+        ),
+        "raw_result_member": "producer/result.json",
+        "result_qualification_member": (
+            "evidence/development-result-qualification.json"
+        ),
+        "independent_audit_member": (
+            "evidence/independent-audit.json"
+        ),
+        "audit_reproduction_member": (
+            "evidence/audit-reproduction.json"
+        ),
+        "audit_runtime_manifest_member": (
+            "evidence/audit-runtime.json"
+        ),
+        "audit_invocation_manifest_member": (
+            "evidence/audit-invocation.json"
+        ),
+        "audit_stderr_member": "evidence/audit-stderr.log",
+        "producer_execution": {
+            "git_commit": "a" * 40,
+            "git_tree": "b" * 40,
+            "worktree_clean": True,
+            "dependency_lock_sha256": "1" * 64,
+            "python_executable": "/runtime/bin/python",
+            "python_executable_sha256": "4" * 64,
+            "python_version": "3.12.0",
+            "platform": "Linux-runtime",
+            "machine": "x86_64",
+            "device": "cpu",
+            "python_flags": dict(preformal._RUNTIME_FLAGS),
+            "process_environment": dict(_RUNTIME_ENVIRONMENT),
+            "accelerator": None,
+            "thread_count": 1,
+            "interop_thread_count": 1,
+            "cuda_runtime": None,
+            "cuda_driver": None,
+            "cublas_workspace_config": None,
+            "deterministic_algorithms": True,
+            "runtime_seal_sha256": "3" * 64,
+            "runtime_seal_descriptor_custody": True,
+            "producer_bootstrap_sha256": "2" * 64,
+            "bootstrap_descriptor_custody": True,
+            "package_roots": [
+                {
+                    "environment": "runtime-only",
+                    "packages": ["prospect", "torch"],
+                }
+            ],
+            "standard_library": {"environment": "runtime-only"},
+        },
+        "producer_custody": {
+            "runtime_seal_member": (
+                "evidence/producer-runtime-seal.json"
+            ),
+            "runtime_seal_sha256": "3" * 64,
+            "producer_bootstrap_member": (
+                "evidence/producer-bootstrap.py"
+            ),
+            "producer_bootstrap_sha256": "2" * 64,
+            "launch_bootstrap_member": (
+                "evidence/launch-bootstrap.py"
+            ),
+            "launch_bootstrap_sha256": "1" * 64,
+            "package_ownership": {"environment": "runtime-only"},
+        },
+        "audit_execution": {
+            "receipt_sha256": "b" * 64,
+            "runtime_manifest_sha256": "c" * 64,
+            "invocation_manifest_sha256": "a" * 64,
+            "stderr_sha256": "d" * 64,
+            "bootstrap_sha256": "2" * 64,
+            "runner_source_sha256": "7" * 64,
+            "auditor_source_sha256": "8" * 64,
+            "support_files": [
+                {
+                    "path": "producer_bootstrap.py",
+                    "bytes": 1,
+                    "sha256": "2" * 64,
+                },
+                {
+                    "path": "protocol.json",
+                    "bytes": 1,
+                    "sha256": "3" * 64,
+                },
+                {
+                    "path": "schemas/raw-result.schema.json",
+                    "bytes": 1,
+                    "sha256": "4" * 64,
+                },
+            ],
+            "source_mode": "descriptor",
+        },
+        "qualification_archive": {
+            "format": "ustar-uncompressed-v1",
+            "file": archive_file,
+            "canonical_path": (
+                "bench/world_model_lifecycle/results/development/"
+                f"{archive_file}"
+            ),
+            "bytes": 10_240,
+            "sha256": archive_sha256,
+            "members": [
+                {
+                    "path": path,
+                    "bytes": 1,
+                    "sha256": digest,
+                }
+                for path, digest in sorted(member_digests.items())
+            ],
+        },
+        "engineering_verified": True,
+        "audit_reproduced": True,
+        "performance_values_bound": False,
     }
 
 
@@ -144,7 +365,7 @@ def _review() -> dict[str, object]:
     return {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "implementation_files": [],
         "implementation_manifest_sha256": hashlib.sha256(b"[]").hexdigest(),
         "reviewer": {
@@ -162,7 +383,7 @@ def _runtime_seal(runtime_executable: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
             "tamper_resistant": False,
@@ -382,7 +603,7 @@ def _prepare_generation(
     *,
     failed_command: str | None = None,
 ) -> tuple[Path, list[str], dict[str, Path]]:
-    directory = tmp_path / "v1.10.0" / "preformal"
+    directory = tmp_path / "v1.11.0" / "preformal"
     monkeypatch.setattr(
         preformal,
         "PREFORMAL_REPORT_PATH",
@@ -396,7 +617,9 @@ def _prepare_generation(
     runtime_executable = Path(sys.executable)
     seal = _runtime_seal(runtime_executable)
     runtime_seal_path = _write_completed_runtime_seal(inputs, seal)
-    development_closure.write_bytes(_canonical({"development": "verified"}))
+    development_closure.write_bytes(
+        _canonical(_development_closure(inputs / "runtime-producer"))
+    )
     review_path.write_bytes(_canonical(_review()))
     closure_attempt = inputs / "development-closure-attempt"
     closure_attempt.mkdir()
@@ -447,12 +670,6 @@ def _prepare_generation(
         "verify_prospective_review",
         lambda path: dict(_review()),
     )
-    monkeypatch.setattr(
-        preformal,
-        "_verified_closure_member_digests",
-        lambda path: ({}, "5" * 64, "6" * 64),
-    )
-
     def run_command(
         specification: preformal.CommandSpec,
         *,
@@ -486,8 +703,7 @@ def _prepare_generation(
         )
         stderr = (
             b""
-            if specification.name
-            == "runtime-accepted-closure-evidence"
+            if specification.role == "runtime"
             else f"stderr:{specification.name}\n".encode()
         )
         return (
@@ -780,6 +996,26 @@ def test_generates_and_strictly_verifies_exact_preformal_evidence(
     assert report["all_pass"] is True
     assert report["qa_closure_before"] == report["qa_closure_after"]
     assert report["input_files_before"] == report["input_files_after"]
+    qa_packages = {
+        row["name"]
+        for row in report["qa_closure_before"]["distributions"]
+    }
+    command_10 = next(
+        row
+        for row in report["commands"]
+        if row["name"] == "runtime-bootstrap-inventory-conformance"
+    )
+    runtime_output = json.loads(
+        (
+            report_path.parent / command_10["stdout"]["file"]
+        ).read_bytes()
+    )
+    runtime_packages = {
+        row["name"] for row in runtime_output["inventory"]["packages"]
+    }
+    assert {"mypy", "pytest"} <= qa_packages
+    assert {"mypy", "pytest"}.isdisjoint(runtime_packages)
+    assert qa_packages != runtime_packages
     variables = {
         row["name"]: row["value"]
         for row in report["qa_environment"]["variables"]
@@ -794,6 +1030,89 @@ def test_generates_and_strictly_verifies_exact_preformal_evidence(
         if path.name.startswith(preformal.LOG_PREFIX)
     }
     assert len(logs) == 20
+
+
+def test_recorded_report_verifier_uses_explicit_qa_not_caller(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from bench.world_model_lifecycle import binding
+
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    _generate(report_path, inputs)
+    report = _read_report(report_path)
+    recorded_qa = report["qa_executable_before"]["invocation_path"]
+    original_identity = preformal._executable_identity
+    identity_paths: list[str] = []
+    closure_paths: list[str] = []
+
+    def explicit_identity(
+        path: str | Path | None = None,
+        *,
+        implementation: str | None = None,
+        version: str | None = None,
+    ) -> dict[str, object]:
+        if path is None:
+            raise AssertionError(
+                "recorded verifier consulted the caller executable"
+            )
+        identity_paths.append(str(path))
+        return original_identity(
+            path,
+            implementation=implementation,
+            version=version,
+        )
+
+    def explicit_closure(
+        *,
+        executable: str,
+        environment: dict[str, str],
+    ) -> dict[str, object]:
+        assert environment == preformal._environment_from_identity(
+            report["qa_environment"],
+            role="qa",
+        )
+        closure_paths.append(executable)
+        return _qa_closure()
+
+    monkeypatch.setattr(
+        preformal,
+        "_executable_identity",
+        explicit_identity,
+    )
+    monkeypatch.setattr(
+        preformal,
+        "_capture_qa_closure",
+        explicit_closure,
+    )
+
+    def forbidden_ambient_inventory(
+        *_args: object,
+        **_kwargs: object,
+    ) -> object:
+        raise AssertionError(
+            "recorded verifier re-entered an ambient runtime inventory API"
+        )
+
+    for name in (
+        "installed_package_rows",
+        "package_roots",
+        "verify_development_closure",
+        "verify_lockfile_rows",
+    ):
+        monkeypatch.setattr(
+            binding,
+            name,
+            forbidden_ambient_inventory,
+        )
+
+    assert (
+        preformal.verify_recorded_preformal_report(report_path)["all_pass"]
+        is True
+    )
+    assert identity_paths
+    assert set(identity_paths) == {recorded_qa}
+    assert closure_paths == [recorded_qa]
 
 
 def test_preformal_generation_and_verification_reject_same_name_siblings(
@@ -872,8 +1191,11 @@ def test_verifier_rejects_changed_qa_closure_and_runtime_input(
     ("field", "replacement"),
     (
         ("passed", False),
+        ("development_closure_sha256", "4" * 64),
         ("producer_manifest_sha256", "7" * 64),
         ("raw_result_sha256", "8" * 64),
+        ("closure_attempt_manifest_sha256", "9" * 64),
+        ("closure_outer_completion_sha256", "a" * 64),
     ),
 )
 def test_verifier_semantically_rejects_mutated_accepted_closure_stdout(
@@ -914,6 +1236,175 @@ def test_verifier_semantically_rejects_mutated_accepted_closure_stdout(
     with pytest.raises(
         preformal.PreformalEvidenceError,
         match="accepted_closure_semantics_failed",
+    ):
+        preformal.verify_preformal_report(report_path)
+
+
+def test_qa_closure_parser_rejects_digest_role_and_member_mutations(
+    tmp_path: Path,
+) -> None:
+    pristine = _development_closure(tmp_path / "runtime-producer")
+
+    mutations: list[tuple[str, Any]] = []
+
+    invalid_digest = json.loads(json.dumps(pristine))
+    invalid_digest["qualification_archive"]["members"][0][
+        "sha256"
+    ] = "z" * 64
+    mutations.append(("digest", invalid_digest))
+
+    unsafe_role = json.loads(json.dumps(pristine))
+    unsafe_role["audit_runtime_manifest_member"] = (
+        "evidence/../audit-runtime.json"
+    )
+    mutations.append(("role", unsafe_role))
+
+    missing_member = json.loads(json.dumps(pristine))
+    missing_member["qualification_archive"]["members"] = [
+        row
+        for row in missing_member["qualification_archive"]["members"]
+        if row["path"] != "producer/result.json"
+    ]
+    mutations.append(("member", missing_member))
+
+    unordered = json.loads(json.dumps(pristine))
+    unordered["qualification_archive"]["members"].reverse()
+    mutations.append(("order", unordered))
+
+    for name, closure in mutations:
+        path = tmp_path / f"{name}.json"
+        path.write_bytes(_canonical(closure))
+        with pytest.raises(preformal.PreformalEvidenceError):
+            preformal._verified_closure_member_digests(path)
+
+
+def test_qa_closure_parser_never_reenters_runtime_inventory_verifier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from bench.world_model_lifecycle import binding
+
+    closure = _development_closure(tmp_path / "runtime-producer")
+    execution = closure["producer_execution"]
+    assert isinstance(execution, dict)
+    roots = execution["package_roots"]
+    assert isinstance(roots, list)
+    assert "pytest" not in json.dumps(roots)
+    assert preformal.importlib.metadata.version("pytest")
+    path = tmp_path / "development-closure.json"
+    path.write_bytes(_canonical(closure))
+
+    def forbidden_runtime_reentry(_path: Path) -> dict[str, object]:
+        raise AssertionError("QA parser re-entered runtime inventory verifier")
+
+    monkeypatch.setattr(
+        binding,
+        "verify_development_closure",
+        forbidden_runtime_reentry,
+    )
+
+    parsed, manifest_sha256, result_sha256 = (
+        preformal._verified_closure_member_digests(path)
+    )
+    assert parsed == closure
+    assert manifest_sha256 == "5" * 64
+    assert result_sha256 == "6" * 64
+
+
+def test_command_10_semantics_require_empty_stderr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    _generate(report_path, inputs)
+    report = _read_report(report_path)
+    row = next(
+        item
+        for item in report["commands"]
+        if item["name"]
+        == "runtime-bootstrap-inventory-conformance"
+    )
+    old_path = report_path.parent / row["stderr"]["file"]
+    payload = b"unexpected runtime diagnostic\n"
+    digest = hashlib.sha256(payload).hexdigest()
+    new_name = preformal._log_filename(
+        row["ordinal"],
+        row["name"],
+        "stderr",
+        digest,
+    )
+    (report_path.parent / new_name).write_bytes(payload)
+    old_path.unlink()
+    row["stderr"] = {
+        "file": new_name,
+        "bytes": len(payload),
+        "sha256": digest,
+    }
+    _rewrite_report(report_path, report)
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="runtime_conformance_semantics_failed",
+    ):
+        preformal.verify_preformal_report(report_path)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("inventory-structure", "inventory-digest", "fresh-report"),
+)
+def test_command_10_semantics_reject_recorded_identity_mutations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+    _generate(report_path, inputs)
+    report = _read_report(report_path)
+    row = next(
+        item
+        for item in report["commands"]
+        if item["name"]
+        == "runtime-bootstrap-inventory-conformance"
+    )
+    old_path = report_path.parent / row["stdout"]["file"]
+    value = json.loads(old_path.read_bytes())
+    if mutation == "inventory-structure":
+        value["inventory"]["package_ownership"]["file_count"] += 1
+        value["inventory_sha256"] = hashlib.sha256(
+            preformal._canonical_json_bytes(value["inventory"])
+        ).hexdigest()
+    elif mutation == "inventory-digest":
+        value["inventory_sha256"] = "f" * 64
+    else:
+        value["fresh_runtime_identity_conformance"]["passed"] = False
+        value["fresh_runtime_identity_conformance_sha256"] = (
+            hashlib.sha256(
+                preformal._canonical_json_bytes(
+                    value["fresh_runtime_identity_conformance"]
+                )
+            ).hexdigest()
+        )
+    payload = _canonical(value)
+    digest = hashlib.sha256(payload).hexdigest()
+    new_name = preformal._log_filename(
+        row["ordinal"],
+        row["name"],
+        "stdout",
+        digest,
+    )
+    (report_path.parent / new_name).write_bytes(payload)
+    old_path.unlink()
+    row["stdout"] = {
+        "file": new_name,
+        "bytes": len(payload),
+        "sha256": digest,
+    }
+    _rewrite_report(report_path, report)
+
+    with pytest.raises(
+        preformal.PreformalEvidenceError,
+        match="runtime_conformance_semantics_failed",
     ):
         preformal.verify_preformal_report(report_path)
 
@@ -1115,6 +1606,88 @@ def test_generate_report_cli_truthfully_rejects_semantic_runtime_output(
     assert report["all_pass"] is False
 
 
+@pytest.mark.parametrize(
+    ("verifier_name", "failure_id"),
+    (
+        (
+            "_accepted_closure_evidence_from_report",
+            "accepted_closure_semantics_failed",
+        ),
+        (
+            "_runtime_bootstrap_conformance_from_report",
+            "runtime_conformance_semantics_failed",
+        ),
+    ),
+)
+def test_unexpected_semantic_exception_becomes_exact_failed_report_and_envelope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    verifier_name: str,
+    failure_id: str,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+
+    def unexpected_failure(
+        directory: Path,
+        report: object,
+    ) -> dict[str, object]:
+        raise RuntimeError("injected QA/runtime inventory mismatch")
+
+    monkeypatch.setattr(
+        preformal,
+        verifier_name,
+        unexpected_failure,
+    )
+
+    exit_code = preformal.main(
+        [
+            "generate-report",
+            "--output",
+            str(report_path),
+            "--runtime-executable",
+            str(inputs["runtime_executable"]),
+            "--runtime-seal",
+            str(inputs["runtime_seal"]),
+            "--development-closure",
+            str(inputs["development_closure"]),
+            "--closure-attempt",
+            str(inputs["closure_attempt"]),
+            "--prospective-review",
+            str(inputs["prospective_review"]),
+        ]
+    )
+    envelope = json.loads(capsys.readouterr().out)
+    report = _read_report(report_path)
+
+    assert exit_code == 1
+    assert report["all_pass"] is False
+    assert envelope["passed"] is False
+    assert envelope["failed_commands"] == []
+    assert envelope["failed_checks"] == [failure_id]
+
+
+def test_semantic_checks_do_not_swallow_keyboard_interrupt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path, _, inputs = _prepare_generation(tmp_path, monkeypatch)
+
+    def interrupted(
+        directory: Path,
+        report: object,
+    ) -> dict[str, object]:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        preformal,
+        "_accepted_closure_evidence_from_report",
+        interrupted,
+    )
+    with pytest.raises(KeyboardInterrupt):
+        _generate(report_path, inputs)
+
+
 def test_public_runtime_parser_excludes_obsolete_development_evidence(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -1137,14 +1710,43 @@ def test_versioned_preformal_bundle_ignores_retained_prior_version_evidence(
 ) -> None:
     legacy_root = tmp_path / "development"
     legacy_root.mkdir()
-    (legacy_root / "preformal-test-report-v1.9.0.json").write_text(
+    legacy_report = (
+        legacy_root / "preformal-test-report-v1.10.0.json"
+    )
+    legacy_report.write_text(
         "{}\n",
         encoding="utf-8",
     )
-    (legacy_root / "preformal-v1.9.0-command-01.stdout.legacy.log").write_bytes(
+    legacy_log = (
+        legacy_root
+        / "preformal-v1.10.0-command-01.stdout.legacy.log"
+    )
+    legacy_log.write_bytes(
         b"retained failure evidence"
     )
-    bundle_root = legacy_root / "v1.10.0" / "preformal"
+    legacy_link = legacy_root / "retained-report-completion.json"
+    os.link(legacy_report, legacy_link)
+
+    def legacy_fingerprint() -> list[tuple[object, ...]]:
+        rows: list[tuple[object, ...]] = []
+        for path in (legacy_report, legacy_log, legacy_link):
+            metadata = path.stat()
+            payload = path.read_bytes()
+            rows.append(
+                (
+                    path.name,
+                    metadata.st_dev,
+                    metadata.st_ino,
+                    metadata.st_mode,
+                    metadata.st_nlink,
+                    metadata.st_size,
+                    hashlib.sha256(payload).hexdigest(),
+                )
+            )
+        return rows
+
+    before = legacy_fingerprint()
+    bundle_root = legacy_root / "v1.11.0" / "preformal"
     bundle_root.parent.mkdir(parents=True)
     fixture_root = tmp_path / "fixture"
     fixture_root.mkdir()
@@ -1167,7 +1769,8 @@ def test_versioned_preformal_bundle_ignores_retained_prior_version_evidence(
         == bundle_root / preformal.REPORT_NAME
     )
     assert report_path.parent != bundle_root
-    assert (legacy_root / "preformal-test-report-v1.9.0.json").is_file()
+    assert legacy_fingerprint() == before
+    assert os.path.samefile(legacy_report, legacy_link)
 
 
 def test_dirty_worktree_blocks_before_any_command_or_file(
@@ -1203,7 +1806,7 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     review = {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -1236,15 +1839,15 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
         preformal.verify_prospective_review(path)
 
 
-def test_prospective_manifest_binds_v1100_plan_and_runbook() -> None:
+def test_prospective_manifest_binds_v1110_plan_and_runbook() -> None:
     paths = {
         str(row["path"])
         for row in preformal._implementation_files()
     }
 
     assert {
-        "docs/wm001-v1100-confirmation-plan.md",
-        "docs/wm001-v1100-operator-runbook.md",
+        "docs/wm001-v1110-confirmation-plan.md",
+        "docs/wm001-v1110-operator-runbook.md",
     } <= paths
 
 
@@ -1425,7 +2028,7 @@ def test_fresh_closure_reopen_executes_inherited_seal_descriptors(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "mode": "fresh-closure-reopen",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -1518,32 +2121,17 @@ def test_fresh_closure_reopen_validator_uses_archive_member_digests(
     from bench.world_model_lifecycle import binding
 
     closure_path = tmp_path / "development-closure.json"
-    closure_payload = _canonical({"fixture": "closure"})
+    closure = _development_closure(tmp_path / "runtime-producer")
+    closure_payload = _canonical(closure)
     closure_path.write_bytes(closure_payload)
-    manifest_sha256 = "a" * 64
-    result_sha256 = "b" * 64
-    closure = {
-        "producer_manifest_member": "producer/producer-manifest.json",
-        "raw_result_member": "producer/result.json",
-        "qualification_archive": {
-            "members": [
-                {
-                    "path": "producer/producer-manifest.json",
-                    "sha256": manifest_sha256,
-                },
-                {
-                    "path": "producer/result.json",
-                    "sha256": result_sha256,
-                },
-            ],
-        },
-    }
+    manifest_sha256 = "5" * 64
+    result_sha256 = "6" * 64
     report = {
         "schema": (
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "mode": "fresh-closure-reopen",
         "challenge": "7" * 64,
         "requesting_process_id": 101,
@@ -1557,21 +2145,11 @@ def test_fresh_closure_reopen_validator_uses_archive_member_digests(
         "passed": True,
     }
     monkeypatch.setattr(
-        preformal,
-        "_canonical_existing_file",
-        lambda path, *, label: path,
-    )
-    monkeypatch.setattr(
-        preformal,
-        "_file_identity",
-        lambda path, *, label, expected_nlink: {
-            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        },
-    )
-    monkeypatch.setattr(
         binding,
         "verify_development_closure",
-        lambda path: closure,
+        lambda path: pytest.fail(
+            "fresh report QA validation re-entered runtime verifier"
+        ),
     )
     monkeypatch.setattr(
         binding,
@@ -1610,7 +2188,7 @@ def test_fresh_identity_conformance_uses_nested_descriptor_child(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "mode": "fresh-identity-conformance",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -1888,7 +2466,7 @@ def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.10.0",
+        "protocol_version": "1.11.0",
         "mode": "fresh-identity-conformance",
         "challenge": "7" * 64,
         "requesting_process_id": 101,
