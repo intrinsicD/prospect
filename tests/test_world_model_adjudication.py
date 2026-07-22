@@ -14,6 +14,7 @@ import pytest
 
 from bench.world_model_lifecycle import adjudication, producer_bootstrap
 from bench.world_model_lifecycle import operator as operator_module
+from bench.world_model_lifecycle import rehearsal as rehearsal_module
 from bench.world_model_lifecycle.adjudication import (
     ADJUDICATION_CLAIM_NAME,
     ADJUDICATION_MANIFEST_NAME,
@@ -45,6 +46,29 @@ def _canonical(value: object) -> bytes:
 
 def _digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _fixture_rehearsal_identity(
+    binding_path: Path,
+) -> dict[str, dict[str, object]]:
+    binding_sha256 = _digest(binding_path.read_bytes())
+    root = binding_path.parent / "accepted-binding-rehearsal" / binding_sha256
+
+    def row(name: str, payload: bytes) -> dict[str, object]:
+        return {
+            "path": str(root / name),
+            "bytes": len(payload),
+            "sha256": _digest(payload),
+        }
+
+    claim = f"claim:{binding_sha256}".encode("ascii")
+    terminal = f"terminal:{binding_sha256}".encode("ascii")
+    return {
+        "claim": row("rehearsal-claim.json", claim),
+        "claim_marker": row(f"accepted-binding-{binding_sha256}.json", claim),
+        "terminal": row("rehearsal-terminal.json", terminal),
+        "outer_completion": row("outer-completion.json", terminal),
+    }
 
 
 def _write(path: Path, value: object) -> bytes:
@@ -132,7 +156,7 @@ class Harness:
         claim = {
             "schema": "prospect.wm001.formal-audit-claim.v1",
             "experiment_id": "WM-001",
-            "protocol_version": "1.16.0",
+            "protocol_version": "1.17.0",
             "claim_status": "consumed",
             "attempt_path": str(self.audit_attempt),
             "marker_path": str(self.audit_claim_marker),
@@ -238,7 +262,7 @@ class Harness:
             failure = {
                 "schema": "prospect.wm001.operator-execution-failure.v2",
                 "experiment_id": "WM-001",
-                "protocol_version": "1.16.0",
+                "protocol_version": "1.17.0",
                 "kind": "audit",
                 "lane": "formal",
                 "phase": "audit_execution",
@@ -271,7 +295,7 @@ class Harness:
         manifest = {
             "schema": "prospect.wm001.operator-attempt.v1",
             "experiment_id": "WM-001",
-            "protocol_version": "1.16.0",
+            "protocol_version": "1.17.0",
             "assurance": adjudication.assurance_record(),
             "kind": "audit",
             "lane": "formal",
@@ -317,7 +341,7 @@ class Harness:
             "fatal_findings": ([{"code": "terminal-rejection"}] if disposition == "rejected" else []),
             "conclusion": "fixture semantic review",
         }
-        return_path = self.tmp_path / "artifacts" / "wm001-reviews" / "formal-v1.16.0.json"
+        return_path = self.tmp_path / "artifacts" / "wm001-reviews" / "formal-v1.17.0.json"
         _write(return_path, review)
         return return_path
 
@@ -430,7 +454,10 @@ def harness(
         },
     }
     binding_payload = _canonical(binding)
-    launch = {"schema": "prospect.wm001.formal-launch.v2"}
+    launch = {
+        "schema": "prospect.wm001.formal-launch.v3",
+        "accepted_binding_rehearsal": {},
+    }
     launch_payload = _canonical(launch)
     upstream = adjudication._Upstream(
         root=producer,
@@ -448,11 +475,11 @@ def harness(
         source_payloads=source_payloads,
         bootstrap_payload=bootstrap_payload,
     )
-    audit_attempt = tmp_path / "operator" / "audits" / "formal-audit-v1.16.0"
-    audit_claim = tmp_path / "formal" / "formal-audit-v1.16.0.json"
-    package = tmp_path / "adjudication" / "formal-adjudication-v1.16.0"
-    adjudication_marker = tmp_path / "formal" / "formal-adjudication-v1.16.0.json"
-    outer_root = tmp_path / "outer-completions" / "v1.16"
+    audit_attempt = tmp_path / "operator" / "audits" / "formal-audit-v1.17.0"
+    audit_claim = tmp_path / "formal" / "formal-audit-v1.17.0.json"
+    package = tmp_path / "adjudication" / "formal-adjudication-v1.17.0"
+    adjudication_marker = tmp_path / "formal" / "formal-adjudication-v1.17.0.json"
+    outer_root = tmp_path / "outer-completions" / "v1.17"
     value = Harness(
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
@@ -477,7 +504,7 @@ def harness(
     monkeypatch.setattr(
         adjudication,
         "FORMAL_SEMANTIC_REVIEW_PATH",
-        tmp_path / "artifacts" / "wm001-reviews" / "formal-v1.16.0.json",
+        tmp_path / "artifacts" / "wm001-reviews" / "formal-v1.17.0.json",
     )
     monkeypatch.setattr(operator_module, "FORMAL_AUDIT_ATTEMPT_PATH", audit_attempt)
     monkeypatch.setattr(operator_module, "FORMAL_AUDIT_CLAIM_MARKER", audit_claim)
@@ -526,7 +553,7 @@ def cast_dict(value: Any) -> dict[str, Any]:
     return value
 
 
-def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
+def test_launch_v3_authenticates_binding_attempt_and_accepted_rehearsal(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -541,9 +568,9 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
 
     repo = tmp_path / "repo"
     lifecycle = repo / "bench" / "world_model_lifecycle"
-    binding_root = lifecycle / "results" / "operator-v1.16" / "bindings"
-    binding_attempt = binding_root / "formal-binding-v1.16.0"
-    completion_root = lifecycle / "results" / "outer-completions" / "v1.16"
+    binding_root = lifecycle / "results" / "operator-v1.17" / "bindings"
+    binding_attempt = binding_root / "formal-binding-v1.17.0"
+    completion_root = lifecycle / "results" / "outer-completions" / "v1.17"
     binding_root.mkdir(parents=True)
     monkeypatch.setattr(operator_module, "REPO", repo)
     monkeypatch.setattr(adjudication, "REPO", repo)
@@ -616,6 +643,11 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
     )
     operator_module.verify_operator_attempt(binding_attempt)
     terminal_payload = binding_terminal.read_bytes()
+    monkeypatch.setattr(
+        rehearsal_module,
+        "accepted_binding_rehearsal_identity",
+        _fixture_rehearsal_identity,
+    )
 
     binding_sha256 = _digest(binding_payload)
     producer = (
@@ -631,9 +663,9 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
     copied_attempt.write_bytes(terminal_payload)
     copied_completion.write_bytes(terminal_payload)
     record: dict[str, object] = {
-        "schema": "prospect.wm001.formal-launch.v2",
+        "schema": "prospect.wm001.formal-launch.v3",
         "experiment_id": "WM-001",
-        "protocol_version": "1.16.0",
+        "protocol_version": "1.17.0",
         "formal_binding_sha256": binding_sha256,
         "formal_binding_attempt_path": str(binding_attempt),
         "formal_binding_attempt_manifest_file": (FORMAL_BINDING_ATTEMPT_MANIFEST_NAME),
@@ -641,6 +673,9 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
         "formal_binding_outer_completion_file": (FORMAL_BINDING_OUTER_COMPLETION_NAME),
         "formal_binding_outer_completion_marker": str(binding_completion),
         "formal_binding_outer_completion_sha256": _digest(terminal_payload),
+        "accepted_binding_rehearsal": _fixture_rehearsal_identity(
+            binding_attempt / "formal-binding.json"
+        ),
         "attempt_directory": producer.name,
         "global_marker_file": FORMAL_LAUNCH_MARKER_NAME,
         "claimed_at_utc": "2026-07-19T00:00:00Z",
@@ -681,10 +716,34 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
 
     assert launch == record
     assert payload == launch_payload
+
+    def reject_rehearsal(_path: Path) -> dict[str, dict[str, object]]:
+        raise rehearsal_module.RehearsalEvidenceError("failed rehearsal")
+
+    monkeypatch.setattr(
+        rehearsal_module,
+        "accepted_binding_rehearsal_identity",
+        reject_rehearsal,
+    )
+    with pytest.raises(
+        AdjudicationError,
+        match="accepted outer-finalized binding rehearsal",
+    ):
+        adjudication._verify_launch(  # noqa: SLF001
+            root=producer,
+            producer_manifest=producer_manifest,
+            result=result,
+            binding_payload=binding_payload,
+        )
+    monkeypatch.setattr(
+        rehearsal_module,
+        "accepted_binding_rehearsal_identity",
+        _fixture_rehearsal_identity,
+    )
     copied_completion.write_bytes(b"forged completion\n")
     with pytest.raises(
         AdjudicationError,
-        match="unique v1.16 launch record",
+        match="unique v1.17 launch record",
     ):
         adjudication._verify_launch(  # noqa: SLF001
             root=producer,
@@ -693,6 +752,66 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
             binding_payload=binding_payload,
         )
     copied_completion.write_bytes(terminal_payload)
+
+    launch_row = next(
+        row
+        for row in producer_manifest["files"]
+        if row["path"] == "formal-launch.json"
+    )
+    other_binding = tmp_path / "other-binding.json"
+    other_binding.write_bytes(b"other canonical binding bytes\n")
+    for mutation in (
+        "missing-role",
+        "extra-role",
+        "path",
+        "boolean-bytes",
+        "sha256",
+        "cross-binding",
+    ):
+        mutated_record = json.loads(json.dumps(record))
+        identity = mutated_record["accepted_binding_rehearsal"]
+        assert isinstance(identity, dict)
+        if mutation == "missing-role":
+            del identity["claim_marker"]
+        elif mutation == "extra-role":
+            identity["unbound"] = identity["claim"]
+        elif mutation == "cross-binding":
+            mutated_record["accepted_binding_rehearsal"] = (
+                _fixture_rehearsal_identity(other_binding)
+            )
+        else:
+            terminal_identity = identity["terminal"]
+            assert isinstance(terminal_identity, dict)
+            if mutation == "path":
+                terminal_identity["path"] = f"{terminal_identity['path']}.alias"
+            elif mutation == "boolean-bytes":
+                terminal_identity["bytes"] = True
+            else:
+                terminal_identity["sha256"] = "f" * 64
+        mutated_body = dict(mutated_record)
+        mutated_body.pop("record_sha256")
+        mutated_record["record_sha256"] = _digest(
+            _canonical(mutated_body)[:-1]
+        )
+        mutated_payload = _canonical(mutated_record)
+        launch_path.write_bytes(mutated_payload)
+        result["execution"]["formal_launch_sha256"] = _digest(mutated_payload)
+        launch_row["bytes"] = len(mutated_payload)
+        launch_row["sha256"] = _digest(mutated_payload)
+        with pytest.raises(
+            AdjudicationError,
+            match="unique v1.17 launch record",
+        ):
+            adjudication._verify_launch(  # noqa: SLF001
+                root=producer,
+                producer_manifest=producer_manifest,
+                result=result,
+                binding_payload=binding_payload,
+            )
+    launch_path.write_bytes(launch_payload)
+    result["execution"]["formal_launch_sha256"] = _digest(launch_payload)
+    launch_row["bytes"] = len(launch_payload)
+    launch_row["sha256"] = _digest(launch_payload)
 
     sibling = producer.with_name("wrong-child")
     producer.rename(sibling)
@@ -709,17 +828,12 @@ def test_launch_v2_authenticates_real_outer_finalized_binding_attempt(
     result["execution"]["formal_launch_sha256"] = _digest(
         mutated_launch_payload,
     )
-    launch_row = next(
-        row
-        for row in producer_manifest["files"]
-        if row["path"] == "formal-launch.json"
-    )
     launch_row["bytes"] = len(mutated_launch_payload)
     launch_row["sha256"] = _digest(mutated_launch_payload)
 
     with pytest.raises(
         AdjudicationError,
-        match="unique v1.16 launch record",
+        match="unique v1.17 launch record",
     ):
         adjudication._verify_launch(  # noqa: SLF001
             root=sibling,
@@ -963,7 +1077,7 @@ def test_preclaim_staging_mutation_does_not_consume_or_replay(
     assert not harness.adjudication_marker.exists()
     assert harness.replay_calls == []
     assert not harness.package.exists()
-    assert list(harness.package.parent.glob(".formal-adjudication-v1.16.0.staging-*")) == []
+    assert list(harness.package.parent.glob(".formal-adjudication-v1.17.0.staging-*")) == []
 
 
 def test_crash_after_claim_consumes_version_without_replay(
@@ -1262,7 +1376,7 @@ def test_marker_only_explicit_recovery_is_zero_replay_and_single_use(
     with pytest.raises(KeyboardInterrupt):
         harness.create(review, "accepted")
 
-    holders = list(harness.package.parent.glob(".formal-adjudication-v1.16.0.staging-*/" + ADJUDICATION_CLAIM_NAME))
+    holders = list(harness.package.parent.glob(".formal-adjudication-v1.17.0.staging-*/" + ADJUDICATION_CLAIM_NAME))
     assert len(holders) == 1
     shutil.rmtree(holders[0].parent)
     assert harness.adjudication_marker.stat().st_nlink == 1
@@ -1300,7 +1414,7 @@ def test_recovery_cli_is_zero_replay_and_outer_finalizes(
     verify_adjudication_package(harness.package)
 
 
-def test_older_marker_does_not_consume_v116(harness: Harness) -> None:
+def test_older_marker_does_not_consume_v117(harness: Harness) -> None:
     harness.make_attempt()
     review = harness.review(disposition="accepted")
     harness.install_replay()

@@ -34,6 +34,7 @@ typecheck-runtime:
 >   bench/world_model_lifecycle/operator.py \
 >   bench/world_model_lifecycle/preformal.py \
 >   bench/world_model_lifecycle/producer_bootstrap.py \
+>   bench/world_model_lifecycle/rehearsal.py \
 >   bench/world_model_lifecycle/restore_eval.py \
 >   bench/world_model_lifecycle/run.py
 
@@ -44,7 +45,7 @@ epistemic-gate:
 > PYTHONPATH=src python -m bench.epistemic.run_maturity
 
 wm001-development:
-> @echo "Direct WM-001 entry is disabled; use docs/wm001-v1160-operator-runbook.md" >&2
+> @echo "Direct WM-001 entry is disabled; use docs/wm001-v1170-operator-runbook.md" >&2
 > @exit 2
 
 check: lint typecheck test epistemic-diagnostics

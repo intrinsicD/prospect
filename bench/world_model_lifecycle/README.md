@@ -18,17 +18,18 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.16.0 is terminally retired. It preserved the exact v1.4 model,
+Protocol 1.17.0 is the active prospective candidate. It preserves the exact
+v1.4 model,
 learning algorithm, optimizer, planner, controller, budgets, controls, metrics,
-thresholds, and K0–K7 order; separated bounded control parsing from streamed
-bulk custody; and terminal-bound the archived result qualification. It passed
-every authenticated gate through an accepted binding; the operator-recorded
-final stop/go also passed. Its operator-observed exact pre-root accepted-binding
-rehearsal then rejected the real audit terminal because the
-standard-library consumer required a stale fixed reproduction-runtime filename
-instead of the terminal's receipt-linked content-addressed filename. The gate
-failed before child dispatch or formal-root creation, so no formal authority or
-outcome exists. No successor protocol is active. Protocol 1.5 is retired
+thresholds, and K0–K7 order. Its evidence repair follows the authenticated
+audit-reproduction receipt for all content-addressed sidecars, exercises the
+real 15-member audit package across producer and consumers, and places the
+accepted-binding inventory rehearsal behind a single-use claim and
+outer-finalized terminal. Formal-launch v3 binds the accepted rehearsal's live
+claim and completion identities under held custody. The plan and runbook are
+prospective; no v1.17 development or formal outcome exists yet. Protocol 1.16
+is terminally retired after its pre-root rehearsal exposed the stale fixed
+runtime-sidecar consumer predicate described below. Protocol 1.5 is retired
 after its sole outcome-producing development qualification found that
 Gymnasium's lazy import added two unsealed process variables. That producer
 has no result, outer completion, development closure, binding, or formal
@@ -170,6 +171,11 @@ content-addressed reproduction-runtime sidecar; the standard-library consumer
 instead hardcoded the execution-capture filename. No formal marker or outcome
 exists. Its disposition is preserved in the
 [v1.16 accepted-binding rehearsal failure](../../docs/wm001-v1160-accepted-binding-rehearsal-failure.md).
+The active prospective repair is the
+[v1.17 confirmation plan](../../docs/wm001-v1170-confirmation-plan.md), with its
+one-shot sequence in the
+[v1.17 operator runbook](../../docs/wm001-v1170-operator-runbook.md). It has no
+development or formal outcome yet.
 Protocol 1.15.0 passed its result-free rehearsal, development, accepted audit,
 closure, sealed-runtime reopen, preformal report, accepted binding, and the
 operator-recorded final stop/go gate. The sole formal invocation then returned

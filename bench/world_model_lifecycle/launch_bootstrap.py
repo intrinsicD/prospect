@@ -29,16 +29,14 @@ _FORMAL_BINDING_SCHEMA = "prospect.world-model-lifecycle.formal-binding.v10"
 _OPERATOR_ATTEMPT_SCHEMA = "prospect.wm001.operator-attempt.v1"
 _OPERATOR_TERMINAL = "operator-attempt.json"
 _CLOSURE_REFERENCE_SCHEMA = "prospect.wm001.closure-reference.v1"
-_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.16.0.json"
-_PREFORMAL_LOG_PREFIX = "preformal-v1.16.0-command-"
+_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.17.0.json"
+_PREFORMAL_LOG_PREFIX = "preformal-v1.17.0-command-"
 _SHA256_EMPTY = hashlib.sha256(b"").hexdigest()
 _UTC_TIMESTAMP = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
     r"[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?Z$"
 )
-_DEVELOPMENT_MATRIX_CONTRACT_SHA256 = (
-    "09a232a4a58c2690665cbef928936b49fbb28d7134405c8eb696a63371591b84"
-)
+_DEVELOPMENT_MATRIX_CONTRACT_SHA256 = "09a232a4a58c2690665cbef928936b49fbb28d7134405c8eb696a63371591b84"
 _PREFORMAL_COMMAND_NAMES = (
     "protocol-seal-continuity",
     "ruff",
@@ -52,12 +50,19 @@ _PREFORMAL_COMMAND_NAMES = (
     "runtime-bootstrap-inventory-conformance",
 )
 _FORMAL_INPUT_PREFLIGHT_NAME = "formal-input-preflight.json"
-_DEVELOPMENT_RESULT_QUALIFICATION_NAME = (
-    "development-result-qualification.json"
-)
-_FORMAL_INPUT_PREFLIGHT_SCHEMA = (
-    "prospect.wm001.formal-input-preflight.v1"
-)
+_DEVELOPMENT_RESULT_QUALIFICATION_NAME = "development-result-qualification.json"
+_FORMAL_INPUT_PREFLIGHT_SCHEMA = "prospect.wm001.formal-input-preflight.v1"
+_REHEARSAL_CLAIM_SCHEMA = "prospect.wm001.accepted-binding-rehearsal-claim.v1"
+_REHEARSAL_TERMINAL_SCHEMA = "prospect.wm001.accepted-binding-rehearsal-terminal.v1"
+_REHEARSAL_CLAIM_NAME = "rehearsal-claim.json"
+_REHEARSAL_TERMINAL_NAME = "rehearsal-terminal.json"
+_REHEARSAL_STDOUT_NAME = "rehearsal.stdout.json"
+_REHEARSAL_STDERR_NAME = "rehearsal.stderr.log"
+_REHEARSAL_OUTER_RECEIPT_NAME = "rehearsal.outer-receipt.json"
+_REHEARSAL_CHILD_STARTED_NAME = ".child-started"
+_REHEARSAL_TERMINAL_STAGING_NAME = ".rehearsal-terminal.staging"
+_MAX_REHEARSAL_STDOUT_BYTES = 1 << 20
+_MAX_REHEARSAL_STDERR_BYTES = 1 << 20
 _RUNTIME_SEAL_FIELDS = {
     "schema",
     "experiment_id",
@@ -74,7 +79,7 @@ _RUNTIME_SEAL_FIELDS = {
     "package_roots",
     "package_ownership",
 }
-_DEVELOPMENT_SEEDS = (3922749719, 1847570536)
+_DEVELOPMENT_SEEDS = (3454397035, 2131905789)
 _ASSURANCE: dict[str, object] = {
     "trust_model_id": "prospect.wm001.trust-model.v1",
     "tamper_resistant": False,
@@ -162,10 +167,7 @@ def _sanitize_module_search_path() -> tuple[str, ...]:
 
     stdlib_root = Path(sysconfig.get_path("stdlib"))
     _reject_symlink_components(stdlib_root, label="standard-library root")
-    if (
-        not stdlib_root.is_dir()
-        or stdlib_root.resolve(strict=True) != stdlib_root
-    ):
+    if not stdlib_root.is_dir() or stdlib_root.resolve(strict=True) != stdlib_root:
         raise LaunchError("standard-library root must be one canonical directory")
     authorized: set[Path] = set()
     for raw in sys.path:
@@ -175,23 +177,14 @@ def _sanitize_module_search_path() -> tuple[str, ...]:
         if not os.path.lexists(candidate):
             continue
         _reject_symlink_components(candidate, label="module search path entry")
-        if (
-            not candidate.is_dir()
-            or candidate.resolve(strict=True) != candidate
-        ):
-            raise LaunchError(
-                "module search path contains a non-directory entry"
-            )
+        if not candidate.is_dir() or candidate.resolve(strict=True) != candidate:
+            raise LaunchError("module search path contains a non-directory entry")
         try:
             relative = candidate.relative_to(stdlib_root)
         except ValueError as error:
-            raise LaunchError(
-                "module search path contains an ambient import root"
-            ) from error
+            raise LaunchError("module search path contains an ambient import root") from error
         if {"site-packages", "dist-packages"} & set(relative.parts):
-            raise LaunchError(
-                "module search path contains an undeclared package root"
-            )
+            raise LaunchError("module search path contains an undeclared package root")
         if candidate in authorized:
             raise LaunchError("module search path contains a duplicate entry")
         authorized.add(candidate)
@@ -199,11 +192,7 @@ def _sanitize_module_search_path() -> tuple[str, ...]:
         raise LaunchError("module search path omits the standard-library root")
     ordered = (
         str(stdlib_root),
-        *(
-            str(path)
-            for path in sorted(authorized)
-            if path != stdlib_root
-        ),
+        *(str(path) for path in sorted(authorized) if path != stdlib_root),
     )
     sys.path[:] = ordered
     return ordered
@@ -285,10 +274,7 @@ def _stream_regular_row(
             or before.st_size < 0
             or before.st_size > maximum_bytes
         ):
-            raise LaunchError(
-                f"{label} must be a bounded regular file with exactly "
-                f"{expected_nlink} link(s)"
-            )
+            raise LaunchError(f"{label} must be a bounded regular file with exactly {expected_nlink} link(s)")
         digest = hashlib.sha256()
         offset = 0
         while offset < before.st_size:
@@ -311,21 +297,13 @@ def _stream_regular_row(
             ),
             None,
         )
-        same_file = (
-            descriptor_path is not None
-            and os.path.samefile(path, descriptor_path)
-        )
+        same_file = descriptor_path is not None and os.path.samefile(path, descriptor_path)
     except OSError as error:
         raise LaunchError(f"{label} descriptor cannot be streamed") from error
     finally:
         os.close(descriptor)
     identity = _identity(before)
-    if (
-        not same_file
-        or offset != before.st_size
-        or identity != _identity(after)
-        or identity != _identity(current)
-    ):
+    if not same_file or offset != before.st_size or identity != _identity(after) or identity != _identity(current):
         raise LaunchError(f"{label} changed while streamed")
     return (
         {
@@ -356,6 +334,11 @@ def _parser() -> argparse.ArgumentParser:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--runtime-seal", type=Path, action=_StoreOnce)
     mode.add_argument("--create-runtime-seal", type=Path, action=_StoreOnce)
+    mode.add_argument(
+        "--rehearse-accepted-binding",
+        type=Path,
+        action=_StoreOnce,
+    )
     parser.add_argument("producer_arguments", nargs=argparse.REMAINDER)
     return parser
 
@@ -401,14 +384,12 @@ def _strict_json_equal(observed: object, expected: object) -> bool:
     if isinstance(expected, dict):
         assert isinstance(observed, dict)
         return set(observed) == set(expected) and all(
-            _strict_json_equal(observed[key], value)
-            for key, value in expected.items()
+            _strict_json_equal(observed[key], value) for key, value in expected.items()
         )
     if isinstance(expected, list):
         assert isinstance(observed, list)
         return len(observed) == len(expected) and all(
-            _strict_json_equal(left, right)
-            for left, right in zip(observed, expected, strict=True)
+            _strict_json_equal(left, right) for left, right in zip(observed, expected, strict=True)
         )
     return observed == expected
 
@@ -417,9 +398,7 @@ def _parse_utc_timestamp(value: object, *, label: str) -> datetime:
     if not isinstance(value, str) or _UTC_TIMESTAMP.fullmatch(value) is None:
         raise LaunchError(f"{label} is not canonical UTC")
     try:
-        parsed = datetime.fromisoformat(
-            value.removesuffix("Z") + "+00:00"
-        )
+        parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
     except ValueError as error:
         raise LaunchError(f"{label} is not a real UTC timestamp") from error
     if parsed.tzinfo != UTC:
@@ -490,7 +469,7 @@ def _acquire_runtime_lock(repository: Path) -> int:
     parent = repository / "bench" / "world_model_lifecycle" / "results"
     parent.mkdir(parents=True, exist_ok=True)
     _reject_symlink_components(parent, label="runtime lock directory")
-    lock_path = parent / ".wm001-v1.16-runtime.lock"
+    lock_path = parent / ".wm001-v1.17-runtime.lock"
     existed = os.path.lexists(lock_path)
     flags = os.O_RDWR | os.O_CREAT
     if hasattr(os, "O_CLOEXEC"):
@@ -515,7 +494,7 @@ def _acquire_runtime_lock(repository: Path) -> int:
                 fcntl.LOCK_EX | fcntl.LOCK_NB,
             )
         except BlockingIOError as error:
-            raise LaunchError("another WM-001 v1.16 outer invocation holds the runtime lock") from error
+            raise LaunchError("another WM-001 v1.17 outer invocation holds the runtime lock") from error
         if not existed:
             parent_descriptor = os.open(
                 parent,
@@ -533,7 +512,7 @@ def _acquire_runtime_lock(repository: Path) -> int:
 
 
 def _prepare_completion_root(repository: Path) -> Path:
-    root = repository / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.16"
+    root = repository / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.17"
     root.mkdir(parents=True, exist_ok=True)
     _reject_symlink_components(root, label="outer completion directory")
     if root.resolve(strict=True) != root:
@@ -568,14 +547,7 @@ def _completion_marker(completion_root: Path, terminal: Path) -> Path:
 
 
 def _prospective_runtime_seal(repository: Path) -> Path:
-    return (
-        repository
-        / "bench"
-        / "world_model_lifecycle"
-        / "results"
-        / "development"
-        / "runtime-seal-v1.16.0.json"
-    )
+    return repository / "bench" / "world_model_lifecycle" / "results" / "development" / "runtime-seal-v1.17.0.json"
 
 
 def _verify_completion_inode(
@@ -655,12 +627,9 @@ def _recorded_result_free_inventory(
         names[0] != "python"
         or names[1:] != sorted(names[1:])
         or len(names) != len(set(names))
-        or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", packages[0]["version"])
-        is None
+        or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", packages[0]["version"]) is None
     ):
-        raise LaunchError(
-            "formal binding runtime packages are duplicated or unordered"
-        )
+        raise LaunchError("formal binding runtime packages are duplicated or unordered")
 
     root_fields = {
         "semantics_id",
@@ -710,8 +679,7 @@ def _recorded_result_free_inventory(
             "shared_file_count",
             "identity_sha256",
         }
-        or ownership.get("semantics_id")
-        != "prospect.wm001.package-ownership.v1"
+        or ownership.get("semantics_id") != "prospect.wm001.package-ownership.v1"
         or ownership.get("root") != root.get("path")
         or ownership.get("file_count") != root.get("file_count")
         or ownership.get("directory_count") != root.get("directory_count")
@@ -724,9 +692,7 @@ def _recorded_result_free_inventory(
         or standard_library != dependencies.get("standard_library")
         or ownership != dependencies.get("package_ownership")
     ):
-        raise LaunchError(
-            "formal binding runtime inventory differs from bound dependencies"
-        )
+        raise LaunchError("formal binding runtime inventory differs from bound dependencies")
     return value
 
 
@@ -747,10 +713,9 @@ def _recorded_fresh_identity_conformance(value: object) -> dict[str, object]:
     if (
         not isinstance(value, dict)
         or set(value) != fields
-        or value.get("schema")
-        != "prospect.wm001.fresh-runtime-identity-conformance.v1"
+        or value.get("schema") != "prospect.wm001.fresh-runtime-identity-conformance.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.16.0"
+        or value.get("protocol_version") != "1.17.0"
         or value.get("mode") != "fresh-identity-conformance"
         or not _sha256_string(value.get("challenge"))
         or type(requesting) is not int
@@ -758,13 +723,10 @@ def _recorded_fresh_identity_conformance(value: object) -> dict[str, object]:
         or type(verifier) is not int
         or verifier <= 0
         or requesting == verifier
-        or value.get("matrix_contract_sha256")
-        != _DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        or value.get("matrix_contract_sha256") != _DEVELOPMENT_MATRIX_CONTRACT_SHA256
         or value.get("passed") is not True
     ):
-        raise LaunchError(
-            "formal binding fresh runtime identity conformance is malformed"
-        )
+        raise LaunchError("formal binding fresh runtime identity conformance is malformed")
     return value
 
 
@@ -786,8 +748,7 @@ def _recorded_accepted_closure_evidence(
     if (
         not isinstance(value, dict)
         or set(value) != fields
-        or value.get("schema")
-        != "prospect.wm001.preformal-runtime-check.v1"
+        or value.get("schema") != "prospect.wm001.preformal-runtime-check.v1"
         or value.get("mode") != "accepted-closure-evidence"
         or value.get("passed") is not True
         or any(
@@ -802,9 +763,7 @@ def _recorded_accepted_closure_evidence(
         )
         or (expected is not None and value != expected)
     ):
-        raise LaunchError(
-            "formal binding accepted-closure evidence is malformed or misbound"
-        )
+        raise LaunchError("formal binding accepted-closure evidence is malformed or misbound")
     return value
 
 
@@ -821,9 +780,7 @@ def _recorded_runtime_conformance(
         value.get("inventory"),
         dependencies=dependencies,
     )
-    fresh = _recorded_fresh_identity_conformance(
-        value.get("fresh_runtime_identity_conformance")
-    )
+    fresh = _recorded_fresh_identity_conformance(value.get("fresh_runtime_identity_conformance"))
     if (
         set(value)
         != {
@@ -844,8 +801,7 @@ def _recorded_runtime_conformance(
             "repeat_count",
             "path_descriptor_equal",
         }
-        or value.get("schema")
-        != "prospect.wm001.preformal-runtime-check.v1"
+        or value.get("schema") != "prospect.wm001.preformal-runtime-check.v1"
         or value.get("mode") != "bootstrap-inventory-conformance"
         or value.get("device") != device
         or value.get("passed") is not True
@@ -860,29 +816,24 @@ def _recorded_runtime_conformance(
             )
         )
         or value.get("inventory_sha256") != _canonical_digest(inventory)
-        or value.get("conformance_sha256")
-        != _canonical_digest(audit_execution)
-        or value.get("fresh_runtime_identity_conformance_sha256")
-        != _canonical_digest(fresh)
+        or value.get("conformance_sha256") != _canonical_digest(audit_execution)
+        or value.get("fresh_runtime_identity_conformance_sha256") != _canonical_digest(fresh)
         or value.get("restart_runtime_support_files")
         != [
             "producer_bootstrap.py",
             "protocol.json",
             "schemas/raw-result.schema.json",
         ]
-        or value.get("restart_runtime_support_files")
-        != audit_execution.get("restart_runtime_support_files")
+        or value.get("restart_runtime_support_files") != audit_execution.get("restart_runtime_support_files")
         or value.get("restart_runtime_repeat_count") != 3
-        or value.get("restart_runtime_repeat_count")
-        != audit_execution.get("restart_runtime_repeat_count")
+        or value.get("restart_runtime_repeat_count") != audit_execution.get("restart_runtime_repeat_count")
         or value.get("restart_runtime_path_descriptor_equal") is not True
         or value.get("restart_runtime_path_descriptor_equal")
         is not audit_execution.get("restart_runtime_path_descriptor_equal")
         or value.get("repeat_count") != 3
         or value.get("repeat_count") != audit_execution.get("repeat_count")
         or value.get("path_descriptor_equal") is not True
-        or value.get("path_descriptor_equal")
-        is not audit_execution.get("path_descriptor_equal")
+        or value.get("path_descriptor_equal") is not audit_execution.get("path_descriptor_equal")
         or value.get("restart_runtime_conformance_report_sha256")
         != audit_execution.get("restart_runtime_conformance_report_sha256")
         or value.get("restart_runtime_execution_receipt_sha256")
@@ -930,30 +881,22 @@ def _recorded_result_qualification(
             "matrix_contract_sha256",
             "producer_execution",
         }
-        or value.get("schema")
-        != "prospect.wm001.development-result-qualification.v1"
+        or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.16.0"
+        or value.get("protocol_version") != "1.17.0"
         or not isinstance(protocol, dict)
         or value.get("protocol_sha256") != protocol.get("sha256")
         or value.get("raw_result_sha256") != raw_result_sha256
         or value.get("lane") != "development"
         or value.get("claim_eligible") is not False
-        or value.get("matrix_contract_sha256")
-        != _DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        or value.get("matrix_contract_sha256") != _DEVELOPMENT_MATRIX_CONTRACT_SHA256
         or not isinstance(development, dict)
-        or hashlib.sha256(payload).hexdigest()
-        != development.get("result_qualification_sha256")
+        or hashlib.sha256(payload).hexdigest() != development.get("result_qualification_sha256")
         or not isinstance(producer_execution, dict)
-        or _canonical_digest(producer_execution)
-        != development.get("producer_execution_identity_sha256")
+        or _canonical_digest(producer_execution) != development.get("producer_execution_identity_sha256")
         or not isinstance(replicates, list)
         or len(replicates) != len(_DEVELOPMENT_SEEDS)
-        or tuple(
-            row.get("master_seed") if isinstance(row, dict) else None
-            for row in replicates
-        )
-        != _DEVELOPMENT_SEEDS
+        or tuple(row.get("master_seed") if isinstance(row, dict) else None for row in replicates) != _DEVELOPMENT_SEEDS
         or any(
             not isinstance(row, dict)
             or set(row)
@@ -966,16 +909,13 @@ def _recorded_result_qualification(
             or not row.get("replicate_id")
             or type(row.get("master_seed")) is not int
             or any(
-                type(row.get(field)) is not int
-                or row.get(field) != expected
+                type(row.get(field)) is not int or row.get(field) != expected
                 for field, expected in expected_counts.items()
             )
             for row in replicates
         )
     ):
-        raise LaunchError(
-            "terminal-bound development result qualification is malformed or misbound"
-        )
+        raise LaunchError("terminal-bound development result qualification is malformed or misbound")
     return value
 
 
@@ -1002,6 +942,304 @@ def _regular_row(
         )
     finally:
         os.close(descriptor)
+
+
+_CAPTURED_AUDIT_EXECUTION_FIELDS = {
+    "schema",
+    "returncode",
+    "passed",
+    "source_mode",
+    "command",
+    "stdout_file",
+    "stderr_file",
+    "runtime_manifest_file",
+    "invocation_manifest_file",
+    "stdout_bytes",
+    "stdout_sha256",
+    "stderr_bytes",
+    "stderr_sha256",
+    "runtime_manifest_bytes",
+    "runtime_manifest_sha256",
+    "invocation_manifest_bytes",
+    "invocation_manifest_sha256",
+    "bootstrap_sha256",
+    "auditor_source_sha256",
+    "support_files",
+}
+_AUDIT_REPRODUCTION_FIELDS = {
+    "schema",
+    "experiment_id",
+    "protocol_version",
+    "supplied_audit_sha256",
+    "reproduced_audit_sha256",
+    "byte_identical",
+    "returncode",
+    "source_mode",
+    "stdout_bytes",
+    "stderr_file",
+    "stderr_bytes",
+    "stderr_sha256",
+    "runtime_manifest_file",
+    "runtime_manifest_bytes",
+    "runtime_manifest_sha256",
+    "invocation_manifest_file",
+    "invocation_manifest_bytes",
+    "invocation_manifest_sha256",
+    "bootstrap_sha256",
+    "runner_source_sha256",
+    "auditor_source_sha256",
+    "support_files",
+    "passed",
+}
+
+
+def _audit_member_payload(
+    filename: object,
+    *,
+    member_payloads: dict[str, bytes],
+    member_rows: dict[str, dict[str, object]],
+    label: str,
+) -> bytes:
+    """Resolve one terminal-declared audit member by safe exact basename."""
+
+    if (
+        not isinstance(filename, str)
+        or not filename
+        or filename.startswith(".")
+        or "\x00" in filename
+        or "\\" in filename
+        or Path(filename).name != filename
+        or filename not in member_payloads
+        or filename not in member_rows
+    ):
+        raise LaunchError(f"{label} reference is unsafe or absent")
+    payload = member_payloads[filename]
+    row = member_rows[filename]
+    if row != {
+        "path": filename,
+        "bytes": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }:
+        raise LaunchError(f"{label} differs from its terminal row")
+    return payload
+
+
+def _valid_audit_support_rows(value: object) -> bool:
+    if not isinstance(value, list):
+        return False
+    paths: list[str] = []
+    for row in value:
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "bytes", "sha256"}
+            or not isinstance(row.get("path"), str)
+            or not row["path"]
+            or Path(row["path"]).is_absolute()
+            or "." in Path(row["path"]).parts
+            or ".." in Path(row["path"]).parts
+            or "\\" in row["path"]
+            or "\x00" in row["path"]
+            or type(row.get("bytes")) is not int
+            or row["bytes"] < 0
+            or not _sha256_string(row.get("sha256"))
+        ):
+            return False
+        paths.append(row["path"])
+    return paths == sorted(paths) and len(paths) == len(set(paths))
+
+
+def _captured_audit_execution(
+    prefix: str,
+    *,
+    member_payloads: dict[str, bytes],
+    member_rows: dict[str, dict[str, object]],
+) -> tuple[dict[str, object], dict[str, bytes]]:
+    """Reconstruct one passing descriptor audit from its terminal-bound files."""
+
+    receipt_name = f"{prefix}.execution.json"
+    receipt_payload = _audit_member_payload(
+        receipt_name,
+        member_payloads=member_payloads,
+        member_rows=member_rows,
+        label=f"canonical development audit {prefix} receipt",
+    )
+    receipt = _canonical_object(
+        receipt_payload,
+        label=f"canonical development audit {prefix} receipt",
+    )
+    command = receipt.get("command")
+    support_files = receipt.get("support_files")
+    if (
+        set(receipt) != _CAPTURED_AUDIT_EXECUTION_FIELDS
+        or receipt.get("schema") != "prospect.wm001.captured-audit-execution.v1"
+        or type(receipt.get("returncode")) is not int
+        or receipt.get("returncode") != 0
+        or receipt.get("passed") is not True
+        or receipt.get("source_mode") != "descriptor"
+        or not isinstance(command, list)
+        or not command
+        or any(not isinstance(argument, str) for argument in command)
+        or not _sha256_string(receipt.get("bootstrap_sha256"))
+        or not _sha256_string(receipt.get("auditor_source_sha256"))
+        or not _valid_audit_support_rows(support_files)
+    ):
+        raise LaunchError(f"canonical development audit {prefix} receipt is malformed")
+
+    suffixes = {
+        "stdout": "stdout.json",
+        "stderr": "stderr.log",
+        "runtime_manifest": "runtime.json",
+        "invocation_manifest": "invocation.json",
+    }
+    payloads: dict[str, bytes] = {}
+    for role, suffix in suffixes.items():
+        filename = receipt.get(f"{role}_file")
+        expected_name = f"{prefix}.{suffix}"
+        payload = _audit_member_payload(
+            filename,
+            member_payloads=member_payloads,
+            member_rows=member_rows,
+            label=f"canonical development audit {prefix} {role}",
+        )
+        if (
+            filename != expected_name
+            or type(receipt.get(f"{role}_bytes")) is not int
+            or receipt.get(f"{role}_bytes") != len(payload)
+            or not _sha256_string(receipt.get(f"{role}_sha256"))
+            or receipt.get(f"{role}_sha256") != hashlib.sha256(payload).hexdigest()
+        ):
+            raise LaunchError(f"canonical development audit {prefix} {role} identity is malformed")
+        payloads[role] = payload
+
+    report = _canonical_object(
+        payloads["stdout"],
+        label=f"canonical development audit {prefix} stdout",
+    )
+    runtime = _canonical_object(
+        payloads["runtime_manifest"],
+        label=f"canonical development audit {prefix} runtime manifest",
+    )
+    invocation = _canonical_object(
+        payloads["invocation_manifest"],
+        label=f"canonical development audit {prefix} invocation manifest",
+    )
+    source = runtime.get("source")
+    if (
+        report.get("passed") is not True
+        or runtime.get("schema") != "prospect.wm001.audit-runtime-manifest.v1"
+        or runtime.get("bootstrap_sha256") != receipt.get("bootstrap_sha256")
+        or not isinstance(source, dict)
+        or source.get("mode") != "descriptor"
+        or source.get("sha256") != receipt.get("auditor_source_sha256")
+        or not _strict_json_equal(
+            runtime.get("support_files"),
+            support_files,
+        )
+        or invocation.get("schema") != "prospect.wm001.audit-invocation-manifest.v1"
+        or invocation.get("runtime_manifest_sha256") != receipt.get("runtime_manifest_sha256")
+    ):
+        raise LaunchError(f"canonical development audit {prefix} captured payload is malformed")
+    return receipt, payloads
+
+
+def _verify_audit_reproduction(
+    *,
+    primary: dict[str, object],
+    member_payloads: dict[str, bytes],
+    member_rows: dict[str, dict[str, object]],
+) -> None:
+    """Join a canonical reproduction receipt to both captured audit executions."""
+
+    first_receipt, first = _captured_audit_execution(
+        "audit-execution-01",
+        member_payloads=member_payloads,
+        member_rows=member_rows,
+    )
+    second_receipt, second = _captured_audit_execution(
+        "audit-execution-02",
+        member_payloads=member_payloads,
+        member_rows=member_rows,
+    )
+    audit_payload = _audit_member_payload(
+        primary.get("audit_file"),
+        member_payloads=member_payloads,
+        member_rows=member_rows,
+        label="canonical development independent audit",
+    )
+    if (
+        first["stdout"] != audit_payload
+        or second["stdout"] != audit_payload
+        or first["stderr"] != second["stderr"]
+        or first["runtime_manifest"] != second["runtime_manifest"]
+        or first["invocation_manifest"] != second["invocation_manifest"]
+        or first_receipt.get("passed") is not second_receipt.get("passed")
+    ):
+        raise LaunchError("canonical development audit replay is not byte-identical")
+
+    reproduction_payload = _audit_member_payload(
+        primary.get("reproduction_file"),
+        member_payloads=member_payloads,
+        member_rows=member_rows,
+        label="canonical development audit reproduction receipt",
+    )
+    reproduction = _canonical_object(
+        reproduction_payload,
+        label="canonical development audit reproduction receipt",
+    )
+    audit_sha256 = hashlib.sha256(audit_payload).hexdigest()
+    if (
+        set(reproduction) != _AUDIT_REPRODUCTION_FIELDS
+        or reproduction.get("schema") != "prospect.wm001.audit-reproduction.v2"
+        or reproduction.get("experiment_id") != "WM-001"
+        or reproduction.get("protocol_version") != "1.17.0"
+        or reproduction.get("supplied_audit_sha256") != audit_sha256
+        or reproduction.get("reproduced_audit_sha256") != audit_sha256
+        or reproduction.get("byte_identical") is not True
+        or type(reproduction.get("returncode")) is not int
+        or reproduction.get("returncode") != 0
+        or reproduction.get("source_mode") != "descriptor"
+        or type(reproduction.get("stdout_bytes")) is not int
+        or reproduction.get("stdout_bytes") != len(audit_payload)
+        or reproduction.get("bootstrap_sha256") != second_receipt.get("bootstrap_sha256")
+        or not _sha256_string(reproduction.get("runner_source_sha256"))
+        or reproduction.get("auditor_source_sha256") != second_receipt.get("auditor_source_sha256")
+        or not _strict_json_equal(
+            reproduction.get("support_files"),
+            second_receipt.get("support_files"),
+        )
+        or reproduction.get("passed") is not True
+    ):
+        raise LaunchError("canonical development audit reproduction receipt is malformed")
+
+    sidecar_specs = {
+        "runtime_manifest": ("development-audit-runtime", ".json"),
+        "invocation_manifest": (
+            "development-audit-invocation",
+            ".json",
+        ),
+        "stderr": ("development-audit-stderr", ".log"),
+    }
+    for role, (stem, suffix) in sidecar_specs.items():
+        filename = reproduction.get(f"{role}_file")
+        payload = _audit_member_payload(
+            filename,
+            member_payloads=member_payloads,
+            member_rows=member_rows,
+            label=f"canonical development audit reproduction {role}",
+        )
+        digest = hashlib.sha256(payload).hexdigest()
+        expected_name = f"{stem}-{digest[:16]}{suffix}"
+        if (
+            filename != expected_name
+            or type(reproduction.get(f"{role}_bytes")) is not int
+            or reproduction.get(f"{role}_bytes") != len(payload)
+            or not _sha256_string(reproduction.get(f"{role}_sha256"))
+            or reproduction.get(f"{role}_sha256") != digest
+            or payload != second[role]
+        ):
+            raise LaunchError(f"canonical development audit reproduction {role} is misbound")
+    if primary.get("reproduction_runtime_file") != reproduction.get("runtime_manifest_file"):
+        raise LaunchError("canonical development audit reproduction runtime reference changed")
 
 
 def _producer_tree_snapshot(
@@ -1031,42 +1269,30 @@ def _producer_tree_snapshot(
                 for entry in iterator:
                     entry_count += 1
                     if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
-                        raise LaunchError(
-                            "canonical development producer tree exceeds its entry limit"
-                        )
+                        raise LaunchError("canonical development producer tree exceeds its entry limit")
                     entries.append(entry)
                 entries.sort(key=lambda entry: entry.name)
         except OSError as error:
-            raise LaunchError(
-                "canonical development producer tree cannot be scanned"
-            ) from error
+            raise LaunchError("canonical development producer tree cannot be scanned") from error
         for entry in entries:
             relative_path = relative_directory / entry.name
             relative = relative_path.as_posix()
             try:
                 metadata = entry.stat(follow_symlinks=False)
             except OSError as error:
-                raise LaunchError(
-                    f"canonical development producer entry cannot be inspected: {relative}"
-                ) from error
+                raise LaunchError(f"canonical development producer entry cannot be inspected: {relative}") from error
             if stat.S_ISLNK(metadata.st_mode):
-                raise LaunchError(
-                    f"canonical development producer contains a symbolic link: {relative}"
-                )
+                raise LaunchError(f"canonical development producer contains a symbolic link: {relative}")
             if stat.S_ISDIR(metadata.st_mode):
                 directories[relative] = _identity(metadata)
                 pending.append((Path(entry.path), relative_path))
                 continue
             if not stat.S_ISREG(metadata.st_mode):
-                raise LaunchError(
-                    f"canonical development producer contains a special file: {relative}"
-                )
+                raise LaunchError(f"canonical development producer contains a special file: {relative}")
             if relative != "producer-manifest.json":
                 files[relative] = _identity(metadata)
                 if len(files) > _MAX_PRODUCER_FILES:
-                    raise LaunchError(
-                        "canonical development producer exceeds its file-count limit"
-                    )
+                    raise LaunchError("canonical development producer exceeds its file-count limit")
     return _identity(root_metadata), files, directories
 
 
@@ -1077,14 +1303,7 @@ def _verify_development_producer(
 ) -> list[dict[str, object]]:
     """Reconstruct the two producer rows consumed by the development audit."""
 
-    root = (
-        repository
-        / "bench"
-        / "world_model_lifecycle"
-        / "results"
-        / "development"
-        / "qualification-v1.16.0"
-    )
+    root = repository / "bench" / "world_model_lifecycle" / "results" / "development" / "qualification-v1.17.0"
     _reject_symlink_components(root, label="canonical development qualification")
     if not root.is_dir():
         raise LaunchError("canonical development qualification is absent")
@@ -1134,9 +1353,7 @@ def _verify_development_producer(
     ):
         raise LaunchError("canonical development producer manifest is malformed")
     if len(rows) > _MAX_PRODUCER_FILES:
-        raise LaunchError(
-            "canonical development producer manifest exceeds its file-count limit"
-        )
+        raise LaunchError("canonical development producer manifest exceeds its file-count limit")
     references: dict[str, tuple[Path, int, str]] = {}
     total_bytes = 0
     previous = ""
@@ -1146,9 +1363,7 @@ def _verify_development_producer(
             "bytes",
             "sha256",
         }:
-            raise LaunchError(
-                f"canonical development producer manifest row {index} is malformed"
-            )
+            raise LaunchError(f"canonical development producer manifest row {index} is malformed")
         relative = raw_row.get("path")
         byte_count = raw_row.get("bytes")
         digest = raw_row.get("sha256")
@@ -1170,24 +1385,16 @@ def _verify_development_producer(
             or byte_count > _MAX_PRODUCER_FILE_BYTES
             or not _sha256_string(digest)
         ):
-            raise LaunchError(
-                f"canonical development producer manifest row {index} has invalid identity"
-            )
+            raise LaunchError(f"canonical development producer manifest row {index} has invalid identity")
         total_bytes += byte_count
         if total_bytes > _MAX_PRODUCER_TOTAL_BYTES:
-            raise LaunchError(
-                "canonical development producer manifest exceeds its aggregate byte limit"
-            )
+            raise LaunchError("canonical development producer manifest exceeds its aggregate byte limit")
         references[relative] = (root / relative_path, byte_count, str(digest))
         previous = relative
 
-    root_identity, initial_tree, initial_directories = (
-        _producer_tree_snapshot(root)
-    )
+    root_identity, initial_tree, initial_directories = _producer_tree_snapshot(root)
     if set(references) != set(initial_tree):
-        raise LaunchError(
-            "canonical development producer files differ from its manifest"
-        )
+        raise LaunchError("canonical development producer files differ from its manifest")
     actual_rows: list[dict[str, object]] = []
     actual_total_bytes = 0
     result_row: dict[str, object] | None = None
@@ -1207,26 +1414,18 @@ def _verify_development_producer(
             or absolute_row["bytes"] != expected_bytes
             or absolute_row["sha256"] != expected_digest
         ):
-            raise LaunchError(
-                f"canonical development producer file changed: {relative}"
-            )
+            raise LaunchError(f"canonical development producer file changed: {relative}")
         actual_rows.append(actual_row)
         actual_total_bytes += int(absolute_row["bytes"])
         if actual_total_bytes > _MAX_PRODUCER_TOTAL_BYTES:
-            raise LaunchError(
-                "canonical development producer exceeds its aggregate byte limit"
-            )
+            raise LaunchError("canonical development producer exceeds its aggregate byte limit")
         if relative == "result.json":
             result_row = absolute_row
-    final_root_identity, final_tree, final_directories = (
-        _producer_tree_snapshot(root)
-    )
-    final_manifest_row, final_manifest_payload, final_manifest_identity = (
-        _regular_row(
-            manifest_path,
-            label="canonical development producer manifest",
-            expected_nlink=2,
-        )
+    final_root_identity, final_tree, final_directories = _producer_tree_snapshot(root)
+    final_manifest_row, final_manifest_payload, final_manifest_identity = _regular_row(
+        manifest_path,
+        label="canonical development producer manifest",
+        expected_nlink=2,
     )
     if (
         not _strict_json_equal(rows, actual_rows)
@@ -1238,9 +1437,7 @@ def _verify_development_producer(
         or final_manifest_payload != manifest_payload
         or final_manifest_identity != manifest_identity
     ):
-        raise LaunchError(
-            "canonical development producer changed while custody was verified"
-        )
+        raise LaunchError("canonical development producer changed while custody was verified")
     _verify_completion_inode(
         manifest_path,
         payload=manifest_payload,
@@ -1270,9 +1467,9 @@ def _verify_development_audit(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.16"
+        / "operator-v1.17"
         / "audits"
-        / "development-audit-v1.16.0"
+        / "development-audit-v1.17.0"
     )
     terminal = attempt / _OPERATOR_TERMINAL
     terminal_row, terminal_payload, terminal_identity = _regular_row(
@@ -1310,19 +1507,12 @@ def _verify_development_audit(
         "reproduction_runtime_file",
         "claim_file",
     }
-    producer_root = (
-        repository
-        / "bench"
-        / "world_model_lifecycle"
-        / "results"
-        / "development"
-        / "qualification-v1.16.0"
-    )
+    producer_root = repository / "bench" / "world_model_lifecycle" / "results" / "development" / "qualification-v1.17.0"
     if (
         set(manifest) != expected_fields
         or manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
         or manifest.get("experiment_id") != "WM-001"
-        or manifest.get("protocol_version") != "1.16.0"
+        or manifest.get("protocol_version") != "1.17.0"
         or not _strict_json_equal(
             manifest.get("assurance"),
             _ASSURANCE,
@@ -1347,8 +1537,7 @@ def _verify_development_audit(
         ]
         or primary.get("execution_failures") != []
         or primary.get("reproduction_file") != "audit-reproduction.json"
-        or primary.get("reproduction_runtime_file")
-        != "audit-execution-02.runtime.json"
+        or not isinstance(primary.get("reproduction_runtime_file"), str)
         or primary.get("claim_file") is not None
         or not isinstance(files, list)
         or type(manifest.get("file_count")) is not int
@@ -1356,6 +1545,8 @@ def _verify_development_audit(
     ):
         raise LaunchError("canonical development audit terminal is malformed")
     actual_file_rows: list[dict[str, object]] = []
+    member_payloads: dict[str, bytes] = {}
+    member_rows: dict[str, dict[str, object]] = {}
     closure_input_rows: list[dict[str, object]] = []
     for entry in sorted(os.scandir(attempt), key=lambda item: item.name):
         path = attempt / entry.name
@@ -1366,22 +1557,28 @@ def _verify_development_audit(
             or entry.is_symlink()
         ):
             raise LaunchError("canonical development audit namespace is unsafe")
-        row, _, _ = _regular_row(
+        row, payload, _ = _regular_row(
             path,
             label=f"canonical development audit file {entry.name}",
             expected_nlink=(2 if entry.name == _OPERATOR_TERMINAL else 1),
         )
         closure_input_rows.append(row)
         if entry.name != _OPERATOR_TERMINAL:
-            actual_file_rows.append(
-                {
-                    "path": entry.name,
-                    "bytes": row["bytes"],
-                    "sha256": row["sha256"],
-                }
-            )
+            relative_row = {
+                "path": entry.name,
+                "bytes": row["bytes"],
+                "sha256": row["sha256"],
+            }
+            actual_file_rows.append(relative_row)
+            member_payloads[entry.name] = payload
+            member_rows[entry.name] = relative_row
     if not _strict_json_equal(files, actual_file_rows):
         raise LaunchError("canonical development audit files differ from its terminal")
+    _verify_audit_reproduction(
+        primary=primary,
+        member_payloads=member_payloads,
+        member_rows=member_rows,
+    )
     marker = _completion_marker(completion_root, terminal)
     marker_row, marker_payload, marker_identity = _regular_row(
         marker,
@@ -1418,7 +1615,7 @@ def _verify_closure_authorization(
     dict[str, object],
 ]:
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    closure_path = results / "development" / "development-closure-v1.16.0.json"
+    closure_path = results / "development" / "development-closure-v1.17.0.json"
     closure_row, closure_payload, _ = _regular_row(
         closure_path,
         label="canonical development closure",
@@ -1439,7 +1636,7 @@ def _verify_closure_authorization(
     ):
         raise LaunchError("formal binding differs from the canonical development closure")
 
-    attempt = results / "operator-v1.16" / "closures" / "development-closure-v1.16.0"
+    attempt = results / "operator-v1.17" / "closures" / "development-closure-v1.17.0"
     terminal = attempt / _OPERATOR_TERMINAL
     terminal_row, terminal_payload, terminal_identity = _regular_row(
         terminal,
@@ -1469,7 +1666,7 @@ def _verify_closure_authorization(
         set(terminal_manifest) != expected_terminal_fields
         or terminal_manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
         or terminal_manifest.get("experiment_id") != "WM-001"
-        or terminal_manifest.get("protocol_version") != "1.16.0"
+        or terminal_manifest.get("protocol_version") != "1.17.0"
         or not _strict_json_equal(
             terminal_manifest.get("assurance"),
             _ASSURANCE,
@@ -1545,17 +1742,13 @@ def _verify_closure_authorization(
         "fresh_reopen_file",
         "fresh_reopen_sha256",
     }
-    expected_audit = results / "operator-v1.16" / "audits" / "development-audit-v1.16.0"
-    expected_producer = (
-        results
-        / "development"
-        / "qualification-v1.16.0"
-    )
+    expected_audit = results / "operator-v1.17" / "audits" / "development-audit-v1.17.0"
+    expected_producer = results / "development" / "qualification-v1.17.0"
     if (
         set(reference) != expected_reference_fields
         or reference.get("schema") != _CLOSURE_REFERENCE_SCHEMA
         or reference.get("experiment_id") != "WM-001"
-        or reference.get("protocol_version") != "1.16.0"
+        or reference.get("protocol_version") != "1.17.0"
         or reference.get("closure_marker") != str(closure_path)
         or reference.get("closure_sha256") != hashlib.sha256(closure_payload).hexdigest()
         or not _strict_json_equal(
@@ -1566,8 +1759,7 @@ def _verify_closure_authorization(
         or closure.get("producer_root") != str(expected_producer)
         or reference.get("audit_attempt") != str(expected_audit)
         or not _sha256_string(reference.get("audit_attempt_manifest_sha256"))
-        or reference.get("fresh_reopen_file")
-        != "fresh-runtime-reopen.json"
+        or reference.get("fresh_reopen_file") != "fresh-runtime-reopen.json"
         or not _sha256_string(reference.get("fresh_reopen_sha256"))
     ):
         raise LaunchError("canonical closure reference differs from live evidence")
@@ -1587,42 +1779,26 @@ def _verify_closure_authorization(
     members = archive.get("members") if isinstance(archive, dict) else None
     qualification_member = closure.get("result_qualification_member")
     qualification_rows = (
-        [
-            row
-            for row in members
-            if isinstance(row, dict)
-            and row.get("path") == qualification_member
-        ]
+        [row for row in members if isinstance(row, dict) and row.get("path") == qualification_member]
         if isinstance(members, list)
         else []
     )
     member_digests = (
-        {
-            row.get("path"): row.get("sha256")
-            for row in members
-            if isinstance(row, dict)
-        }
+        {row.get("path"): row.get("sha256") for row in members if isinstance(row, dict)}
         if isinstance(members, list)
         else {}
     )
-    requesting_process_id = fresh_reopen.get(
-        "requesting_process_id"
-    )
+    requesting_process_id = fresh_reopen.get("requesting_process_id")
     verifier_process_id = fresh_reopen.get("verifier_process_id")
     if (
-        qualification_member
-        != "evidence/development-result-qualification.json"
+        qualification_member != "evidence/development-result-qualification.json"
         or len(qualification_rows) != 1
         or not _sha256_string(qualification_rows[0].get("sha256"))
-        or development.get("result_qualification_sha256")
-        != qualification_rows[0].get("sha256")
+        or development.get("result_qualification_sha256") != qualification_rows[0].get("sha256")
         or not isinstance(closure.get("producer_execution"), dict)
-        or _canonical_digest(closure["producer_execution"])
-        != development.get("producer_execution_identity_sha256")
+        or _canonical_digest(closure["producer_execution"]) != development.get("producer_execution_identity_sha256")
     ):
-        raise LaunchError(
-            "canonical development result qualification differs from its binding"
-        )
+        raise LaunchError("canonical development result qualification differs from its binding")
     if (
         set(fresh_reopen)
         != {
@@ -1639,10 +1815,9 @@ def _verify_closure_authorization(
             "raw_result_sha256",
             "passed",
         }
-        or fresh_reopen.get("schema")
-        != "prospect.wm001.development-closure-fresh-reopen.v1"
+        or fresh_reopen.get("schema") != "prospect.wm001.development-closure-fresh-reopen.v1"
         or fresh_reopen.get("experiment_id") != "WM-001"
-        or fresh_reopen.get("protocol_version") != "1.16.0"
+        or fresh_reopen.get("protocol_version") != "1.17.0"
         or fresh_reopen.get("mode") != "fresh-closure-reopen"
         or not _sha256_string(fresh_reopen.get("challenge"))
         or type(requesting_process_id) is not int
@@ -1652,19 +1827,13 @@ def _verify_closure_authorization(
         or requesting_process_id == verifier_process_id
         or fresh_reopen.get("matrix_contract_sha256")
         != "09a232a4a58c2690665cbef928936b49fbb28d7134405c8eb696a63371591b84"
-        or fresh_reopen.get("development_closure_sha256")
-        != closure_row["sha256"]
-        or fresh_reopen.get("producer_manifest_sha256")
-        != member_digests.get("producer/producer-manifest.json")
-        or fresh_reopen.get("raw_result_sha256")
-        != member_digests.get("producer/result.json")
+        or fresh_reopen.get("development_closure_sha256") != closure_row["sha256"]
+        or fresh_reopen.get("producer_manifest_sha256") != member_digests.get("producer/producer-manifest.json")
+        or fresh_reopen.get("raw_result_sha256") != member_digests.get("producer/result.json")
         or fresh_reopen.get("passed") is not True
-        or hashlib.sha256(fresh_payload).hexdigest()
-        != reference.get("fresh_reopen_sha256")
+        or hashlib.sha256(fresh_payload).hexdigest() != reference.get("fresh_reopen_sha256")
     ):
-        raise LaunchError(
-            "canonical fresh closure-reopen report differs from live evidence"
-        )
+        raise LaunchError("canonical fresh closure-reopen report differs from live evidence")
     producer_rows = _verify_development_producer(
         repository=repository,
         completion_root=completion_root,
@@ -1681,20 +1850,15 @@ def _verify_closure_authorization(
     )
     if (
         audit_attempt != expected_audit
-        or reference.get("audit_attempt_manifest_sha256")
-        != audit_terminal_row["sha256"]
+        or reference.get("audit_attempt_manifest_sha256") != audit_terminal_row["sha256"]
         or not _strict_json_equal(
             terminal_manifest.get("inputs"),
             [*producer_rows, *audit_input_rows],
         )
-        or development.get("producer_manifest_sha256")
-        != producer_rows[0]["sha256"]
-        or development.get("raw_result_sha256")
-        != producer_rows[1]["sha256"]
+        or development.get("producer_manifest_sha256") != producer_rows[0]["sha256"]
+        or development.get("raw_result_sha256") != producer_rows[1]["sha256"]
     ):
-        raise LaunchError(
-            "canonical closure authorization inputs differ from live producer/audit evidence"
-        )
+        raise LaunchError("canonical closure authorization inputs differ from live producer/audit evidence")
     marker = _completion_marker(completion_root, terminal)
     marker_row, marker_payload, marker_identity = _regular_row(
         marker,
@@ -1775,7 +1939,7 @@ def _verify_binding_attempt_terminal(
             set(manifest) != expected_fields
             or manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
             or manifest.get("experiment_id") != "WM-001"
-            or manifest.get("protocol_version") != "1.16.0"
+            or manifest.get("protocol_version") != "1.17.0"
             or not _strict_json_equal(
                 manifest.get("assurance"),
                 _ASSURANCE,
@@ -1896,23 +2060,19 @@ def _verify_binding_attempt_terminal(
             [
                 row
                 for row in implementation
-                if isinstance(row, dict)
-                and row.get("path")
-                == "bench/world_model_lifecycle/artifact_audit.py"
+                if isinstance(row, dict) and row.get("path") == "bench/world_model_lifecycle/artifact_audit.py"
             ]
             if isinstance(implementation, list)
             else []
         )
         if (
             set(preflight) != preflight_fields
-            or preflight.get("schema")
-            != _FORMAL_INPUT_PREFLIGHT_SCHEMA
+            or preflight.get("schema") != _FORMAL_INPUT_PREFLIGHT_SCHEMA
             or preflight.get("experiment_id") != "WM-001"
-            or preflight.get("protocol_version") != "1.16.0"
+            or preflight.get("protocol_version") != "1.17.0"
             or type(preflight.get("binding_bytes")) is not int
             or preflight.get("binding_bytes") != len(binding_payload)
-            or preflight.get("binding_sha256")
-            != hashlib.sha256(binding_payload).hexdigest()
+            or preflight.get("binding_sha256") != hashlib.sha256(binding_payload).hexdigest()
             or preflight.get("passed") is not True
             or any(
                 not _sha256_string(preflight.get(field))
@@ -1925,12 +2085,9 @@ def _verify_binding_attempt_terminal(
                 )
             )
             or len(auditor_rows) != 1
-            or preflight.get("auditor_source_sha256")
-            != auditor_rows[0].get("sha256")
+            or preflight.get("auditor_source_sha256") != auditor_rows[0].get("sha256")
         ):
-            raise LaunchError(
-                "formal input preflight receipt is malformed or misbound"
-            )
+            raise LaunchError("formal input preflight receipt is malformed or misbound")
         report_value = inputs[0].get("path")
         if not isinstance(report_value, str):
             raise LaunchError("formal binding preformal report input is malformed")
@@ -1941,7 +2098,7 @@ def _verify_binding_attempt_terminal(
             / "world_model_lifecycle"
             / "results"
             / "development"
-            / "v1.16.0"
+            / "v1.17.0"
             / "preformal"
             / _PREFORMAL_REPORT_NAME
         )
@@ -1957,19 +2114,14 @@ def _verify_binding_attempt_terminal(
         )
         commands = report.get("commands")
         if (
-            report.get("schema")
-            != "prospect.wm001.preformal-test-report.v2"
+            report.get("schema") != "prospect.wm001.preformal-test-report.v2"
             or report.get("experiment_id") != "WM-001"
-            or report.get("protocol_version") != "1.16.0"
+            or report.get("protocol_version") != "1.17.0"
             or report.get("device") not in {"cpu", "cuda"}
             or report.get("device") != runtime.get("device")
             or report.get("all_pass") is not True
             or not isinstance(commands, list)
-            or tuple(
-                row.get("name") if isinstance(row, dict) else None
-                for row in commands
-            )
-            != _PREFORMAL_COMMAND_NAMES
+            or tuple(row.get("name") if isinstance(row, dict) else None for row in commands) != _PREFORMAL_COMMAND_NAMES
         ):
             raise LaunchError("formal binding preformal report is malformed")
         source_logs = source.get("test_log_files")
@@ -2009,11 +2161,7 @@ def _verify_binding_attempt_terminal(
                 "bootstrap-inventory-conformance",
             ),
         ):
-            command = next(
-                row
-                for row in commands
-                if isinstance(row, dict) and row.get("name") == command_name
-            )
+            command = next(row for row in commands if isinstance(row, dict) and row.get("name") == command_name)
             stdout = command.get("stdout")
             stderr = command.get("stderr")
             ordinal = _PREFORMAL_COMMAND_NAMES.index(command_name) + 1
@@ -2028,10 +2176,7 @@ def _verify_binding_attempt_terminal(
                 or stdout["bytes"] < 1
                 or not _sha256_string(stdout.get("sha256"))
                 or stdout.get("file")
-                != (
-                    f"{_PREFORMAL_LOG_PREFIX}{ordinal:02d}-{command_name}."
-                    f"stdout.{stdout.get('sha256')}.log"
-                )
+                != (f"{_PREFORMAL_LOG_PREFIX}{ordinal:02d}-{command_name}.stdout.{stdout.get('sha256')}.log")
                 or stdout["file"] not in log_payloads
                 or not isinstance(stderr, dict)
                 or set(stderr) != {"file", "bytes", "sha256"}
@@ -2039,38 +2184,24 @@ def _verify_binding_attempt_terminal(
                 or stderr.get("bytes") != 0
                 or stderr.get("sha256") != _SHA256_EMPTY
                 or stderr.get("file")
-                != (
-                    f"{_PREFORMAL_LOG_PREFIX}{ordinal:02d}-{command_name}."
-                    f"stderr.{_SHA256_EMPTY}.log"
-                )
+                != (f"{_PREFORMAL_LOG_PREFIX}{ordinal:02d}-{command_name}.stderr.{_SHA256_EMPTY}.log")
                 or stderr.get("file") not in log_payloads
                 or log_payloads[str(stderr.get("file"))] != b""
             ):
-                raise LaunchError(
-                    "formal binding runtime preformal output is malformed"
-                )
+                raise LaunchError("formal binding runtime preformal output is malformed")
             output_payload = log_payloads[stdout["file"]]
-            if (
-                len(output_payload) != stdout["bytes"]
-                or hashlib.sha256(output_payload).hexdigest()
-                != stdout["sha256"]
-            ):
-                raise LaunchError(
-                    "formal binding runtime preformal output identity changed"
-                )
+            if len(output_payload) != stdout["bytes"] or hashlib.sha256(output_payload).hexdigest() != stdout["sha256"]:
+                raise LaunchError("formal binding runtime preformal output identity changed")
             output = _canonical_object(
                 output_payload,
                 label=f"formal binding {command_name} output",
             )
             if (
-                output.get("schema")
-                != "prospect.wm001.preformal-runtime-check.v1"
+                output.get("schema") != "prospect.wm001.preformal-runtime-check.v1"
                 or output.get("mode") != mode
                 or output.get("passed") is not True
             ):
-                raise LaunchError(
-                    "formal binding runtime preformal output did not pass"
-                )
+                raise LaunchError("formal binding runtime preformal output did not pass")
             if command_name == "runtime-bootstrap-inventory-conformance":
                 output = _recorded_runtime_conformance(
                     output,
@@ -2097,15 +2228,11 @@ def _verify_binding_attempt_terminal(
             binding=binding,
         )
         if qualification_payload is None:
-            raise LaunchError(
-                "formal binding attempt omits the development result qualification"
-            )
+            raise LaunchError("formal binding attempt omits the development result qualification")
         _recorded_result_qualification(
             qualification_payload,
             binding=binding,
-            raw_result_sha256=expected_accepted_closure[
-                "raw_result_sha256"
-            ],
+            raw_result_sha256=expected_accepted_closure["raw_result_sha256"],
         )
         closure_terminal_row = {
             "path": str(closure_terminal),
@@ -2134,22 +2261,12 @@ def _verify_binding_attempt_terminal(
             or source.get("test_report_bytes") != report_row["bytes"]
             or source.get("test_report_sha256") != report_row["sha256"]
             or not _strict_json_equal(inputs, expected_inputs)
-            or preflight.get("preformal_report_sha256")
-            != report_row["sha256"]
-            or preflight.get("development_closure_sha256")
-            != closure_row["sha256"]
+            or preflight.get("preformal_report_sha256") != report_row["sha256"]
+            or preflight.get("development_closure_sha256") != closure_row["sha256"]
             or preflight.get("accepted_closure_evidence_sha256")
-            != _canonical_digest(
-                runtime_receipts[
-                    "runtime-accepted-closure-evidence"
-                ]
-            )
+            != _canonical_digest(runtime_receipts["runtime-accepted-closure-evidence"])
             or preflight.get("runtime_conformance_sha256")
-            != _canonical_digest(
-                runtime_receipts[
-                    "runtime-bootstrap-inventory-conformance"
-                ]
-            )
+            != _canonical_digest(runtime_receipts["runtime-bootstrap-inventory-conformance"])
             or closure_path
             != (
                 repository
@@ -2157,7 +2274,7 @@ def _verify_binding_attempt_terminal(
                 / "world_model_lifecycle"
                 / "results"
                 / "development"
-                / "development-closure-v1.16.0.json"
+                / "development-closure-v1.17.0.json"
             )
         ):
             raise LaunchError("formal binding authorization inputs differ from live evidence")
@@ -2181,7 +2298,7 @@ def _open_typed_runtime_custody(
     """Capture exactly one of the two protocol-authorized runtime seals."""
 
     results_root = repository / "bench" / "world_model_lifecycle" / "results"
-    binding_attempt = results_root / "operator-v1.16" / "bindings" / "formal-binding-v1.16.0"
+    binding_attempt = results_root / "operator-v1.17" / "bindings" / "formal-binding-v1.17.0"
     formal_binding = binding_attempt / "formal-binding.json"
     prospective_runtime_seal = _prospective_runtime_seal(repository)
     if (
@@ -2190,7 +2307,7 @@ def _open_typed_runtime_custody(
         or path.resolve(strict=False) != path
         or path not in {formal_binding, prospective_runtime_seal}
     ):
-        raise LaunchError("runtime seal path is not one canonical protocol-1.16 seal")
+        raise LaunchError("runtime seal path is not one canonical protocol-1.17 seal")
     is_formal_binding = path == formal_binding
     expected_nlink = 1 if is_formal_binding else 2
     seal_fd, seal_payload, seal_identity = _open_regular(
@@ -2213,10 +2330,7 @@ def _open_typed_runtime_custody(
             )
             or (
                 not is_formal_binding
-                and (
-                    set(value) != _RUNTIME_SEAL_FIELDS
-                    or value.get("protocol_version") != "1.16.0"
-                )
+                and (set(value) != _RUNTIME_SEAL_FIELDS or value.get("protocol_version") != "1.17.0")
             )
         ):
             raise LaunchError("runtime custody schema or assurance is invalid")
@@ -2271,7 +2385,7 @@ def _commit_outer_receipt(
         set(receipt) != expected
         or receipt.get("schema") != _OUTER_RECEIPT_SCHEMA
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.16.0"
+        or receipt.get("protocol_version") != "1.17.0"
         or not _strict_json_equal(
             receipt.get("assurance"),
             _ASSURANCE,
@@ -2332,6 +2446,1285 @@ def _commit_outer_receipt(
             pass
 
 
+def _canonical_bytes(value: object) -> bytes:
+    return (
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        + b"\n"
+    )
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _write_exclusive(path: Path, payload: bytes) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags, 0o600)
+    try:
+        view = memoryview(payload)
+        offset = 0
+        while offset < len(view):
+            written = os.write(descriptor, view[offset:])
+            if written <= 0:
+                raise LaunchError(f"exclusive write made no progress: {path}")
+            offset += written
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    _fsync_directory(path.parent)
+
+
+def _rehearsal_failpoint(_name: str) -> None:
+    """Test-only crash boundary; production execution is deliberately inert."""
+
+
+def _rehearsal_paths(
+    repository: Path,
+    *,
+    binding_sha256: str,
+    completion_root: Path,
+) -> dict[str, Path]:
+    results = repository / "bench" / "world_model_lifecycle" / "results"
+    attempt = results / "operator-v1.17" / "rehearsals" / "accepted-binding-rehearsal-v1.17.0"
+    claim_root = results / "rehearsals" / "v1.17"
+    terminal = attempt / _REHEARSAL_TERMINAL_NAME
+    return {
+        "attempt": attempt,
+        "claim_root": claim_root,
+        "claim": attempt / _REHEARSAL_CLAIM_NAME,
+        "claim_marker": (claim_root / f"accepted-binding-{binding_sha256}.json"),
+        "stdout": attempt / _REHEARSAL_STDOUT_NAME,
+        "stderr": attempt / _REHEARSAL_STDERR_NAME,
+        "outer_receipt": attempt / _REHEARSAL_OUTER_RECEIPT_NAME,
+        "child_started": attempt / _REHEARSAL_CHILD_STARTED_NAME,
+        "terminal_staging": (attempt / _REHEARSAL_TERMINAL_STAGING_NAME),
+        "terminal": terminal,
+        "completion": _completion_marker(completion_root, terminal),
+    }
+
+
+def _formal_rehearsal_paths(
+    repository: Path,
+    *,
+    binding_sha256: str,
+) -> tuple[Path, ...]:
+    results = repository / "bench" / "world_model_lifecycle" / "results"
+    return (
+        results / "formal" / binding_sha256,
+        results / "formal" / "formal-launch-v1.17.0.json",
+        (results / "operator-v1.17" / "audits" / "formal-audit-v1.17.0"),
+        (results / "operator-v1.17" / "audits" / ".formal-audit-v1.17.0.staging"),
+        results / "formal" / "formal-audit-v1.17.0.json",
+        repository / "artifacts" / "wm001-reviews" / "formal-v1.17.0.json",
+        results / "formal" / "formal-adjudication-v1.17.0.json",
+        (results / "adjudication-v1.17" / "formal-adjudication-v1.17.0"),
+    )
+
+
+def _formal_rehearsal_paths_absent(
+    repository: Path,
+    *,
+    binding_sha256: str,
+) -> bool:
+    if any(
+        os.path.lexists(path)
+        for path in _formal_rehearsal_paths(
+            repository,
+            binding_sha256=binding_sha256,
+        )
+    ):
+        return False
+    formal_root = repository / "bench" / "world_model_lifecycle" / "results" / "formal"
+    try:
+        entry_count = 0
+        if os.path.lexists(formal_root):
+            metadata = os.lstat(formal_root)
+            if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+                return False
+            with os.scandir(formal_root) as entries:
+                for entry in entries:
+                    entry_count += 1
+                    if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
+                        return False
+                    if entry.name == "confirmation-v1.17.0":
+                        return False
+                    if os.path.lexists(Path(entry.path) / "confirmation-v1.17.0"):
+                        return False
+        adjudication_root = repository / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.17"
+        if os.path.lexists(adjudication_root):
+            metadata = os.lstat(adjudication_root)
+            if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+                return False
+            with os.scandir(adjudication_root) as entries:
+                for entry in entries:
+                    entry_count += 1
+                    if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
+                        return False
+                    if entry.name.startswith(".formal-adjudication-v1.17.0.staging-"):
+                        return False
+        return True
+    except OSError:
+        return False
+
+
+def _formal_launch_paths_ready(
+    repository: Path,
+    *,
+    binding_sha256: str,
+) -> bool:
+    """Require the one empty prepared parent and no competing v1.17 claim."""
+
+    paths = _formal_rehearsal_paths(
+        repository,
+        binding_sha256=binding_sha256,
+    )
+    binding_root, *forbidden = paths
+    if any(os.path.lexists(path) for path in forbidden):
+        return False
+    formal_root = binding_root.parent
+    adjudication_root = repository / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.17"
+    try:
+        root_metadata = os.lstat(formal_root)
+        binding_metadata = os.lstat(binding_root)
+        with os.scandir(binding_root) as binding_entries:
+            binding_root_empty = next(binding_entries, None) is None
+        if (
+            stat.S_ISLNK(root_metadata.st_mode)
+            or not stat.S_ISDIR(root_metadata.st_mode)
+            or formal_root.resolve(strict=True) != formal_root
+            or stat.S_ISLNK(binding_metadata.st_mode)
+            or not stat.S_ISDIR(binding_metadata.st_mode)
+            or binding_root.resolve(strict=True) != binding_root
+            or not binding_root_empty
+        ):
+            return False
+        entry_count = 0
+        with os.scandir(formal_root) as entries:
+            for entry in entries:
+                entry_count += 1
+                if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
+                    return False
+                if entry.name == "confirmation-v1.17.0":
+                    return False
+                if Path(entry.path) != binding_root and os.path.lexists(Path(entry.path) / "confirmation-v1.17.0"):
+                    return False
+        if os.path.lexists(adjudication_root):
+            adjudication_metadata = os.lstat(adjudication_root)
+            if stat.S_ISLNK(adjudication_metadata.st_mode) or not stat.S_ISDIR(adjudication_metadata.st_mode):
+                return False
+            with os.scandir(adjudication_root) as entries:
+                for entry in entries:
+                    entry_count += 1
+                    if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
+                        return False
+                    if entry.name.startswith(".formal-adjudication-v1.17.0.staging-"):
+                        return False
+        return True
+    except OSError:
+        return False
+
+
+def _rehearsal_claim_value(
+    *,
+    binding_path: Path,
+    binding_payload: bytes,
+    attempt: Path,
+    marker: Path,
+    launch_path: Path,
+    launch_payload: bytes,
+    bootstrap_path: Path,
+    bootstrap_payload: bytes,
+    device: str,
+) -> dict[str, object]:
+    return {
+        "schema": _REHEARSAL_CLAIM_SCHEMA,
+        "experiment_id": "WM-001",
+        "protocol_version": "1.17.0",
+        "assurance": dict(_ASSURANCE),
+        "status": "consumed",
+        "binding_path": str(binding_path),
+        "binding_bytes": len(binding_payload),
+        "binding_sha256": hashlib.sha256(binding_payload).hexdigest(),
+        "attempt_path": str(attempt),
+        "marker_path": str(marker),
+        "launch_bootstrap_path": str(launch_path),
+        "launch_bootstrap_bytes": len(launch_payload),
+        "launch_bootstrap_sha256": hashlib.sha256(launch_payload).hexdigest(),
+        "producer_bootstrap_path": str(bootstrap_path),
+        "producer_bootstrap_bytes": len(bootstrap_payload),
+        "producer_bootstrap_sha256": hashlib.sha256(bootstrap_payload).hexdigest(),
+        "command": [
+            "preformal-runtime",
+            "bootstrap-inventory-conformance",
+            "--device",
+            device,
+        ],
+    }
+
+
+def _prepare_rehearsal_namespace(
+    paths: dict[str, Path],
+    *,
+    claim_payload: bytes,
+) -> bool:
+    """Publish the claim, or identify an already consumed recovery state."""
+
+    attempt = paths["attempt"]
+    claim_root = paths["claim_root"]
+    attempt.parent.mkdir(parents=True, exist_ok=True)
+    claim_root.mkdir(parents=True, exist_ok=True)
+    for directory, label in (
+        (attempt.parent, "accepted-binding rehearsal parent"),
+        (claim_root, "accepted-binding rehearsal claim root"),
+    ):
+        _reject_symlink_components(directory, label=label)
+        if directory.resolve(strict=True) != directory or not directory.is_dir():
+            raise LaunchError(f"{label} is not one canonical directory")
+
+    try:
+        marker_names = {entry.name for entry in os.scandir(claim_root)}
+        attempt_names = {entry.name for entry in os.scandir(attempt.parent)}
+    except OSError as error:
+        raise LaunchError("accepted-binding rehearsal namespace cannot be scanned") from error
+    if attempt_names not in (set(), {attempt.name}):
+        raise LaunchError("accepted-binding rehearsal attempts namespace is contaminated")
+    prior_state = os.path.lexists(attempt) or bool(marker_names) or os.path.lexists(paths["completion"])
+    if not prior_state:
+        try:
+            os.mkdir(attempt, 0o700)
+        except OSError as error:
+            raise LaunchError("accepted-binding rehearsal attempt cannot be claimed") from error
+        _fsync_directory(attempt.parent)
+        _rehearsal_failpoint("after_attempt_mkdir")
+        _write_exclusive(paths["claim"], claim_payload)
+        _rehearsal_failpoint("before_claim_marker")
+        try:
+            os.link(
+                paths["claim"],
+                paths["claim_marker"],
+                follow_symlinks=False,
+            )
+        except OSError as error:
+            raise LaunchError("accepted-binding rehearsal claim marker cannot be published") from error
+        _fsync_directory(claim_root)
+        _rehearsal_failpoint("after_claim_marker")
+        return True
+
+    if os.path.lexists(paths["completion"]):
+        raise LaunchError("accepted-binding rehearsal is already finalized")
+    if not attempt.is_dir() or attempt.is_symlink():
+        raise LaunchError("accepted-binding rehearsal recovery has no canonical attempt")
+    if attempt_names != {attempt.name}:
+        raise LaunchError("accepted-binding rehearsal recovery attempt is not sole")
+    _reject_symlink_components(
+        attempt,
+        label="accepted-binding rehearsal recovery attempt",
+    )
+    allowed = {
+        _REHEARSAL_CLAIM_NAME,
+        _REHEARSAL_STDOUT_NAME,
+        _REHEARSAL_STDERR_NAME,
+        _REHEARSAL_OUTER_RECEIPT_NAME,
+        _REHEARSAL_TERMINAL_NAME,
+        _REHEARSAL_CHILD_STARTED_NAME,
+        _REHEARSAL_TERMINAL_STAGING_NAME,
+    }
+    observed = {entry.name for entry in os.scandir(attempt)}
+    if not observed <= allowed:
+        raise LaunchError("accepted-binding rehearsal recovery namespace is contaminated")
+    expected_marker_name = paths["claim_marker"].name
+    marker_names = {entry.name for entry in os.scandir(claim_root)}
+    if not marker_names <= {expected_marker_name}:
+        raise LaunchError("accepted-binding rehearsal has a prior binding claim")
+
+    claim_exists = os.path.lexists(paths["claim"])
+    marker_exists = os.path.lexists(paths["claim_marker"])
+    if claim_exists:
+        expected_links = 2 if marker_exists else 1
+        descriptor, payload, _ = _open_regular(
+            paths["claim"],
+            label="accepted-binding rehearsal recovery claim",
+            expected_nlink=expected_links,
+        )
+        os.close(descriptor)
+        if payload != claim_payload:
+            raise LaunchError("accepted-binding rehearsal consumed claim is misbound")
+    elif marker_exists:
+        descriptor, payload, _ = _open_regular(
+            paths["claim_marker"],
+            label="accepted-binding rehearsal orphaned claim marker",
+        )
+        os.close(descriptor)
+        if payload != claim_payload:
+            raise LaunchError("accepted-binding rehearsal orphaned marker is misbound")
+        os.link(
+            paths["claim_marker"],
+            paths["claim"],
+            follow_symlinks=False,
+        )
+        _fsync_directory(attempt)
+    else:
+        raise LaunchError("accepted-binding rehearsal recovery has no durable claim")
+
+    if not os.path.lexists(paths["claim_marker"]):
+        os.link(
+            paths["claim"],
+            paths["claim_marker"],
+            follow_symlinks=False,
+        )
+        _fsync_directory(claim_root)
+    if not os.path.samefile(paths["claim"], paths["claim_marker"]):
+        raise LaunchError("accepted-binding rehearsal recovery claim is not one inode")
+    return False
+
+
+def _rehearsal_relative_row(path: Path) -> dict[str, object]:
+    payload = path.read_bytes()
+    return {
+        "path": path.name,
+        "bytes": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+
+def _ensure_rehearsal_sidecar(path: Path, payload: bytes | None) -> None:
+    if os.path.lexists(path):
+        descriptor, _, _ = _open_regular(
+            path,
+            label=f"accepted-binding rehearsal sidecar {path.name}",
+        )
+        os.close(descriptor)
+        return
+    _write_exclusive(path, b"" if payload is None else payload)
+
+
+def _publish_rehearsal_terminal(
+    paths: dict[str, Path],
+    *,
+    claim: dict[str, object],
+    status: str,
+    child_started: bool,
+    returncode: int | None,
+    stdout: bytes | None,
+    stderr: bytes | None,
+    outer_receipt: bytes | None,
+    formal_paths_absent_before: bool,
+    formal_paths_absent_after: bool,
+    phase: str,
+    error_code: str | None,
+) -> None:
+    for role, payload in (
+        ("stdout", stdout),
+        ("stderr", stderr),
+        ("outer_receipt", outer_receipt),
+    ):
+        _ensure_rehearsal_sidecar(paths[role], payload)
+
+    if os.path.lexists(paths["terminal"]):
+        raise LaunchError("accepted-binding rehearsal canonical terminal already exists")
+    if os.path.lexists(paths["terminal_staging"]):
+        raise LaunchError("accepted-binding rehearsal terminal staging already exists")
+    if os.path.lexists(paths["child_started"]):
+        descriptor, _, _ = _open_regular(
+            paths["child_started"],
+            label="accepted-binding rehearsal child-start staging",
+        )
+        os.close(descriptor)
+        child_started = True
+        if returncode is None:
+            returncode = -1
+
+    claim_payload = paths["claim"].read_bytes()
+    rows = [_rehearsal_relative_row(paths[role]) for role in ("claim", "outer_receipt", "stderr", "stdout")]
+    rows.sort(key=lambda row: str(row["path"]))
+    rows_by_path = {str(row["path"]): row for row in rows}
+    stdout_row = rows_by_path[_REHEARSAL_STDOUT_NAME]
+    stderr_row = rows_by_path[_REHEARSAL_STDERR_NAME]
+    outer_receipt_row = rows_by_path[_REHEARSAL_OUTER_RECEIPT_NAME]
+    terminal = {
+        "schema": _REHEARSAL_TERMINAL_SCHEMA,
+        "experiment_id": "WM-001",
+        "protocol_version": "1.17.0",
+        "assurance": dict(_ASSURANCE),
+        "status": status,
+        "claim_file": _REHEARSAL_CLAIM_NAME,
+        "claim_marker": str(paths["claim_marker"]),
+        "claim_bytes": len(claim_payload),
+        "claim_sha256": hashlib.sha256(claim_payload).hexdigest(),
+        "binding_path": claim["binding_path"],
+        "binding_bytes": claim["binding_bytes"],
+        "binding_sha256": claim["binding_sha256"],
+        "child_started": child_started,
+        "returncode": returncode,
+        "stdout_file": _REHEARSAL_STDOUT_NAME,
+        "stdout_bytes": stdout_row["bytes"],
+        "stdout_sha256": stdout_row["sha256"],
+        "stderr_file": _REHEARSAL_STDERR_NAME,
+        "stderr_bytes": stderr_row["bytes"],
+        "stderr_sha256": stderr_row["sha256"],
+        "outer_receipt_file": _REHEARSAL_OUTER_RECEIPT_NAME,
+        "outer_receipt_bytes": outer_receipt_row["bytes"],
+        "outer_receipt_sha256": outer_receipt_row["sha256"],
+        "formal_paths_absent_before": formal_paths_absent_before,
+        "formal_paths_absent_after": formal_paths_absent_after,
+        "phase": phase,
+        "error_code": error_code,
+        "files": rows,
+        "file_count": len(rows),
+        "manifest_excludes": [_REHEARSAL_TERMINAL_NAME],
+    }
+    _write_exclusive(
+        paths["terminal_staging"],
+        _canonical_bytes(terminal),
+    )
+    _rehearsal_failpoint("after_terminal_staging")
+    try:
+        os.link(
+            paths["terminal_staging"],
+            paths["terminal"],
+            follow_symlinks=False,
+        )
+    except OSError as error:
+        raise LaunchError("accepted-binding rehearsal terminal cannot be published") from error
+    _fsync_directory(paths["attempt"])
+    _rehearsal_failpoint("after_terminal_hardlink")
+    paths["terminal_staging"].unlink()
+    _fsync_directory(paths["attempt"])
+    _rehearsal_failpoint("after_staging_cleanup")
+    if os.path.lexists(paths["child_started"]):
+        paths["child_started"].unlink()
+        _fsync_directory(paths["attempt"])
+    expected_names = {
+        _REHEARSAL_CLAIM_NAME,
+        _REHEARSAL_STDOUT_NAME,
+        _REHEARSAL_STDERR_NAME,
+        _REHEARSAL_OUTER_RECEIPT_NAME,
+        _REHEARSAL_TERMINAL_NAME,
+    }
+    if {entry.name for entry in os.scandir(paths["attempt"])} != expected_names:
+        raise LaunchError("accepted-binding rehearsal terminal namespace is not exact")
+    try:
+        os.link(
+            paths["terminal"],
+            paths["completion"],
+            follow_symlinks=False,
+        )
+    except OSError as error:
+        raise LaunchError("accepted-binding rehearsal completion cannot be published") from error
+    _rehearsal_failpoint("after_completion_hardlink")
+    _fsync_directory(paths["completion"].parent)
+    if not os.path.samefile(paths["terminal"], paths["completion"]):
+        raise LaunchError("accepted-binding rehearsal completion is not the terminal inode")
+
+
+_REHEARSAL_CLAIM_FIELDS = {
+    "schema",
+    "experiment_id",
+    "protocol_version",
+    "assurance",
+    "status",
+    "binding_path",
+    "binding_bytes",
+    "binding_sha256",
+    "attempt_path",
+    "marker_path",
+    "launch_bootstrap_path",
+    "launch_bootstrap_bytes",
+    "launch_bootstrap_sha256",
+    "producer_bootstrap_path",
+    "producer_bootstrap_bytes",
+    "producer_bootstrap_sha256",
+    "command",
+}
+_REHEARSAL_TERMINAL_FIELDS = {
+    "schema",
+    "experiment_id",
+    "protocol_version",
+    "assurance",
+    "status",
+    "claim_file",
+    "claim_marker",
+    "claim_bytes",
+    "claim_sha256",
+    "binding_path",
+    "binding_bytes",
+    "binding_sha256",
+    "child_started",
+    "returncode",
+    "stdout_file",
+    "stdout_bytes",
+    "stdout_sha256",
+    "stderr_file",
+    "stderr_bytes",
+    "stderr_sha256",
+    "outer_receipt_file",
+    "outer_receipt_bytes",
+    "outer_receipt_sha256",
+    "formal_paths_absent_before",
+    "formal_paths_absent_after",
+    "phase",
+    "error_code",
+    "files",
+    "file_count",
+    "manifest_excludes",
+}
+
+
+def _verify_binding_rehearsal_package(
+    binding_path: Path,
+    *,
+    repository: Path,
+    completion_root: Path,
+    finalized: bool,
+    accepted_only: bool,
+) -> tuple[dict[str, object], dict[str, dict[str, object]]]:
+    """Independently reopen rehearsal evidence using only the stdlib."""
+
+    canonical_binding = (
+        repository
+        / "bench"
+        / "world_model_lifecycle"
+        / "results"
+        / "operator-v1.17"
+        / "bindings"
+        / "formal-binding-v1.17.0"
+        / "formal-binding.json"
+    )
+    if binding_path != canonical_binding:
+        raise LaunchError("accepted-binding rehearsal uses a noncanonical binding")
+    captures: dict[
+        str,
+        tuple[int, bytes, tuple[int, ...], int, str],
+    ] = {}
+
+    def capture(
+        role: str,
+        path: Path,
+        *,
+        expected_nlink: int,
+        maximum_bytes: int = _MAX_CONTROL_BYTES,
+    ) -> bytes:
+        descriptor, payload, identity = _open_regular(
+            path,
+            label=f"accepted-binding rehearsal {role}",
+            expected_nlink=expected_nlink,
+        )
+        if len(payload) > maximum_bytes:
+            os.close(descriptor)
+            raise LaunchError(f"accepted-binding rehearsal {role} exceeds its byte limit")
+        captures[role] = (
+            descriptor,
+            payload,
+            identity,
+            expected_nlink,
+            str(path),
+        )
+        return payload
+
+    try:
+        binding_payload = capture(
+            "binding",
+            binding_path,
+            expected_nlink=1,
+        )
+        binding = _canonical_object(
+            binding_payload,
+            label="accepted-binding rehearsal binding",
+        )
+        binding_sha256 = hashlib.sha256(binding_payload).hexdigest()
+        paths = _rehearsal_paths(
+            repository,
+            binding_sha256=binding_sha256,
+            completion_root=completion_root,
+        )
+        attempt_parent = paths["attempt"].parent
+        _reject_symlink_components(
+            attempt_parent,
+            label="accepted-binding rehearsal attempts root",
+        )
+        if (
+            attempt_parent.resolve(strict=True) != attempt_parent
+            or not attempt_parent.is_dir()
+            or {entry.name for entry in os.scandir(attempt_parent)} != {paths["attempt"].name}
+        ):
+            raise LaunchError("accepted-binding rehearsal attempts namespace is not exact")
+        for key in ("attempt", "claim_root"):
+            path = paths[key]
+            _reject_symlink_components(
+                path,
+                label=f"accepted-binding rehearsal {key}",
+            )
+            if path.resolve(strict=True) != path or not path.is_dir():
+                raise LaunchError(f"accepted-binding rehearsal {key} is not canonical")
+        expected_names = {
+            _REHEARSAL_CLAIM_NAME,
+            _REHEARSAL_STDOUT_NAME,
+            _REHEARSAL_STDERR_NAME,
+            _REHEARSAL_OUTER_RECEIPT_NAME,
+            _REHEARSAL_TERMINAL_NAME,
+        }
+        if not finalized and os.path.lexists(paths["child_started"]):
+            expected_names.add(_REHEARSAL_CHILD_STARTED_NAME)
+        if (
+            {entry.name for entry in os.scandir(paths["attempt"])} != expected_names
+            or {entry.name for entry in os.scandir(attempt_parent)} != {paths["attempt"].name}
+            or {entry.name for entry in os.scandir(paths["claim_root"])} != {paths["claim_marker"].name}
+        ):
+            raise LaunchError("accepted-binding rehearsal namespace is not exact")
+
+        claim_payload = capture(
+            "claim",
+            paths["claim"],
+            expected_nlink=2,
+        )
+        marker_payload = capture(
+            "claim marker",
+            paths["claim_marker"],
+            expected_nlink=2,
+        )
+        stdout_payload = capture(
+            "stdout",
+            paths["stdout"],
+            expected_nlink=1,
+            maximum_bytes=_MAX_REHEARSAL_STDOUT_BYTES,
+        )
+        stderr_payload = capture(
+            "stderr",
+            paths["stderr"],
+            expected_nlink=1,
+            maximum_bytes=_MAX_REHEARSAL_STDERR_BYTES,
+        )
+        outer_receipt_payload = capture(
+            "outer receipt",
+            paths["outer_receipt"],
+            expected_nlink=1,
+            maximum_bytes=_MAX_RECEIPT_BYTES,
+        )
+        terminal_payload = capture(
+            "terminal",
+            paths["terminal"],
+            expected_nlink=(2 if finalized else 1),
+        )
+        completion_payload = (
+            capture(
+                "outer completion",
+                paths["completion"],
+                expected_nlink=2,
+            )
+            if finalized
+            else None
+        )
+        child_started_payload = (
+            capture(
+                "child-start staging",
+                paths["child_started"],
+                expected_nlink=1,
+            )
+            if not finalized and os.path.lexists(paths["child_started"])
+            else None
+        )
+        launch_path = repository / "bench" / "world_model_lifecycle" / "launch_bootstrap.py"
+        bootstrap_path = launch_path.with_name("producer_bootstrap.py")
+        launch_payload = capture(
+            "launch bootstrap",
+            launch_path,
+            expected_nlink=1,
+        )
+        bootstrap_payload = capture(
+            "producer bootstrap",
+            bootstrap_path,
+            expected_nlink=1,
+        )
+        if (
+            claim_payload != marker_payload
+            or not os.path.samefile(paths["claim"], paths["claim_marker"])
+            or (
+                finalized
+                and (
+                    terminal_payload != completion_payload
+                    or not os.path.samefile(
+                        paths["terminal"],
+                        paths["completion"],
+                    )
+                )
+            )
+            or (not finalized and os.path.lexists(paths["completion"]))
+            or child_started_payload not in {None, b"started\n"}
+        ):
+            raise LaunchError("accepted-binding rehearsal marker identity is invalid")
+
+        runtime = binding.get("runtime")
+        device = runtime.get("device") if isinstance(runtime, dict) else None
+        claim = _canonical_object(
+            claim_payload,
+            label="accepted-binding rehearsal claim",
+        )
+        expected_claim = _rehearsal_claim_value(
+            binding_path=binding_path,
+            binding_payload=binding_payload,
+            attempt=paths["attempt"],
+            marker=paths["claim_marker"],
+            launch_path=launch_path,
+            launch_payload=launch_payload,
+            bootstrap_path=bootstrap_path,
+            bootstrap_payload=bootstrap_payload,
+            device=str(device),
+        )
+        if (
+            device not in {"cpu", "cuda"}
+            or set(claim) != _REHEARSAL_CLAIM_FIELDS
+            or not _strict_json_equal(claim, expected_claim)
+        ):
+            raise LaunchError("accepted-binding rehearsal claim is malformed or misbound")
+
+        terminal = _canonical_object(
+            terminal_payload,
+            label="accepted-binding rehearsal terminal",
+        )
+        rows = [
+            {
+                "path": paths[role].name,
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+            for role, payload in (
+                ("claim", claim_payload),
+                ("outer_receipt", outer_receipt_payload),
+                ("stderr", stderr_payload),
+                ("stdout", stdout_payload),
+            )
+        ]
+        rows.sort(key=lambda row: str(row["path"]))
+        status = terminal.get("status")
+        child_started = terminal.get("child_started")
+        returncode = terminal.get("returncode")
+        if (
+            set(terminal) != _REHEARSAL_TERMINAL_FIELDS
+            or terminal.get("schema") != _REHEARSAL_TERMINAL_SCHEMA
+            or terminal.get("experiment_id") != "WM-001"
+            or terminal.get("protocol_version") != "1.17.0"
+            or not _strict_json_equal(terminal.get("assurance"), _ASSURANCE)
+            or status not in {"accepted", "failed"}
+            or (accepted_only and status != "accepted")
+            or terminal.get("claim_file") != _REHEARSAL_CLAIM_NAME
+            or terminal.get("claim_marker") != str(paths["claim_marker"])
+            or type(terminal.get("claim_bytes")) is not int
+            or terminal.get("claim_bytes") != len(claim_payload)
+            or terminal.get("claim_sha256") != hashlib.sha256(claim_payload).hexdigest()
+            or terminal.get("binding_path") != str(binding_path)
+            or type(terminal.get("binding_bytes")) is not int
+            or terminal.get("binding_bytes") != len(binding_payload)
+            or terminal.get("binding_sha256") != binding_sha256
+            or type(child_started) is not bool
+            or terminal.get("stdout_file") != _REHEARSAL_STDOUT_NAME
+            or type(terminal.get("stdout_bytes")) is not int
+            or terminal.get("stdout_bytes") != len(stdout_payload)
+            or terminal.get("stdout_sha256") != hashlib.sha256(stdout_payload).hexdigest()
+            or terminal.get("stderr_file") != _REHEARSAL_STDERR_NAME
+            or type(terminal.get("stderr_bytes")) is not int
+            or terminal.get("stderr_bytes") != len(stderr_payload)
+            or terminal.get("stderr_sha256") != hashlib.sha256(stderr_payload).hexdigest()
+            or terminal.get("outer_receipt_file") != _REHEARSAL_OUTER_RECEIPT_NAME
+            or type(terminal.get("outer_receipt_bytes")) is not int
+            or terminal.get("outer_receipt_bytes") != len(outer_receipt_payload)
+            or terminal.get("outer_receipt_sha256") != hashlib.sha256(outer_receipt_payload).hexdigest()
+            or type(terminal.get("formal_paths_absent_before")) is not bool
+            or type(terminal.get("formal_paths_absent_after")) is not bool
+            or not _strict_json_equal(terminal.get("files"), rows)
+            or type(terminal.get("file_count")) is not int
+            or terminal.get("file_count") != len(rows)
+            or terminal.get("manifest_excludes") != [_REHEARSAL_TERMINAL_NAME]
+        ):
+            raise LaunchError("accepted-binding rehearsal terminal is malformed or failed")
+        if status == "accepted":
+            if (
+                child_started is not True
+                or type(returncode) is not int
+                or returncode != 0
+                or stderr_payload
+                or outer_receipt_payload
+                or terminal.get("formal_paths_absent_before") is not True
+                or terminal.get("formal_paths_absent_after") is not True
+                or terminal.get("phase") != "complete"
+                or terminal.get("error_code") is not None
+            ):
+                raise LaunchError("accepted-binding rehearsal terminal is not clean")
+            dependencies = binding.get("dependencies")
+            audit_execution = binding.get("audit_execution")
+            if not isinstance(dependencies, dict):
+                raise LaunchError("accepted-binding rehearsal binding dependencies are absent")
+            stdout = _canonical_object(
+                stdout_payload,
+                label="accepted-binding rehearsal stdout",
+            )
+            _recorded_runtime_conformance(
+                stdout,
+                dependencies=dependencies,
+                audit_execution=audit_execution,
+                device=device,
+            )
+        else:
+            error_code = terminal.get("error_code")
+            phase = terminal.get("phase")
+            if (
+                phase
+                not in {
+                    "pre_dispatch",
+                    "child_execution",
+                    "output_validation",
+                    "post_dispatch",
+                    "recovery",
+                }
+                or not isinstance(error_code, str)
+                or re.fullmatch(r"[a-z][a-z0-9_]{0,127}", error_code) is None
+                or (child_started is False and returncode is not None)
+                or (child_started is True and type(returncode) is not int)
+            ):
+                raise LaunchError("failed accepted-binding rehearsal terminal is malformed")
+        if child_started_payload is not None and child_started is not True:
+            raise LaunchError("accepted-binding rehearsal child-start staging is misbound")
+        for descriptor, payload, identity, links, label in captures.values():
+            _verify_unchanged(
+                descriptor,
+                expected_payload=payload,
+                expected_identity=identity,
+                expected_nlink=links,
+                label=label,
+            )
+        if {entry.name for entry in os.scandir(paths["attempt"])} != expected_names or {
+            entry.name for entry in os.scandir(paths["claim_root"])
+        } != {paths["claim_marker"].name}:
+            raise LaunchError("accepted-binding rehearsal namespace changed while verified")
+        identities = {
+            "claim": {
+                "path": str(paths["claim"]),
+                "bytes": len(claim_payload),
+                "sha256": hashlib.sha256(claim_payload).hexdigest(),
+            },
+            "claim_marker": {
+                "path": str(paths["claim_marker"]),
+                "bytes": len(marker_payload),
+                "sha256": hashlib.sha256(marker_payload).hexdigest(),
+            },
+            "terminal": {
+                "path": str(paths["terminal"]),
+                "bytes": len(terminal_payload),
+                "sha256": hashlib.sha256(terminal_payload).hexdigest(),
+            },
+        }
+        if completion_payload is not None:
+            identities["outer_completion"] = {
+                "path": str(paths["completion"]),
+                "bytes": len(completion_payload),
+                "sha256": hashlib.sha256(completion_payload).hexdigest(),
+            }
+        return terminal, identities
+    finally:
+        for descriptor, _, _, _, _ in reversed(tuple(captures.values())):
+            _close_quietly(descriptor)
+
+
+def _verify_accepted_binding_rehearsal(
+    binding_path: Path,
+    *,
+    repository: Path,
+    completion_root: Path,
+) -> dict[str, dict[str, object]]:
+    """Return identities from one accepted, outer-finalized rehearsal."""
+
+    _, identities = _verify_binding_rehearsal_package(
+        binding_path,
+        repository=repository,
+        completion_root=completion_root,
+        finalized=True,
+        accepted_only=True,
+    )
+    return identities
+
+
+def _recover_accepted_binding_rehearsal(
+    binding_path: Path,
+    *,
+    repository: Path,
+    completion_root: Path,
+    paths: dict[str, Path],
+    claim: dict[str, object],
+    binding_sha256: str,
+) -> int:
+    """Finish an interrupted transaction without dispatching another child."""
+
+    terminal_exists = os.path.lexists(paths["terminal"])
+    staging_exists = os.path.lexists(paths["terminal_staging"])
+    if terminal_exists:
+        if staging_exists:
+            terminal_metadata = os.lstat(paths["terminal"])
+            staging_metadata = os.lstat(paths["terminal_staging"])
+            if (
+                not stat.S_ISREG(terminal_metadata.st_mode)
+                or not stat.S_ISREG(staging_metadata.st_mode)
+                or terminal_metadata.st_nlink != 2
+                or staging_metadata.st_nlink != 2
+                or not os.path.samefile(
+                    paths["terminal"],
+                    paths["terminal_staging"],
+                )
+            ):
+                raise LaunchError("accepted-binding rehearsal terminal staging is misbound")
+            paths["terminal_staging"].unlink()
+            _fsync_directory(paths["attempt"])
+        terminal, _ = _verify_binding_rehearsal_package(
+            binding_path,
+            repository=repository,
+            completion_root=completion_root,
+            finalized=False,
+            accepted_only=False,
+        )
+        if terminal.get("status") == "accepted" and not _formal_rehearsal_paths_absent(
+            repository,
+            binding_sha256=binding_sha256,
+        ):
+            raise LaunchError("accepted-binding rehearsal recovery found formal authority")
+        if os.path.lexists(paths["child_started"]):
+            paths["child_started"].unlink()
+            _fsync_directory(paths["attempt"])
+        expected_names = {
+            _REHEARSAL_CLAIM_NAME,
+            _REHEARSAL_STDOUT_NAME,
+            _REHEARSAL_STDERR_NAME,
+            _REHEARSAL_OUTER_RECEIPT_NAME,
+            _REHEARSAL_TERMINAL_NAME,
+        }
+        if {entry.name for entry in os.scandir(paths["attempt"])} != expected_names:
+            raise LaunchError("accepted-binding rehearsal recovery namespace is not exact")
+        try:
+            os.link(
+                paths["terminal"],
+                paths["completion"],
+                follow_symlinks=False,
+            )
+        except OSError as error:
+            raise LaunchError("accepted-binding rehearsal recovery completion failed") from error
+        _rehearsal_failpoint("after_completion_hardlink")
+        _fsync_directory(paths["completion"].parent)
+        return 0 if terminal.get("status") == "accepted" else 2
+
+    if staging_exists:
+        metadata = os.lstat(paths["terminal_staging"])
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise LaunchError("accepted-binding rehearsal incomplete staging is aliased")
+        paths["terminal_staging"].unlink()
+        _fsync_directory(paths["attempt"])
+    _publish_rehearsal_terminal(
+        paths,
+        claim=claim,
+        status="failed",
+        child_started=False,
+        returncode=None,
+        stdout=None,
+        stderr=None,
+        outer_receipt=None,
+        formal_paths_absent_before=False,
+        formal_paths_absent_after=_formal_rehearsal_paths_absent(
+            repository,
+            binding_sha256=binding_sha256,
+        ),
+        phase="recovery",
+        error_code="interrupted_rehearsal",
+    )
+    return 2
+
+
+def _run_accepted_binding_rehearsal(
+    binding_path: Path,
+    *,
+    environment: dict[str, str],
+    repository: Path,
+    completion_root: Path,
+    bootstrap_path: Path,
+    bootstrap_fd: int,
+    bootstrap_payload: bytes,
+    bootstrap_identity: tuple[int, ...],
+) -> int:
+    """Consume and terminally record the one accepted-binding rehearsal."""
+
+    canonical_binding = (
+        repository
+        / "bench"
+        / "world_model_lifecycle"
+        / "results"
+        / "operator-v1.17"
+        / "bindings"
+        / "formal-binding-v1.17.0"
+        / "formal-binding.json"
+    )
+    if binding_path != canonical_binding:
+        raise LaunchError("accepted-binding rehearsal requires the canonical formal binding")
+    binding_fd, binding_payload, binding_identity = _open_regular(
+        binding_path,
+        label="accepted-binding rehearsal binding",
+    )
+    launch_path = repository / "bench" / "world_model_lifecycle" / "launch_bootstrap.py"
+    launch_fd, launch_payload, launch_identity = _open_regular(
+        launch_path,
+        label="accepted-binding rehearsal launcher",
+    )
+    seal_fd: int | None = None
+    seal_payload: bytes | None = None
+    seal_identity: tuple[int, ...] | None = None
+    seal_expected_nlink: int | None = None
+    try:
+        binding = _canonical_object(
+            binding_payload,
+            label="accepted-binding rehearsal binding",
+        )
+        runtime = binding.get("runtime")
+        device = runtime.get("device") if isinstance(runtime, dict) else None
+        if device not in {"cpu", "cuda"}:
+            raise LaunchError("accepted-binding rehearsal binding device is malformed")
+        binding_sha256 = hashlib.sha256(binding_payload).hexdigest()
+        paths = _rehearsal_paths(
+            repository,
+            binding_sha256=binding_sha256,
+            completion_root=completion_root,
+        )
+        claim = _rehearsal_claim_value(
+            binding_path=binding_path,
+            binding_payload=binding_payload,
+            attempt=paths["attempt"],
+            marker=paths["claim_marker"],
+            launch_path=launch_path,
+            launch_payload=launch_payload,
+            bootstrap_path=bootstrap_path,
+            bootstrap_payload=bootstrap_payload,
+            device=device,
+        )
+        new_attempt = _prepare_rehearsal_namespace(
+            paths,
+            claim_payload=_canonical_bytes(claim),
+        )
+        if not new_attempt:
+            return _recover_accepted_binding_rehearsal(
+                binding_path,
+                repository=repository,
+                completion_root=completion_root,
+                paths=paths,
+                claim=claim,
+                binding_sha256=binding_sha256,
+            )
+
+        formal_paths_absent_before = _formal_rehearsal_paths_absent(
+            repository,
+            binding_sha256=binding_sha256,
+        )
+        child_started = False
+        returncode: int | None = None
+        stdout: bytes | None = None
+        stderr: bytes | None = None
+        outer_receipt: bytes | None = None
+        phase = "pre_dispatch"
+        try:
+            if not formal_paths_absent_before:
+                raise LaunchError("accepted-binding rehearsal formal paths already exist")
+            (
+                seal_fd,
+                seal_payload,
+                seal_identity,
+                seal_expected_nlink,
+            ) = _open_typed_runtime_custody(
+                binding_path,
+                repository=repository,
+                completion_root=completion_root,
+            )
+            if seal_payload != binding_payload:
+                raise LaunchError("accepted-binding rehearsal binding changed before authorization")
+            binding = _canonical_object(
+                seal_payload,
+                label="accepted-binding rehearsal authorized binding",
+            )
+            runtime = binding.get("runtime")
+            dependencies = binding.get("dependencies")
+            audit_execution = binding.get("audit_execution")
+            authorized_device = runtime.get("device") if isinstance(runtime, dict) else None
+            if authorized_device != device or not isinstance(dependencies, dict):
+                raise LaunchError("accepted-binding rehearsal authorization changed its command")
+            formal_paths_absent_before = formal_paths_absent_before and _formal_rehearsal_paths_absent(
+                repository,
+                binding_sha256=binding_sha256,
+            )
+            if not formal_paths_absent_before:
+                raise LaunchError("accepted-binding rehearsal created formal authority before child")
+
+            receipt_read_fd, receipt_write_fd = os.pipe()
+            try:
+                _write_exclusive(paths["child_started"], b"started\n")
+                child_started = True
+                _rehearsal_failpoint("after_child_start")
+                phase = "child_execution"
+                command = [
+                    sys.executable,
+                    "-I",
+                    "-S",
+                    "-B",
+                    _descriptor_path(bootstrap_fd),
+                    "--bootstrap-fd",
+                    str(bootstrap_fd),
+                    "--outer-receipt-fd",
+                    str(receipt_write_fd),
+                    "--runtime-seal-fd",
+                    str(seal_fd),
+                    "preformal-runtime",
+                    "bootstrap-inventory-conformance",
+                    "--device",
+                    device,
+                ]
+                completed = subprocess.run(
+                    command,
+                    cwd=repository,
+                    env=environment,
+                    check=False,
+                    pass_fds=(
+                        bootstrap_fd,
+                        receipt_write_fd,
+                        seal_fd,
+                    ),
+                    capture_output=True,
+                )
+                returncode = completed.returncode
+                stdout = completed.stdout
+                stderr = completed.stderr
+                if not isinstance(stdout, bytes) or not isinstance(stderr, bytes):
+                    raise LaunchError("accepted-binding rehearsal child streams are not bytes")
+                os.close(receipt_write_fd)
+                receipt_write_fd = -1
+                outer_receipt = _read_receipt(receipt_read_fd)
+            finally:
+                if receipt_write_fd >= 0:
+                    _close_quietly(receipt_write_fd)
+                _close_quietly(receipt_read_fd)
+            _ensure_rehearsal_sidecar(paths["stdout"], stdout)
+            _ensure_rehearsal_sidecar(paths["stderr"], stderr)
+            _ensure_rehearsal_sidecar(
+                paths["outer_receipt"],
+                outer_receipt,
+            )
+            _rehearsal_failpoint("after_sidecars")
+            phase = "output_validation"
+            if (
+                returncode != 0
+                or stderr
+                or outer_receipt
+                or len(stdout) > _MAX_REHEARSAL_STDOUT_BYTES
+                or len(stderr) > _MAX_REHEARSAL_STDERR_BYTES
+            ):
+                raise LaunchError("accepted-binding rehearsal child result is not clean")
+            output = _canonical_object(
+                stdout,
+                label="accepted-binding rehearsal stdout",
+            )
+            _recorded_runtime_conformance(
+                output,
+                dependencies=dependencies,
+                audit_execution=audit_execution,
+                device=device,
+            )
+            phase = "post_dispatch"
+            _verify_unchanged(
+                bootstrap_fd,
+                expected_payload=bootstrap_payload,
+                expected_identity=bootstrap_identity,
+                label="producer bootstrap",
+            )
+            _verify_unchanged(
+                launch_fd,
+                expected_payload=launch_payload,
+                expected_identity=launch_identity,
+                label="accepted-binding rehearsal launcher",
+            )
+            _verify_unchanged(
+                binding_fd,
+                expected_payload=binding_payload,
+                expected_identity=binding_identity,
+                label="accepted-binding rehearsal binding",
+            )
+            assert seal_fd is not None
+            assert seal_payload is not None
+            assert seal_identity is not None
+            assert seal_expected_nlink is not None
+            _verify_unchanged(
+                seal_fd,
+                expected_payload=seal_payload,
+                expected_identity=seal_identity,
+                expected_nlink=seal_expected_nlink,
+                label="accepted-binding rehearsal authorized binding",
+            )
+            formal_paths_absent_after = _formal_rehearsal_paths_absent(
+                repository,
+                binding_sha256=binding_sha256,
+            )
+            if not formal_paths_absent_after:
+                raise LaunchError("accepted-binding rehearsal created formal authority")
+            _publish_rehearsal_terminal(
+                paths,
+                claim=claim,
+                status="accepted",
+                child_started=True,
+                returncode=0,
+                stdout=stdout,
+                stderr=stderr,
+                outer_receipt=outer_receipt,
+                formal_paths_absent_before=True,
+                formal_paths_absent_after=True,
+                phase="complete",
+                error_code=None,
+            )
+            return 0
+        except Exception:
+            formal_paths_absent_after = _formal_rehearsal_paths_absent(
+                repository,
+                binding_sha256=binding_sha256,
+            )
+            error_code = {
+                "pre_dispatch": "authorization_failed",
+                "child_execution": "child_execution_failed",
+                "output_validation": "output_validation_failed",
+                "post_dispatch": "post_dispatch_failed",
+            }[phase]
+            _publish_rehearsal_terminal(
+                paths,
+                claim=claim,
+                status="failed",
+                child_started=child_started,
+                returncode=returncode,
+                stdout=stdout,
+                stderr=stderr,
+                outer_receipt=outer_receipt,
+                formal_paths_absent_before=formal_paths_absent_before,
+                formal_paths_absent_after=formal_paths_absent_after,
+                phase=phase,
+                error_code=error_code,
+            )
+            return 2
+    finally:
+        if seal_fd is not None:
+            _close_quietly(seal_fd)
+        _close_quietly(launch_fd)
+        _close_quietly(binding_fd)
+
+
 def _run_locked(
     arguments: argparse.Namespace,
     *,
@@ -2354,21 +3747,40 @@ def _run_locked(
     }
     if any(item in forbidden or any(item.startswith(f"{name}=") for name in forbidden) for item in producer_arguments):
         raise LaunchError("producer arguments contain a second custody source")
-    if (
-        arguments.create_runtime_seal is not None
-        and arguments.create_runtime_seal != _prospective_runtime_seal(repository)
+    rehearsal_binding = getattr(
+        arguments,
+        "rehearse_accepted_binding",
+        None,
+    )
+    if arguments.create_runtime_seal is not None and arguments.create_runtime_seal != _prospective_runtime_seal(
+        repository
     ):
-        raise LaunchError(
-            "runtime-seal creation requires the sole canonical protocol-1.16 prospective path"
-        )
+        raise LaunchError("runtime-seal creation requires the sole canonical protocol-1.17 prospective path")
     bootstrap_fd, bootstrap_payload, bootstrap_identity = _open_regular(
         arguments.bootstrap,
         label="producer bootstrap",
     )
+    if rehearsal_binding is not None:
+        try:
+            if producer_arguments:
+                raise LaunchError("accepted-binding rehearsal takes no producer arguments")
+            return _run_accepted_binding_rehearsal(
+                rehearsal_binding,
+                environment=environment,
+                repository=repository,
+                completion_root=completion_root,
+                bootstrap_path=arguments.bootstrap,
+                bootstrap_fd=bootstrap_fd,
+                bootstrap_payload=bootstrap_payload,
+                bootstrap_identity=bootstrap_identity,
+            )
+        finally:
+            _close_quietly(bootstrap_fd)
     seal_fd: int | None = None
     seal_payload: bytes | None = None
     seal_identity: tuple[int, ...] | None = None
     seal_expected_nlink: int | None = None
+    formal_launch_binding_sha256: str | None = None
     receipt_read_fd, receipt_write_fd = os.pipe()
     try:
         command = [
@@ -2406,9 +3818,37 @@ def _run_locked(
                 repository=repository,
                 completion_root=completion_root,
             )
+            canonical_binding = (
+                repository
+                / "bench"
+                / "world_model_lifecycle"
+                / "results"
+                / "operator-v1.17"
+                / "bindings"
+                / "formal-binding-v1.17.0"
+                / "formal-binding.json"
+            )
+            if arguments.runtime_seal == canonical_binding:
+                _verify_accepted_binding_rehearsal(
+                    arguments.runtime_seal,
+                    repository=repository,
+                    completion_root=completion_root,
+                )
+                if producer_arguments[:1] == ["formal"]:
+                    formal_launch_binding_sha256 = hashlib.sha256(seal_payload).hexdigest()
+                    if not _formal_launch_paths_ready(
+                        repository,
+                        binding_sha256=formal_launch_binding_sha256,
+                    ):
+                        raise LaunchError("formal launch namespace is not pristine")
             command.extend(["--runtime-seal-fd", str(seal_fd)])
             command.extend(producer_arguments)
             pass_fds.append(seal_fd)
+        if formal_launch_binding_sha256 is not None and not _formal_launch_paths_ready(
+            repository,
+            binding_sha256=formal_launch_binding_sha256,
+        ):
+            raise LaunchError("formal launch namespace changed before child dispatch")
         completed = subprocess.run(
             command,
             cwd=repository,

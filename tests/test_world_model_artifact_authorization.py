@@ -38,7 +38,7 @@ def _preflight_receipt(binding_payload: bytes) -> bytes:
         {
             "schema": "prospect.wm001.formal-input-preflight.v1",
             "experiment_id": "WM-001",
-            "protocol_version": "1.16.0",
+            "protocol_version": "1.17.0",
             "binding_bytes": len(binding_payload),
             "binding_sha256": hashlib.sha256(
                 binding_payload
@@ -94,7 +94,7 @@ def _write_attempt(
     manifest = {
         "schema": "prospect.wm001.operator-attempt.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.16.0",
+        "protocol_version": "1.17.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "kind": kind,
         "lane": lane,
@@ -117,6 +117,164 @@ def _write_attempt(
         os.link(terminal, marker, follow_symlinks=False)
 
 
+def _content_addressed_name(
+    prefix: str,
+    payload: bytes,
+    suffix: str,
+) -> str:
+    return (
+        f"{prefix}-{hashlib.sha256(payload).hexdigest()[:16]}{suffix}"
+    )
+
+
+def _production_development_audit_package(
+    *,
+    producer: Path,
+    audit_payload: bytes,
+    runtime_payload: bytes,
+    invocation_payload: bytes,
+    stderr_payload: bytes,
+) -> tuple[
+    dict[str, bytes],
+    dict[str, object],
+    dict[str, str],
+]:
+    bootstrap_sha256 = "1" * 64
+    auditor_sha256 = "2" * 64
+    runner_sha256 = "3" * 64
+    support_files: list[object] = []
+    audit_sha256 = hashlib.sha256(audit_payload).hexdigest()
+    runtime_sha256 = hashlib.sha256(runtime_payload).hexdigest()
+    invocation_sha256 = hashlib.sha256(
+        invocation_payload
+    ).hexdigest()
+    stderr_sha256 = hashlib.sha256(stderr_payload).hexdigest()
+    files: dict[str, bytes] = {}
+
+    for ordinal in (1, 2):
+        prefix = f"audit-execution-{ordinal:02d}"
+        stdout_file = f"{prefix}.stdout.json"
+        stderr_file = f"{prefix}.stderr.log"
+        runtime_file = f"{prefix}.runtime.json"
+        invocation_file = f"{prefix}.invocation.json"
+        files.update(
+            {
+                stdout_file: audit_payload,
+                stderr_file: stderr_payload,
+                runtime_file: runtime_payload,
+                invocation_file: invocation_payload,
+                f"{prefix}.execution.json": _canonical(
+                    {
+                        "schema": (
+                            "prospect.wm001."
+                            "captured-audit-execution.v1"
+                        ),
+                        "returncode": 0,
+                        "passed": True,
+                        "source_mode": "descriptor",
+                        "command": [
+                            "/runtime/python",
+                            "-I",
+                            "-S",
+                            "-B",
+                            f"/proc/self/fd/{20 + ordinal}",
+                        ],
+                        "stdout_file": stdout_file,
+                        "stderr_file": stderr_file,
+                        "runtime_manifest_file": runtime_file,
+                        "invocation_manifest_file": invocation_file,
+                        "stdout_bytes": len(audit_payload),
+                        "stdout_sha256": audit_sha256,
+                        "stderr_bytes": len(stderr_payload),
+                        "stderr_sha256": stderr_sha256,
+                        "runtime_manifest_bytes": len(
+                            runtime_payload
+                        ),
+                        "runtime_manifest_sha256": runtime_sha256,
+                        "invocation_manifest_bytes": len(
+                            invocation_payload
+                        ),
+                        "invocation_manifest_sha256": (
+                            invocation_sha256
+                        ),
+                        "bootstrap_sha256": bootstrap_sha256,
+                        "auditor_source_sha256": auditor_sha256,
+                        "support_files": support_files,
+                    }
+                ),
+            }
+        )
+
+    reproduction_names = {
+        "runtime": _content_addressed_name(
+            "development-audit-runtime",
+            runtime_payload,
+            ".json",
+        ),
+        "invocation": _content_addressed_name(
+            "development-audit-invocation",
+            invocation_payload,
+            ".json",
+        ),
+        "stderr": _content_addressed_name(
+            "development-audit-stderr",
+            stderr_payload,
+            ".log",
+        ),
+    }
+    reproduction_payload = _canonical(
+        {
+            "schema": "prospect.wm001.audit-reproduction.v2",
+            "experiment_id": "WM-001",
+            "protocol_version": "1.17.0",
+            "supplied_audit_sha256": audit_sha256,
+            "reproduced_audit_sha256": audit_sha256,
+            "byte_identical": True,
+            "returncode": 0,
+            "source_mode": "descriptor",
+            "stdout_bytes": len(audit_payload),
+            "stderr_file": reproduction_names["stderr"],
+            "stderr_bytes": len(stderr_payload),
+            "stderr_sha256": stderr_sha256,
+            "runtime_manifest_file": reproduction_names["runtime"],
+            "runtime_manifest_bytes": len(runtime_payload),
+            "runtime_manifest_sha256": runtime_sha256,
+            "invocation_manifest_file": (
+                reproduction_names["invocation"]
+            ),
+            "invocation_manifest_bytes": len(invocation_payload),
+            "invocation_manifest_sha256": invocation_sha256,
+            "bootstrap_sha256": bootstrap_sha256,
+            "runner_source_sha256": runner_sha256,
+            "auditor_source_sha256": auditor_sha256,
+            "support_files": support_files,
+            "passed": True,
+        }
+    )
+    files.update(
+        {
+            "audit-reproduction.json": reproduction_payload,
+            "independent-audit.json": audit_payload,
+            reproduction_names["runtime"]: runtime_payload,
+            reproduction_names["invocation"]: invocation_payload,
+            reproduction_names["stderr"]: stderr_payload,
+        }
+    )
+    primary = {
+        "producer_root": str(producer),
+        "audit_file": "independent-audit.json",
+        "executions": [
+            "audit-execution-01.execution.json",
+            "audit-execution-02.execution.json",
+        ],
+        "execution_failures": [],
+        "reproduction_file": "audit-reproduction.json",
+        "reproduction_runtime_file": reproduction_names["runtime"],
+        "claim_file": None,
+    }
+    return files, primary, reproduction_names
+
+
 @pytest.fixture
 def authorization_space(
     tmp_path: Path,
@@ -130,7 +288,7 @@ def authorization_space(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.16"
+        / "v1.17"
     )
     completion_root.mkdir(parents=True)
     monkeypatch.setattr(
@@ -164,13 +322,13 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "v1.16.0"
+        / "v1.17.0"
         / "preformal"
-        / "preformal-test-report-v1.16.0.json"
+        / "preformal-test-report-v1.17.0.json"
     )
     closure_path = (
         preformal_path.parents[2]
-        / "development-closure-v1.16.0.json"
+        / "development-closure-v1.17.0.json"
     )
     preformal_payload = b"preformal\n"
     closure_payload = b"closure\n"
@@ -186,9 +344,9 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.16"
+        / "operator-v1.17"
         / "bindings"
-        / "formal-binding-v1.16.0"
+        / "formal-binding-v1.17.0"
     )
     preflight_payload = _preflight_receipt(binding_payload)
     (artifact_root / "formal-input-preflight.json").write_bytes(
@@ -287,9 +445,9 @@ def test_formal_binding_authorization_requires_exact_preflight_receipt(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.16"
+        / "operator-v1.17"
         / "bindings"
-        / "formal-binding-v1.16.0"
+        / "formal-binding-v1.17.0"
     )
     files = {
         "formal-binding.json": binding_payload,
@@ -378,9 +536,9 @@ def test_formal_binding_authorization_requires_exact_result_qualification(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.16"
+        / "operator-v1.17"
         / "bindings"
-        / "formal-binding-v1.16.0"
+        / "formal-binding-v1.17.0"
     )
     _write_attempt(
         binding_attempt_path,
@@ -474,7 +632,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
         / "world_model_lifecycle"
         / "results"
     )
-    producer = results / "development" / "qualification-v1.16.0"
+    producer = results / "development" / "qualification-v1.17.0"
     producer.mkdir(parents=True)
     producer_manifest = producer / "producer-manifest.json"
     producer_result = producer / "result.json"
@@ -516,116 +674,39 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
     ]
     audit_path = (
         results
-        / "operator-v1.16"
+        / "operator-v1.17"
         / "audits"
-        / "development-audit-v1.16.0"
+        / "development-audit-v1.17.0"
     )
     audit_payload = _canonical({"passed": True})
     runtime_payload = _canonical({"runtime": "sealed"})
     invocation_payload = _canonical({"invocation": "sealed"})
     stderr_payload = b""
-    bootstrap_sha256 = "1" * 64
-    auditor_sha256 = "2" * 64
-    runner_sha256 = "3" * 64
-    support_files: list[object] = []
-    runtime_file = "audit-execution-02.runtime.json"
-    invocation_file = "audit-invocation-manifest.json"
-    stderr_file = "audit-stderr.txt"
-
-    def execution_receipt() -> bytes:
-        return _canonical(
-            {
-                "schema": (
-                    "prospect.wm001.captured-audit-execution.v1"
-                ),
-                "returncode": 0,
-                "passed": True,
-                "source_mode": "descriptor",
-                "command": ["python", "artifact_audit.py"],
-                "stdout_file": "independent-audit.json",
-                "stderr_file": stderr_file,
-                "runtime_manifest_file": runtime_file,
-                "invocation_manifest_file": invocation_file,
-                "stdout_bytes": len(audit_payload),
-                "stdout_sha256": hashlib.sha256(
-                    audit_payload
-                ).hexdigest(),
-                "stderr_bytes": len(stderr_payload),
-                "stderr_sha256": hashlib.sha256(
-                    stderr_payload
-                ).hexdigest(),
-                "runtime_manifest_bytes": len(runtime_payload),
-                "runtime_manifest_sha256": hashlib.sha256(
-                    runtime_payload
-                ).hexdigest(),
-                "invocation_manifest_bytes": len(invocation_payload),
-                "invocation_manifest_sha256": hashlib.sha256(
-                    invocation_payload
-                ).hexdigest(),
-                "bootstrap_sha256": bootstrap_sha256,
-                "auditor_source_sha256": auditor_sha256,
-                "support_files": support_files,
-            }
+    audit_files, audit_primary, reproduction_names = (
+        _production_development_audit_package(
+            producer=producer,
+            audit_payload=audit_payload,
+            runtime_payload=runtime_payload,
+            invocation_payload=invocation_payload,
+            stderr_payload=stderr_payload,
         )
-
-    reproduction_payload = _canonical(
-        {
-            "schema": "prospect.wm001.audit-reproduction.v2",
-            "experiment_id": "WM-001",
-            "protocol_version": "1.16.0",
-            "supplied_audit_sha256": hashlib.sha256(
-                audit_payload
-            ).hexdigest(),
-            "reproduced_audit_sha256": hashlib.sha256(
-                audit_payload
-            ).hexdigest(),
-            "byte_identical": True,
-            "returncode": 0,
-            "source_mode": "descriptor",
-            "stdout_bytes": len(audit_payload),
-            "stderr_file": stderr_file,
-            "stderr_bytes": len(stderr_payload),
-            "stderr_sha256": hashlib.sha256(
-                stderr_payload
-            ).hexdigest(),
-            "runtime_manifest_file": runtime_file,
-            "runtime_manifest_bytes": len(runtime_payload),
-            "runtime_manifest_sha256": hashlib.sha256(
-                runtime_payload
-            ).hexdigest(),
-            "invocation_manifest_file": invocation_file,
-            "invocation_manifest_bytes": len(invocation_payload),
-            "invocation_manifest_sha256": hashlib.sha256(
-                invocation_payload
-            ).hexdigest(),
-            "bootstrap_sha256": bootstrap_sha256,
-            "runner_source_sha256": runner_sha256,
-            "auditor_source_sha256": auditor_sha256,
-            "support_files": support_files,
-            "passed": True,
-        }
     )
-    audit_files = {
-        "audit-execution-01.execution.json": execution_receipt(),
-        "audit-execution-02.execution.json": execution_receipt(),
-        runtime_file: runtime_payload,
-        "audit-reproduction.json": reproduction_payload,
-        invocation_file: invocation_payload,
-        stderr_file: stderr_payload,
-        "independent-audit.json": audit_payload,
-    }
-    audit_primary = {
-        "producer_root": str(producer),
-        "audit_file": "independent-audit.json",
-        "executions": [
-            "audit-execution-01.execution.json",
-            "audit-execution-02.execution.json",
-        ],
-        "execution_failures": [],
-        "reproduction_file": "audit-reproduction.json",
-        "reproduction_runtime_file": runtime_file,
-        "claim_file": None,
-    }
+    runtime_file = reproduction_names["runtime"]
+    invocation_file = reproduction_names["invocation"]
+    stderr_file = reproduction_names["stderr"]
+    assert len(audit_files) == 15
+    assert runtime_file != "audit-execution-02.runtime.json"
+    assert invocation_file != "audit-execution-02.invocation.json"
+    assert stderr_file != "audit-execution-02.stderr.log"
+    assert audit_files[runtime_file] == audit_files[
+        "audit-execution-02.runtime.json"
+    ]
+    assert audit_files[invocation_file] == audit_files[
+        "audit-execution-02.invocation.json"
+    ]
+    assert audit_files[stderr_file] == audit_files[
+        "audit-execution-02.stderr.log"
+    ]
     _write_attempt(
         audit_path,
         kind="audit",
@@ -643,11 +724,11 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
     closure_path = (
         results
         / "development"
-        / "development-closure-v1.16.0.json"
+        / "development-closure-v1.17.0.json"
     )
     qualification_archive = {
         "format": "ustar-uncompressed-v1",
-        "file": "development-qualification-v1.16.0.tar",
+        "file": "development-qualification-v1.17.0.tar",
         "members": [
             {
                 "path": "producer/producer-manifest.json",
@@ -713,7 +794,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
         {
             "schema": "prospect.wm001.development-closure.v2",
             "experiment_id": "WM-001",
-            "protocol_version": "1.16.0",
+            "protocol_version": "1.17.0",
             "producer_root": str(producer),
             "producer_manifest_member": "producer/producer-manifest.json",
             "raw_result_member": "producer/result.json",
@@ -739,9 +820,9 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
 
     closure_attempt_path = (
         results
-        / "operator-v1.16"
+        / "operator-v1.17"
         / "closures"
-        / "development-closure-v1.16.0"
+        / "development-closure-v1.17.0"
     )
     audit_terminal_row = next(
         row
@@ -753,7 +834,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.16.0",
+        "protocol_version": "1.17.0",
         "mode": "fresh-closure-reopen",
         "challenge": "1" * 64,
         "requesting_process_id": 100,
@@ -770,7 +851,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
     reference = {
         "schema": "prospect.wm001.closure-reference.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.16.0",
+        "protocol_version": "1.17.0",
         "closure_marker": str(closure_path),
         "closure_sha256": closure_row["sha256"],
         "qualification_archive": qualification_archive,
@@ -839,6 +920,120 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
         assert attempt.root == closure_attempt_path
 
 
+def test_authorization_follows_payload_addressed_reproduction_sidecars(
+    authorization_space: tuple[Path, Path],
+) -> None:
+    base_repository, completion_root = authorization_space
+    observed_names: list[dict[str, str]] = []
+    for variant in ("alpha", "beta"):
+        repository = base_repository / variant
+        results = (
+            repository
+            / "bench"
+            / "world_model_lifecycle"
+            / "results"
+        )
+        producer = (
+            results / "development" / "qualification-v1.17.0"
+        )
+        producer.mkdir(parents=True)
+        result_payload = _canonical({"result": variant})
+        result_path = producer / "result.json"
+        result_path.write_bytes(result_payload)
+        manifest_payload = _canonical(
+            {
+                "schema": "prospect.wm001.producer-manifest.v1",
+                "experiment_id": "WM-001",
+                "lane": "development",
+                "status": "completed",
+                "started_at_utc": "2026-01-01T00:00:00Z",
+                "completed_at_utc": "2026-01-01T00:01:00Z",
+                "error": None,
+                "manifest_excludes": ["producer-manifest.json"],
+                "file_count": 1,
+                "files": [
+                    {
+                        "path": "result.json",
+                        "bytes": len(result_payload),
+                        "sha256": hashlib.sha256(
+                            result_payload
+                        ).hexdigest(),
+                    }
+                ],
+            }
+        )
+        manifest_path = producer / "producer-manifest.json"
+        manifest_path.write_bytes(manifest_payload)
+        producer_completion = completion_root / (
+            hashlib.sha256(
+                str(manifest_path).encode("utf-8")
+            ).hexdigest()
+            + ".json"
+        )
+        os.link(manifest_path, producer_completion)
+        producer_rows = [
+            _row(manifest_path, manifest_payload),
+            _row(result_path, result_payload),
+        ]
+
+        audit_payload = _canonical(
+            {"passed": True, "variant": variant}
+        )
+        runtime_payload = _canonical({"runtime": variant})
+        invocation_payload = _canonical({"invocation": variant})
+        stderr_payload = f"{variant} stderr\n".encode()
+        audit_files, primary, names = (
+            _production_development_audit_package(
+                producer=producer,
+                audit_payload=audit_payload,
+                runtime_payload=runtime_payload,
+                invocation_payload=invocation_payload,
+                stderr_payload=stderr_payload,
+            )
+        )
+        audit_path = (
+            results
+            / "operator-v1.17"
+            / "audits"
+            / "development-audit-v1.17.0"
+        )
+        _write_attempt(
+            audit_path,
+            kind="audit",
+            lane="development",
+            primary=primary,
+            inputs=producer_rows,
+            files=audit_files,
+        )
+
+        attempt = artifact_audit._authorization_development_audit(
+            repository,
+            producer=producer,
+            producer_rows=producer_rows,
+        )
+        assert attempt.manifest["primary"] == primary
+        assert attempt.manifest["file_count"] == 15
+        assert len(attempt.payloads) == 16
+        for role, capture_name in (
+            ("runtime", "audit-execution-02.runtime.json"),
+            ("invocation", "audit-execution-02.invocation.json"),
+            ("stderr", "audit-execution-02.stderr.log"),
+        ):
+            assert attempt.payloads[names[role]] == (
+                attempt.payloads[capture_name]
+            )
+            assert not os.path.samefile(
+                audit_path / names[role],
+                audit_path / capture_name,
+            )
+        observed_names.append(names)
+
+    assert all(
+        observed_names[0][role] != observed_names[1][role]
+        for role in ("runtime", "invocation", "stderr")
+    )
+
+
 def test_authorization_rejects_unfinalized_or_sibling_attempt(
     authorization_space: tuple[Path, Path],
 ) -> None:
@@ -848,9 +1043,9 @@ def test_authorization_rejects_unfinalized_or_sibling_attempt(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.16"
+        / "operator-v1.17"
         / "bindings"
-        / "formal-binding-v1.16.0"
+        / "formal-binding-v1.17.0"
     )
     sibling = expected.with_name("sibling-binding")
     binding_payload = _canonical({"binding": True})
@@ -900,9 +1095,9 @@ def test_authorization_attempt_rejects_numeric_file_count_aliases(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.16"
+        / "operator-v1.17"
         / "bindings"
-        / "formal-binding-v1.16.0"
+        / "formal-binding-v1.17.0"
     )
     _write_attempt(
         attempt_path,
@@ -941,9 +1136,9 @@ def test_authorization_reference_rejects_numeric_byte_aliases(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.16"
+        / "operator-v1.17"
         / "audits"
-        / "development-audit-v1.16.0"
+        / "development-audit-v1.17.0"
     )
     payload = b"x"
     _write_attempt(

@@ -165,4 +165,11 @@ filename. The rehearsal returned `1` before child dispatch or formal-root
 creation. No formal marker, producer, outcome, audit, review, or adjudication
 exists. Its terminal disposition is preserved in the
 [v1.16 accepted-binding rehearsal failure](docs/wm001-v1160-accepted-binding-rehearsal-failure.md).
-No successor protocol is active.
+Protocol 1.17 is the active prospective candidate. It follows the authenticated
+audit-reproduction receipt instead of duplicating sidecar filenames, exercises
+the real 15-member producer-to-consumer audit package, and adds a
+binding-keyed single-use rehearsal claim with an outer-finalized terminal.
+Formal launch v3 binds that accepted rehearsal under held custody. Its
+[confirmation plan](docs/wm001-v1170-confirmation-plan.md) and
+[operator runbook](docs/wm001-v1170-operator-runbook.md) are pre-outcome; no
+v1.17 development or formal outcome exists yet.

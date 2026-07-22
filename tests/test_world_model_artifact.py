@@ -16,6 +16,7 @@ from bench.world_model_lifecycle import binding as binding_module
 from bench.world_model_lifecycle import experiment as experiment_module
 from bench.world_model_lifecycle import operator as operator_module
 from bench.world_model_lifecycle import producer_bootstrap as producer_bootstrap_module
+from bench.world_model_lifecycle import rehearsal as rehearsal_module
 from bench.world_model_lifecycle import run as run_module
 from bench.world_model_lifecycle import verify as verify_module
 from bench.world_model_lifecycle.artifact import (
@@ -53,6 +54,64 @@ def _read_json(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(value, dict)
     return value
+
+
+def test_current_protocol_passes_complete_static_verifier() -> None:
+    protocol = verify_module.verify_protocol()
+
+    assert protocol["experiment"]["protocol_version"] == "1.17.0"
+
+
+def _fixture_rehearsal_identity(
+    binding_path: Path,
+) -> dict[str, dict[str, object]]:
+    binding_sha256 = hashlib.sha256(binding_path.read_bytes()).hexdigest()
+    root = binding_path.parent / "accepted-binding-rehearsal" / binding_sha256
+
+    def row(name: str, payload: bytes) -> dict[str, object]:
+        return {
+            "path": str(root / name),
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        }
+
+    claim = f"claim:{binding_sha256}".encode("ascii")
+    terminal = f"terminal:{binding_sha256}".encode("ascii")
+    return {
+        "claim": row("rehearsal-claim.json", claim),
+        "claim_marker": row(f"accepted-binding-{binding_sha256}.json", claim),
+        "terminal": row("rehearsal-terminal.json", terminal),
+        "outer_completion": row("outer-completion.json", terminal),
+    }
+
+
+class _FixtureRehearsalCustody:
+    def __init__(self, binding_path: Path, *, fail_recheck_at: int | None = None):
+        self.binding_path = binding_path
+        self.fail_recheck_at = fail_recheck_at
+        self.recheck_count = 0
+        self.terminal: dict[str, object] = {"status": "accepted"}
+
+    def __enter__(self) -> _FixtureRehearsalCustody:
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.recheck()
+
+    def identity_rows(self) -> dict[str, dict[str, object]]:
+        self.recheck()
+        return _fixture_rehearsal_identity(self.binding_path)
+
+    def recheck(self) -> None:
+        self.recheck_count += 1
+        if self.recheck_count == self.fail_recheck_at:
+            raise rehearsal_module.RehearsalEvidenceError(
+                "rehearsal custody changed at publication boundary"
+            )
+
+
+def _fixture_held_rehearsal(binding_path: Path) -> _FixtureRehearsalCustody:
+    return _FixtureRehearsalCustody(binding_path)
 
 
 def _implementation_row(relative: str = "Makefile") -> dict[str, object]:
@@ -157,7 +216,7 @@ def _write_minimal_formal_binding(path: Path, *, git_commit: str) -> str:
             "external_attestation": False,
             "exclusive_path_use_required": True,
         },
-        "protocol": {"version": "1.16.0"},
+        "protocol": {"version": "1.17.0"},
         "source": {
             "git_commit": git_commit,
             "git_tree": "2" * 40,
@@ -223,6 +282,22 @@ def _install_binding_attempt_stub(
         artifact_module,
         "_formal_binding_attempt_evidence",
         evidence,
+    )
+    monkeypatch.setattr(
+        rehearsal_module,
+        "accepted_binding_rehearsal_identity",
+        _fixture_rehearsal_identity,
+    )
+    monkeypatch.setattr(
+        rehearsal_module,
+        "FORMAL_BINDING_PATH",
+        binding_path,
+    )
+    monkeypatch.setattr(
+        rehearsal_module,
+        "hold_accepted_binding_rehearsal",
+        _fixture_held_rehearsal,
+        raising=False,
     )
     return terminal_payload
 
@@ -327,9 +402,12 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
     copied = _read_json(producer_record)
     assert copied["formal_binding_sha256"] == first_digest
     assert copied["attempt_directory"] == FORMAL_CONFIRMATION_NAME
-    assert copied["schema"] == "prospect.wm001.formal-launch.v2"
-    assert copied["protocol_version"] == "1.16.0"
+    assert copied["schema"] == "prospect.wm001.formal-launch.v3"
+    assert copied["protocol_version"] == "1.17.0"
     assert copied["global_marker_file"] == FORMAL_LAUNCH_MARKER_NAME
+    assert copied["accepted_binding_rehearsal"] == _fixture_rehearsal_identity(
+        first_binding
+    )
     assert marker.read_bytes() == producer_record.read_bytes()
     assert os.path.samefile(marker, producer_record)
     assert marker.stat().st_ino == producer_record.stat().st_ino
@@ -342,6 +420,32 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
             "git_commit": "1" * 40,
             "git_tree": "2" * 40,
         },
+    )
+
+    def reject_rehearsal(_path: Path) -> dict[str, dict[str, object]]:
+        raise rehearsal_module.RehearsalEvidenceError("unfinalized")
+
+    monkeypatch.setattr(
+        rehearsal_module,
+        "accepted_binding_rehearsal_identity",
+        reject_rehearsal,
+    )
+    with pytest.raises(
+        verify_module.Violation,
+        match="accepted outer-finalized binding rehearsal",
+    ):
+        verify_module._verify_formal_launch_record(
+            producer_record,
+            binding_sha256=first_digest,
+            execution={
+                "git_commit": "1" * 40,
+                "git_tree": "2" * 40,
+            },
+        )
+    monkeypatch.setattr(
+        rehearsal_module,
+        "accepted_binding_rehearsal_identity",
+        _fixture_rehearsal_identity,
     )
     wrong_output = results_root / first_digest / "wrong-child"
     wrong_output.mkdir()
@@ -422,6 +526,236 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
             )
 
 
+def test_formal_launch_holds_rehearsal_against_canonical_operator_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The producer copy must not be mistaken for rehearsal authority."""
+
+    canonical_binding = (
+        tmp_path / "operator-attempt" / "formal-binding.json"
+    )
+    canonical_binding.parent.mkdir()
+    binding_digest = _write_minimal_formal_binding(
+        canonical_binding,
+        git_commit="1" * 40,
+    )
+    attempt_payload = _install_binding_attempt_stub(
+        monkeypatch,
+        canonical_binding,
+    )
+    results_root = tmp_path / "results" / "formal"
+    output = results_root / binding_digest / FORMAL_CONFIRMATION_NAME
+    output.mkdir(parents=True)
+    copied_binding = output / "formal-binding.json"
+    copied_binding.write_bytes(canonical_binding.read_bytes())
+    assert not os.path.samefile(canonical_binding, copied_binding)
+    _preserve_stubbed_binding_attempt(output, attempt_payload)
+
+    observed: list[Path] = []
+
+    def hold(path: Path) -> _FixtureRehearsalCustody:
+        observed.append(path)
+        if path != canonical_binding:
+            raise rehearsal_module.RehearsalEvidenceError(
+                "producer-root binding copy cannot authorize rehearsal"
+            )
+        return _FixtureRehearsalCustody(path)
+
+    monkeypatch.setattr(
+        rehearsal_module,
+        "hold_accepted_binding_rehearsal",
+        hold,
+    )
+    with _formal_claim_authorization(canonical_binding):
+        marker = claim_formal_launch(
+            copied_binding,
+            output,
+            formal_results_root=results_root,
+        )
+
+    assert observed == [canonical_binding]
+    record = _read_json(output / FORMAL_LAUNCH_NAME)
+    assert record["formal_binding_sha256"] == binding_digest
+    assert record["accepted_binding_rehearsal"] == (
+        _fixture_rehearsal_identity(canonical_binding)
+    )
+    assert os.path.samefile(marker, output / FORMAL_LAUNCH_NAME)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ("missing", "failed", "claim-only", "tampered"),
+)
+def test_formal_launch_requires_accepted_outer_finalized_rehearsal_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    binding = tmp_path / "binding-attempt" / "formal-binding.json"
+    binding.parent.mkdir()
+    binding_digest = _write_minimal_formal_binding(binding, git_commit="1" * 40)
+    attempt_payload = _install_binding_attempt_stub(monkeypatch, binding)
+    results_root = tmp_path / "results" / "formal"
+    output = results_root / binding_digest / FORMAL_CONFIRMATION_NAME
+    output.mkdir(parents=True)
+    _preserve_stubbed_binding_attempt(output, attempt_payload)
+
+    def reject(_path: Path) -> dict[str, dict[str, object]]:
+        raise rehearsal_module.RehearsalEvidenceError(failure)
+
+    monkeypatch.setattr(
+        rehearsal_module,
+        "accepted_binding_rehearsal_identity",
+        reject,
+    )
+    monkeypatch.setattr(
+        rehearsal_module,
+        "hold_accepted_binding_rehearsal",
+        reject,
+        raising=False,
+    )
+    with _formal_claim_authorization(binding):
+        with pytest.raises(
+            RuntimeError,
+            match="accepted outer-finalized binding rehearsal",
+        ):
+            claim_formal_launch(
+                binding,
+                output,
+                formal_results_root=results_root,
+            )
+
+    assert not (output / FORMAL_LAUNCH_NAME).exists()
+    assert not (results_root / FORMAL_LAUNCH_MARKER_NAME).exists()
+
+
+@pytest.mark.parametrize(
+    ("fail_recheck_at", "marker_exists"),
+    ((2, False), (3, True)),
+)
+def test_formal_launch_holds_rehearsal_custody_across_marker_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fail_recheck_at: int,
+    marker_exists: bool,
+) -> None:
+    binding = tmp_path / "binding-attempt" / "formal-binding.json"
+    binding.parent.mkdir()
+    binding_digest = _write_minimal_formal_binding(binding, git_commit="1" * 40)
+    attempt_payload = _install_binding_attempt_stub(monkeypatch, binding)
+    results_root = tmp_path / "results" / "formal"
+    output = results_root / binding_digest / FORMAL_CONFIRMATION_NAME
+    output.mkdir(parents=True)
+    _preserve_stubbed_binding_attempt(output, attempt_payload)
+    custody = _FixtureRehearsalCustody(
+        binding,
+        fail_recheck_at=fail_recheck_at,
+    )
+    monkeypatch.setattr(
+        rehearsal_module,
+        "hold_accepted_binding_rehearsal",
+        lambda path: custody if path == binding else pytest.fail("wrong binding"),
+        raising=False,
+    )
+
+    with _formal_claim_authorization(binding):
+        with pytest.raises(
+            RuntimeError,
+            match="stable accepted outer-finalized binding rehearsal custody",
+        ) as raised:
+            claim_formal_launch(
+                binding,
+                output,
+                formal_results_root=results_root,
+            )
+    assert isinstance(raised.value.__cause__, rehearsal_module.RehearsalEvidenceError)
+    assert "publication boundary" in str(raised.value.__cause__)
+
+    producer_record = output / FORMAL_LAUNCH_NAME
+    marker = results_root / FORMAL_LAUNCH_MARKER_NAME
+    assert producer_record.is_file()
+    assert marker.exists() is marker_exists
+    if marker_exists:
+        assert os.path.samefile(producer_record, marker)
+        assert marker.read_bytes() == producer_record.read_bytes()
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "missing-role",
+        "extra-role",
+        "path",
+        "bytes",
+        "boolean-bytes",
+        "sha256",
+        "cross-binding",
+    ),
+)
+def test_formal_launch_v3_rejects_rehashed_rehearsal_identity_substitution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    results_root = tmp_path / "results" / "formal"
+    monkeypatch.setattr(artifact_module, "FORMAL_RESULTS_ROOT", results_root)
+    binding = tmp_path / "binding-attempt" / "formal-binding.json"
+    binding.parent.mkdir()
+    binding_digest = _write_minimal_formal_binding(binding, git_commit="1" * 40)
+    attempt_payload = _install_binding_attempt_stub(monkeypatch, binding)
+    output = results_root / binding_digest / FORMAL_CONFIRMATION_NAME
+    output.mkdir(parents=True)
+    _preserve_stubbed_binding_attempt(output, attempt_payload)
+    with _formal_claim_authorization(binding):
+        claim_formal_launch(
+            binding,
+            output,
+            formal_results_root=results_root,
+        )
+    launch_path = output / FORMAL_LAUNCH_NAME
+    record = _read_json(launch_path)
+    identity = json.loads(json.dumps(record["accepted_binding_rehearsal"]))
+    assert isinstance(identity, dict)
+    if mutation == "missing-role":
+        del identity["claim_marker"]
+    elif mutation == "extra-role":
+        identity["unbound"] = identity["claim"]
+    elif mutation == "cross-binding":
+        other = tmp_path / "other-binding.json"
+        _write_minimal_formal_binding(other, git_commit="3" * 40)
+        identity = _fixture_rehearsal_identity(other)
+    else:
+        terminal = identity["terminal"]
+        assert isinstance(terminal, dict)
+        if mutation == "path":
+            terminal["path"] = f"{terminal['path']}.alias"
+        elif mutation == "bytes":
+            terminal["bytes"] = int(terminal["bytes"]) + 1
+        elif mutation == "boolean-bytes":
+            terminal["bytes"] = True
+        else:
+            terminal["sha256"] = "f" * 64
+    record["accepted_binding_rehearsal"] = identity
+    body = dict(record)
+    body.pop("record_sha256")
+    record["record_sha256"] = hashlib.sha256(_canonical(body)[:-1]).hexdigest()
+    launch_path.write_bytes(_canonical(record))
+
+    with pytest.raises(
+        verify_module.Violation,
+        match="formal launch record identity",
+    ):
+        verify_module._verify_formal_launch_record(
+            launch_path,
+            binding_sha256=binding_digest,
+            execution={
+                "git_commit": "1" * 40,
+                "git_tree": "2" * 40,
+            },
+        )
+
+
 def test_formal_launch_claim_rejects_noncanonical_output(tmp_path: Path) -> None:
     binding = tmp_path / "binding.json"
     binding_digest = _write_minimal_formal_binding(
@@ -438,7 +772,7 @@ def test_formal_launch_claim_rejects_noncanonical_output(tmp_path: Path) -> None
     for output in invalid_outputs:
         with pytest.raises(
             ValueError,
-            match="results/formal/<binding-sha256>/confirmation-v1.16.0",
+            match="results/formal/<binding-sha256>/confirmation-v1.17.0",
         ):
             formal_launch_marker_path(
                 binding,
@@ -896,7 +1230,7 @@ def test_formal_cli_refuses_noncanonical_or_omitted_output_before_custody(
         "formal_preflight",
     ),
 )
-def test_formal_cli_preclaim_failures_leave_v116_marker_absent(
+def test_formal_cli_preclaim_failures_leave_v117_marker_absent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     failure_stage: str,
@@ -1157,7 +1491,7 @@ def test_experiment_entrypoint_refuses_unowned_or_existing_output(
         )
 
     development = experiment_module.ExperimentConfig.development(
-        master_seeds=(3922749719,),
+        master_seeds=(3454397035,),
         device="cpu",
     )
     assert (

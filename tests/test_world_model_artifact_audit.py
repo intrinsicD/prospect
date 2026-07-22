@@ -15,6 +15,7 @@ import torch
 
 import bench.world_model_lifecycle.artifact_audit as artifact_audit_module
 from bench.world_model_lifecycle import binding as binding_module
+from bench.world_model_lifecycle import rehearsal as rehearsal_module
 from bench.world_model_lifecycle.artifact_audit import (
     _GRAPH_RECORD_FIELDS,
     ArtifactAuditError,
@@ -171,7 +172,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
     seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.16.0",
+        "protocol_version": "1.17.0",
         "assurance": dict(artifact_audit_module._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -239,7 +240,7 @@ def test_independent_preformal_log_parser_requires_empty_stderr() -> None:
     empty_digest = hashlib.sha256(b"").hexdigest()
     empty = {
         "file": (
-            "preformal-v1.16.0-command-02-ruff.stderr."
+            "preformal-v1.17.0-command-02-ruff.stderr."
             f"{empty_digest}.log"
         ),
         "bytes": 0,
@@ -261,7 +262,7 @@ def test_independent_preformal_log_parser_requires_empty_stderr() -> None:
     diagnostic_digest = hashlib.sha256(diagnostic).hexdigest()
     nonempty = {
         "file": (
-            "preformal-v1.16.0-command-02-ruff.stderr."
+            "preformal-v1.17.0-command-02-ruff.stderr."
             f"{diagnostic_digest}.log"
         ),
         "bytes": len(diagnostic),
@@ -1161,13 +1162,13 @@ def test_formal_launch_namespace_requires_exact_confirmation_name(
         / "results"
         / "formal"
         / binding_digest
-        / "confirmation-v1.16.0"
+        / "confirmation-v1.17.0"
     )
 
     assert artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical,
         binding_digest=binding_digest,
-        launch={"attempt_directory": "confirmation-v1.16.0"},
+        launch={"attempt_directory": "confirmation-v1.17.0"},
     )
     assert not artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical.with_name("wrong-child"),
@@ -1178,6 +1179,63 @@ def test_formal_launch_namespace_requires_exact_confirmation_name(
         canonical,
         binding_digest=binding_digest,
         launch={"attempt_directory": "wrong-child"},
+    )
+
+
+def test_formal_launch_v3_rehearsal_identity_is_live_and_type_strict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding = tmp_path / "formal-binding.json"
+    binding.write_bytes(b"binding\n")
+    expected = {
+        role: {
+            "path": str(tmp_path / f"{role}.json"),
+            "bytes": index + 1,
+            "sha256": f"{index + 1:x}" * 64,
+        }
+        for index, role in enumerate(
+            ("claim", "claim_marker", "terminal", "outer_completion")
+        )
+    }
+    monkeypatch.setattr(
+        rehearsal_module,
+        "accepted_binding_rehearsal_identity",
+        lambda path: expected if path == binding else pytest.fail("wrong binding"),
+    )
+
+    observed = artifact_audit_module._accepted_binding_rehearsal_identity_for_audit(  # noqa: SLF001
+        binding
+    )
+    assert artifact_audit_module._strict_json_equal(observed, expected)  # noqa: SLF001
+    type_forgery = json.loads(json.dumps(expected))
+    type_forgery["terminal"]["bytes"] = True
+    assert not artifact_audit_module._strict_json_equal(  # noqa: SLF001
+        type_forgery,
+        expected,
+    )
+
+    def reject(_path: Path) -> dict[str, dict[str, object]]:
+        raise rehearsal_module.RehearsalEvidenceError("claim-only")
+
+    monkeypatch.setattr(
+        rehearsal_module,
+        "accepted_binding_rehearsal_identity",
+        reject,
+    )
+    with pytest.raises(
+        ArtifactAuditError,
+        match="accepted outer-finalized binding rehearsal",
+    ):
+        artifact_audit_module._accepted_binding_rehearsal_identity_for_audit(  # noqa: SLF001
+            binding
+        )
+
+
+def test_preformal_typecheck_contract_includes_rehearsal_verifier() -> None:
+    assert (
+        "bench/world_model_lifecycle/rehearsal.py"
+        in artifact_audit_module._PREFORMAL_MYPY_FILES  # noqa: SLF001
     )
 
 
@@ -1615,11 +1673,11 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     owned_state = runtime.owner.snapshot_state()
     parameter_sha256 = runtime.digest
     model_version = runtime.version
-    master_seed = 3922749719
+    master_seed = 3454397035
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.16.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.17.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
@@ -2100,7 +2158,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     result: dict[str, Any] = {
         "schema": "prospect.world-model-lifecycle.raw-result.v9",
         "experiment_id": "WM-001",
-        "protocol_version": "1.16.0",
+        "protocol_version": "1.17.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),

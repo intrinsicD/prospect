@@ -53,8 +53,8 @@ HERE = Path(__file__).resolve().parent
 LOCKFILE_PATH = REPO / "requirements-wm001.lock"
 MANIFEST_NAME = "producer-manifest.json"
 FORMAL_LAUNCH_NAME = "formal-launch.json"
-FORMAL_LAUNCH_MARKER_NAME = "formal-launch-v1.16.0.json"
-FORMAL_CONFIRMATION_NAME = "confirmation-v1.16.0"
+FORMAL_LAUNCH_MARKER_NAME = "formal-launch-v1.17.0.json"
+FORMAL_CONFIRMATION_NAME = "confirmation-v1.17.0"
 FORMAL_BINDING_ATTEMPT_MANIFEST_NAME = "formal-binding-operator-attempt.json"
 FORMAL_BINDING_OUTER_COMPLETION_NAME = "formal-binding-outer-completion.json"
 FORMAL_INPUT_PREFLIGHT_NAME = "formal-input-preflight.json"
@@ -331,9 +331,9 @@ def formal_launch_marker_path(
         or binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v10"
         or binding.get("experiment_id") != "WM-001"
         or not isinstance(binding.get("protocol"), dict)
-        or binding["protocol"].get("version") != "1.16.0"
+        or binding["protocol"].get("version") != "1.17.0"
     ):
-        raise ValueError("formal binding is not a WM-001 protocol-1.16 binding")
+        raise ValueError("formal binding is not a WM-001 protocol-1.17 binding")
     binding_sha256 = hashlib.sha256(binding_payload).hexdigest()
     results_root_lexical = (
         formal_results_root if formal_results_root.is_absolute() else Path.cwd() / formal_results_root
@@ -354,7 +354,7 @@ def formal_launch_marker_path(
     if output != expected_output:
         raise ValueError(
             "formal output must be the exact "
-            "results/formal/<binding-sha256>/confirmation-v1.16.0 path"
+            "results/formal/<binding-sha256>/confirmation-v1.17.0 path"
         )
     return results_root / FORMAL_LAUNCH_MARKER_NAME, binding_sha256
 
@@ -365,7 +365,17 @@ def _claim_formal_launch(
     *,
     formal_results_root: Path = FORMAL_RESULTS_ROOT,
 ) -> tuple[Path, str]:
-    """Publish the durable producer record as protocol 1.16's sole formal claim."""
+    """Publish the durable producer record as protocol 1.17's sole formal claim."""
+
+    try:
+        from .rehearsal import (
+            RehearsalEvidenceError,
+            hold_accepted_binding_rehearsal,
+        )
+    except ImportError as error:
+        raise RuntimeError(
+            "formal launch rehearsal verifier cannot be imported"
+        ) from error
 
     binding_payload = binding_path.read_bytes()
     (
@@ -449,62 +459,83 @@ def _claim_formal_launch(
     if not output.is_dir() or output.is_symlink():
         raise ValueError("formal launch requires an existing non-aliased producer directory")
     if os.path.lexists(marker_path):
-        raise RuntimeError("protocol 1.16 already has a formal launch claim; same-version resume or retry is forbidden")
+        raise RuntimeError("protocol 1.17 already has a formal launch claim; same-version resume or retry is forbidden")
     binding = _load_json(binding_path)
     source = binding.get("source", {})
     if not isinstance(source, dict):
         raise ValueError("formal binding source block is invalid")
-    record: dict[str, object] = {
-        "schema": "prospect.wm001.formal-launch.v2",
-        "experiment_id": "WM-001",
-        "protocol_version": "1.16.0",
-        "formal_binding_sha256": binding_sha256,
-        "formal_binding_attempt_path": str(binding_attempt_path),
-        "formal_binding_attempt_manifest_file": FORMAL_BINDING_ATTEMPT_MANIFEST_NAME,
-        "formal_binding_attempt_manifest_sha256": binding_attempt_manifest_sha256,
-        "formal_binding_outer_completion_file": FORMAL_BINDING_OUTER_COMPLETION_NAME,
-        "formal_binding_outer_completion_marker": str(binding_outer_completion),
-        "formal_binding_outer_completion_sha256": binding_outer_completion_sha256,
-        "attempt_directory": output.name,
-        "global_marker_file": FORMAL_LAUNCH_MARKER_NAME,
-        "claimed_at_utc": utc_now(),
-        "git_commit": source.get("git_commit"),
-        "git_tree": source.get("git_tree"),
-    }
-    record["record_sha256"] = hashlib.sha256(_canonical_json_bytes(record)).hexdigest()
-    producer_record = output / FORMAL_LAUNCH_NAME
-    if (output / FORMAL_BINDING_ATTEMPT_MANIFEST_NAME).read_bytes() != binding_attempt_manifest or (
-        output / FORMAL_BINDING_OUTER_COMPLETION_NAME
-    ).read_bytes() != binding_attempt_manifest:
-        raise RuntimeError("preserved formal binding attempt evidence differs from its canonical source")
-    atomic_write_exclusive(
-        producer_record,
-        _canonical_json_bytes(record) + b"\n",
-    )
-    record_sha256 = sha256_file(producer_record)
     try:
-        os.link(producer_record, marker_path)
-    except FileExistsError:
+        with hold_accepted_binding_rehearsal(
+            binding_attempt_path / "formal-binding.json"
+        ) as rehearsal_custody:
+            record: dict[str, object] = {
+                "schema": "prospect.wm001.formal-launch.v3",
+                "experiment_id": "WM-001",
+                "protocol_version": "1.17.0",
+                "formal_binding_sha256": binding_sha256,
+                "formal_binding_attempt_path": str(binding_attempt_path),
+                "formal_binding_attempt_manifest_file": FORMAL_BINDING_ATTEMPT_MANIFEST_NAME,
+                "formal_binding_attempt_manifest_sha256": binding_attempt_manifest_sha256,
+                "formal_binding_outer_completion_file": FORMAL_BINDING_OUTER_COMPLETION_NAME,
+                "formal_binding_outer_completion_marker": str(binding_outer_completion),
+                "formal_binding_outer_completion_sha256": binding_outer_completion_sha256,
+                "accepted_binding_rehearsal": rehearsal_custody.identity_rows(),
+                "attempt_directory": output.name,
+                "global_marker_file": FORMAL_LAUNCH_MARKER_NAME,
+                "claimed_at_utc": utc_now(),
+                "git_commit": source.get("git_commit"),
+                "git_tree": source.get("git_tree"),
+            }
+            record["record_sha256"] = hashlib.sha256(
+                _canonical_json_bytes(record)
+            ).hexdigest()
+            producer_record = output / FORMAL_LAUNCH_NAME
+            if (
+                output / FORMAL_BINDING_ATTEMPT_MANIFEST_NAME
+            ).read_bytes() != binding_attempt_manifest or (
+                output / FORMAL_BINDING_OUTER_COMPLETION_NAME
+            ).read_bytes() != binding_attempt_manifest:
+                raise RuntimeError(
+                    "preserved formal binding attempt evidence differs from its canonical source"
+                )
+            atomic_write_exclusive(
+                producer_record,
+                _canonical_json_bytes(record) + b"\n",
+            )
+            record_sha256 = sha256_file(producer_record)
+            rehearsal_custody.recheck()
+            try:
+                os.link(producer_record, marker_path)
+            except FileExistsError:
+                raise RuntimeError(
+                    "protocol 1.17 already has a formal launch claim; same-version resume or retry is forbidden"
+                ) from None
+            for directory in (output, marker_path.parent):
+                directory_descriptor = os.open(
+                    directory,
+                    os.O_RDONLY | os.O_DIRECTORY,
+                )
+                try:
+                    os.fsync(directory_descriptor)
+                finally:
+                    os.close(directory_descriptor)
+            if (
+                producer_record.is_symlink()
+                or marker_path.is_symlink()
+                or not producer_record.is_file()
+                or not marker_path.is_file()
+                or not os.path.samefile(producer_record, marker_path)
+                or producer_record.read_bytes() != marker_path.read_bytes()
+                or sha256_file(marker_path) != record_sha256
+            ):
+                raise RuntimeError(
+                    "protocol 1.17 launch publication did not preserve one exact inode"
+                )
+            return marker_path, record_sha256
+    except RehearsalEvidenceError as error:
         raise RuntimeError(
-            "protocol 1.16 already has a formal launch claim; same-version resume or retry is forbidden"
-        ) from None
-    for directory in (output, marker_path.parent):
-        directory_descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            os.fsync(directory_descriptor)
-        finally:
-            os.close(directory_descriptor)
-    if (
-        producer_record.is_symlink()
-        or marker_path.is_symlink()
-        or not producer_record.is_file()
-        or not marker_path.is_file()
-        or not os.path.samefile(producer_record, marker_path)
-        or producer_record.read_bytes() != marker_path.read_bytes()
-        or sha256_file(marker_path) != record_sha256
-    ):
-        raise RuntimeError("protocol 1.16 launch publication did not preserve one exact inode")
-    return marker_path, record_sha256
+            "formal launch requires stable accepted outer-finalized binding rehearsal custody"
+        ) from error
 
 
 def _formal_binding_attempt_evidence(
