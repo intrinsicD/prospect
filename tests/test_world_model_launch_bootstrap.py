@@ -59,9 +59,9 @@ def _canonical(value: object) -> bytes:
 def _repository_paths(tmp_path: Path) -> tuple[Path, Path, Path]:
     repository = tmp_path / "repository"
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    completion_root = results / "outer-completions" / "v1.17"
+    completion_root = results / "outer-completions" / "v1.18"
     completion_root.mkdir(parents=True)
-    terminal = results / "operator-v1.17" / "attempt-001" / "terminal-manifest.json"
+    terminal = results / "operator-v1.18" / "attempt-001" / "terminal-manifest.json"
     terminal.parent.mkdir(parents=True)
     terminal.write_bytes(
         _canonical(
@@ -84,7 +84,7 @@ def _receipt(
     return {
         "schema": "prospect.wm001.outer-terminal-receipt.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(_ASSURANCE),
         "trust_model": "trusted-single-principal-cooperative-lock-v1",
         "terminal_path": str(terminal),
@@ -120,9 +120,9 @@ def _development_producer(
 
     repository = tmp_path / "repository"
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    completion_root = results / "outer-completions" / "v1.17"
+    completion_root = results / "outer-completions" / "v1.18"
     completion_root.mkdir(parents=True)
-    producer = results / "development" / "qualification-v1.17.0"
+    producer = results / "development" / "qualification-v1.18.0"
     producer.mkdir(parents=True)
     rows: list[dict[str, object]] = []
     for relative, value in sorted(files.items()):
@@ -201,7 +201,7 @@ def _formal_binding_attempt(
     producer_files: dict[str, int | bytes] | None = None,
 ) -> tuple[Path, Path, Path]:
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    report = results / "development" / "v1.17.0" / "preformal" / "preformal-test-report-v1.17.0.json"
+    report = results / "development" / "v1.18.0" / "preformal" / "preformal-test-report-v1.18.0.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     packages = [
         {
@@ -256,7 +256,7 @@ def _formal_binding_attempt(
     fresh_identity = {
         "schema": "prospect.wm001.fresh-runtime-identity-conformance.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "mode": "fresh-identity-conformance",
         "challenge": "5" * 64,
         "requesting_process_id": 101,
@@ -323,7 +323,7 @@ def _formal_binding_attempt(
         if name in runtime_outputs:
             payload = _canonical(runtime_outputs[name])
             digest = hashlib.sha256(payload).hexdigest()
-            log_path = report.with_name(f"preformal-v1.17.0-command-{ordinal:02d}-{name}.stdout.{digest}.log")
+            log_path = report.with_name(f"preformal-v1.18.0-command-{ordinal:02d}-{name}.stdout.{digest}.log")
             log_path.write_bytes(payload)
             log_paths[f"{name}:stdout"] = log_path
             row["stdout"] = {
@@ -332,7 +332,7 @@ def _formal_binding_attempt(
                 "sha256": digest,
             }
             stderr_path = report.with_name(
-                f"preformal-v1.17.0-command-{ordinal:02d}-{name}.stderr.{launch_bootstrap._SHA256_EMPTY}.log"
+                f"preformal-v1.18.0-command-{ordinal:02d}-{name}.stderr.{launch_bootstrap._SHA256_EMPTY}.log"
             )
             stderr_path.write_bytes(b"")
             log_paths[f"{name}:stderr"] = stderr_path
@@ -353,21 +353,21 @@ def _formal_binding_attempt(
             {
                 "schema": "prospect.wm001.preformal-test-report.v2",
                 "experiment_id": "WM-001",
-                "protocol_version": "1.17.0",
+                "protocol_version": "1.18.0",
                 "device": "cpu",
                 "all_pass": True,
                 "commands": commands,
             }
         )
     )
-    producer = results / "development" / "qualification-v1.17.0"
+    producer = results / "development" / "qualification-v1.18.0"
     producer.mkdir()
     values = producer_files or {
         "result.json": _canonical(
             {
                 "schema": "prospect.world-model-lifecycle.raw-result.v9",
                 "experiment_id": "WM-001",
-                "protocol_version": "1.17.0",
+                "protocol_version": "1.18.0",
                 "lane": "development",
             }
         )
@@ -407,7 +407,7 @@ def _formal_binding_attempt(
         {
             "schema": ("prospect.wm001.development-result-qualification.v1"),
             "experiment_id": "WM-001",
-            "protocol_version": "1.17.0",
+            "protocol_version": "1.18.0",
             "protocol_sha256": "e" * 64,
             "raw_result_sha256": result_sha256,
             "lane": "development",
@@ -464,7 +464,7 @@ def _formal_binding_attempt(
             "sha256": result_sha256,
         },
     ]
-    audit_attempt = results / "operator-v1.17" / "audits" / "development-audit-v1.17.0"
+    audit_attempt = results / "operator-v1.18" / "audits" / "development-audit-v1.18.0"
     audit_attempt.mkdir(parents=True)
     audit = {"schema": "test.independent-audit.v1", "passed": True}
     audit_payload = _canonical(audit)
@@ -553,7 +553,7 @@ def _formal_binding_attempt(
             {
                 "schema": "prospect.wm001.operator-attempt.v1",
                 "experiment_id": "WM-001",
-                "protocol_version": "1.17.0",
+                "protocol_version": "1.18.0",
                 "assurance": dict(_ASSURANCE),
                 "kind": "audit",
                 "lane": "development",
@@ -594,7 +594,7 @@ def _formal_binding_attempt(
             audit_completion,
         )
     ]
-    closure = results / "development" / "development-closure-v1.17.0.json"
+    closure = results / "development" / "development-closure-v1.18.0.json"
     closure_value = {
         "engineering_verified": True,
         "audit_reproduced": True,
@@ -621,12 +621,12 @@ def _formal_binding_attempt(
         },
     }
     closure.write_bytes(_canonical(closure_value))
-    closure_attempt = results / "operator-v1.17" / "closures" / "development-closure-v1.17.0"
+    closure_attempt = results / "operator-v1.18" / "closures" / "development-closure-v1.18.0"
     closure_attempt.mkdir(parents=True)
     fresh_reopen = {
         "schema": "prospect.wm001.development-closure-fresh-reopen.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "mode": "fresh-closure-reopen",
         "challenge": "1" * 64,
         "requesting_process_id": 100,
@@ -643,7 +643,7 @@ def _formal_binding_attempt(
     closure_reference = {
         "schema": "prospect.wm001.closure-reference.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "closure_marker": str(closure),
         "closure_sha256": hashlib.sha256(closure.read_bytes()).hexdigest(),
         "qualification_archive": closure_value["qualification_archive"],
@@ -662,7 +662,7 @@ def _formal_binding_attempt(
             {
                 "schema": "prospect.wm001.operator-attempt.v1",
                 "experiment_id": "WM-001",
-                "protocol_version": "1.17.0",
+                "protocol_version": "1.18.0",
                 "assurance": dict(_ASSURANCE),
                 "kind": "closure",
                 "lane": "development",
@@ -708,7 +708,7 @@ def _formal_binding_attempt(
     accepted_key = "runtime-accepted-closure-evidence:stdout"
     log_paths[accepted_key].unlink()
     accepted_log = report.with_name(
-        f"preformal-v1.17.0-command-09-runtime-accepted-closure-evidence.stdout.{accepted_digest}.log"
+        f"preformal-v1.18.0-command-09-runtime-accepted-closure-evidence.stdout.{accepted_digest}.log"
     )
     accepted_log.write_bytes(accepted_payload)
     log_paths[accepted_key] = accepted_log
@@ -723,7 +723,7 @@ def _formal_binding_attempt(
             {
                 "schema": "prospect.wm001.preformal-test-report.v2",
                 "experiment_id": "WM-001",
-                "protocol_version": "1.17.0",
+                "protocol_version": "1.18.0",
                 "device": "cpu",
                 "all_pass": True,
                 "commands": commands,
@@ -775,6 +775,33 @@ def _formal_binding_attempt(
     binding["source"] = source
     development = binding.get("development_qualification")
     development = dict(development) if isinstance(development, dict) else {}
+    development_defaults: dict[str, object] = {
+        "closure_schema": "prospect.wm001.development-closure.v2",
+        "closure_file": "development-closure-aaaaaaaaaaaaaaaa.json",
+        "qualification_archive_file": "development-qualification-aaaaaaaaaaaaaaaa.tar",
+        "qualification_archive_path": (
+            "bench/world_model_lifecycle/results/development/"
+            "development-qualification-aaaaaaaaaaaaaaaa.tar"
+        ),
+        "qualification_archive_bytes": 10240,
+        "qualification_archive_sha256": "1" * 64,
+        "qualification_archive_members_sha256": "2" * 64,
+        "independent_audit_sha256": "3" * 64,
+        "audit_reproduction_sha256": "4" * 64,
+        "audit_runtime_manifest_sha256": "5" * 64,
+        "audit_invocation_manifest_sha256": "6" * 64,
+        "audit_stderr_sha256": "7" * 64,
+        "source_identity_sha256": "8" * 64,
+        "producer_custody_identity_sha256": "9" * 64,
+        "audit_execution_identity_sha256": "a" * 64,
+        "git_commit": "1" * 40,
+        "git_tree": "2" * 40,
+        "engineering_verified": True,
+        "audit_reproduced": True,
+        "performance_values_bound": False,
+    }
+    for field, value in development_defaults.items():
+        development.setdefault(field, value)
     development.setdefault(
         "producer_manifest_sha256",
         producer_rows[0]["sha256"],
@@ -791,10 +818,6 @@ def _formal_binding_attempt(
         "producer_execution_identity_sha256",
         launch_bootstrap._canonical_digest(producer_execution),
     )
-    development.setdefault(
-        "matrix_contract_sha256",
-        launch_bootstrap._DEVELOPMENT_MATRIX_CONTRACT_SHA256,
-    )
     development.update(
         {
             "closure_bytes": closure.stat().st_size,
@@ -802,7 +825,7 @@ def _formal_binding_attempt(
         }
     )
     binding["development_qualification"] = development
-    attempt = results / "operator-v1.17" / "bindings" / "formal-binding-v1.17.0"
+    attempt = results / "operator-v1.18" / "bindings" / "formal-binding-v1.18.0"
     attempt.mkdir(parents=True)
     binding_path = attempt / "formal-binding.json"
     binding_path.write_bytes(_canonical(binding))
@@ -812,7 +835,7 @@ def _formal_binding_attempt(
         {
             "schema": "prospect.wm001.formal-input-preflight.v1",
             "experiment_id": "WM-001",
-            "protocol_version": "1.17.0",
+            "protocol_version": "1.18.0",
             "binding_bytes": len(binding_payload),
             "binding_sha256": hashlib.sha256(binding_payload).hexdigest(),
             "preformal_report_sha256": hashlib.sha256(report.read_bytes()).hexdigest(),
@@ -836,7 +859,7 @@ def _formal_binding_attempt(
             {
                 "schema": "prospect.wm001.operator-attempt.v1",
                 "experiment_id": "WM-001",
-                "protocol_version": "1.17.0",
+                "protocol_version": "1.18.0",
                 "assurance": dict(_ASSURANCE),
                 "kind": "binding",
                 "lane": None,
@@ -921,9 +944,9 @@ def _development_audit_context(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "audits"
-        / "development-audit-v1.17.0"
+        / "development-audit-v1.18.0"
     )
     producer_rows = launch_bootstrap._verify_development_producer(
         repository=repository,
@@ -952,11 +975,9 @@ def _rehearsal_output(binding: dict[str, object]) -> bytes:
     dependencies = binding["dependencies"]
     runtime = binding["runtime"]
     audit_execution = binding["audit_execution"]
-    development = binding["development_qualification"]
     assert isinstance(dependencies, dict)
     assert isinstance(runtime, dict)
     assert isinstance(audit_execution, dict)
-    assert isinstance(development, dict)
     inventory = {
         "packages": dependencies["packages"],
         "package_roots": dependencies["package_roots"],
@@ -966,12 +987,14 @@ def _rehearsal_output(binding: dict[str, object]) -> bytes:
     fresh = {
         "schema": "prospect.wm001.fresh-runtime-identity-conformance.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "mode": "fresh-identity-conformance",
         "challenge": "6" * 64,
         "requesting_process_id": 303,
         "verifier_process_id": 404,
-        "matrix_contract_sha256": development["matrix_contract_sha256"],
+        "matrix_contract_sha256": (
+            launch_bootstrap._DEVELOPMENT_MATRIX_CONTRACT_SHA256
+        ),
         "passed": True,
     }
     return _canonical(
@@ -1004,10 +1027,10 @@ def _configure_independent_rehearsal(
     binding: dict[str, object],
 ) -> None:
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    operator_root = results / "operator-v1.17"
-    attempt = operator_root / "rehearsals" / "accepted-binding-rehearsal-v1.17.0"
-    claim_root = results / "rehearsals" / "v1.17"
-    completion_root = results / "outer-completions" / "v1.17"
+    operator_root = results / "operator-v1.18"
+    attempt = operator_root / "rehearsals" / "accepted-binding-rehearsal-v1.18.0"
+    claim_root = results / "rehearsals" / "v1.18"
+    completion_root = results / "outer-completions" / "v1.18"
     lifecycle = repository / "bench" / "world_model_lifecycle"
     replacements = {
         "REPO": repository,
@@ -1082,7 +1105,7 @@ def _prospective_runtime_seal_value() -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(_ASSURANCE),
         "git_commit": "a" * 40,
         "git_tree": "b" * 40,
@@ -1422,7 +1445,7 @@ def test_completed_runtime_seal_rejects_missing_or_forged_marker(
 ) -> None:
     repository, completion_root, terminal = _repository_paths(tmp_path)
     results = completion_root.parents[1]
-    runtime_seal = results / "development" / "runtime-seal-v1.17.0.json"
+    runtime_seal = results / "development" / "runtime-seal-v1.18.0.json"
     runtime_seal.parent.mkdir()
     runtime_seal.write_bytes(_canonical(_prospective_runtime_seal_value()))
     stray_seal_link = runtime_seal.with_name("stray-seal-link.json")
@@ -1474,7 +1497,7 @@ def test_outer_accepts_only_exact_canonical_prospective_runtime_seal(
     finally:
         os.close(descriptor)
 
-    sibling = runtime_seal.with_name("alias-runtime-seal-v1.17.0.json")
+    sibling = runtime_seal.with_name("alias-runtime-seal-v1.18.0.json")
     shutil.copyfile(runtime_seal, sibling)
     sibling_link = sibling.with_name("alias-runtime-seal-link.json")
     os.link(sibling, sibling_link)
@@ -1761,9 +1784,9 @@ def test_recorded_runtime_conformance_is_cross_linked_to_binding(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "v1.17.0"
+        / "v1.18.0"
         / "preformal"
-        / "preformal-test-report-v1.17.0.json"
+        / "preformal-test-report-v1.18.0.json"
     )
     report = json.loads(report_path.read_bytes())
     command = next(row for row in report["commands"] if row["name"] == "runtime-bootstrap-inventory-conformance")
@@ -1829,7 +1852,7 @@ def test_outer_rejects_rebound_nonempty_command10_stderr(
         terminal_state="finalized",
     )
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    report_path = results / "development" / "v1.17.0" / "preformal" / "preformal-test-report-v1.17.0.json"
+    report_path = results / "development" / "v1.18.0" / "preformal" / "preformal-test-report-v1.18.0.json"
     report = json.loads(report_path.read_bytes())
     command = next(row for row in report["commands"] if row["name"] == "runtime-bootstrap-inventory-conformance")
     stderr_path = report_path.parent / command["stderr"]["file"]
@@ -1903,13 +1926,13 @@ def test_recorded_accepted_closure_evidence_is_complete_and_cross_linked(
         terminal_state="finalized",
     )
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    report_path = results / "development" / "v1.17.0" / "preformal" / "preformal-test-report-v1.17.0.json"
+    report_path = results / "development" / "v1.18.0" / "preformal" / "preformal-test-report-v1.18.0.json"
     report = json.loads(report_path.read_bytes())
     command = next(row for row in report["commands"] if row["name"] == "runtime-accepted-closure-evidence")
     value = json.loads((report_path.parent / command["stdout"]["file"]).read_bytes())
-    closure = results / "development" / "development-closure-v1.17.0.json"
-    producer = results / "development" / "qualification-v1.17.0"
-    closure_terminal = results / "operator-v1.17" / "closures" / "development-closure-v1.17.0" / "operator-attempt.json"
+    closure = results / "development" / "development-closure-v1.18.0.json"
+    producer = results / "development" / "qualification-v1.18.0"
+    closure_terminal = results / "operator-v1.18" / "closures" / "development-closure-v1.18.0" / "operator-attempt.json"
     expected = {
         "schema": "prospect.wm001.preformal-runtime-check.v1",
         "mode": "accepted-closure-evidence",
@@ -2026,7 +2049,7 @@ def test_outer_rejects_malformed_producer_time_or_numeric_count(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "qualification-v1.17.0"
+        / "qualification-v1.18.0"
         / "producer-manifest.json"
     )
     manifest = json.loads(manifest_path.read_bytes())
@@ -2071,10 +2094,10 @@ def test_outer_streams_production_scale_five_role_producer_once_per_file(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     production_files = {
-        "checkpoints/development-3454397035.pt": 78_204_724,
-        "checkpoints/development-2131905789.pt": 78_205_824,
-        "replicates/development-3454397035.json": 160_421_650,
-        "replicates/development-2131905789.json": 160_537_118,
+        "checkpoints/development-1787261725.pt": 78_204_724,
+        "checkpoints/development-1697528199.pt": 78_205_824,
+        "replicates/development-1787261725.json": 160_421_650,
+        "replicates/development-1697528199.json": 160_537_118,
         "result.json": 320_977_868,
     }
     repository, completion_root, producer = _development_producer(
@@ -2576,7 +2599,7 @@ def test_outer_rejects_substituted_closure_authorization_input(
         terminal_state="finalized",
     )
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    closure_terminal = results / "operator-v1.17" / "closures" / "development-closure-v1.17.0" / "operator-attempt.json"
+    closure_terminal = results / "operator-v1.18" / "closures" / "development-closure-v1.18.0" / "operator-attempt.json"
     closure_completion = _completion_marker(
         completion_root,
         closure_terminal,
@@ -2819,12 +2842,26 @@ def test_accepted_binding_rehearsal_publishes_one_authenticated_transaction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repository, completion_root, binding_path, binding = _rehearsal_context(tmp_path, monkeypatch)
+    development = binding["development_qualification"]
+    assert isinstance(development, dict)
+    binding_schema = json.loads(
+        (
+            Path(binding_module.__file__).with_name("schemas")
+            / "formal-binding.schema.json"
+        ).read_bytes()
+    )
+    development_schema = binding_schema["properties"]["development_qualification"]
+    assert development_schema["additionalProperties"] is False
+    assert set(development_schema["required"]) == set(development_schema["properties"])
+    assert set(development) == set(development_schema["required"])
+    assert "matrix_contract_sha256" not in development
+    expected_stdout = _rehearsal_output(binding)
     calls: list[list[str]] = []
     monkeypatch.setattr(
         launch_bootstrap.subprocess,
         "run",
         _captured_rehearsal_child(
-            _rehearsal_output(binding),
+            expected_stdout,
             calls,
         ),
     )
@@ -2845,6 +2882,17 @@ def test_accepted_binding_rehearsal_publishes_one_authenticated_transaction(
         "--device",
         "cpu",
     ]
+    stored_stdout = (
+        repository
+        / "bench"
+        / "world_model_lifecycle"
+        / "results"
+        / "operator-v1.18"
+        / "rehearsals"
+        / "accepted-binding-rehearsal-v1.18.0"
+        / "rehearsal.stdout.json"
+    ).read_bytes()
+    assert stored_stdout == expected_stdout
     local = launch_bootstrap._verify_accepted_binding_rehearsal(
         binding_path,
         repository=repository,
@@ -3154,7 +3202,7 @@ def test_rehearsal_attempt_sibling_refuses_before_claim_or_child(
         tmp_path,
         monkeypatch,
     )
-    attempts = repository / "bench" / "world_model_lifecycle" / "results" / "operator-v1.17" / "rehearsals"
+    attempts = repository / "bench" / "world_model_lifecycle" / "results" / "operator-v1.18" / "rehearsals"
     attempts.mkdir(parents=True)
     (attempts / ".stale-rehearsal").write_bytes(b"stale\n")
     monkeypatch.setattr(
@@ -3197,7 +3245,7 @@ def test_accepted_unfinalized_recovery_refuses_new_formal_authority(
             completion_root=completion_root,
         )
     formal = (
-        repository / "bench" / "world_model_lifecycle" / "results" / "formal" / "other-binding" / "confirmation-v1.17.0"
+        repository / "bench" / "world_model_lifecycle" / "results" / "formal" / "other-binding" / "confirmation-v1.18.0"
     )
     formal.mkdir(parents=True)
     monkeypatch.setattr(
@@ -3438,10 +3486,10 @@ def test_rehearsal_formal_absence_scan_rejects_every_current_namespace(
     if candidate == "current-binding-root":
         (formal / binding_sha256).mkdir()
     elif candidate == "alternate-binding":
-        path = formal / ("b" * 64) / "confirmation-v1.17.0"
+        path = formal / ("b" * 64) / "confirmation-v1.18.0"
         path.mkdir(parents=True)
     elif candidate == "nested-confirmation":
-        path = formal / "nonhex-root" / "confirmation-v1.17.0"
+        path = formal / "nonhex-root" / "confirmation-v1.18.0"
         path.mkdir(parents=True)
     elif candidate == "symlink-confirmation":
         root = formal / "other-binding"
@@ -3449,13 +3497,13 @@ def test_rehearsal_formal_absence_scan_rejects_every_current_namespace(
         (repository / "target").mkdir()
         os.symlink(
             repository / "target",
-            root / "confirmation-v1.17.0",
+            root / "confirmation-v1.18.0",
         )
     elif candidate == "audit-staging":
-        path = results / "operator-v1.17" / "audits" / ".formal-audit-v1.17.0.staging"
+        path = results / "operator-v1.18" / "audits" / ".formal-audit-v1.18.0.staging"
         path.mkdir(parents=True)
     elif candidate == "adjudication-staging":
-        path = results / "adjudication-v1.17" / ".formal-adjudication-v1.17.0.staging-123"
+        path = results / "adjudication-v1.18" / ".formal-adjudication-v1.18.0.staging-123"
         path.mkdir(parents=True)
     else:  # pragma: no cover - closed parametrization
         raise AssertionError(candidate)
@@ -3486,9 +3534,9 @@ def test_rehearsal_formal_absence_scan_preserves_retired_evidence_and_is_bounded
 ) -> None:
     repository = tmp_path / "repository"
     formal = repository / "bench" / "world_model_lifecycle" / "results" / "formal"
-    retired = formal / ("b" * 64) / "confirmation-v1.16.0"
+    retired = formal / ("b" * 64) / "confirmation-v1.17.0"
     retired.mkdir(parents=True)
-    (formal / "formal-launch-v1.16.0.json").write_bytes(b"retired\n")
+    (formal / "formal-launch-v1.17.0.json").write_bytes(b"retired\n")
     assert launch_bootstrap._formal_rehearsal_paths_absent(
         repository,
         binding_sha256="a" * 64,
@@ -3542,9 +3590,9 @@ def test_formal_launch_dispatch_rechecks_one_pristine_prepared_root(
     binding_sha256 = hashlib.sha256(binding_path.read_bytes()).hexdigest()
     formal_root = repository / "bench" / "world_model_lifecycle" / "results" / "formal"
     (formal_root / binding_sha256).mkdir(parents=True)
-    retired = formal_root / ("b" * 64) / "confirmation-v1.16.0"
+    retired = formal_root / ("b" * 64) / "confirmation-v1.17.0"
     retired.mkdir(parents=True)
-    (formal_root / "formal-launch-v1.16.0.json").write_bytes(b"retired\n")
+    (formal_root / "formal-launch-v1.17.0.json").write_bytes(b"retired\n")
 
     readiness_calls: list[str] = []
     original_ready = launch_bootstrap._formal_launch_paths_ready
@@ -3640,9 +3688,9 @@ def test_formal_launch_contamination_refuses_before_child(
     elif candidate == "current-child":
         (binding_root / "unexpected").write_bytes(b"")
     elif candidate == "root-confirmation":
-        (formal_root / "confirmation-v1.17.0").mkdir()
+        (formal_root / "confirmation-v1.18.0").mkdir()
     elif candidate == "alternate-confirmation":
-        (formal_root / ("c" * 64) / "confirmation-v1.17.0").mkdir(parents=True)
+        (formal_root / ("c" * 64) / "confirmation-v1.18.0").mkdir(parents=True)
     elif candidate == "symlink-confirmation":
         alternate = formal_root / "alternate"
         target = repository / "confirmation-target"
@@ -3650,25 +3698,25 @@ def test_formal_launch_contamination_refuses_before_child(
         target.mkdir()
         os.symlink(
             target,
-            alternate / "confirmation-v1.17.0",
+            alternate / "confirmation-v1.18.0",
             target_is_directory=True,
         )
     elif candidate == "formal-marker":
-        (formal_root / "formal-launch-v1.17.0.json").write_bytes(b"")
+        (formal_root / "formal-launch-v1.18.0.json").write_bytes(b"")
     elif candidate == "audit-final":
-        (results / "operator-v1.17" / "audits" / "formal-audit-v1.17.0").mkdir(parents=True)
+        (results / "operator-v1.18" / "audits" / "formal-audit-v1.18.0").mkdir(parents=True)
     elif candidate == "audit-staging":
-        (results / "operator-v1.17" / "audits" / ".formal-audit-v1.17.0.staging").mkdir(parents=True)
+        (results / "operator-v1.18" / "audits" / ".formal-audit-v1.18.0.staging").mkdir(parents=True)
     elif candidate == "semantic-review":
-        review = repository / "artifacts" / "wm001-reviews" / "formal-v1.17.0.json"
+        review = repository / "artifacts" / "wm001-reviews" / "formal-v1.18.0.json"
         review.parent.mkdir(parents=True)
         review.write_bytes(b"")
     elif candidate == "adjudication-marker":
-        (formal_root / "formal-adjudication-v1.17.0.json").write_bytes(b"")
+        (formal_root / "formal-adjudication-v1.18.0.json").write_bytes(b"")
     elif candidate == "adjudication-final":
-        (results / "adjudication-v1.17" / "formal-adjudication-v1.17.0").mkdir(parents=True)
+        (results / "adjudication-v1.18" / "formal-adjudication-v1.18.0").mkdir(parents=True)
     elif candidate == "adjudication-staging":
-        (results / "adjudication-v1.17" / ".formal-adjudication-v1.17.0.staging-race").mkdir(parents=True)
+        (results / "adjudication-v1.18" / ".formal-adjudication-v1.18.0.staging-race").mkdir(parents=True)
     else:  # pragma: no cover - closed parametrization
         raise AssertionError(candidate)
 
@@ -3765,7 +3813,7 @@ def test_later_publishers_do_not_reenter_preformal_readiness_gate(
     )
     binding_sha256 = hashlib.sha256(binding_path.read_bytes()).hexdigest()
     confirmation = (
-        repository / "bench" / "world_model_lifecycle" / "results" / "formal" / binding_sha256 / "confirmation-v1.17.0"
+        repository / "bench" / "world_model_lifecycle" / "results" / "formal" / binding_sha256 / "confirmation-v1.18.0"
     )
     confirmation.mkdir(parents=True)
     monkeypatch.setattr(
@@ -3831,7 +3879,7 @@ def test_runtime_lock_is_repository_wide_across_working_directories(
     try:
         with pytest.raises(
             launch_bootstrap.LaunchError,
-            match="another WM-001 v1.17 outer invocation",
+            match="another WM-001 v1.18 outer invocation",
         ):
             launch_bootstrap._acquire_runtime_lock(repository)
     finally:
@@ -3915,7 +3963,6 @@ def _install_minimal_distribution(virtualenv: Path) -> None:
         "    dependencies = binding['dependencies']\n"
         "    runtime = binding['runtime']\n"
         "    audit = binding['audit_execution']\n"
-        "    development = binding['development_qualification']\n"
         "    inventory = {\n"
         "        'packages': dependencies['packages'],\n"
         "        'package_roots': dependencies['package_roots'],\n"
@@ -3925,12 +3972,12 @@ def _install_minimal_distribution(virtualenv: Path) -> None:
         "    fresh = {\n"
         "        'schema': 'prospect.wm001.fresh-runtime-identity-conformance.v1',\n"
         "        'experiment_id': 'WM-001',\n"
-        "        'protocol_version': '1.17.0',\n"
+        "        'protocol_version': '1.18.0',\n"
         "        'mode': 'fresh-identity-conformance',\n"
         "        'challenge': '6' * 64,\n"
         "        'requesting_process_id': 303,\n"
         "        'verifier_process_id': 404,\n"
-        "        'matrix_contract_sha256': development['matrix_contract_sha256'],\n"
+        "        'matrix_contract_sha256': '09a232a4a58c2690665cbef928936b49fbb28d7134405c8eb696a63371591b84',\n"
         "        'passed': True,\n"
         "    }\n"
         "    sys.stdout.write(_payload({\n"
@@ -4135,7 +4182,7 @@ def test_real_outer_launcher_rehearses_accepted_binding_with_large_producer(
     )
     _install_minimal_distribution(virtualenv)
 
-    runtime_seal = lifecycle / "results" / "development" / "runtime-seal-v1.17.0.json"
+    runtime_seal = lifecycle / "results" / "development" / "runtime-seal-v1.18.0.json"
     runtime_seal.parent.mkdir(parents=True, exist_ok=True)
     environment = {
         "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
@@ -4171,7 +4218,7 @@ def test_real_outer_launcher_rehearses_accepted_binding_with_large_producer(
     assert seal["schema"] == "prospect.wm001.runtime-seal.v1"
     assert seal["assurance"] == _ASSURANCE
     assert seal["worktree_clean"] is True
-    completion_root = lifecycle / "results" / "outer-completions" / "v1.17"
+    completion_root = lifecycle / "results" / "outer-completions" / "v1.18"
     marker = _completion_marker(completion_root, runtime_seal)
     assert marker.read_bytes() == runtime_seal.read_bytes()
     assert os.path.samefile(marker, runtime_seal)
@@ -4221,10 +4268,10 @@ def test_real_outer_launcher_rehearses_accepted_binding_with_large_producer(
         binding=formal_binding,
         terminal_state="unfinalized",
         producer_files={
-            "checkpoints/development-2131905789.pt": 78_205_824,
-            "checkpoints/development-3454397035.pt": 78_204_724,
-            "replicates/development-2131905789.json": 160_537_118,
-            "replicates/development-3454397035.json": 160_421_650,
+            "checkpoints/development-1697528199.pt": 78_205_824,
+            "checkpoints/development-1787261725.pt": 78_204_724,
+            "replicates/development-1697528199.json": 160_537_118,
+            "replicates/development-1787261725.json": 160_421_650,
             "result.json": 320_977_868,
         },
     )
@@ -4309,7 +4356,7 @@ def test_real_outer_launcher_rehearses_accepted_binding_with_large_producer(
     assert rehearsal_runtime.returncode == 0, f"stdout:\n{rehearsal_runtime.stdout}stderr:\n{rehearsal_runtime.stderr}"
     assert rehearsal_runtime.stdout == ""
     assert rehearsal_runtime.stderr == ""
-    rehearsal_attempt = lifecycle / "results" / "operator-v1.17" / "rehearsals" / "accepted-binding-rehearsal-v1.17.0"
+    rehearsal_attempt = lifecycle / "results" / "operator-v1.18" / "rehearsals" / "accepted-binding-rehearsal-v1.18.0"
     rehearsal_terminal = rehearsal_attempt / "rehearsal-terminal.json"
     rehearsal_completion = _completion_marker(
         completion_root,

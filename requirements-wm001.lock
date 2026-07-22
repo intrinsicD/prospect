@@ -1,5 +1,5 @@
-# WM-001 protocol 1.17.0 isolated live execution closure.
-# Versions preserve the v1.4 scientific runtime; each v1.17 digest covers
+# WM-001 protocol 1.18.0 isolated live execution closure.
+# Versions preserve the v1.4 scientific runtime; each v1.18 digest covers
 # the executable or every stable installed distribution file.
 python==3.12.9 --distribution-sha256=d9b73f600a860cefe799d7b4d21bad64719231227c2cf326ca17ed94624841af
 attrs==26.1.0 --distribution-sha256=1b832c73cc494544dc1a27c82e0701cd6eac8c0ab9fa4fd9b1e3fe1dd687e457
@@ -11,12 +11,12 @@ gymnasium==0.29.1 --distribution-sha256=26e63050893c6aff6497bddbe4f7c1868ce602f8
 hoptorch==0.1.4 --distribution-sha256=5da872654fa2c19d66b8f37f5237e0095206fcf29c88123df249026ca6d4b383
 importlib-metadata==9.0.0 --distribution-sha256=ae4f1b60e65fbb28da84669d4a6f36cd3b9e549e9e5987feaad660281d3a66d9
 jinja2==3.1.6 --distribution-sha256=075efe8e874ad42a629a1f6cbfdbc09312f4ad7aa51b505e97782007f58a93a9
-jsonschema==4.25.1 --distribution-sha256=561f67bcc9d9320571d4e3a8acd1e19e69b1151dfebaa7e05d8cd7394edbcc63
+jsonschema==4.25.1 --distribution-sha256=5743acf69627d1875ca4ad9fff64c50b7f9126e309ed3a4744b35276ac332153
 jsonschema-specifications==2025.9.1 --distribution-sha256=84cd702aca55e8b9626961cdbf61502d02eb9191e9fd9af241bb7ab3c9805034
 markupsafe==3.0.2 --distribution-sha256=ab5278c9b4ee67dd56dbd45ccc74f2fbc6b741d9a0ee33f73c0196c310f0734c
 mpmath==1.3.0 --distribution-sha256=00cc5ac8f637e86662f05dc6addbe008a00db3ec77a87c8a337265ff09fa66c0
 networkx==3.4.2 --distribution-sha256=d03d598d018c580c1e91229095c1d50d89f9125c60493ceacb53d996fc1a5cc6
-numpy==2.1.3 --distribution-sha256=1ba1173b709c48a153faf99ba3fe9339e24ffe6c4268803ae08d45a008dbd57f
+numpy==2.1.3 --distribution-sha256=9a4d9b14895f6d808593bf84aea993f2d5b710fd711a6cdf184f0c456925132c
 nvidia-cublas-cu12==12.8.4.1 --distribution-sha256=1ad0fa1c51f9e3a39949bc7bc5aa8779d7bb65516621c38c62d6949455fb9ba6
 nvidia-cuda-cupti-cu12==12.8.90 --distribution-sha256=fe3b1673b89cb4f577eb7889a87a563b1cdd827f731455f0f2fac9170e43a3ad
 nvidia-cuda-nvrtc-cu12==12.8.93 --distribution-sha256=37a39b3d01de0c269766352440b4be167673d2696163ccccb5b69625e85a9a77
@@ -34,15 +34,15 @@ nvidia-nvshmem-cu12==3.3.20 --distribution-sha256=55852fc75afc8ea3784b677e2bfe76
 nvidia-nvtx-cu12==12.8.90 --distribution-sha256=768bb8860727103d9250e2ea95e9c03aa226153ab2549092a53500c65612dac7
 orjson==3.11.9 --distribution-sha256=bc7bcfae42b7961caa680d26402a8eb39738f5f3e1b856d3aac83db23d09dd8d
 packaging==24.2 --distribution-sha256=2d6ad0d304cad02f9eb0a097764c724cebdc5a77cdee253cba36e81adbd01629
-prospect==0.0.1 --distribution-sha256=01cb67968240d966e979d43d33e4d99ec91faffbf52011ea51a848f80625b5e1
+prospect==0.0.1 --distribution-sha256=676dd36bd40f790792814ec84ba19030ee2a68aaeb3ca5ac199e7702417fec37
 pyvers==0.2.3 --distribution-sha256=6dd75b92d86220ffad7642c7825549fc428954c452cfd98c9d435a6be539ce7d
 referencing==0.37.0 --distribution-sha256=771c0599ef6190537198d7edacc339e7cbe5d20f3230c0a756a2e89a4e0740cf
 rpds-py==2026.6.3 --distribution-sha256=906aeb81e70a7113280bf5f9b1bf6cb2da6a300e3191f0f74a8211d06738578a
 setuptools==75.8.0 --distribution-sha256=a4f161e0047ecca4d2323910f4432c00abc0a38edd0324cff270ceea51103951
-sympy==1.14.0 --distribution-sha256=00cf9fcfd7ab5b7b370c7fe671c489d5967ca5d451a8b238aabfa1b7c23a1960
+sympy==1.14.0 --distribution-sha256=62fa25ee79fcb7bf4ef97125150adb8705188921dffa6067ce0f6852a903b09f
 tensordict==0.13.0 --distribution-sha256=387aa94ba9599aa3b4300d0bdd8a6157f341462782c7c8282c4ed1bc9cbbde08
-torch==2.9.0 --distribution-sha256=68840d18d96cdd5626c8b7f86618e491fda8e4ae2f92d15a92b8e3b792fdf8bb
+torch==2.9.0 --distribution-sha256=2241e1b20f34a4ae6f42156aa0aa9b64f94167b8374e9d6105e6969ed10d5204
 torchrl==0.13.3 --distribution-sha256=544753278f01736eb6b051da0d8c735cfa7d9e9da4de3c8985b962a58a8b253e
-triton==3.5.0 --distribution-sha256=7d832c7d6d8da5482b0bd83803b6a8763ad7c8fbb5e60883d398be4db8d5323a
+triton==3.5.0 --distribution-sha256=6289c02ffbc5235a2b50174cde68c95de1fde5dd9febadf438f3024348c074ca
 typing-extensions==4.12.2 --distribution-sha256=35f30c129d58522ac4dc115e91968415c98e06526c3bbca5d738b925481936e6
 zipp==4.1.0 --distribution-sha256=93addf232e926e6d522f0b59547123fab263404975dbf1b8b0b8b049a29e2aae

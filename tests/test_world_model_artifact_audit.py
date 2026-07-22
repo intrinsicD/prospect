@@ -172,7 +172,7 @@ def test_preformal_runtime_seal_requires_exact_negative_assurance() -> None:
     seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(artifact_audit_module._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -240,7 +240,7 @@ def test_independent_preformal_log_parser_requires_empty_stderr() -> None:
     empty_digest = hashlib.sha256(b"").hexdigest()
     empty = {
         "file": (
-            "preformal-v1.17.0-command-02-ruff.stderr."
+            "preformal-v1.18.0-command-02-ruff.stderr."
             f"{empty_digest}.log"
         ),
         "bytes": 0,
@@ -262,7 +262,7 @@ def test_independent_preformal_log_parser_requires_empty_stderr() -> None:
     diagnostic_digest = hashlib.sha256(diagnostic).hexdigest()
     nonempty = {
         "file": (
-            "preformal-v1.17.0-command-02-ruff.stderr."
+            "preformal-v1.18.0-command-02-ruff.stderr."
             f"{diagnostic_digest}.log"
         ),
         "bytes": len(diagnostic),
@@ -1162,13 +1162,13 @@ def test_formal_launch_namespace_requires_exact_confirmation_name(
         / "results"
         / "formal"
         / binding_digest
-        / "confirmation-v1.17.0"
+        / "confirmation-v1.18.0"
     )
 
     assert artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical,
         binding_digest=binding_digest,
-        launch={"attempt_directory": "confirmation-v1.17.0"},
+        launch={"attempt_directory": "confirmation-v1.18.0"},
     )
     assert not artifact_audit_module._formal_launch_namespace_is_canonical(  # noqa: SLF001
         canonical.with_name("wrong-child"),
@@ -1673,11 +1673,11 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     owned_state = runtime.owner.snapshot_state()
     parameter_sha256 = runtime.digest
     model_version = runtime.version
-    master_seed = 3454397035
+    master_seed = 1787261725
 
     def seed(namespace: str, index: int = 0) -> int:
         return int.from_bytes(
-            hashlib.sha256(f"WM-001|1.17.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
+            hashlib.sha256(f"WM-001|1.18.0|{namespace}|{master_seed}|{index}".encode()).digest()[:4],
             "big",
         )
 
@@ -2158,7 +2158,7 @@ def _write_minimal_auditable_artifact(root: Path) -> Path:
     result: dict[str, Any] = {
         "schema": "prospect.world-model-lifecycle.raw-result.v9",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "protocol_sha256": hashlib.sha256(
             (Path(__file__).resolve().parents[1] / "bench" / "world_model_lifecycle" / "protocol.json").read_bytes()
         ).hexdigest(),

@@ -18,6 +18,12 @@ that Prospect passes them.
 
 ## Current status
 
+Protocol 1.18.0 is the active prospective successor. It preserves every
+scientific and serialized representation while resolving the rehearsal matrix
+identity through the sealed protocol, removing schema-forbidden fixture data,
+and requiring launcher-accepted stored bytes to pass the independent verifier.
+Its plan and runbook are prospective; no v1.18 lifecycle claim or outcome
+exists yet.
 Protocol 1.17.0 repaired the real audit-package boundary and reached an
 authentic accepted, outer-finalized result-free rehearsal. The required
 independent verifier then rejected the valid matrix identity because its test
@@ -170,9 +176,9 @@ instead hardcoded the execution-capture filename. No formal marker or outcome
 exists. Its disposition is preserved in the
 [v1.16 accepted-binding rehearsal failure](../../docs/wm001-v1160-accepted-binding-rehearsal-failure.md).
 The active prospective repair is the
-[v1.17 confirmation plan](../../docs/wm001-v1170-confirmation-plan.md), with its
+[v1.18 confirmation plan](../../docs/wm001-v1180-confirmation-plan.md), with its
 one-shot sequence in the
-[v1.17 operator runbook](../../docs/wm001-v1170-operator-runbook.md). It has no
+[v1.18 operator runbook](../../docs/wm001-v1180-operator-runbook.md). It has no
 development or formal outcome yet.
 Protocol 1.15.0 passed its result-free rehearsal, development, accepted audit,
 closure, sealed-runtime reopen, preformal report, accepted binding, and the

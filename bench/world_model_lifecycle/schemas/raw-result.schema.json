@@ -28,7 +28,7 @@
       "const": "WM-001"
     },
     "protocol_version": {
-      "const": "1.17.0"
+      "const": "1.18.0"
     },
     "protocol_sha256": {
       "$ref": "#/$defs/sha256"

@@ -1,4 +1,4 @@
-"""Trusted, immutable preformal test evidence for WM-001 protocol 1.17."""
+"""Trusted, immutable preformal test evidence for WM-001 protocol 1.18."""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ from .assurance import ASSURANCE
 
 SCHEMA = "prospect.wm001.preformal-test-report.v2"
 EXPERIMENT_ID = "WM-001"
-PROTOCOL_VERSION = "1.17.0"
-REPORT_NAME = "preformal-test-report-v1.17.0.json"
+PROTOCOL_VERSION = "1.18.0"
+REPORT_NAME = "preformal-test-report-v1.18.0.json"
 PREFORMAL_REPORT_NAME = REPORT_NAME
-LOG_PREFIX = "preformal-v1.17.0-command-"
+LOG_PREFIX = "preformal-v1.18.0-command-"
 _EVIDENCE_PREFIX = "preformal-"
 SOURCE_RELATIVE_PATH = "bench/world_model_lifecycle/preformal.py"
-REVIEW_RELATIVE_PATH = "docs/wm001-v1170-prospective-harness-review.json"
+REVIEW_RELATIVE_PATH = "docs/wm001-v1180-prospective-harness-review.json"
 REVIEW_SCHEMA = "prospect.wm001.prospective-harness-review.v1"
 
 
@@ -60,22 +60,22 @@ DEVELOPMENT_RESULTS_ROOT = (
     REPO / "bench" / "world_model_lifecycle" / "results" / "development"
 )
 DEVELOPMENT_CLOSURE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.17.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.18.0.json"
 )
 RUNTIME_SEAL_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "runtime-seal-v1.17.0.json"
+    DEVELOPMENT_RESULTS_ROOT / "runtime-seal-v1.18.0.json"
 )
 PREFORMAL_BUNDLE_PATH = (
-    DEVELOPMENT_RESULTS_ROOT / "v1.17.0" / "preformal"
+    DEVELOPMENT_RESULTS_ROOT / "v1.18.0" / "preformal"
 )
 CLOSURE_ATTEMPT_PATH = (
     REPO
     / "bench"
     / "world_model_lifecycle"
     / "results"
-    / "operator-v1.17"
+    / "operator-v1.18"
     / "closures"
-    / "development-closure-v1.17.0"
+    / "development-closure-v1.18.0"
 )
 PREFORMAL_REPORT_PATH = PREFORMAL_BUNDLE_PATH / REPORT_NAME
 LAUNCH_BOOTSTRAP_PATH = REPO / "bench/world_model_lifecycle/launch_bootstrap.py"
@@ -951,8 +951,8 @@ def _implementation_files(*, environment: dict[str, str] | None = None) -> list[
         REPO / "bench/world_model_lifecycle/protocol.json",
         REPO / "bench/world_model_lifecycle/schemas/raw-result.schema.json",
         REPO / "bench/world_model_lifecycle/schemas/formal-binding.schema.json",
-        REPO / "docs/wm001-v1170-confirmation-plan.md",
-        REPO / "docs/wm001-v1170-operator-runbook.md",
+        REPO / "docs/wm001-v1180-confirmation-plan.md",
+        REPO / "docs/wm001-v1180-operator-runbook.md",
     ]
     rows: list[dict[str, object]] = []
     for path in sorted(set(candidates)):
@@ -1086,7 +1086,7 @@ def required_commands(
     prospective_review_path: Path = REVIEW_PATH,
     device: str = "cpu",
 ) -> tuple[CommandSpec, ...]:
-    """Return the fixed, ordered v1.17 preformal command contract."""
+    """Return the fixed, ordered v1.18 preformal command contract."""
 
     if device not in {"cpu", "cuda"}:
         raise PreformalEvidenceError("preformal device must be cpu or cuda")
@@ -1368,7 +1368,7 @@ def generate_preformal_report(
         raise PreformalEvidenceError("preformal report path must not contain aliases")
     if output != PREFORMAL_REPORT_PATH:
         raise PreformalEvidenceError(
-            "preformal report must use the sole canonical protocol-1.17 "
+            "preformal report must use the sole canonical protocol-1.18 "
             f"path {PREFORMAL_REPORT_PATH}"
         )
     final_directory = output.parent
@@ -1384,11 +1384,11 @@ def generate_preformal_report(
     )
     if runtime_seal_path != RUNTIME_SEAL_PATH:
         raise PreformalEvidenceError(
-            "runtime seal must use its canonical v1.17 path"
+            "runtime seal must use its canonical v1.18 path"
         )
     if development_closure_path != DEVELOPMENT_CLOSURE_PATH:
         raise PreformalEvidenceError(
-            "development closure must use its canonical v1.17 path"
+            "development closure must use its canonical v1.18 path"
         )
     if closure_attempt_path != CLOSURE_ATTEMPT_PATH:
         raise PreformalEvidenceError(

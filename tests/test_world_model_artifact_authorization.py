@@ -38,7 +38,7 @@ def _preflight_receipt(binding_payload: bytes) -> bytes:
         {
             "schema": "prospect.wm001.formal-input-preflight.v1",
             "experiment_id": "WM-001",
-            "protocol_version": "1.17.0",
+            "protocol_version": "1.18.0",
             "binding_bytes": len(binding_payload),
             "binding_sha256": hashlib.sha256(
                 binding_payload
@@ -94,7 +94,7 @@ def _write_attempt(
     manifest = {
         "schema": "prospect.wm001.operator-attempt.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "kind": kind,
         "lane": lane,
@@ -226,7 +226,7 @@ def _production_development_audit_package(
         {
             "schema": "prospect.wm001.audit-reproduction.v2",
             "experiment_id": "WM-001",
-            "protocol_version": "1.17.0",
+            "protocol_version": "1.18.0",
             "supplied_audit_sha256": audit_sha256,
             "reproduced_audit_sha256": audit_sha256,
             "byte_identical": True,
@@ -288,7 +288,7 @@ def authorization_space(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.17"
+        / "v1.18"
     )
     completion_root.mkdir(parents=True)
     monkeypatch.setattr(
@@ -322,13 +322,13 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
         / "world_model_lifecycle"
         / "results"
         / "development"
-        / "v1.17.0"
+        / "v1.18.0"
         / "preformal"
-        / "preformal-test-report-v1.17.0.json"
+        / "preformal-test-report-v1.18.0.json"
     )
     closure_path = (
         preformal_path.parents[2]
-        / "development-closure-v1.17.0.json"
+        / "development-closure-v1.18.0.json"
     )
     preformal_payload = b"preformal\n"
     closure_payload = b"closure\n"
@@ -344,9 +344,9 @@ def test_formal_binding_authorization_reconstructs_exact_ordered_inputs(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "bindings"
-        / "formal-binding-v1.17.0"
+        / "formal-binding-v1.18.0"
     )
     preflight_payload = _preflight_receipt(binding_payload)
     (artifact_root / "formal-input-preflight.json").write_bytes(
@@ -445,9 +445,9 @@ def test_formal_binding_authorization_requires_exact_preflight_receipt(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "bindings"
-        / "formal-binding-v1.17.0"
+        / "formal-binding-v1.18.0"
     )
     files = {
         "formal-binding.json": binding_payload,
@@ -536,9 +536,9 @@ def test_formal_binding_authorization_requires_exact_result_qualification(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "bindings"
-        / "formal-binding-v1.17.0"
+        / "formal-binding-v1.18.0"
     )
     _write_attempt(
         binding_attempt_path,
@@ -632,7 +632,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
         / "world_model_lifecycle"
         / "results"
     )
-    producer = results / "development" / "qualification-v1.17.0"
+    producer = results / "development" / "qualification-v1.18.0"
     producer.mkdir(parents=True)
     producer_manifest = producer / "producer-manifest.json"
     producer_result = producer / "result.json"
@@ -674,9 +674,9 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
     ]
     audit_path = (
         results
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "audits"
-        / "development-audit-v1.17.0"
+        / "development-audit-v1.18.0"
     )
     audit_payload = _canonical({"passed": True})
     runtime_payload = _canonical({"runtime": "sealed"})
@@ -724,11 +724,11 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
     closure_path = (
         results
         / "development"
-        / "development-closure-v1.17.0.json"
+        / "development-closure-v1.18.0.json"
     )
     qualification_archive = {
         "format": "ustar-uncompressed-v1",
-        "file": "development-qualification-v1.17.0.tar",
+        "file": "development-qualification-v1.18.0.tar",
         "members": [
             {
                 "path": "producer/producer-manifest.json",
@@ -794,7 +794,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
         {
             "schema": "prospect.wm001.development-closure.v2",
             "experiment_id": "WM-001",
-            "protocol_version": "1.17.0",
+            "protocol_version": "1.18.0",
             "producer_root": str(producer),
             "producer_manifest_member": "producer/producer-manifest.json",
             "raw_result_member": "producer/result.json",
@@ -820,9 +820,9 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
 
     closure_attempt_path = (
         results
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "closures"
-        / "development-closure-v1.17.0"
+        / "development-closure-v1.18.0"
     )
     audit_terminal_row = next(
         row
@@ -834,7 +834,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "mode": "fresh-closure-reopen",
         "challenge": "1" * 64,
         "requesting_process_id": 100,
@@ -851,7 +851,7 @@ def test_development_closure_authorization_reconstructs_producer_and_audit(
     reference = {
         "schema": "prospect.wm001.closure-reference.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "closure_marker": str(closure_path),
         "closure_sha256": closure_row["sha256"],
         "qualification_archive": qualification_archive,
@@ -934,7 +934,7 @@ def test_authorization_follows_payload_addressed_reproduction_sidecars(
             / "results"
         )
         producer = (
-            results / "development" / "qualification-v1.17.0"
+            results / "development" / "qualification-v1.18.0"
         )
         producer.mkdir(parents=True)
         result_payload = _canonical({"result": variant})
@@ -993,9 +993,9 @@ def test_authorization_follows_payload_addressed_reproduction_sidecars(
         )
         audit_path = (
             results
-            / "operator-v1.17"
+            / "operator-v1.18"
             / "audits"
-            / "development-audit-v1.17.0"
+            / "development-audit-v1.18.0"
         )
         _write_attempt(
             audit_path,
@@ -1043,9 +1043,9 @@ def test_authorization_rejects_unfinalized_or_sibling_attempt(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "bindings"
-        / "formal-binding-v1.17.0"
+        / "formal-binding-v1.18.0"
     )
     sibling = expected.with_name("sibling-binding")
     binding_payload = _canonical({"binding": True})
@@ -1095,9 +1095,9 @@ def test_authorization_attempt_rejects_numeric_file_count_aliases(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "bindings"
-        / "formal-binding-v1.17.0"
+        / "formal-binding-v1.18.0"
     )
     _write_attempt(
         attempt_path,
@@ -1136,9 +1136,9 @@ def test_authorization_reference_rejects_numeric_byte_aliases(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "audits"
-        / "development-audit-v1.17.0"
+        / "development-audit-v1.18.0"
     )
     payload = b"x"
     _write_attempt(

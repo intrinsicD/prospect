@@ -58,15 +58,15 @@ def _patch_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     launch.write_bytes(b"# sealed launch fixture\n")
     bootstrap.write_bytes(b"# sealed producer fixture\n")
     results = source / "results"
-    operator_root = results / "operator-v1.17"
+    operator_root = results / "operator-v1.18"
     attempts = operator_root / "rehearsals"
-    attempt = attempts / "accepted-binding-rehearsal-v1.17.0"
-    claim_root = results / "rehearsals" / "v1.17"
-    completions = results / "outer-completions" / "v1.17"
+    attempt = attempts / "accepted-binding-rehearsal-v1.18.0"
+    claim_root = results / "rehearsals" / "v1.18"
+    completions = results / "outer-completions" / "v1.18"
     binding_path = (
         operator_root
         / "bindings"
-        / "formal-binding-v1.17.0"
+        / "formal-binding-v1.18.0"
         / "formal-binding.json"
     )
     values = {
@@ -94,7 +94,7 @@ def _binding() -> dict[str, object]:
     return {
         "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "experiment_id": "WM-001",
-        "protocol": {"version": "1.17.0"},
+        "protocol": {"version": "1.18.0"},
         "assurance": dict(ASSURANCE),
         "runtime": {"device": "cpu"},
         "dependencies": {
@@ -135,7 +135,35 @@ def _binding() -> dict[str, object]:
             },
         },
         "development_qualification": {
-            "matrix_contract_sha256": "5" * 64,
+            "closure_schema": "prospect.wm001.development-closure.v2",
+            "closure_file": "development-closure.json",
+            "closure_bytes": 1,
+            "closure_sha256": "5" * 64,
+            "qualification_archive_file": "development-qualification-aaaaaaaaaaaaaaaa.tar",
+            "qualification_archive_path": (
+                "bench/world_model_lifecycle/results/development/"
+                "development-qualification-aaaaaaaaaaaaaaaa.tar"
+            ),
+            "qualification_archive_bytes": 10240,
+            "qualification_archive_sha256": "6" * 64,
+            "qualification_archive_members_sha256": "7" * 64,
+            "producer_manifest_sha256": "8" * 64,
+            "raw_result_sha256": "9" * 64,
+            "result_qualification_sha256": "a" * 64,
+            "independent_audit_sha256": "b" * 64,
+            "audit_reproduction_sha256": "c" * 64,
+            "audit_runtime_manifest_sha256": "d" * 64,
+            "audit_invocation_manifest_sha256": "e" * 64,
+            "audit_stderr_sha256": "f" * 64,
+            "source_identity_sha256": "1" * 64,
+            "producer_execution_identity_sha256": "2" * 64,
+            "producer_custody_identity_sha256": "3" * 64,
+            "audit_execution_identity_sha256": "4" * 64,
+            "git_commit": "1" * 40,
+            "git_tree": "2" * 40,
+            "engineering_verified": True,
+            "audit_reproduced": True,
+            "performance_values_bound": False,
         },
         "audit_execution": {
             "restart_runtime_conformance_report_sha256": "6" * 64,
@@ -168,12 +196,14 @@ def _stdout(binding: dict[str, object]) -> bytes:
     fresh = {
         "schema": "prospect.wm001.fresh-runtime-identity-conformance.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "mode": "fresh-identity-conformance",
         "challenge": "8" * 64,
         "requesting_process_id": 100,
         "verifier_process_id": 101,
-        "matrix_contract_sha256": "5" * 64,
+        "matrix_contract_sha256": (
+            "09a232a4a58c2690665cbef928936b49fbb28d7134405c8eb696a63371591b84"
+        ),
         "passed": True,
     }
     value = {
@@ -266,7 +296,7 @@ def _package(
     claim = {
         "schema": rehearsal.CLAIM_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(ASSURANCE),
         "status": "consumed",
         "binding_path": str(binding_path),
@@ -303,7 +333,7 @@ def _package(
     terminal: dict[str, object] = {
         "schema": rehearsal.TERMINAL_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(ASSURANCE),
         "status": status,
         "claim_file": rehearsal.CLAIM_NAME,
@@ -377,6 +407,28 @@ def test_accepted_rehearsal_verifies_and_exports_authorization_rows(
         assert custody.terminal == package["terminal"]
         assert custody.identity_rows() == rows
         custody.recheck()
+
+
+def test_accepted_rehearsal_rejects_wrong_protocol_matrix_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package = _package(tmp_path, monkeypatch)
+    value = json.loads(rehearsal.STDOUT_PATH.read_bytes())
+    fresh = value["fresh_runtime_identity_conformance"]
+    assert isinstance(fresh, dict)
+    fresh["matrix_contract_sha256"] = "0" * 64
+    value["fresh_runtime_identity_conformance_sha256"] = _digest(fresh)
+    rehearsal.STDOUT_PATH.write_bytes(_canonical(value))
+    _rewrite_terminal(package)
+
+    with pytest.raises(
+        rehearsal.RehearsalEvidenceError,
+        match="fresh runtime identity is malformed",
+    ):
+        rehearsal.verify_accepted_binding_rehearsal(
+            rehearsal.FORMAL_BINDING_PATH
+        )
 
 
 @pytest.mark.parametrize(

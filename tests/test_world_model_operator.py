@@ -107,19 +107,19 @@ def operator_space(
     repo = tmp_path / "repo"
     lifecycle = repo / "bench" / "world_model_lifecycle"
     lifecycle.mkdir(parents=True)
-    _write(lifecycle / "protocol.json", {"version": "1.17.0"})
-    operator_root = lifecycle / "results" / "operator-v1.17"
+    _write(lifecycle / "protocol.json", {"version": "1.18.0"})
+    operator_root = lifecycle / "results" / "operator-v1.18"
     binding_root = operator_root / "bindings"
     audit_root = operator_root / "audits"
     closure_root = operator_root / "closures"
-    completion_root = lifecycle / "results" / "outer-completions" / "v1.17"
-    formal_binding = binding_root / "formal-binding-v1.17.0"
-    development_audit = audit_root / "development-audit-v1.17.0"
-    formal_audit = audit_root / "formal-audit-v1.17.0"
-    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.17.0.json"
-    development_qualification = lifecycle / "results" / "development" / "qualification-v1.17.0"
-    development_closure = lifecycle / "results" / "development" / "development-closure-v1.17.0.json"
-    closure = closure_root / "development-closure-v1.17.0"
+    completion_root = lifecycle / "results" / "outer-completions" / "v1.18"
+    formal_binding = binding_root / "formal-binding-v1.18.0"
+    development_audit = audit_root / "development-audit-v1.18.0"
+    formal_audit = audit_root / "formal-audit-v1.18.0"
+    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.18.0.json"
+    development_qualification = lifecycle / "results" / "development" / "qualification-v1.18.0"
+    development_closure = lifecycle / "results" / "development" / "development-closure-v1.18.0.json"
+    closure = closure_root / "development-closure-v1.18.0"
     registrations: list[tuple[Path, int]] = []
 
     for name, value in {
@@ -163,7 +163,7 @@ def operator_space(
         preformal,
         "PREFORMAL_REPORT_PATH",
         development_qualification.parent
-        / "v1.17.0"
+        / "v1.18.0"
         / "preformal"
         / preformal.PREFORMAL_REPORT_NAME,
     )
@@ -645,7 +645,7 @@ def _install_closure_fakes(
     list[tuple[Path, Path, Path]],
 ]:
     marker = space.development_closure
-    archive = marker.with_name("development-qualification-v1.17.0.tar")
+    archive = marker.with_name("development-qualification-v1.18.0.tar")
     calls: list[tuple[Path, Path, Path]] = []
     monkeypatch.setattr(binding, "DEVELOPMENT_CLOSURE_PATH", marker)
 
@@ -713,7 +713,7 @@ def _install_closure_fakes(
     fresh_report = {
         "schema": "prospect.wm001.development-closure-fresh-reopen.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "mode": "fresh-closure-reopen",
         "challenge": "1" * 64,
         "requesting_process_id": 100,
@@ -826,14 +826,14 @@ def test_sibling_binding_or_closure_attempt_is_never_canonical(
         sibling = operator_space.closure_root / "sibling-closure"
     shutil.copytree(canonical, sibling)
 
-    with pytest.raises(OperatorError, match="canonical protocol-1.17"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.18"):
         operator_module.inspect_unfinalized_operator_attempt(sibling)
 
     sibling_terminal = sibling / "operator-attempt.json"
     sibling_completion = operator_module.outer_completion_marker(sibling_terminal)
     sibling_completion.parent.mkdir(parents=True, exist_ok=True)
     os.link(sibling_terminal, sibling_completion)
-    with pytest.raises(OperatorError, match="canonical protocol-1.17"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.18"):
         operator_module.verify_operator_attempt(sibling)
 
 
@@ -950,7 +950,7 @@ def test_operator_namespace_is_durably_created_from_absent_root(
     assert fsynced == [
         results_root.parent,
         results_root,
-        results_root / "operator-v1.17",
+        results_root / "operator-v1.18",
     ]
     assert operator_space.binding_root.is_dir()
 
@@ -1088,7 +1088,7 @@ def test_development_audit_is_retired_by_closure_marker(
 def test_closure_rejects_noncanonical_development_audit(
     operator_space: OperatorSpace,
 ) -> None:
-    with pytest.raises(OperatorError, match="canonical protocol-1.17 audit"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.18 audit"):
         operator_module.closure_main(
             [
                 "--producer",
@@ -1107,7 +1107,7 @@ def test_development_authority_rejects_sibling_qualification_producer(
     operator_space: OperatorSpace,
     entry: str,
 ) -> None:
-    sibling = operator_space.development_qualification.parent / "qualification-v1.17.0-copy"
+    sibling = operator_space.development_qualification.parent / "qualification-v1.18.0-copy"
     if entry == "audit":
         arguments = [
             "development",

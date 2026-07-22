@@ -29,8 +29,8 @@ _FORMAL_BINDING_SCHEMA = "prospect.world-model-lifecycle.formal-binding.v10"
 _OPERATOR_ATTEMPT_SCHEMA = "prospect.wm001.operator-attempt.v1"
 _OPERATOR_TERMINAL = "operator-attempt.json"
 _CLOSURE_REFERENCE_SCHEMA = "prospect.wm001.closure-reference.v1"
-_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.17.0.json"
-_PREFORMAL_LOG_PREFIX = "preformal-v1.17.0-command-"
+_PREFORMAL_REPORT_NAME = "preformal-test-report-v1.18.0.json"
+_PREFORMAL_LOG_PREFIX = "preformal-v1.18.0-command-"
 _SHA256_EMPTY = hashlib.sha256(b"").hexdigest()
 _UTC_TIMESTAMP = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
@@ -79,7 +79,7 @@ _RUNTIME_SEAL_FIELDS = {
     "package_roots",
     "package_ownership",
 }
-_DEVELOPMENT_SEEDS = (3454397035, 2131905789)
+_DEVELOPMENT_SEEDS = (1787261725, 1697528199)
 _ASSURANCE: dict[str, object] = {
     "trust_model_id": "prospect.wm001.trust-model.v1",
     "tamper_resistant": False,
@@ -469,7 +469,7 @@ def _acquire_runtime_lock(repository: Path) -> int:
     parent = repository / "bench" / "world_model_lifecycle" / "results"
     parent.mkdir(parents=True, exist_ok=True)
     _reject_symlink_components(parent, label="runtime lock directory")
-    lock_path = parent / ".wm001-v1.17-runtime.lock"
+    lock_path = parent / ".wm001-v1.18-runtime.lock"
     existed = os.path.lexists(lock_path)
     flags = os.O_RDWR | os.O_CREAT
     if hasattr(os, "O_CLOEXEC"):
@@ -494,7 +494,7 @@ def _acquire_runtime_lock(repository: Path) -> int:
                 fcntl.LOCK_EX | fcntl.LOCK_NB,
             )
         except BlockingIOError as error:
-            raise LaunchError("another WM-001 v1.17 outer invocation holds the runtime lock") from error
+            raise LaunchError("another WM-001 v1.18 outer invocation holds the runtime lock") from error
         if not existed:
             parent_descriptor = os.open(
                 parent,
@@ -512,7 +512,7 @@ def _acquire_runtime_lock(repository: Path) -> int:
 
 
 def _prepare_completion_root(repository: Path) -> Path:
-    root = repository / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.17"
+    root = repository / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.18"
     root.mkdir(parents=True, exist_ok=True)
     _reject_symlink_components(root, label="outer completion directory")
     if root.resolve(strict=True) != root:
@@ -547,7 +547,7 @@ def _completion_marker(completion_root: Path, terminal: Path) -> Path:
 
 
 def _prospective_runtime_seal(repository: Path) -> Path:
-    return repository / "bench" / "world_model_lifecycle" / "results" / "development" / "runtime-seal-v1.17.0.json"
+    return repository / "bench" / "world_model_lifecycle" / "results" / "development" / "runtime-seal-v1.18.0.json"
 
 
 def _verify_completion_inode(
@@ -715,7 +715,7 @@ def _recorded_fresh_identity_conformance(value: object) -> dict[str, object]:
         or set(value) != fields
         or value.get("schema") != "prospect.wm001.fresh-runtime-identity-conformance.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.17.0"
+        or value.get("protocol_version") != "1.18.0"
         or value.get("mode") != "fresh-identity-conformance"
         or not _sha256_string(value.get("challenge"))
         or type(requesting) is not int
@@ -883,7 +883,7 @@ def _recorded_result_qualification(
         }
         or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.17.0"
+        or value.get("protocol_version") != "1.18.0"
         or not isinstance(protocol, dict)
         or value.get("protocol_sha256") != protocol.get("sha256")
         or value.get("raw_result_sha256") != raw_result_sha256
@@ -1191,7 +1191,7 @@ def _verify_audit_reproduction(
         set(reproduction) != _AUDIT_REPRODUCTION_FIELDS
         or reproduction.get("schema") != "prospect.wm001.audit-reproduction.v2"
         or reproduction.get("experiment_id") != "WM-001"
-        or reproduction.get("protocol_version") != "1.17.0"
+        or reproduction.get("protocol_version") != "1.18.0"
         or reproduction.get("supplied_audit_sha256") != audit_sha256
         or reproduction.get("reproduced_audit_sha256") != audit_sha256
         or reproduction.get("byte_identical") is not True
@@ -1303,7 +1303,7 @@ def _verify_development_producer(
 ) -> list[dict[str, object]]:
     """Reconstruct the two producer rows consumed by the development audit."""
 
-    root = repository / "bench" / "world_model_lifecycle" / "results" / "development" / "qualification-v1.17.0"
+    root = repository / "bench" / "world_model_lifecycle" / "results" / "development" / "qualification-v1.18.0"
     _reject_symlink_components(root, label="canonical development qualification")
     if not root.is_dir():
         raise LaunchError("canonical development qualification is absent")
@@ -1467,9 +1467,9 @@ def _verify_development_audit(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "audits"
-        / "development-audit-v1.17.0"
+        / "development-audit-v1.18.0"
     )
     terminal = attempt / _OPERATOR_TERMINAL
     terminal_row, terminal_payload, terminal_identity = _regular_row(
@@ -1507,12 +1507,12 @@ def _verify_development_audit(
         "reproduction_runtime_file",
         "claim_file",
     }
-    producer_root = repository / "bench" / "world_model_lifecycle" / "results" / "development" / "qualification-v1.17.0"
+    producer_root = repository / "bench" / "world_model_lifecycle" / "results" / "development" / "qualification-v1.18.0"
     if (
         set(manifest) != expected_fields
         or manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
         or manifest.get("experiment_id") != "WM-001"
-        or manifest.get("protocol_version") != "1.17.0"
+        or manifest.get("protocol_version") != "1.18.0"
         or not _strict_json_equal(
             manifest.get("assurance"),
             _ASSURANCE,
@@ -1615,7 +1615,7 @@ def _verify_closure_authorization(
     dict[str, object],
 ]:
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    closure_path = results / "development" / "development-closure-v1.17.0.json"
+    closure_path = results / "development" / "development-closure-v1.18.0.json"
     closure_row, closure_payload, _ = _regular_row(
         closure_path,
         label="canonical development closure",
@@ -1636,7 +1636,7 @@ def _verify_closure_authorization(
     ):
         raise LaunchError("formal binding differs from the canonical development closure")
 
-    attempt = results / "operator-v1.17" / "closures" / "development-closure-v1.17.0"
+    attempt = results / "operator-v1.18" / "closures" / "development-closure-v1.18.0"
     terminal = attempt / _OPERATOR_TERMINAL
     terminal_row, terminal_payload, terminal_identity = _regular_row(
         terminal,
@@ -1666,7 +1666,7 @@ def _verify_closure_authorization(
         set(terminal_manifest) != expected_terminal_fields
         or terminal_manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
         or terminal_manifest.get("experiment_id") != "WM-001"
-        or terminal_manifest.get("protocol_version") != "1.17.0"
+        or terminal_manifest.get("protocol_version") != "1.18.0"
         or not _strict_json_equal(
             terminal_manifest.get("assurance"),
             _ASSURANCE,
@@ -1742,13 +1742,13 @@ def _verify_closure_authorization(
         "fresh_reopen_file",
         "fresh_reopen_sha256",
     }
-    expected_audit = results / "operator-v1.17" / "audits" / "development-audit-v1.17.0"
-    expected_producer = results / "development" / "qualification-v1.17.0"
+    expected_audit = results / "operator-v1.18" / "audits" / "development-audit-v1.18.0"
+    expected_producer = results / "development" / "qualification-v1.18.0"
     if (
         set(reference) != expected_reference_fields
         or reference.get("schema") != _CLOSURE_REFERENCE_SCHEMA
         or reference.get("experiment_id") != "WM-001"
-        or reference.get("protocol_version") != "1.17.0"
+        or reference.get("protocol_version") != "1.18.0"
         or reference.get("closure_marker") != str(closure_path)
         or reference.get("closure_sha256") != hashlib.sha256(closure_payload).hexdigest()
         or not _strict_json_equal(
@@ -1817,7 +1817,7 @@ def _verify_closure_authorization(
         }
         or fresh_reopen.get("schema") != "prospect.wm001.development-closure-fresh-reopen.v1"
         or fresh_reopen.get("experiment_id") != "WM-001"
-        or fresh_reopen.get("protocol_version") != "1.17.0"
+        or fresh_reopen.get("protocol_version") != "1.18.0"
         or fresh_reopen.get("mode") != "fresh-closure-reopen"
         or not _sha256_string(fresh_reopen.get("challenge"))
         or type(requesting_process_id) is not int
@@ -1939,7 +1939,7 @@ def _verify_binding_attempt_terminal(
             set(manifest) != expected_fields
             or manifest.get("schema") != _OPERATOR_ATTEMPT_SCHEMA
             or manifest.get("experiment_id") != "WM-001"
-            or manifest.get("protocol_version") != "1.17.0"
+            or manifest.get("protocol_version") != "1.18.0"
             or not _strict_json_equal(
                 manifest.get("assurance"),
                 _ASSURANCE,
@@ -2069,7 +2069,7 @@ def _verify_binding_attempt_terminal(
             set(preflight) != preflight_fields
             or preflight.get("schema") != _FORMAL_INPUT_PREFLIGHT_SCHEMA
             or preflight.get("experiment_id") != "WM-001"
-            or preflight.get("protocol_version") != "1.17.0"
+            or preflight.get("protocol_version") != "1.18.0"
             or type(preflight.get("binding_bytes")) is not int
             or preflight.get("binding_bytes") != len(binding_payload)
             or preflight.get("binding_sha256") != hashlib.sha256(binding_payload).hexdigest()
@@ -2098,7 +2098,7 @@ def _verify_binding_attempt_terminal(
             / "world_model_lifecycle"
             / "results"
             / "development"
-            / "v1.17.0"
+            / "v1.18.0"
             / "preformal"
             / _PREFORMAL_REPORT_NAME
         )
@@ -2116,7 +2116,7 @@ def _verify_binding_attempt_terminal(
         if (
             report.get("schema") != "prospect.wm001.preformal-test-report.v2"
             or report.get("experiment_id") != "WM-001"
-            or report.get("protocol_version") != "1.17.0"
+            or report.get("protocol_version") != "1.18.0"
             or report.get("device") not in {"cpu", "cuda"}
             or report.get("device") != runtime.get("device")
             or report.get("all_pass") is not True
@@ -2274,7 +2274,7 @@ def _verify_binding_attempt_terminal(
                 / "world_model_lifecycle"
                 / "results"
                 / "development"
-                / "development-closure-v1.17.0.json"
+                / "development-closure-v1.18.0.json"
             )
         ):
             raise LaunchError("formal binding authorization inputs differ from live evidence")
@@ -2298,7 +2298,7 @@ def _open_typed_runtime_custody(
     """Capture exactly one of the two protocol-authorized runtime seals."""
 
     results_root = repository / "bench" / "world_model_lifecycle" / "results"
-    binding_attempt = results_root / "operator-v1.17" / "bindings" / "formal-binding-v1.17.0"
+    binding_attempt = results_root / "operator-v1.18" / "bindings" / "formal-binding-v1.18.0"
     formal_binding = binding_attempt / "formal-binding.json"
     prospective_runtime_seal = _prospective_runtime_seal(repository)
     if (
@@ -2307,7 +2307,7 @@ def _open_typed_runtime_custody(
         or path.resolve(strict=False) != path
         or path not in {formal_binding, prospective_runtime_seal}
     ):
-        raise LaunchError("runtime seal path is not one canonical protocol-1.17 seal")
+        raise LaunchError("runtime seal path is not one canonical protocol-1.18 seal")
     is_formal_binding = path == formal_binding
     expected_nlink = 1 if is_formal_binding else 2
     seal_fd, seal_payload, seal_identity = _open_regular(
@@ -2330,7 +2330,7 @@ def _open_typed_runtime_custody(
             )
             or (
                 not is_formal_binding
-                and (set(value) != _RUNTIME_SEAL_FIELDS or value.get("protocol_version") != "1.17.0")
+                and (set(value) != _RUNTIME_SEAL_FIELDS or value.get("protocol_version") != "1.18.0")
             )
         ):
             raise LaunchError("runtime custody schema or assurance is invalid")
@@ -2385,7 +2385,7 @@ def _commit_outer_receipt(
         set(receipt) != expected
         or receipt.get("schema") != _OUTER_RECEIPT_SCHEMA
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.17.0"
+        or receipt.get("protocol_version") != "1.18.0"
         or not _strict_json_equal(
             receipt.get("assurance"),
             _ASSURANCE,
@@ -2499,8 +2499,8 @@ def _rehearsal_paths(
     completion_root: Path,
 ) -> dict[str, Path]:
     results = repository / "bench" / "world_model_lifecycle" / "results"
-    attempt = results / "operator-v1.17" / "rehearsals" / "accepted-binding-rehearsal-v1.17.0"
-    claim_root = results / "rehearsals" / "v1.17"
+    attempt = results / "operator-v1.18" / "rehearsals" / "accepted-binding-rehearsal-v1.18.0"
+    claim_root = results / "rehearsals" / "v1.18"
     terminal = attempt / _REHEARSAL_TERMINAL_NAME
     return {
         "attempt": attempt,
@@ -2525,13 +2525,13 @@ def _formal_rehearsal_paths(
     results = repository / "bench" / "world_model_lifecycle" / "results"
     return (
         results / "formal" / binding_sha256,
-        results / "formal" / "formal-launch-v1.17.0.json",
-        (results / "operator-v1.17" / "audits" / "formal-audit-v1.17.0"),
-        (results / "operator-v1.17" / "audits" / ".formal-audit-v1.17.0.staging"),
-        results / "formal" / "formal-audit-v1.17.0.json",
-        repository / "artifacts" / "wm001-reviews" / "formal-v1.17.0.json",
-        results / "formal" / "formal-adjudication-v1.17.0.json",
-        (results / "adjudication-v1.17" / "formal-adjudication-v1.17.0"),
+        results / "formal" / "formal-launch-v1.18.0.json",
+        (results / "operator-v1.18" / "audits" / "formal-audit-v1.18.0"),
+        (results / "operator-v1.18" / "audits" / ".formal-audit-v1.18.0.staging"),
+        results / "formal" / "formal-audit-v1.18.0.json",
+        repository / "artifacts" / "wm001-reviews" / "formal-v1.18.0.json",
+        results / "formal" / "formal-adjudication-v1.18.0.json",
+        (results / "adjudication-v1.18" / "formal-adjudication-v1.18.0"),
     )
 
 
@@ -2560,11 +2560,11 @@ def _formal_rehearsal_paths_absent(
                     entry_count += 1
                     if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
                         return False
-                    if entry.name == "confirmation-v1.17.0":
+                    if entry.name == "confirmation-v1.18.0":
                         return False
-                    if os.path.lexists(Path(entry.path) / "confirmation-v1.17.0"):
+                    if os.path.lexists(Path(entry.path) / "confirmation-v1.18.0"):
                         return False
-        adjudication_root = repository / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.17"
+        adjudication_root = repository / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.18"
         if os.path.lexists(adjudication_root):
             metadata = os.lstat(adjudication_root)
             if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
@@ -2574,7 +2574,7 @@ def _formal_rehearsal_paths_absent(
                     entry_count += 1
                     if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
                         return False
-                    if entry.name.startswith(".formal-adjudication-v1.17.0.staging-"):
+                    if entry.name.startswith(".formal-adjudication-v1.18.0.staging-"):
                         return False
         return True
     except OSError:
@@ -2586,7 +2586,7 @@ def _formal_launch_paths_ready(
     *,
     binding_sha256: str,
 ) -> bool:
-    """Require the one empty prepared parent and no competing v1.17 claim."""
+    """Require the one empty prepared parent and no competing v1.18 claim."""
 
     paths = _formal_rehearsal_paths(
         repository,
@@ -2596,7 +2596,7 @@ def _formal_launch_paths_ready(
     if any(os.path.lexists(path) for path in forbidden):
         return False
     formal_root = binding_root.parent
-    adjudication_root = repository / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.17"
+    adjudication_root = repository / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.18"
     try:
         root_metadata = os.lstat(formal_root)
         binding_metadata = os.lstat(binding_root)
@@ -2618,9 +2618,9 @@ def _formal_launch_paths_ready(
                 entry_count += 1
                 if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
                     return False
-                if entry.name == "confirmation-v1.17.0":
+                if entry.name == "confirmation-v1.18.0":
                     return False
-                if Path(entry.path) != binding_root and os.path.lexists(Path(entry.path) / "confirmation-v1.17.0"):
+                if Path(entry.path) != binding_root and os.path.lexists(Path(entry.path) / "confirmation-v1.18.0"):
                     return False
         if os.path.lexists(adjudication_root):
             adjudication_metadata = os.lstat(adjudication_root)
@@ -2631,7 +2631,7 @@ def _formal_launch_paths_ready(
                     entry_count += 1
                     if entry_count > _MAX_PRODUCER_TREE_ENTRIES:
                         return False
-                    if entry.name.startswith(".formal-adjudication-v1.17.0.staging-"):
+                    if entry.name.startswith(".formal-adjudication-v1.18.0.staging-"):
                         return False
         return True
     except OSError:
@@ -2653,7 +2653,7 @@ def _rehearsal_claim_value(
     return {
         "schema": _REHEARSAL_CLAIM_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(_ASSURANCE),
         "status": "consumed",
         "binding_path": str(binding_path),
@@ -2858,7 +2858,7 @@ def _publish_rehearsal_terminal(
     terminal = {
         "schema": _REHEARSAL_TERMINAL_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(_ASSURANCE),
         "status": status,
         "claim_file": _REHEARSAL_CLAIM_NAME,
@@ -2999,9 +2999,9 @@ def _verify_binding_rehearsal_package(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "bindings"
-        / "formal-binding-v1.17.0"
+        / "formal-binding-v1.18.0"
         / "formal-binding.json"
     )
     if binding_path != canonical_binding:
@@ -3216,7 +3216,7 @@ def _verify_binding_rehearsal_package(
             set(terminal) != _REHEARSAL_TERMINAL_FIELDS
             or terminal.get("schema") != _REHEARSAL_TERMINAL_SCHEMA
             or terminal.get("experiment_id") != "WM-001"
-            or terminal.get("protocol_version") != "1.17.0"
+            or terminal.get("protocol_version") != "1.18.0"
             or not _strict_json_equal(terminal.get("assurance"), _ASSURANCE)
             or status not in {"accepted", "failed"}
             or (accepted_only and status != "accepted")
@@ -3466,9 +3466,9 @@ def _run_accepted_binding_rehearsal(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "bindings"
-        / "formal-binding-v1.17.0"
+        / "formal-binding-v1.18.0"
         / "formal-binding.json"
     )
     if binding_path != canonical_binding:
@@ -3755,7 +3755,7 @@ def _run_locked(
     if arguments.create_runtime_seal is not None and arguments.create_runtime_seal != _prospective_runtime_seal(
         repository
     ):
-        raise LaunchError("runtime-seal creation requires the sole canonical protocol-1.17 prospective path")
+        raise LaunchError("runtime-seal creation requires the sole canonical protocol-1.18 prospective path")
     bootstrap_fd, bootstrap_payload, bootstrap_identity = _open_regular(
         arguments.bootstrap,
         label="producer bootstrap",
@@ -3823,9 +3823,9 @@ def _run_locked(
                 / "bench"
                 / "world_model_lifecycle"
                 / "results"
-                / "operator-v1.17"
+                / "operator-v1.18"
                 / "bindings"
-                / "formal-binding-v1.17.0"
+                / "formal-binding-v1.18.0"
                 / "formal-binding.json"
             )
             if arguments.runtime_seal == canonical_binding:

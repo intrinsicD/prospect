@@ -40,6 +40,7 @@ def test_verifier_and_independent_auditor_share_every_prior_seed_domain() -> Non
         "V1140",
         "V1150",
         "V1160",
+        "V1170",
     )
     for version in prior_versions:
         name = f"_{version}_MASTER_SEEDS"
@@ -236,7 +237,7 @@ def test_independent_preformal_contract_matches_live_producer_contract() -> None
         runtime_seal_path=str(
             preformal.REPO
             / "bench/world_model_lifecycle/results/development/"
-            "runtime-seal-v1.17.0.json"
+            "runtime-seal-v1.18.0.json"
         ),
         development_closure_path=str(
             preformal.DEVELOPMENT_CLOSURE_PATH
@@ -345,14 +346,14 @@ def test_active_protocol_seed_universe_has_no_declared_collision() -> None:
     assert audit.passed_checks == 1
 
 
-def test_prebinding_protocol_requires_exact_v1160_supersession_lineage(
+def test_prebinding_protocol_requires_exact_v1170_supersession_lineage(
     tmp_path: Path,
 ) -> None:
     protocol = json.loads(PROTOCOL.read_text(encoding="utf-8"))
     revision = protocol["experiment"]["revision"]
-    assert revision["supersedes"] == "1.16.0"
+    assert revision["supersedes"] == "1.17.0"
     assert revision["superseded_protocol_sha256"] == (
-        artifact_audit._V1160_PROTOCOL_SHA256
+        artifact_audit._V1170_PROTOCOL_SHA256
     )
     protocol["experiment"]["revision"]["superseded_protocol_sha256"] = "0" * 64
     changed = tmp_path / "protocol.json"
@@ -818,7 +819,7 @@ def _preformal_v2_fixture(
     review: dict[str, object] = {
         "schema": "prospect.wm001.prospective-harness-review.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "implementation_files": reviewed_files,
         "implementation_manifest_sha256": hashlib.sha256(
             artifact_audit._canonical_json_bytes(reviewed_files)
@@ -954,7 +955,7 @@ def _preformal_v2_fixture(
     runtime_seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -987,7 +988,7 @@ def _preformal_v2_fixture(
         / "development"
     )
     development_root.mkdir(parents=True)
-    runtime_seal_path = development_root / "runtime-seal-v1.17.0.json"
+    runtime_seal_path = development_root / "runtime-seal-v1.18.0.json"
     runtime_seal_path.write_bytes(runtime_seal_payload)
     runtime_seal_completion = (
         repository
@@ -995,7 +996,7 @@ def _preformal_v2_fixture(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.17"
+        / "v1.18"
         / (
             hashlib.sha256(
                 str(runtime_seal_path).encode("utf-8")
@@ -1008,7 +1009,7 @@ def _preformal_v2_fixture(
     development_closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "producer_manifest_member": "producer/producer-manifest.json",
         "raw_result_member": "producer/result.json",
         "qualification_archive": {
@@ -1030,7 +1031,7 @@ def _preformal_v2_fixture(
         artifact_audit._canonical_json_bytes(development_closure) + b"\n"
     )
     development_path = (
-        development_root / "development-closure-v1.17.0.json"
+        development_root / "development-closure-v1.18.0.json"
     )
     development_path.write_bytes(development_payload)
     closure_terminal = (
@@ -1038,9 +1039,9 @@ def _preformal_v2_fixture(
         / "bench"
         / "world_model_lifecycle"
         / "results"
-        / "operator-v1.17"
+        / "operator-v1.18"
         / "closures"
-        / "development-closure-v1.17.0"
+        / "development-closure-v1.18.0"
         / "operator-attempt.json"
     )
     closure_terminal.parent.mkdir(parents=True)
@@ -1052,7 +1053,7 @@ def _preformal_v2_fixture(
         / "world_model_lifecycle"
         / "results"
         / "outer-completions"
-        / "v1.17"
+        / "v1.18"
         / (
             hashlib.sha256(
                 str(closure_terminal).encode("utf-8")
@@ -1186,7 +1187,7 @@ def _preformal_v2_fixture(
                         "fresh-runtime-identity-conformance.v1"
                     ),
                     "experiment_id": "WM-001",
-                    "protocol_version": "1.17.0",
+                    "protocol_version": "1.18.0",
                     "mode": "fresh-identity-conformance",
                     "challenge": "7" * 64,
                     "requesting_process_id": 101,
@@ -1289,7 +1290,7 @@ def _preformal_v2_fixture(
     report: dict[str, Any] = {
         "schema": "prospect.wm001.preformal-test-report.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "repository_cwd": repository_cwd,
         "device": "cpu",
         "qa_environment": qa_environment_identity,
@@ -2131,7 +2132,7 @@ def _preflight_package_fixture(
     (tmp_path / artifact_audit._PREFORMAL_REPORT_NAME).write_bytes(
         report_payload
     )
-    (tmp_path / "development-closure-v1.17.0.json").write_bytes(
+    (tmp_path / "development-closure-v1.18.0.json").write_bytes(
         closure_payload
     )
     (
@@ -2150,7 +2151,7 @@ def _preflight_package_fixture(
         "restart_runtime_path_descriptor_equal": True,
     }
     development = {
-        "closure_file": "development-closure-v1.17.0.json",
+        "closure_file": "development-closure-v1.18.0.json",
         "closure_sha256": hashlib.sha256(
             closure_payload
         ).hexdigest(),
@@ -2187,7 +2188,7 @@ def _preflight_package_fixture(
         "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "experiment_id": "WM-001",
         "assurance": dict(artifact_audit._ASSURANCE),
-        "protocol": {"version": "1.17.0"},
+        "protocol": {"version": "1.18.0"},
         "source": {
             "test_report_file": artifact_audit._PREFORMAL_REPORT_NAME,
         },
@@ -2720,7 +2721,7 @@ def _development_qualification_fixture(
         / "results"
         / "development"
     )
-    producer_root = development_root / "qualification-v1.17.0"
+    producer_root = development_root / "qualification-v1.18.0"
     producer_root.mkdir(parents=True, exist_ok=True)
     closure_source = {
         "git_commit": source["git_commit"],
@@ -2825,7 +2826,7 @@ def _development_qualification_fixture(
     qualification = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "protocol_sha256": protocol_row["sha256"],
         "raw_result_sha256": raw_result_sha256,
         "lane": "development",
@@ -3020,7 +3021,7 @@ def _development_qualification_fixture(
     receipt = {
         "schema": "prospect.wm001.audit-reproduction.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "supplied_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(audit_payload).hexdigest(),
         "byte_identical": True,
@@ -3088,7 +3089,7 @@ def _development_qualification_fixture(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "source": closure_source,
         "producer_root": str(producer_root),
         **role_members,
@@ -3212,7 +3213,7 @@ def test_development_qualification_is_linked_field_for_field(
     preformal_runtime_seal = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.17.0",
+        "protocol_version": "1.18.0",
         "assurance": dict(artifact_audit._ASSURANCE),
         "git_commit": source["git_commit"],
         "git_tree": source["git_tree"],
@@ -3538,7 +3539,7 @@ def test_formal_input_preflight_runs_both_substantive_validators(
         "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "experiment_id": "WM-001",
         "assurance": dict(artifact_audit._ASSURANCE),
-        "protocol": {"version": "1.17.0"},
+        "protocol": {"version": "1.18.0"},
         "source": source,
         "dependencies": dependencies,
         "runtime": runtime,
@@ -4149,7 +4150,7 @@ def test_bound_prebinding_execution_requires_complete_passing_report(
                 "schema": (
                     "prospect.wm001.restart-runtime-conformance.v1"
                 ),
-                "protocol_version": "1.17.0",
+                "protocol_version": "1.18.0",
                 "support_files": support_rows(outcome_supports),
                 "branches": {
                     "development": {

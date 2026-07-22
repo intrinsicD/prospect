@@ -49,20 +49,20 @@ def _repository_root() -> Path:
     )
 
 
-PROTOCOL_VERSION = "1.17.0"
+PROTOCOL_VERSION = "1.18.0"
 REPO = _repository_root()
 RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results"
-OPERATOR_RESULTS_ROOT = RESULTS_ROOT / "operator-v1.17"
+OPERATOR_RESULTS_ROOT = RESULTS_ROOT / "operator-v1.18"
 REHEARSAL_ATTEMPTS_ROOT = OPERATOR_RESULTS_ROOT / "rehearsals"
 REHEARSAL_ATTEMPT_PATH = (
-    REHEARSAL_ATTEMPTS_ROOT / "accepted-binding-rehearsal-v1.17.0"
+    REHEARSAL_ATTEMPTS_ROOT / "accepted-binding-rehearsal-v1.18.0"
 )
-REHEARSAL_CLAIM_ROOT = RESULTS_ROOT / "rehearsals" / "v1.17"
-OUTER_COMPLETIONS_ROOT = RESULTS_ROOT / "outer-completions" / "v1.17"
+REHEARSAL_CLAIM_ROOT = RESULTS_ROOT / "rehearsals" / "v1.18"
+OUTER_COMPLETIONS_ROOT = RESULTS_ROOT / "outer-completions" / "v1.18"
 FORMAL_BINDING_PATH = (
     OPERATOR_RESULTS_ROOT
     / "bindings"
-    / "formal-binding-v1.17.0"
+    / "formal-binding-v1.18.0"
     / "formal-binding.json"
 )
 LAUNCH_BOOTSTRAP_PATH = (
@@ -495,6 +495,30 @@ def _verified_binding(path: Path) -> dict[str, object]:
     return cast(dict[str, object], verify_binding(path))
 
 
+def _sealed_matrix_contract_sha256() -> str:
+    """Return the matrix identity from the independently verified protocol."""
+
+    from .verify import verify_protocol
+
+    protocol = verify_protocol()
+    bindings = protocol.get("bindings")
+    development = (
+        bindings.get("development_qualification")
+        if isinstance(bindings, dict)
+        else None
+    )
+    matrix_digest = (
+        development.get("matrix_contract_sha256")
+        if isinstance(development, dict)
+        else None
+    )
+    if not _is_sha256(matrix_digest):
+        raise RehearsalEvidenceError(
+            "sealed protocol has no verified development matrix identity"
+        )
+    return cast(str, matrix_digest)
+
+
 def _validate_stdout(
     payload: bytes,
     *,
@@ -504,12 +528,10 @@ def _validate_stdout(
     dependencies = binding.get("dependencies")
     audit_execution = binding.get("audit_execution")
     runtime = binding.get("runtime")
-    development = binding.get("development_qualification")
     if (
         not isinstance(dependencies, dict)
         or not isinstance(audit_execution, dict)
         or not isinstance(runtime, dict)
-        or not isinstance(development, dict)
     ):
         raise RehearsalEvidenceError(
             "formal binding omits recorded rehearsal conformance inputs"
@@ -524,7 +546,7 @@ def _validate_stdout(
     fresh = value.get("fresh_runtime_identity_conformance")
     requesting = fresh.get("requesting_process_id") if isinstance(fresh, dict) else None
     verifier = fresh.get("verifier_process_id") if isinstance(fresh, dict) else None
-    matrix_digest = development.get("matrix_contract_sha256")
+    matrix_digest = _sealed_matrix_contract_sha256()
     if (
         not isinstance(fresh, dict)
         or set(fresh)
@@ -550,7 +572,6 @@ def _validate_stdout(
         or type(verifier) is not int
         or verifier <= 0
         or requesting == verifier
-        or not _is_sha256(matrix_digest)
         or fresh.get("matrix_contract_sha256") != matrix_digest
         or fresh.get("passed") is not True
     ):

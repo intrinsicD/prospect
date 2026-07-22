@@ -171,3 +171,11 @@ then rejected the valid matrix identity because it looked for a field that
 formal-binding v10 explicitly does not contain. No formal authority or outcome
 exists. Its terminal disposition and exact fixture gap are preserved in the
 [v1.17 independent rehearsal-verifier failure](docs/wm001-v1170-independent-rehearsal-verifier-failure.md).
+Protocol 1.18 is the active prospective repair. It makes the sealed protocol,
+already authenticated by the binding verifier, the independent rehearsal
+verifier's matrix authority. Its fixtures use the exact formal-binding v10
+development projection, and the decisive integration invariant requires the
+exact bytes stored by an accepting launcher to pass the separate verifier.
+Its [confirmation plan](docs/wm001-v1180-confirmation-plan.md) and
+[operator runbook](docs/wm001-v1180-operator-runbook.md) are pre-outcome; no
+v1.18 lifecycle claim or outcome exists yet.
