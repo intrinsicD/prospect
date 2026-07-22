@@ -171,11 +171,11 @@ then rejected the valid matrix identity because it looked for a field that
 formal-binding v10 explicitly does not contain. No formal authority or outcome
 exists. Its terminal disposition and exact fixture gap are preserved in the
 [v1.17 independent rehearsal-verifier failure](docs/wm001-v1170-independent-rehearsal-verifier-failure.md).
-Protocol 1.18 is the active prospective repair. It makes the sealed protocol,
-already authenticated by the binding verifier, the independent rehearsal
-verifier's matrix authority. Its fixtures use the exact formal-binding v10
-development projection, and the decisive integration invariant requires the
-exact bytes stored by an accepting launcher to pass the separate verifier.
-Its [confirmation plan](docs/wm001-v1180-confirmation-plan.md) and
-[operator runbook](docs/wm001-v1180-operator-runbook.md) are pre-outcome; no
-v1.18 lifecycle claim or outcome exists yet.
+Protocol 1.18 correctly repaired the independent rehearsal verifier: its
+launcher and separate verifier both accepted the exact production binding and
+stored child bytes. The sealed formal producer then completed, but the sole
+independent formal audit reached its bound 600-second timeout before producing
+a report. The outer-finalized adjudication performed zero replay and rejected
+v1.18; no scientific endpoint is established in either direction. The exact
+evidence, claim limits, and fresh-version requirements are preserved in the
+[v1.18 formal-audit timeout record](docs/wm001-v1180-formal-audit-timeout.md).

@@ -18,12 +18,15 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.18.0 is the active prospective successor. It preserves every
-scientific and serialized representation while resolving the rehearsal matrix
-identity through the sealed protocol, removing schema-forbidden fixture data,
-and requiring launcher-accepted stored bytes to pass the independent verifier.
-Its plan and runbook are prospective; no v1.18 lifecycle claim or outcome
-exists yet.
+Protocol 1.18.0 correctly resolved the rehearsal matrix identity through the
+sealed protocol: the production launcher and separate verifier accepted the
+same stored bytes. Its sole formal producer completed, but the sole bound
+formal-audit execution reached the frozen 600-second timeout before emitting a
+report. The outer-finalized adjudication performed zero replay and rejected
+the version. No K0–K7 gate or scientific endpoint is established in either
+direction. Protocol 1.18 is terminally retired; the exact evidence and
+fresh-version capacity requirements are in the
+[v1.18 failure record](../../docs/wm001-v1180-formal-audit-timeout.md).
 Protocol 1.17.0 repaired the real audit-package boundary and reached an
 authentic accepted, outer-finalized result-free rehearsal. The required
 independent verifier then rejected the valid matrix identity because its test
@@ -163,8 +166,8 @@ binding-keyed formal root consumed the sole formal attempt; the subsequent
 pre-producer refusal retired the version. The complete lifecycle claim remains
 unestablished.
 
-Protocols 1.16.0, 1.15.0, 1.14.0, 1.13.0, 1.12.0, 1.11.0, 1.10.0, 1.9.0, 1.8.0, 1.7.0,
-1.6.0, 1.5.0, and 1.4.0 are immutable and retired.
+Protocols 1.18.0, 1.17.0, 1.16.0, 1.15.0, 1.14.0, 1.13.0, 1.12.0, 1.11.0,
+1.10.0, 1.9.0, 1.8.0, 1.7.0, 1.6.0, 1.5.0, and 1.4.0 are immutable and retired.
 Protocol 1.16.0 passed its prospective gates, result-free rehearsal,
 development, accepted audit, closure, sealed-runtime reopen, complete preformal
 report and accepted binding; the operator-recorded final stop/go also passed.
@@ -175,11 +178,13 @@ content-addressed reproduction-runtime sidecar; the standard-library consumer
 instead hardcoded the execution-capture filename. No formal marker or outcome
 exists. Its disposition is preserved in the
 [v1.16 accepted-binding rehearsal failure](../../docs/wm001-v1160-accepted-binding-rehearsal-failure.md).
-The active prospective repair is the
-[v1.18 confirmation plan](../../docs/wm001-v1180-confirmation-plan.md), with its
-one-shot sequence in the
-[v1.18 operator runbook](../../docs/wm001-v1180-operator-runbook.md). It has no
-development or formal outcome yet.
+Protocol 1.18.0's frozen
+[confirmation plan](../../docs/wm001-v1180-confirmation-plan.md) and
+[operator runbook](../../docs/wm001-v1180-operator-runbook.md) produced one
+completed formal artifact, but its only independent audit timed out before a
+report and the adjudication terminally rejected it. The
+[v1.18 failure record](../../docs/wm001-v1180-formal-audit-timeout.md) defines
+the exact evidence and fresh-version repair boundary.
 Protocol 1.15.0 passed its result-free rehearsal, development, accepted audit,
 closure, sealed-runtime reopen, preformal report, accepted binding, and the
 operator-recorded final stop/go gate. The sole formal invocation then returned

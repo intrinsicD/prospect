@@ -502,14 +502,16 @@ field forbidden by the production formal-binding v10 schema. No formal
 authority or outcome exists. The terminal evidence, counterfactual, and fixture
 gap are recorded in the
 [v1.17 independent rehearsal-verifier failure](wm001-v1170-independent-rehearsal-verifier-failure.md).
-Protocol 1.18 is the active prospective successor. The binding verifier first
-authenticates formal-binding v10 and the sealed protocol; the independent
-rehearsal verifier then reads the matrix identity from that protocol, never
-from the performance-free development projection. Schema-exact fixtures and a
-launcher-stored-byte acceptance invariant directly cover the failed boundary.
-Its [confirmation plan](wm001-v1180-confirmation-plan.md) and
-[operator runbook](wm001-v1180-operator-runbook.md) preserve every scientific
-and serialized representation and introduce no v1.18 outcome yet.
+Protocol 1.18 repaired that boundary: the production launcher and separate
+verifier accepted the exact same binding-keyed child bytes, and the sole sealed
+formal producer completed. Its only independent formal-audit execution then
+reached the bound 600-second timeout before emitting a report. The authenticated
+failure has empty streams, no return code, no replay, no independent-audit
+digest, and no reviewed gates. The one-shot adjudication rejected the version
+and forbids same-version replay. This is an audit-capacity failure, not evidence
+for or against any scientific endpoint. The exact evidence and successor
+requirements are recorded in the
+[v1.18 formal-audit timeout](wm001-v1180-formal-audit-timeout.md).
 
 ## Open engineering boundaries
 
@@ -518,10 +520,10 @@ and serialized representation and introduce no v1.18 outcome yet.
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocols 1.10 through 1.17 are terminally retired without formal authority.
-  Protocol 1.18 is the fresh prospective successor. The complete lifecycle
-  claim remains unestablished until its one formal artifact passes every audit
-  and adjudication gate.
+- Protocols 1.10 through 1.18 are terminally retired. Version 1.18 reached a
+  formal producer but its independent audit timed out and its adjudication was
+  rejected. The complete lifecycle claim remains unestablished until a fresh
+  version's one formal artifact passes every audit and adjudication gate.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External
