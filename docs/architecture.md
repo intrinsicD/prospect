@@ -522,6 +522,14 @@ authenticated failure occurred before canonical closure publication, so no
 binding, formal authority, or scientific outcome exists. The evidence and
 fresh-version correction are recorded in the
 [v1.19 development-closure custody failure](wm001-v1190-development-closure-custody-failure.md).
+Protocol 1.20 is the active prospective successor. It replaces the implicit
+one-link read with explicit two-link finalized-manifest capture, derives the
+canonical object and digest from those same bytes, and exercises the real
+producer-to-closure composition seam. Its scientific blocks, kernels,
+serialized representations, and v1.19 audit-capacity contract remain frozen.
+The [v1.20 confirmation plan](wm001-v1200-confirmation-plan.md) and
+[operator runbook](wm001-v1200-operator-runbook.md) define its pre-outcome
+evidence program; no v1.20 result exists yet.
 
 ## Open engineering boundaries
 
@@ -532,9 +540,9 @@ fresh-version correction are recorded in the
   external adjudication packaging.
 - Protocols 1.10 through 1.19 are terminally retired. Version 1.19 verified its
   development audit-capacity repair but failed before closure because one
-  consumer imposed the wrong hard-link contract. The complete lifecycle claim
-  remains unestablished until a fresh version's one formal artifact passes
-  every audit and adjudication gate.
+  consumer imposed the wrong hard-link contract. Protocol 1.20 is the fresh
+  prospective repair. The complete lifecycle claim remains unestablished until
+  its one formal artifact passes every audit and adjudication gate.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External

@@ -87,7 +87,7 @@ def _repository_root() -> Path:
 REPO = _repository_root()
 LOCKFILE = REPO / "requirements-wm001.lock"
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.19.0.json"
+DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.20.0.json"
 DEVELOPMENT_RESULT_QUALIFICATION_NAME = "development-result-qualification.json"
 ROOT_DISTRIBUTIONS = (
     "gymnasium",
@@ -177,17 +177,6 @@ _V130_BOUNDARY_LOG_VARIANCES_F32_HEX = (
     "9390b2c0",
 )
 _V130_BOUNDARY_EXPECTED_PIT_HEX = "0x1.999998b3745adp-5"
-
-
-def _load_canonical_json(path: Path, *, label: str) -> dict[str, object]:
-    try:
-        payload = _stable_regular_payload(path, label=label)
-        value = json.loads(payload)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise RuntimeError(f"{label} is not readable canonical JSON") from error
-    if not isinstance(value, dict) or payload != canonical_json_bytes(value) + b"\n":
-        raise RuntimeError(f"{label} is not one canonical JSON object followed by LF")
-    return value
 
 
 def verify_canonical_machine_test_report(path: Path) -> dict[str, object]:
@@ -511,7 +500,11 @@ def verify_bound_machine_test_report(
         or path.parent.resolve(strict=True) != path.parent
     ):
         raise RuntimeError("bound preformal report is not one safe binding sibling")
-    payload = _stable_regular_payload(path, label="bound preformal report")
+    payload = _stable_regular_payload(
+        path,
+        label="bound preformal report",
+        expected_nlink=1,
+    )
     try:
         report = preformal._load_canonical_object(
             payload,
@@ -644,7 +637,7 @@ def verify_bound_machine_test_report(
         inputs[name].get("path") != expected_path
         for name, expected_path in expected_input_paths.items()
     ):
-        raise RuntimeError("bound preformal input path is not canonical v1.19")
+        raise RuntimeError("bound preformal input path is not canonical v1.20")
 
     implementation = _bound_preformal_implementation_map(source)
     generator = implementation.get(preformal.SOURCE_RELATIVE_PATH)
@@ -874,6 +867,7 @@ def verify_bound_machine_test_report(
             log_payload = _stable_regular_payload(
                 path.parent / filename,
                 label=f"bound preformal command {ordinal} {stream}",
+                expected_nlink=1,
             )
             total_log_bytes += len(log_payload)
             if (
@@ -941,6 +935,7 @@ def verify_bound_machine_test_report(
     accepted_payload = _stable_regular_payload(
         path.parent / cast(str, accepted_stdout["file"]),
         label="bound preformal accepted-closure receipt",
+        expected_nlink=1,
     )
     try:
         accepted = preformal._load_canonical_object(
@@ -1060,6 +1055,7 @@ def _capture_preformal_logs(
             payload = _stable_regular_payload(
                 path,
                 label=f"preformal report {stream} log",
+                expected_nlink=1,
             )
             total_bytes += len(payload)
             if (
@@ -1097,6 +1093,7 @@ def _formal_binding_root_schema() -> dict[str, object]:
         payload = _stable_regular_payload(
             BINDING_SCHEMA_PATH,
             label="formal binding root schema",
+            expected_nlink=1,
         )
         value = json.loads(payload)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -1338,7 +1335,7 @@ def build_bound_audit_execution(
     restart_runtime_report_value = dict(restart_runtime_conformance.path_execution.report)
     if (
         restart_runtime_report_value.get("schema") != "prospect.wm001.restart-runtime-conformance.v1"
-        or restart_runtime_report_value.get("protocol_version") != "1.19.0"
+        or restart_runtime_report_value.get("protocol_version") != "1.20.0"
         or restart_runtime_report_value.get("passed") is not True
         or restart_runtime_conformance.path_execution.stdout != restart_runtime_conformance.descriptor_execution.stdout
     ):
@@ -1606,9 +1603,9 @@ def implementation_files() -> list[dict[str, object]]:
         REPO / "bench" / "world_model_lifecycle" / "protocol.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "raw-result.schema.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "formal-binding.schema.json",
-        REPO / "docs" / "wm001-v1190-confirmation-plan.md",
-        REPO / "docs" / "wm001-v1190-operator-runbook.md",
-        REPO / "docs" / "wm001-v1190-prospective-harness-review.json",
+        REPO / "docs" / "wm001-v1200-confirmation-plan.md",
+        REPO / "docs" / "wm001-v1200-operator-runbook.md",
+        REPO / "docs" / "wm001-v1200-prospective-harness-review.json",
     ]
     unique = sorted(set(candidates))
     return [
@@ -2436,6 +2433,7 @@ def create_audit_reproduction_receipt(
         payload = _stable_regular_payload(
             path,
             label=f"captured audit execution receipt {expected_name}",
+            expected_nlink=1,
         )
         value = _canonical_json_object(
             payload,
@@ -2487,6 +2485,7 @@ def create_audit_reproduction_receipt(
     supplied = _stable_regular_payload(
         supplied_audit_path,
         label="supplied independent audit",
+        expected_nlink=1,
     )
     if supplied != execution.stdout:
         raise RuntimeError("isolated audit reproduction differs from the supplied audit bytes")
@@ -2584,7 +2583,7 @@ def create_audit_reproduction_receipt(
     receipt = {
         "schema": "prospect.wm001.audit-reproduction.v3",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "supplied_audit_sha256": hashlib.sha256(supplied).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(execution.stdout).hexdigest(),
         "byte_identical": True,
@@ -2906,7 +2905,7 @@ def _stable_regular_payload(
     *,
     label: str,
     limit: int = 64 << 20,
-    expected_nlink: int = 1,
+    expected_nlink: int,
 ) -> bytes:
     """Read one canonical regular file while binding its inode metadata."""
 
@@ -2939,7 +2938,7 @@ def _stable_regular_digest(
     *,
     label: str,
     maximum_bytes: int,
-    expected_nlink: int = 1,
+    expected_nlink: int,
 ) -> tuple[int, str]:
     """Stream one canonical regular file while binding its path and inode."""
 
@@ -3053,7 +3052,11 @@ def _receipt_sidecar(
     ):
         raise RuntimeError(f"{label} reference is malformed")
     path = receipt_path.with_name(filename)
-    payload = _stable_regular_payload(path, label=label)
+    payload = _stable_regular_payload(
+        path,
+        label=label,
+        expected_nlink=1,
+    )
     if (
         len(payload) != expected_bytes
         or hashlib.sha256(payload).hexdigest() != expected_sha256
@@ -3168,7 +3171,7 @@ def _validate_producer_custody(
         set(runtime_seal) != _DEVELOPMENT_RUNTIME_SEAL_FIELDS
         or runtime_seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or runtime_seal.get("experiment_id") != "WM-001"
-        or runtime_seal.get("protocol_version") != "1.19.0"
+        or runtime_seal.get("protocol_version") != "1.20.0"
         or not _strict_json_equal(runtime_seal.get("assurance"), ASSURANCE)
         or runtime_seal.get("git_commit") != execution["git_commit"]
         or runtime_seal.get("git_tree") != execution["git_tree"]
@@ -3329,7 +3332,7 @@ def _validate_development_audit_evidence(
         set(receipt) != _AUDIT_RECEIPT_FIELDS
         or receipt.get("schema") != "prospect.wm001.audit-reproduction.v3"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.19.0"
+        or receipt.get("protocol_version") != "1.20.0"
         or receipt.get("supplied_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("reproduced_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("byte_identical") is not True
@@ -3597,7 +3600,7 @@ def _result_qualification_payload(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "protocol_sha256": sha256_file(PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -3662,7 +3665,7 @@ def _validate_result_qualification(
         }
         or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.19.0"
+        or value.get("protocol_version") != "1.20.0"
         or value.get("protocol_sha256") != sha256_file(PROTOCOL_PATH)
         or value.get("raw_result_sha256") != archived_result_sha256
         or value.get("lane") != "development"
@@ -4272,6 +4275,7 @@ def _reverify_live_development_producer(
         producer_root / "result.json",
         label="development result",
         maximum_bytes=cast(int, expected_result_bytes),
+        expected_nlink=1,
     )
     if (
         current_manifest != expected_manifest
@@ -4339,6 +4343,7 @@ def verify_development_closure(
     closure_payload = _stable_regular_payload(
         closure_path,
         label="development closure marker",
+        expected_nlink=1,
     )
     _closure_path_mode(closure_path, closure_payload)
     closure = _canonical_json_object(
@@ -4349,7 +4354,7 @@ def verify_development_closure(
         set(closure) != _DEVELOPMENT_CLOSURE_FIELDS
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.19.0"
+        or closure.get("protocol_version") != "1.20.0"
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
         or closure.get("performance_values_bound") is not False
@@ -4668,7 +4673,7 @@ def create_development_closure(
     runtime_manifest_path: Path,
     output_path: Path = DEVELOPMENT_CLOSURE_PATH,
 ) -> dict[str, object]:
-    """Close the sole v1.19 qualification into one self-contained evidence archive."""
+    """Close the sole v1.20 qualification into one self-contained evidence archive."""
 
     from .artifact import verify_producer_manifest
     from .operator import (
@@ -4713,21 +4718,22 @@ def create_development_closure(
         not isinstance(replicates, list)
         or tuple(row.get("master_seed") if isinstance(row, dict) else None for row in replicates) != DEVELOPMENT_SEEDS
     ):
-        raise RuntimeError("development qualification requires exactly both fresh v1.19 seeds")
+        raise RuntimeError("development qualification requires exactly both fresh v1.20 seeds")
     for replicate in replicates:
         assert isinstance(replicate, dict)
         _verify_formal_matrix(
             replicate,
             replicate_id=str(replicate.get("replicate_id")),
         )
-    audit = _load_canonical_json(audit_path, label="development independent audit")
     audit_payload = _stable_regular_payload(
         audit_path,
         label="development independent audit",
+        expected_nlink=1,
     )
     receipt_payload = _stable_regular_payload(
         audit_reproduction_path,
         label="development audit reproduction",
+        expected_nlink=1,
     )
     receipt = _canonical_json_object(
         receipt_payload,
@@ -4774,26 +4780,38 @@ def create_development_closure(
         DEVELOPMENT_AUDIT_ATTEMPT_PATH
         / "audit-execution-01.execution.json",
         label="first development audit execution receipt",
+        expected_nlink=1,
     )
     replay_execution_receipt_payload = _stable_regular_payload(
         DEVELOPMENT_AUDIT_ATTEMPT_PATH
         / "audit-execution-02.execution.json",
         label="replay development audit execution receipt",
+        expected_nlink=1,
     )
     result_sha256 = sha256_file(result_path)
     execution = _validate_execution_identity(
         result.get("execution"),
         require_live_identity=True,
     )
+    producer_manifest_payload = _stable_regular_payload(
+        producer_root / "producer-manifest.json",
+        label="development producer manifest",
+        expected_nlink=2,
+    )
+    captured_producer_manifest = _canonical_json_object(
+        producer_manifest_payload,
+        label="development producer manifest",
+    )
+    if producer_manifest_payload != canonical_json_bytes(producer_manifest) + b"\n":
+        raise RuntimeError(
+            "captured development producer manifest differs from its strict verifier"
+        )
     _validate_development_audit_evidence(
         producer_root=producer_root,
-        producer_manifest=_load_canonical_json(
-            producer_root / "producer-manifest.json",
-            label="development producer manifest",
-        ),
-        producer_manifest_sha256=sha256_file(
-            producer_root / "producer-manifest.json"
-        ),
+        producer_manifest=captured_producer_manifest,
+        producer_manifest_sha256=hashlib.sha256(
+            producer_manifest_payload
+        ).hexdigest(),
         result_sha256=result_sha256,
         execution=execution,
         audit_payload=audit_payload,
@@ -4876,7 +4894,7 @@ def create_development_closure(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "source": {
             "git_commit": execution["git_commit"],
             "git_tree": execution["git_tree"],
@@ -4956,6 +4974,7 @@ def create_development_closure(
             or _stable_regular_payload(
                 expected_output,
                 label="published development closure",
+                expected_nlink=1,
             )
             != closure_payload
         ):
@@ -5049,7 +5068,7 @@ def create_formal_binding(
     if conformance_cases != FORMAL_CONFORMANCE_CASES:
         raise ValueError("formal Pendulum conformance is fixed at exactly 1,024 cases (512 per task)")
     if development_closure_path is None or not development_closure_path.is_file():
-        raise RuntimeError("formal binding requires the immutable v1.19 development closure")
+        raise RuntimeError("formal binding requires the immutable v1.20 development closure")
     if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
         raise RuntimeError("CUDA formal binding requires CUBLAS_WORKSPACE_CONFIG=:4096:8")
     if output_path.exists():
@@ -5086,6 +5105,7 @@ def create_formal_binding(
     test_report_bytes = _stable_regular_payload(
         test_report_path,
         label="formal binding test report",
+        expected_nlink=1,
     )
     if test_report_bytes != canonical_json_bytes(test_report) + b"\n":
         raise RuntimeError(
@@ -5111,6 +5131,7 @@ def create_formal_binding(
     development_closure_bytes = _stable_regular_payload(
         development_closure_path,
         label="formal binding development closure",
+        expected_nlink=1,
     )
     if development_closure_bytes != canonical_json_bytes(development_closure) + b"\n":
         raise RuntimeError(
@@ -5212,7 +5233,7 @@ def create_formal_binding(
         "experiment_id": "WM-001",
         "assurance": assurance_record(),
         "protocol": {
-            "version": "1.19.0",
+            "version": "1.20.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),
@@ -5447,6 +5468,7 @@ def _binding_evidence_bytes(
     payload = _stable_regular_payload(
         evidence_path,
         label=f"bound {prefix}",
+        expected_nlink=1,
     )
     if (
         block.get(f"{prefix}_bytes") != len(payload)

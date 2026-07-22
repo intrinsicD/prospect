@@ -4,6 +4,7 @@ import base64
 import copy
 import hashlib
 import importlib.metadata
+import inspect
 import io
 import json
 import os
@@ -328,55 +329,55 @@ def test_record_hash_decoder_requires_exact_sha256() -> None:
             decode(("sha256", "not+a+valid+digest"))
 
 
-def test_protocol_1190_seed_domain_and_master_seeds_are_exact() -> None:
-    assert verify_module.DEVELOPMENT_SEEDS == (2548769521, 799442746)
+def test_protocol_1200_seed_domain_and_master_seeds_are_exact() -> None:
+    assert verify_module.DEVELOPMENT_SEEDS == (3626676950, 2572962267)
     assert verify_module.FORMAL_SEEDS == (
-        3714505505,
-        79878112,
-        795255854,
-        1251505627,
-        1184933223,
-        3676873506,
-        286726369,
-        2337061326,
+        3772418031,
+        1586188972,
+        155797552,
+        2704051827,
+        818738828,
+        4077496645,
+        1566512625,
+        2151461680,
     )
     assert [
         verify_module.derive_seed(
             "predictive_validation_irrelevant_episode",
-            2548769521,
+            3626676950,
             index,
         )
         for index in range(8)
     ] == [
-        1338803444,
-        952746842,
-        1427628582,
-        3724194794,
-        382794618,
-        2879492202,
-        1019461994,
-        974023347,
+        1373322386,
+        176994979,
+        3820403429,
+        2385238390,
+        2501448555,
+        212039677,
+        1137743429,
+        1857977328,
     ]
-    assert verify_module.derive_seed("model_initialization", 2548769521, 0) == 481713359
-    assert verify_module.derive_seed("planner", 2548769521, 0) == 3196574767
-    assert verify_module.derive_seed("collection_action", 2548769521, 1) == 326364741
-    assert verify_module.derive_seed("irrelevant_collection_action", 2548769521, 0) == 1686813869
-    assert verify_module.derive_seed("collect_irrelevant_episode", 2548769521, 0) == 2913978499
+    assert verify_module.derive_seed("model_initialization", 3626676950, 0) == 3554237159
+    assert verify_module.derive_seed("planner", 3626676950, 0) == 3182258505
+    assert verify_module.derive_seed("collection_action", 3626676950, 1) == 738900297
+    assert verify_module.derive_seed("irrelevant_collection_action", 3626676950, 0) == 615670841
+    assert verify_module.derive_seed("collect_irrelevant_episode", 3626676950, 0) == 3469312547
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            2548769521,
+            3626676950,
             0,
         )
-        == 2585598262
+        == 2159724402
     )
     assert (
         verify_module.derive_seed(
             "predictive_validation_irrelevant_action",
-            799442746,
+            2572962267,
             0,
         )
-        == 752041994
+        == 491521575
     )
     assert (
         tuple(verify_module.derive_master_seed("development", index) for index in range(2))
@@ -389,11 +390,11 @@ def test_protocol_1190_seed_domain_and_master_seeds_are_exact() -> None:
     assert collision_audit["current_master_seed_count"] == 10
     assert collision_audit["current_derived_stream_count"] == 1360
     assert collision_audit["unique_current_derived_stream_count"] == 1360
-    assert collision_audit["prior_master_seed_count"] == 180
-    assert collision_audit["unique_prior_derived_stream_count"] == 24480
+    assert collision_audit["prior_master_seed_count"] == 190
+    assert collision_audit["unique_prior_derived_stream_count"] == 25840
 
 
-def test_protocol_1190_states_the_negative_assurance_boundary() -> None:
+def test_protocol_1200_states_the_negative_assurance_boundary() -> None:
     protocol = json.loads(verify_module.PROTOCOL_PATH.read_text(encoding="utf-8"))
 
     assert protocol["trust_model"] == {
@@ -487,7 +488,7 @@ def test_verify_binding_rejects_rebound_nonempty_conformance_stderr(
     restart_report_payload = canonical(
         {
             "schema": ("prospect.wm001.restart-runtime-conformance.v1"),
-            "protocol_version": "1.19.0",
+            "protocol_version": "1.20.0",
             "passed": True,
         }
     )
@@ -740,13 +741,13 @@ def test_verify_binding_rejects_rebound_nonempty_conformance_stderr(
         verify_module.verify_binding(binding_path)
 
 
-def test_implementation_manifest_binds_reviewed_v1190_documents() -> None:
+def test_implementation_manifest_binds_reviewed_v1200_documents() -> None:
     paths = {str(row["path"]) for row in binding_module.implementation_files()}
 
     assert {
-        "docs/wm001-v1190-confirmation-plan.md",
-        "docs/wm001-v1190-operator-runbook.md",
-        "docs/wm001-v1190-prospective-harness-review.json",
+        "docs/wm001-v1200-confirmation-plan.md",
+        "docs/wm001-v1200-operator-runbook.md",
+        "docs/wm001-v1200-prospective-harness-review.json",
     } <= paths
 
 
@@ -817,7 +818,7 @@ def test_result_runtime_must_equal_formal_binding_runtime() -> None:
         )
 
 
-def test_formal_binding_schema_binds_protocol_1190_and_fresh_seeds() -> None:
+def test_formal_binding_schema_binds_protocol_1200_and_fresh_seeds() -> None:
     schema = json.loads(
         verify_module.BINDING_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -833,7 +834,7 @@ def test_formal_binding_schema_binds_protocol_1190_and_fresh_seeds() -> None:
         "external_attestation": {"const": False},
         "exclusive_path_use_required": {"const": True},
     }
-    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.19.0"
+    assert schema["properties"]["protocol"]["properties"]["version"]["const"] == "1.20.0"
     assert (
         tuple(
             schema["properties"]["formal_replicate_master_seeds"]["const"],
@@ -936,7 +937,7 @@ def test_root_binding_schema_accepts_realistic_zero_byte_stderr_logs(
     verify_module._validate_json_schema(
         candidate,
         schema,
-        label="synthetic v1.19 formal binding",
+        label="synthetic v1.20 formal binding",
     )
     assert len(rows) == 20
     assert all(row["bytes"] > 0 for row in rows[0::2])
@@ -966,7 +967,7 @@ def test_root_binding_schema_rejects_negative_log_bytes_and_zero_source_bytes(
         verify_module._validate_json_schema(
             negative_log,
             schema,
-            label="synthetic v1.19 formal binding",
+            label="synthetic v1.20 formal binding",
         )
 
     empty_source = copy.deepcopy(candidate)
@@ -978,7 +979,7 @@ def test_root_binding_schema_rejects_negative_log_bytes_and_zero_source_bytes(
         verify_module._validate_json_schema(
             empty_source,
             schema,
-            label="synthetic v1.19 formal binding",
+            label="synthetic v1.20 formal binding",
         )
 
 
@@ -1022,7 +1023,7 @@ def test_restart_json_comparison_rejects_python_numeric_aliases(
     assert not verify_module._strict_json_equal(observed, expected)
 
 
-def test_raw_result_schema_binds_v1190_heldout_split_and_formal_counts() -> None:
+def test_raw_result_schema_binds_v1200_heldout_split_and_formal_counts() -> None:
     schema = json.loads(
         verify_module.RESULT_SCHEMA_PATH.read_text(encoding="utf-8"),
     )
@@ -1033,7 +1034,7 @@ def test_raw_result_schema_binds_v1190_heldout_split_and_formal_counts() -> None
 
     assert schema["$id"].endswith("wm-001-raw-result-v9.json")
     assert schema["properties"]["schema"]["const"] == "prospect.world-model-lifecycle.raw-result.v9"
-    assert schema["properties"]["protocol_version"]["const"] == "1.19.0"
+    assert schema["properties"]["protocol_version"]["const"] == "1.20.0"
     assert "predictive_validation_irrelevant" in schema["$defs"]["episode"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in schema["$defs"]["transition"]["properties"]["split"]["enum"]
     assert "predictive_validation_irrelevant" in predictive_properties["split"]["enum"]
@@ -1074,7 +1075,7 @@ def test_raw_result_schema_binds_v1190_heldout_split_and_formal_counts() -> None
     assert replicate_limits["policy_runs"] == {"minItems": 20, "maxItems": 20}
 
 
-def test_formal_matrix_verifier_requires_every_exact_v1190_row() -> None:
+def test_formal_matrix_verifier_requires_every_exact_v1200_row() -> None:
     episodes: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
     for contract, count in verify_module.FORMAL_EPISODE_CONTRACT_COUNTS.items():
@@ -1503,7 +1504,7 @@ def test_create_formal_binding_root_schema_preflight_accepts_actual_log_rows(
     verify_module._validate_json_schema(
         created,
         schema,
-        label="generated v1.19 formal binding",
+        label="generated v1.20 formal binding",
     )
     assert created["source"]["test_log_files"] == binding_module.preformal_log_rows(
         report_path,
@@ -1774,9 +1775,9 @@ def _recorded_development_closure_fixture(
     closure: dict[str, object] = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "source": source,
-        "producer_root": str((tmp_path / "qualification-v1.19.0").resolve()),
+        "producer_root": str((tmp_path / "qualification-v1.20.0").resolve()),
         **{
             field: member
             for field, member in role_paths.items()
@@ -2001,7 +2002,7 @@ def _producer_custody_fixture(
     seal: dict[str, object] = {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "assurance": dict(binding_module.ASSURANCE),
         "git_commit": execution["git_commit"],
         "git_tree": execution["git_tree"],
@@ -2114,6 +2115,346 @@ def _outer_finalized_development_producer(
     )
     assert artifact.verify_producer_manifest(producer) == manifest
     return producer, manifest
+
+
+def test_outer_finalized_manifest_capture_binds_exact_object_and_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer, verified_manifest = _outer_finalized_development_producer(
+        tmp_path,
+        monkeypatch,
+    )
+    manifest_path = producer / "producer-manifest.json"
+
+    payload = binding_module._stable_regular_payload(
+        manifest_path,
+        label="development producer manifest",
+        expected_nlink=2,
+    )
+    captured_manifest = binding_module._canonical_json_object(
+        payload,
+        label="development producer manifest",
+    )
+
+    assert manifest_path.stat().st_nlink == 2
+    assert captured_manifest == verified_manifest
+    assert payload == binding_module.canonical_json_bytes(verified_manifest) + b"\n"
+    assert hashlib.sha256(payload).hexdigest() == binding_module.sha256_file(
+        manifest_path,
+    )
+
+
+def test_binding_stable_file_readers_require_explicit_link_custody(
+) -> None:
+    for reader in (
+        binding_module._stable_regular_payload,
+        binding_module._stable_regular_digest,
+    ):
+        assert (
+            inspect.signature(reader).parameters["expected_nlink"].default
+            is inspect.Parameter.empty
+        )
+
+
+@pytest.mark.parametrize("observed_links", [1, 3])
+def test_outer_finalized_manifest_capture_requires_exactly_two_links(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    observed_links: int,
+) -> None:
+    producer, _ = _outer_finalized_development_producer(
+        tmp_path,
+        monkeypatch,
+    )
+    manifest_path = producer / "producer-manifest.json"
+    completion_marker = next((tmp_path / "outer-completions").iterdir())
+    if observed_links == 1:
+        completion_marker.unlink()
+    else:
+        os.link(manifest_path, tmp_path / "unexpected-manifest-alias.json")
+    assert manifest_path.stat().st_nlink == observed_links
+
+    with pytest.raises(RuntimeError, match="2-link custody"):
+        binding_module._stable_regular_payload(
+            manifest_path,
+            label="development producer manifest",
+            expected_nlink=2,
+        )
+
+
+class _DevelopmentManifestCaptured(Exception):
+    """Stop a closure fixture immediately after its authenticated manifest seam."""
+
+
+def _reach_development_manifest_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    observed_manifest_links: int = 2,
+    symlink_manifest: bool = False,
+    mutate_manifest_during_capture: bool = False,
+    forbid_loose_manifest_digest: bool = False,
+    verified_manifest_override: dict[str, object] | None = None,
+) -> tuple[dict[str, object], dict[str, object]]:
+    from bench.world_model_lifecycle import artifact, operator, verify
+
+    producer, verified_manifest = _outer_finalized_development_producer(
+        tmp_path,
+        monkeypatch,
+    )
+    manifest_path = producer / artifact.MANIFEST_NAME
+    if observed_manifest_links == 1:
+        next((tmp_path / "outer-completions").iterdir()).unlink()
+    elif observed_manifest_links == 3:
+        os.link(manifest_path, tmp_path / "unexpected-manifest-alias.json")
+    elif observed_manifest_links != 2:
+        raise ValueError("unsupported manifest-link fixture")
+    if symlink_manifest:
+        completion_marker = next((tmp_path / "outer-completions").iterdir())
+        manifest_path.unlink()
+        manifest_path.symlink_to(completion_marker)
+    if verified_manifest_override is not None:
+        monkeypatch.setattr(
+            artifact,
+            "verify_producer_manifest",
+            lambda _root: verified_manifest_override,
+        )
+    closure_path = tmp_path / "development-closure-v1.20.0.json"
+    monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", closure_path)
+    audit_path = tmp_path / "audit.json"
+    audit_path.write_bytes(_canonical_payload({"lane": "development"}))
+    receipt_path = tmp_path / "audit-reproduction.json"
+    receipt_path.write_bytes(
+        _canonical_payload({field: None for field in binding_module._AUDIT_RECEIPT_FIELDS})
+    )
+    runtime_path = tmp_path / "runtime.json"
+    runtime_path.write_bytes(b"{}\n")
+    sidecars = {
+        "runtime_manifest": (runtime_path, b"{}\n"),
+        "invocation_manifest": (tmp_path / "invocation.json", b"{}\n"),
+        "stderr": (tmp_path / "stderr.log", b""),
+    }
+    monkeypatch.setattr(
+        binding_module,
+        "_receipt_sidecar",
+        lambda _path, _receipt, *, prefix, label: sidecars[prefix],
+    )
+    attempt_path = tmp_path / "audit-attempt"
+    attempt_path.mkdir()
+    for name in (
+        "audit-execution-01.execution.json",
+        "audit-execution-02.execution.json",
+    ):
+        (attempt_path / name).write_bytes(b"{}\n")
+    monkeypatch.setattr(operator, "DEVELOPMENT_AUDIT_ATTEMPT_PATH", attempt_path)
+    monkeypatch.setattr(
+        operator,
+        "verify_operator_attempt",
+        lambda _path: {
+            "kind": "audit",
+            "lane": "development",
+            "status": "accepted",
+            "primary": {
+                "executions": [
+                    "audit-execution-01.execution.json",
+                    "audit-execution-02.execution.json",
+                ],
+                "reproduction_file": receipt_path.name,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        verify,
+        "verify_result",
+        lambda _path, _binding: {
+            "replicates": [
+                {"master_seed": seed, "replicate_id": f"development-{index:02d}"}
+                for index, seed in enumerate(verify.DEVELOPMENT_SEEDS, start=1)
+            ],
+            "execution": {"fixture": "execution"},
+        },
+    )
+    monkeypatch.setattr(verify, "_verify_formal_matrix", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        binding_module,
+        "_validate_execution_identity",
+        lambda _execution, *, require_live_identity: {"fixture": "execution"},
+    )
+    observed: dict[str, object] = {}
+
+    def capture_manifest(**arguments: object) -> None:
+        observed.update(arguments)
+        raise _DevelopmentManifestCaptured
+
+    monkeypatch.setattr(
+        binding_module,
+        "_validate_development_audit_evidence",
+        capture_manifest,
+    )
+    if forbid_loose_manifest_digest:
+        original_sha256_file = binding_module.sha256_file
+
+        def reject_loose_manifest_digest(path: Path) -> str:
+            if path == manifest_path:
+                raise AssertionError(
+                    "development manifest digest must come from captured bytes"
+                )
+            return original_sha256_file(path)
+
+        monkeypatch.setattr(
+            binding_module,
+            "sha256_file",
+            reject_loose_manifest_digest,
+    )
+    if mutate_manifest_during_capture:
+        original_pread = binding_module.os.pread
+        original_verify_producer_manifest = artifact.verify_producer_manifest
+        manifest_inode = manifest_path.stat().st_ino
+        mutated = False
+        strict_verification_completed = False
+
+        def mark_strict_verification(root: Path) -> dict[str, object]:
+            nonlocal strict_verification_completed
+            value = original_verify_producer_manifest(root)
+            strict_verification_completed = True
+            return value
+
+        def mutate_captured_manifest(
+            descriptor: int,
+            length: int,
+            offset: int,
+        ) -> bytes:
+            nonlocal mutated
+            payload = original_pread(descriptor, length, offset)
+            if (
+                strict_verification_completed
+                and not mutated
+                and os.fstat(descriptor).st_ino == manifest_inode
+            ):
+                mutated = True
+                with manifest_path.open("r+b") as stream:
+                    stream.write(b" ")
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            return payload
+
+        monkeypatch.setattr(
+            artifact,
+            "verify_producer_manifest",
+            mark_strict_verification,
+        )
+        monkeypatch.setattr(binding_module.os, "pread", mutate_captured_manifest)
+
+    with pytest.raises(_DevelopmentManifestCaptured):
+        binding_module.create_development_closure(
+            producer_root=producer,
+            audit_path=audit_path,
+            audit_reproduction_path=receipt_path,
+            runtime_manifest_path=runtime_path,
+            output_path=closure_path,
+        )
+    return observed, verified_manifest
+
+
+def test_development_closure_captures_outer_finalized_manifest_for_object_and_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed, verified_manifest = _reach_development_manifest_capture(
+        tmp_path,
+        monkeypatch,
+    )
+    payload = binding_module.canonical_json_bytes(verified_manifest) + b"\n"
+
+    assert observed["producer_manifest"] == verified_manifest
+    assert observed["producer_manifest_sha256"] == hashlib.sha256(payload).hexdigest()
+
+
+@pytest.mark.parametrize("observed_links", [1, 3])
+def test_development_closure_rejects_nonfinal_manifest_link_custody(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    observed_links: int,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="producer manifest has the wrong outer-completion link count",
+    ):
+        _reach_development_manifest_capture(
+            tmp_path,
+            monkeypatch,
+            observed_manifest_links=observed_links,
+        )
+
+
+def test_development_closure_rejects_manifest_mutation_during_exact_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(RuntimeError, match="changed while read"):
+        _reach_development_manifest_capture(
+            tmp_path,
+            monkeypatch,
+            mutate_manifest_during_capture=True,
+        )
+
+
+def test_development_closure_rejects_symlinked_manifest_in_creator_chain(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="producer root contains a symbolic link: producer-manifest.json",
+    ):
+        _reach_development_manifest_capture(
+            tmp_path,
+            monkeypatch,
+            symlink_manifest=True,
+        )
+
+
+def test_development_closure_never_uses_loose_manifest_digest_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed, verified_manifest = _reach_development_manifest_capture(
+        tmp_path,
+        monkeypatch,
+        forbid_loose_manifest_digest=True,
+    )
+    payload = binding_module.canonical_json_bytes(verified_manifest) + b"\n"
+
+    assert observed["producer_manifest_sha256"] == hashlib.sha256(payload).hexdigest()
+
+
+def test_development_closure_rejects_manifest_verifier_divergence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    divergent_manifest: dict[str, object] = {
+        "schema": "prospect.wm001.producer-manifest.v1",
+        "experiment_id": "WM-001",
+        "lane": "development",
+        "status": "completed",
+        "started_at_utc": "2026-07-19T00:00:00Z",
+        "completed_at_utc": "2026-07-19T00:02:00Z",
+        "error": None,
+        "manifest_excludes": ["producer-manifest.json"],
+        "file_count": 1,
+        "files": [],
+    }
+
+    with pytest.raises(
+        RuntimeError,
+        match="captured development producer manifest differs from its strict verifier",
+    ):
+        _reach_development_manifest_capture(
+            tmp_path,
+            monkeypatch,
+            verified_manifest_override=divergent_manifest,
+        )
 
 
 def test_audit_reproduction_receipt_derives_descriptor_execution_identities(
@@ -2742,6 +3083,7 @@ def test_streamed_regular_digest_rejects_in_read_mutation(
             target,
             label="development result",
             maximum_bytes=target.stat().st_size,
+            expected_nlink=1,
         )
 
 
@@ -2784,6 +3126,7 @@ def test_streamed_regular_digest_rejects_path_namespace_replacement(
             target,
             label="development result",
             maximum_bytes=len(payload),
+            expected_nlink=1,
         )
 
 
@@ -2799,6 +3142,7 @@ def test_streamed_regular_digest_rejects_aliases_and_nonregular_files(
             alias,
             label="development result",
             maximum_bytes=target.stat().st_size,
+            expected_nlink=1,
         )
 
     directory = tmp_path / "directory"
@@ -2808,6 +3152,7 @@ def test_streamed_regular_digest_rejects_aliases_and_nonregular_files(
             directory,
             label="development result",
             maximum_bytes=0,
+            expected_nlink=1,
         )
 
 
@@ -3231,7 +3576,7 @@ def test_result_qualification_binds_only_exact_structural_seed_and_budget_facts(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -3356,7 +3701,7 @@ def test_result_qualification_created_in_one_process_reopens_in_two_others(
     qualification = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "protocol_sha256": binding_module.sha256_file(binding_module.PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -3493,7 +3838,7 @@ def test_central_development_audit_requires_exact_full_report(
     tmp_path: Path,
     mutation: str,
 ) -> None:
-    producer_root = tmp_path / "qualification-v1.19.0"
+    producer_root = tmp_path / "qualification-v1.20.0"
     producer_manifest_sha256 = "a" * 64
     result_sha256 = "b" * 64
     auditor_sha256 = "c" * 64
@@ -3565,7 +3910,7 @@ def test_development_closure_creator_rejects_any_alternate_marker_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    canonical = tmp_path / "development-closure-v1.19.0.json"
+    canonical = tmp_path / "development-closure-v1.20.0.json"
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
 
     with pytest.raises(RuntimeError, match="only be published"):
@@ -3583,7 +3928,7 @@ def test_preserved_development_closure_name_must_be_content_addressed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _canonical_payload({"schema": "fixture"})
-    canonical = tmp_path / "development-closure-v1.19.0.json"
+    canonical = tmp_path / "development-closure-v1.20.0.json"
     canonical.write_bytes(payload)
     monkeypatch.setattr(binding_module, "DEVELOPMENT_CLOSURE_PATH", canonical)
     assert binding_module._closure_path_mode(canonical, payload) == "canonical"

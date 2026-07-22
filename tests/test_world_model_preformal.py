@@ -180,7 +180,7 @@ def _fresh_identity_conformance() -> dict[str, object]:
     return {
         "schema": "prospect.wm001.fresh-runtime-identity-conformance.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "mode": "fresh-identity-conformance",
         "challenge": "7" * 64,
         "requesting_process_id": 101,
@@ -272,7 +272,7 @@ def _development_closure(producer_root: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "source": {
             "git_commit": "a" * 40,
             "git_tree": "b" * 40,
@@ -450,7 +450,7 @@ def _review(
     return {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -470,7 +470,7 @@ def _runtime_seal(runtime_executable: Path) -> dict[str, object]:
     return {
         "schema": "prospect.wm001.runtime-seal.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "assurance": {
             "trust_model_id": "prospect.wm001.trust-model.v1",
             "tamper_resistant": False,
@@ -691,7 +691,7 @@ def _prepare_generation(
     failed_command: str | None = None,
     stderr_command: str | None = None,
 ) -> tuple[Path, list[str], dict[str, Path]]:
-    directory = tmp_path / "v1.19.0" / "preformal"
+    directory = tmp_path / "v1.20.0" / "preformal"
     monkeypatch.setattr(
         preformal,
         "PREFORMAL_REPORT_PATH",
@@ -1198,7 +1198,7 @@ def _strict_audit_execution_fixture(
     outcome_runtime_payload = _canonical(outcome_runtime)
     restart_report = {
         "schema": "prospect.wm001.restart-runtime-conformance.v1",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "support_files": support_rows,
         "branches": {
             "development": {
@@ -3303,7 +3303,7 @@ def test_versioned_preformal_bundle_ignores_retained_prior_version_evidence(
         return rows
 
     before = legacy_fingerprint()
-    bundle_root = legacy_root / "v1.19.0" / "preformal"
+    bundle_root = legacy_root / "v1.20.0" / "preformal"
     bundle_root.parent.mkdir(parents=True)
     fixture_root = tmp_path / "fixture"
     fixture_root.mkdir()
@@ -3363,7 +3363,7 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
     review = {
         "schema": preformal.REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "implementation_files": rows,
         "implementation_manifest_sha256": hashlib.sha256(
             preformal._canonical_json_bytes(rows)
@@ -3396,15 +3396,15 @@ def test_prospective_review_requires_exact_manifest_and_independent_acceptance(
         preformal.verify_prospective_review(path)
 
 
-def test_prospective_manifest_binds_v1190_plan_and_runbook() -> None:
+def test_prospective_manifest_binds_v1200_plan_and_runbook() -> None:
     paths = {
         str(row["path"])
         for row in preformal._implementation_files()
     }
 
     assert {
-        "docs/wm001-v1190-confirmation-plan.md",
-        "docs/wm001-v1190-operator-runbook.md",
+        "docs/wm001-v1200-confirmation-plan.md",
+        "docs/wm001-v1200-operator-runbook.md",
     } <= paths
 
 
@@ -3498,7 +3498,7 @@ def _formal_runtime_custody() -> dict[str, object]:
         "experiment_id": "WM-001",
         "assurance": copy.deepcopy(binding_module.ASSURANCE),
         "protocol": {
-            "version": "1.19.0",
+            "version": "1.20.0",
             "sha256": "1" * 64,
             "raw_result_schema_sha256": "2" * 64,
             "binding_schema_sha256": "3" * 64,
@@ -3790,7 +3790,7 @@ def test_fresh_closure_reopen_executes_inherited_seal_descriptors(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "mode": "fresh-closure-reopen",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -3893,7 +3893,7 @@ def test_fresh_closure_reopen_validator_uses_archive_member_digests(
             "prospect.wm001.development-closure-fresh-reopen.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "mode": "fresh-closure-reopen",
         "challenge": "7" * 64,
         "requesting_process_id": 101,
@@ -3950,7 +3950,7 @@ def test_fresh_identity_conformance_uses_nested_descriptor_child(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "mode": "fresh-identity-conformance",
         "challenge": challenge,
         "requesting_process_id": os.getpid(),
@@ -4240,7 +4240,7 @@ def test_bootstrap_inventory_rehearses_gymnasium_before_final_closure_check(
             "prospect.wm001.fresh-runtime-identity-conformance.v1"
         ),
         "experiment_id": "WM-001",
-        "protocol_version": "1.19.0",
+        "protocol_version": "1.20.0",
         "mode": "fresh-identity-conformance",
         "challenge": "7" * 64,
         "requesting_process_id": 101,

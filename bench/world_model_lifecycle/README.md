@@ -18,6 +18,14 @@ that Prospect passes them.
 
 ## Current status
 
+Protocol 1.20.0 is the active prospective successor. It repairs only the
+closure custody seam: the finalized producer manifest is captured explicitly
+at two links, its object and digest come from those same bytes, and real
+composition tests reject one-link, overlinked, and verifier-divergent inputs.
+The scientific system and v1.19 audit-capacity contract are unchanged. Its
+[confirmation plan](../../docs/wm001-v1200-confirmation-plan.md) and
+[operator runbook](../../docs/wm001-v1200-operator-runbook.md) are pre-outcome;
+no v1.20 lifecycle claim exists yet.
 Protocol 1.19.0 repaired the v1.18 audit-runtime defect: its complete
 development audit ran twice under the sealed outcome role and passed the exact
 capacity projection. Its sole development closure then rejected the valid
@@ -198,6 +206,10 @@ development audit. The sole closure then failed on the hidden one-link reader
 predicate. The
 [v1.19 failure record](../../docs/wm001-v1190-development-closure-custody-failure.md)
 defines the exact evidence and successor boundary.
+The active prospective repair is the
+[v1.20 confirmation plan](../../docs/wm001-v1200-confirmation-plan.md), with
+its one-shot sequence in the
+[v1.20 operator runbook](../../docs/wm001-v1200-operator-runbook.md).
 Protocol 1.15.0 passed its result-free rehearsal, development, accepted audit,
 closure, sealed-runtime reopen, preformal report, accepted binding, and the
 operator-recorded final stop/go gate. The sole formal invocation then returned

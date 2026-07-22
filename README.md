@@ -188,3 +188,10 @@ completion to be the same two-link inode. No closure, binding, formal authority,
 or scientific outcome exists. The exact evidence and fresh-version repair are
 preserved in the
 [v1.19 development-closure custody failure](docs/wm001-v1190-development-closure-custody-failure.md).
+Protocol 1.20 is the active prospective successor. It captures the finalized
+producer manifest under an explicit two-link contract, derives its canonical
+object and digest from the same bytes, and adds real closure-composition
+regressions. The scientific system and v1.19 audit-capacity contract are
+unchanged. Its [confirmation plan](docs/wm001-v1200-confirmation-plan.md) and
+[operator runbook](docs/wm001-v1200-operator-runbook.md) are pre-outcome; no
+v1.20 lifecycle claim or result exists yet.

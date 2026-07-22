@@ -59,7 +59,7 @@ def _read_json(path: Path) -> dict[str, object]:
 def test_current_protocol_passes_complete_static_verifier() -> None:
     protocol = verify_module.verify_protocol()
 
-    assert protocol["experiment"]["protocol_version"] == "1.19.0"
+    assert protocol["experiment"]["protocol_version"] == "1.20.0"
 
 
 def _fixture_rehearsal_identity(
@@ -216,7 +216,7 @@ def _write_minimal_formal_binding(path: Path, *, git_commit: str) -> str:
             "external_attestation": False,
             "exclusive_path_use_required": True,
         },
-        "protocol": {"version": "1.19.0"},
+        "protocol": {"version": "1.20.0"},
         "source": {
             "git_commit": git_commit,
             "git_tree": "2" * 40,
@@ -403,7 +403,7 @@ def test_protocol_wide_formal_launch_claim_is_atomic_across_bindings(
     assert copied["formal_binding_sha256"] == first_digest
     assert copied["attempt_directory"] == FORMAL_CONFIRMATION_NAME
     assert copied["schema"] == "prospect.wm001.formal-launch.v3"
-    assert copied["protocol_version"] == "1.19.0"
+    assert copied["protocol_version"] == "1.20.0"
     assert copied["global_marker_file"] == FORMAL_LAUNCH_MARKER_NAME
     assert copied["accepted_binding_rehearsal"] == _fixture_rehearsal_identity(
         first_binding
@@ -772,7 +772,7 @@ def test_formal_launch_claim_rejects_noncanonical_output(tmp_path: Path) -> None
     for output in invalid_outputs:
         with pytest.raises(
             ValueError,
-            match="results/formal/<binding-sha256>/confirmation-v1.19.0",
+            match="results/formal/<binding-sha256>/confirmation-v1.20.0",
         ):
             formal_launch_marker_path(
                 binding,
@@ -1230,7 +1230,7 @@ def test_formal_cli_refuses_noncanonical_or_omitted_output_before_custody(
         "formal_preflight",
     ),
 )
-def test_formal_cli_preclaim_failures_leave_v119_marker_absent(
+def test_formal_cli_preclaim_failures_leave_v120_marker_absent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     failure_stage: str,
@@ -1491,7 +1491,7 @@ def test_experiment_entrypoint_refuses_unowned_or_existing_output(
         )
 
     development = experiment_module.ExperimentConfig.development(
-        master_seeds=(2548769521,),
+        master_seeds=(3626676950,),
         device="cpu",
     )
     assert (
