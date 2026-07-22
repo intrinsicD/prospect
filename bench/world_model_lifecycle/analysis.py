@@ -41,16 +41,16 @@ TASK_A = "pendulum_normal_torque"
 TASK_B = "pendulum_reversed_torque"
 TASK_IRRELEVANT = "independent_phase_oscillator"
 FORMAL_SEEDS = (
-    952286440,
-    4273641788,
-    1748047518,
-    2531734648,
-    2611012043,
-    1851041586,
-    1135019273,
-    1670867274,
+    3714505505,
+    79878112,
+    795255854,
+    1251505627,
+    1184933223,
+    3676873506,
+    286726369,
+    2337061326,
 )
-DEVELOPMENT_SEEDS = (1787261725, 1697528199)
+DEVELOPMENT_SEEDS = (2548769521, 799442746)
 COVERAGE_SEMANTICS = "wm001-mixture-pit-binary64-count-v1"
 T_CRITICAL_N8 = 2.364624251
 
@@ -617,7 +617,7 @@ def _phase_index(replicate: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
 
 
 def _derive_seed(namespace: str, master_seed: int, index: int) -> int:
-    payload = f"WM-001|1.18.0|{namespace}|{master_seed}|{index}".encode()
+    payload = f"WM-001|1.19.0|{namespace}|{master_seed}|{index}".encode()
     return int.from_bytes(sha256(payload).digest()[:4], "big", signed=False)
 
 
@@ -954,7 +954,7 @@ def _structural_checks(
         envelope_violations.append("wrong raw-result schema")
     if result.get("experiment_id") != "WM-001":
         envelope_violations.append("wrong experiment_id")
-    if result.get("protocol_version") != "1.18.0":
+    if result.get("protocol_version") != "1.19.0":
         envelope_violations.append("wrong protocol_version")
     if result.get("protocol_sha256") != expected_protocol_sha256:
         envelope_violations.append("protocol SHA-256 does not match sealed raw bytes")

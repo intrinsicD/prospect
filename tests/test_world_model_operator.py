@@ -107,19 +107,19 @@ def operator_space(
     repo = tmp_path / "repo"
     lifecycle = repo / "bench" / "world_model_lifecycle"
     lifecycle.mkdir(parents=True)
-    _write(lifecycle / "protocol.json", {"version": "1.18.0"})
-    operator_root = lifecycle / "results" / "operator-v1.18"
+    _write(lifecycle / "protocol.json", {"version": "1.19.0"})
+    operator_root = lifecycle / "results" / "operator-v1.19"
     binding_root = operator_root / "bindings"
     audit_root = operator_root / "audits"
     closure_root = operator_root / "closures"
-    completion_root = lifecycle / "results" / "outer-completions" / "v1.18"
-    formal_binding = binding_root / "formal-binding-v1.18.0"
-    development_audit = audit_root / "development-audit-v1.18.0"
-    formal_audit = audit_root / "formal-audit-v1.18.0"
-    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.18.0.json"
-    development_qualification = lifecycle / "results" / "development" / "qualification-v1.18.0"
-    development_closure = lifecycle / "results" / "development" / "development-closure-v1.18.0.json"
-    closure = closure_root / "development-closure-v1.18.0"
+    completion_root = lifecycle / "results" / "outer-completions" / "v1.19"
+    formal_binding = binding_root / "formal-binding-v1.19.0"
+    development_audit = audit_root / "development-audit-v1.19.0"
+    formal_audit = audit_root / "formal-audit-v1.19.0"
+    formal_claim = lifecycle / "results" / "formal" / "formal-audit-v1.19.0.json"
+    development_qualification = lifecycle / "results" / "development" / "qualification-v1.19.0"
+    development_closure = lifecycle / "results" / "development" / "development-closure-v1.19.0.json"
+    closure = closure_root / "development-closure-v1.19.0"
     registrations: list[tuple[Path, int]] = []
 
     for name, value in {
@@ -162,10 +162,7 @@ def operator_space(
     monkeypatch.setattr(
         preformal,
         "PREFORMAL_REPORT_PATH",
-        development_qualification.parent
-        / "v1.18.0"
-        / "preformal"
-        / preformal.PREFORMAL_REPORT_NAME,
+        development_qualification.parent / "v1.19.0" / "preformal" / preformal.PREFORMAL_REPORT_NAME,
     )
     return OperatorSpace(
         repo=repo,
@@ -199,6 +196,7 @@ def _execution(
     passed: bool = True,
     variant: str = "stable",
     stderr: bytes = b"",
+    subprocess_elapsed_ns: int = 100_000,
 ) -> AuditExecution:
     report = {
         "passed": passed,
@@ -212,6 +210,7 @@ def _execution(
     runtime = _canonical(
         {
             "schema": RUNTIME_MANIFEST_SCHEMA,
+            "execution_role": "outcome_audit",
             "assurance": dict(ASSURANCE),
             "bootstrap_sha256": bootstrap_sha256,
             "source": {
@@ -221,6 +220,11 @@ def _execution(
                 "sha256": binding.sha256_file(auditor),
             },
             "support_files": support_rows,
+            "limits": {
+                "timeout_seconds": 10_800,
+                "stdout_bytes": 64 << 20,
+                "stderr_bytes": 16 << 20,
+            },
             "variant": variant,
         }
     )
@@ -253,7 +257,37 @@ def _execution(
             for row in support_rows
         ),
         source_mode="descriptor",
+        subprocess_elapsed_ns=subprocess_elapsed_ns,
     )
+
+
+def _capacity_manifest(
+    *,
+    result_payload: bytes,
+    additional_files: tuple[tuple[str, bytes], ...] = (),
+) -> tuple[dict[str, object], str]:
+    files = [
+        {
+            "path": "result.json",
+            "bytes": len(result_payload),
+            "sha256": hashlib.sha256(result_payload).hexdigest(),
+        },
+        *[
+            {
+                "path": path,
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+            for path, payload in additional_files
+        ],
+    ]
+    manifest: dict[str, object] = {
+        "status": "completed",
+        "lane": "development",
+        "error": None,
+        "files": files,
+    }
+    return manifest, hashlib.sha256(_canonical(manifest)).hexdigest()
 
 
 def _execution_failure() -> AuditExecutionFailure:
@@ -298,25 +332,29 @@ def _patch_finalized_producer(
             "TZ": "UTC",
         }
     }
-    _write(
-        producer / "producer-manifest.json",
-        {"status": "completed", "lane": lane, "error": None},
-    )
-    _write(
-        producer / "result.json",
+    result_payload = _canonical(
         {
             "lane": lane,
             "execution": execution_identity,
-        },
+        }
     )
+    _write(producer / "result.json", result_payload)
+    additional_files: tuple[tuple[str, bytes], ...] = ()
     if lane == "formal":
-        _write(
-            producer / "formal-binding.json",
+        formal_binding_payload = _canonical(
             {
                 "schema": "prospect.world-model-lifecycle.formal-binding.v10",
                 "assurance": dict(ASSURANCE),
-            },
+            }
         )
+        _write(producer / "formal-binding.json", formal_binding_payload)
+        additional_files = (("formal-binding.json", formal_binding_payload),)
+    producer_manifest, _ = _capacity_manifest(
+        result_payload=result_payload,
+        additional_files=additional_files,
+    )
+    producer_manifest["lane"] = lane
+    _write(producer / "producer-manifest.json", producer_manifest)
     terminal = producer / "producer-manifest.json"
     completion = operator_module.outer_completion_marker(terminal)
     completion.parent.mkdir(parents=True, exist_ok=True)
@@ -512,6 +550,7 @@ def _run_development_audit(
     ) == (0 if passed else 1)
     assert len(calls) == 2
     for call in calls:
+        assert call["execution_role"] == "outcome_audit"
         auditor_arguments = call["auditor_arguments"]
         assert isinstance(auditor_arguments, tuple)
         assert auditor_arguments[1:] == (
@@ -526,9 +565,7 @@ def _run_development_audit(
             "schemas/raw-result.schema.json",
         ]
     if passed:
-        manifest = operator_module.inspect_unfinalized_operator_attempt(
-            output
-        )["manifest"]
+        manifest = operator_module.inspect_unfinalized_operator_attempt(output)["manifest"]
         primary = manifest["primary"]
         assert isinstance(primary, dict)
         receipt = _load(output / "audit-reproduction.json")
@@ -540,22 +577,14 @@ def _run_development_audit(
         assert isinstance(invocation_name, str)
         assert isinstance(stderr_name, str)
         assert runtime_name.startswith("development-audit-runtime-")
-        assert invocation_name.startswith(
-            "development-audit-invocation-"
-        )
+        assert invocation_name.startswith("development-audit-invocation-")
         assert stderr_name.startswith("development-audit-stderr-")
         assert runtime_name != "audit-execution-02.runtime.json"
         assert invocation_name != "audit-execution-02.invocation.json"
         assert stderr_name != "audit-execution-02.stderr.log"
-        assert (output / runtime_name).read_bytes() == (
-            output / "audit-execution-02.runtime.json"
-        ).read_bytes()
-        assert (output / invocation_name).read_bytes() == (
-            output / "audit-execution-02.invocation.json"
-        ).read_bytes()
-        assert (output / stderr_name).read_bytes() == (
-            output / "audit-execution-02.stderr.log"
-        ).read_bytes()
+        assert (output / runtime_name).read_bytes() == (output / "audit-execution-02.runtime.json").read_bytes()
+        assert (output / invocation_name).read_bytes() == (output / "audit-execution-02.invocation.json").read_bytes()
+        assert (output / stderr_name).read_bytes() == (output / "audit-execution-02.stderr.log").read_bytes()
         assert not os.path.samefile(
             output / runtime_name,
             output / "audit-execution-02.runtime.json",
@@ -574,7 +603,21 @@ def test_reproduction_sidecar_names_are_payload_derived_and_consumed(
     ):
         root = tmp_path / variant
         root.mkdir()
-        execution = _execution(variant=variant, stderr=stderr)
+        first_execution = _execution(
+            variant=variant,
+            stderr=stderr,
+            subprocess_elapsed_ns=90_000,
+        )
+        execution = _execution(
+            variant=variant,
+            stderr=stderr,
+            subprocess_elapsed_ns=100_000,
+        )
+        operator_module._write_execution(  # noqa: SLF001
+            root,
+            prefix="audit-execution-01",
+            execution=first_execution,
+        )
         operator_module._write_execution(  # noqa: SLF001
             root,
             prefix="audit-execution-02",
@@ -583,10 +626,31 @@ def test_reproduction_sidecar_names_are_payload_derived_and_consumed(
         audit_path = root / "independent-audit.json"
         audit_path.write_bytes(execution.stdout)
         receipt_path = root / "audit-reproduction.json"
+        producer_manifest, producer_manifest_sha256 = _capacity_manifest(
+            result_payload=_canonical(
+                {
+                    "lane": "development",
+                    "observations": ["small-fixture"] * 32,
+                }
+            )
+        )
         receipt = binding.create_audit_reproduction_receipt(
             supplied_audit_path=audit_path,
+            first_execution=first_execution,
             execution=execution,
+            first_execution_receipt_path=(
+                root / "audit-execution-01.execution.json"
+            ),
+            replay_execution_receipt_path=(
+                root / "audit-execution-02.execution.json"
+            ),
+            producer_manifest=producer_manifest,
+            producer_manifest_sha256=producer_manifest_sha256,
             output_path=receipt_path,
+        )
+        first = operator_module._verify_execution_receipt(  # noqa: SLF001
+            root,
+            "audit-execution-01.execution.json",
         )
         replay = operator_module._verify_execution_receipt(  # noqa: SLF001
             root,
@@ -596,7 +660,10 @@ def test_reproduction_sidecar_names_are_payload_derived_and_consumed(
             root,
             receipt_path.name,
             audit_payload=execution.stdout,
+            first=first,
             replay=replay,
+            producer_manifest=producer_manifest,
+            producer_manifest_sha256=producer_manifest_sha256,
         )
 
         names = (
@@ -605,18 +672,24 @@ def test_reproduction_sidecar_names_are_payload_derived_and_consumed(
             str(receipt["stderr_file"]),
         )
         assert verified == receipt
-        assert names[0] == (
-            "development-audit-runtime-"
-            f"{execution.runtime_manifest_sha256[:16]}.json"
-        )
-        assert names[1] == (
-            "development-audit-invocation-"
-            f"{execution.invocation_manifest_sha256[:16]}.json"
-        )
-        assert names[2] == (
-            "development-audit-stderr-"
-            f"{hashlib.sha256(stderr).hexdigest()[:16]}.log"
-        )
+        assert receipt["schema"] == "prospect.wm001.audit-reproduction.v3"
+        capacity = receipt["capacity"]
+        assert isinstance(capacity, dict)
+        assert capacity["schema"] == "prospect.wm001.audit-capacity.v1"
+        assert capacity["producer_manifest_sha256"] == producer_manifest_sha256
+        assert capacity["first_elapsed_ns"] == 90_000
+        assert capacity["replay_elapsed_ns"] == 100_000
+        assert capacity["combined_required_ns"] <= capacity["available_timeout_ns"]
+        execution_receipt = _load(root / "audit-execution-02.execution.json")
+        assert execution_receipt["schema"] == ("prospect.wm001.captured-audit-execution.v2")
+        assert execution_receipt["subprocess_elapsed_ns"] == 100_000
+        runtime_manifest = json.loads(execution.runtime_manifest)
+        assert runtime_manifest["schema"] == ("prospect.wm001.audit-runtime-manifest.v2")
+        assert runtime_manifest["execution_role"] == "outcome_audit"
+        assert runtime_manifest["limits"]["timeout_seconds"] == 10_800
+        assert names[0] == (f"development-audit-runtime-{execution.runtime_manifest_sha256[:16]}.json")
+        assert names[1] == (f"development-audit-invocation-{execution.invocation_manifest_sha256[:16]}.json")
+        assert names[2] == (f"development-audit-stderr-{hashlib.sha256(stderr).hexdigest()[:16]}.log")
         assert (root / names[0]).read_bytes() == execution.runtime_manifest
         assert (root / names[1]).read_bytes() == execution.invocation_manifest
         assert (root / names[2]).read_bytes() == stderr
@@ -645,7 +718,7 @@ def _install_closure_fakes(
     list[tuple[Path, Path, Path]],
 ]:
     marker = space.development_closure
-    archive = marker.with_name("development-qualification-v1.18.0.tar")
+    archive = marker.with_name("development-qualification-v1.19.0.tar")
     calls: list[tuple[Path, Path, Path]] = []
     monkeypatch.setattr(binding, "DEVELOPMENT_CLOSURE_PATH", marker)
 
@@ -690,13 +763,8 @@ def _install_closure_fakes(
         assert isinstance(runtime_name, str)
         assert runtime_manifest_path.name == runtime_name
         assert runtime_name.startswith("development-audit-runtime-")
-        execution_capture = (
-            audit_reproduction_path.parent
-            / "audit-execution-02.runtime.json"
-        )
-        assert runtime_manifest_path.read_bytes() == (
-            execution_capture.read_bytes()
-        )
+        execution_capture = audit_reproduction_path.parent / "audit-execution-02.runtime.json"
+        assert runtime_manifest_path.read_bytes() == (execution_capture.read_bytes())
         assert not os.path.samefile(
             runtime_manifest_path,
             execution_capture,
@@ -713,14 +781,12 @@ def _install_closure_fakes(
     fresh_report = {
         "schema": "prospect.wm001.development-closure-fresh-reopen.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "mode": "fresh-closure-reopen",
         "challenge": "1" * 64,
         "requesting_process_id": 100,
         "verifier_process_id": 101,
-        "matrix_contract_sha256": (
-            binding._DEVELOPMENT_MATRIX_CONTRACT_SHA256
-        ),
+        "matrix_contract_sha256": (binding._DEVELOPMENT_MATRIX_CONTRACT_SHA256),
         "development_closure_sha256": "2" * 64,
         "producer_manifest_sha256": "3" * 64,
         "raw_result_sha256": "4" * 64,
@@ -826,14 +892,14 @@ def test_sibling_binding_or_closure_attempt_is_never_canonical(
         sibling = operator_space.closure_root / "sibling-closure"
     shutil.copytree(canonical, sibling)
 
-    with pytest.raises(OperatorError, match="canonical protocol-1.18"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.19"):
         operator_module.inspect_unfinalized_operator_attempt(sibling)
 
     sibling_terminal = sibling / "operator-attempt.json"
     sibling_completion = operator_module.outer_completion_marker(sibling_terminal)
     sibling_completion.parent.mkdir(parents=True, exist_ok=True)
     os.link(sibling_terminal, sibling_completion)
-    with pytest.raises(OperatorError, match="canonical protocol-1.18"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.19"):
         operator_module.verify_operator_attempt(sibling)
 
 
@@ -940,17 +1006,12 @@ def test_operator_namespace_is_durably_created_from_absent_root(
         label="binding attempt",
     )
 
-    results_root = (
-        operator_space.repo
-        / "bench"
-        / "world_model_lifecycle"
-        / "results"
-    )
+    results_root = operator_space.repo / "bench" / "world_model_lifecycle" / "results"
     assert output == operator_space.formal_binding
     assert fsynced == [
         results_root.parent,
         results_root,
-        results_root / "operator-v1.18",
+        results_root / "operator-v1.19",
     ]
     assert operator_space.binding_root.is_dir()
 
@@ -1088,7 +1149,7 @@ def test_development_audit_is_retired_by_closure_marker(
 def test_closure_rejects_noncanonical_development_audit(
     operator_space: OperatorSpace,
 ) -> None:
-    with pytest.raises(OperatorError, match="canonical protocol-1.18 audit"):
+    with pytest.raises(OperatorError, match="canonical protocol-1.19 audit"):
         operator_module.closure_main(
             [
                 "--producer",
@@ -1107,7 +1168,7 @@ def test_development_authority_rejects_sibling_qualification_producer(
     operator_space: OperatorSpace,
     entry: str,
 ) -> None:
-    sibling = operator_space.development_qualification.parent / "qualification-v1.18.0-copy"
+    sibling = operator_space.development_qualification.parent / "qualification-v1.19.0-copy"
     if entry == "audit":
         arguments = [
             "development",
@@ -1233,6 +1294,56 @@ def test_replay_mismatch_becomes_authenticated_failure_with_both_runs(
         == 2
     )
     manifest = operator_module.inspect_unfinalized_operator_attempt(output)["manifest"]
+    assert manifest["status"] == "failure"
+    assert manifest["primary"]["executions"] == [
+        "audit-execution-01.execution.json",
+        "audit-execution-02.execution.json",
+    ]
+    assert manifest["primary"]["execution_failures"] == []
+    assert _finalize(output) == manifest
+
+
+def test_replay_stderr_mismatch_becomes_authenticated_failure(
+    operator_space: OperatorSpace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from bench.world_model_lifecycle import audit_runner
+
+    producer, _ = _patch_finalized_producer(
+        monkeypatch,
+        operator_space,
+        lane="development",
+    )
+    executions = [
+        _execution(stderr=b"first stderr\n"),
+        _execution(stderr=b"different stderr\n"),
+    ]
+    calls = 0
+
+    def runner(_source: Path, **_kwargs: object) -> AuditExecution:
+        nonlocal calls
+        execution = executions[calls]
+        calls += 1
+        return execution
+
+    monkeypatch.setattr(audit_runner, "run_captured_auditor", runner)
+    output = operator_space.development_audit
+
+    assert (
+        operator_module.audit_main(
+            [
+                "development",
+                "--producer",
+                str(producer),
+                "--output",
+                str(output),
+            ]
+        )
+        == 2
+    )
+    manifest = operator_module.inspect_unfinalized_operator_attempt(output)[
+        "manifest"
+    ]
     assert manifest["status"] == "failure"
     assert manifest["primary"]["executions"] == [
         "audit-execution-01.execution.json",
@@ -1628,9 +1739,7 @@ def test_development_closure_then_binding_end_to_end(
     monkeypatch.setattr(
         binding,
         "verify_development_closure",
-        lambda _path: pytest.fail(
-            "QA binding authorization must not replay live closure verification"
-        ),
+        lambda _path: pytest.fail("QA binding authorization must not replay live closure verification"),
     )
     binding_manifest = operator_module.inspect_unfinalized_operator_attempt(operator_space.formal_binding)["manifest"]
     assert binding_manifest["status"] == "accepted"
@@ -1646,25 +1755,16 @@ def test_development_closure_then_binding_end_to_end(
     extra_terminal_link.unlink()
     assert operator_module.verify_operator_attempt(operator_space.formal_binding) == binding_manifest
 
-    preflight_path = (
-        operator_space.formal_binding / "formal-input-preflight.json"
-    )
+    preflight_path = operator_space.formal_binding / "formal-input-preflight.json"
     original_preflight = preflight_path.read_bytes()
     preflight_path.write_bytes(b'{"passed":false}\n')
     with pytest.raises(
         OperatorError,
         match="files differ from the terminal manifest",
     ):
-        operator_module.verify_operator_attempt(
-            operator_space.formal_binding
-        )
+        operator_module.verify_operator_attempt(operator_space.formal_binding)
     preflight_path.write_bytes(original_preflight)
-    assert (
-        operator_module.verify_operator_attempt(
-            operator_space.formal_binding
-        )
-        == binding_manifest
-    )
+    assert operator_module.verify_operator_attempt(operator_space.formal_binding) == binding_manifest
 
     binding_terminal = operator_space.formal_binding / "operator-attempt.json"
     tampered = _load(binding_terminal)
@@ -1783,9 +1883,7 @@ def test_binding_rejects_log_manifest_schema_mismatch_before_attempt(
     monkeypatch.setattr(
         binding,
         "verify_development_closure",
-        lambda _path: pytest.fail(
-            "closure verification must follow log-schema preclaim validation"
-        ),
+        lambda _path: pytest.fail("closure verification must follow log-schema preclaim validation"),
     )
 
     with pytest.raises(

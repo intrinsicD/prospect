@@ -1,4 +1,4 @@
-"""One-shot terminal adjudication for the sole formal WM-001 v1.18 attempt.
+"""One-shot terminal adjudication for the sole formal WM-001 v1.19 attempt.
 
 The adjudicator consumes the canonical formal operator audit attempt.  A
 finalized accepted/rejected audit attempt receives exactly one bound replay.
@@ -7,7 +7,7 @@ outer completion is absent, receives no replay and is terminally rejected.
 
 The version-scoped adjudication claim is a no-replace hardlink.  It is
 published only after every pre-claim check and immediately before the sole
-replay or failure-package action.  Once that claim exists, protocol 1.18 is
+replay or failure-package action.  Once that claim exists, protocol 1.19 is
 consumed even if the process crashes.
 """
 
@@ -23,6 +23,7 @@ import re
 import shutil
 import stat
 import sys
+import tarfile
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -49,13 +50,13 @@ RUNNER_SOURCE_PATH = HERE / "audit_runner.py"
 ADJUDICATOR_SOURCE_PATH = HERE / "adjudication.py"
 LAUNCH_BOOTSTRAP_SOURCE_PATH = HERE / "launch_bootstrap.py"
 
-ADJUDICATION_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.18"
-FORMAL_ADJUDICATION_PACKAGE_PATH = ADJUDICATION_RESULTS_ROOT / "formal-adjudication-v1.18.0"
+ADJUDICATION_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "adjudication-v1.19"
+FORMAL_ADJUDICATION_PACKAGE_PATH = ADJUDICATION_RESULTS_ROOT / "formal-adjudication-v1.19.0"
 FORMAL_ADJUDICATION_CLAIM_MARKER = (
-    REPO / "bench" / "world_model_lifecycle" / "results" / "formal" / "formal-adjudication-v1.18.0.json"
+    REPO / "bench" / "world_model_lifecycle" / "results" / "formal" / "formal-adjudication-v1.19.0.json"
 )
 FORMAL_AUDIT_ATTEMPT_PATH = operator_module.FORMAL_AUDIT_ATTEMPT_PATH
-FORMAL_SEMANTIC_REVIEW_PATH = REPO / "artifacts" / "wm001-reviews" / "formal-v1.18.0.json"
+FORMAL_SEMANTIC_REVIEW_PATH = REPO / "artifacts" / "wm001-reviews" / "formal-v1.19.0.json"
 
 ADJUDICATION_MANIFEST_NAME = "adjudication-manifest.json"
 ADJUDICATION_CLAIM_NAME = "formal-adjudication-claim.json"
@@ -83,14 +84,14 @@ COPIED_SOURCE_PREFIX = "bound-source--"
 
 _PACKAGE_SCHEMA = "prospect.wm001.adjudication-package.v8"
 _CLAIM_SCHEMA = "prospect.wm001.formal-adjudication-claim.v2"
-_EXECUTION_SCHEMA = "prospect.wm001.adjudication-audit-execution.v2"
+_EXECUTION_SCHEMA = "prospect.wm001.adjudication-audit-execution.v3"
 _REPLAY_FAILURE_SCHEMA = "prospect.wm001.adjudication-replay-failure.v1"
 _REPLAY_STARTED_SCHEMA = "prospect.wm001.adjudication-replay-started.v1"
 _RECOVERY_FAILURE_SCHEMA = "prospect.wm001.adjudication-recovery-failure.v1"
 _INPUT_FAILURE_SCHEMA = "prospect.wm001.adjudication-input-failure.v1"
 _SEMANTIC_REVIEW_SCHEMA = "prospect.wm001.semantic-review.v2"
 _MAX_CONTROL_BYTES = 64 << 20
-_MAX_RESULT_BYTES = 4 << 30
+_MAX_RESULT_BYTES = 2 << 30
 _MAX_AUDIT_BYTES = 64 << 20
 _MAX_REVIEW_BYTES = 16 << 20
 _MAX_STDERR_BYTES = 16 << 20
@@ -141,7 +142,7 @@ ReviewRole = Literal[
 
 
 class AdjudicationError(ValueError):
-    """Evidence cannot enter the sole terminal WM-001 v1.18 adjudication."""
+    """Evidence cannot enter the sole terminal WM-001 v1.19 adjudication."""
 
 
 class _AdjudicationRetired(AdjudicationError):
@@ -563,6 +564,497 @@ def _verify_formal_binding(binding_path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], verify_binding(binding_path))
 
 
+def _verify_development_capacity_independently(
+    *,
+    root: Path,
+    producer_manifest: Mapping[str, object],
+    binding: Mapping[str, object],
+) -> None:
+    """Rejoin durable calibration bytes without calling another verifier."""
+
+    development = binding.get("development_qualification")
+    if not isinstance(development, Mapping):
+        raise AdjudicationError("formal binding has no development capacity evidence")
+    closure_name = development.get("closure_file")
+    if not isinstance(closure_name, str) or Path(closure_name).name != closure_name:
+        raise AdjudicationError("development closure filename is unsafe")
+    closure_payload = _read_regular_file(
+        root / closure_name,
+        limit=_MAX_CONTROL_BYTES,
+        label="bound development closure for capacity",
+    )
+    if (
+        development.get("closure_bytes") != len(closure_payload)
+        or development.get("closure_sha256") != _sha256(closure_payload)
+    ):
+        raise AdjudicationError("bound development closure identity changed")
+    _manifested_digest(
+        producer_manifest,
+        filename=closure_name,
+        payload=closure_payload,
+    )
+    closure = _parse_canonical_json_object(
+        closure_payload,
+        label="bound development closure for capacity",
+    )
+    archive = closure.get("qualification_archive")
+    if (
+        not isinstance(archive, Mapping)
+        or set(archive)
+        != {"format", "file", "canonical_path", "bytes", "sha256", "members"}
+        or archive.get("format") != "ustar-uncompressed-v1"
+        or not _is_sha256(archive.get("sha256"))
+    ):
+        raise AdjudicationError("development capacity archive identity is absent")
+    archive_relative = archive.get("canonical_path")
+    member_rows = archive.get("members")
+    if (
+        not isinstance(archive_relative, str)
+        or Path(archive_relative).is_absolute()
+        or Path(archive_relative).as_posix() != archive_relative
+        or "." in Path(archive_relative).parts
+        or ".." in Path(archive_relative).parts
+        or not isinstance(member_rows, list)
+    ):
+        raise AdjudicationError("development capacity archive identity is unsafe")
+    archive_path = REPO / archive_relative
+    try:
+        metadata = archive_path.lstat()
+        resolved = archive_path.resolve(strict=True)
+    except OSError as error:
+        raise AdjudicationError("development capacity archive is missing") from error
+    if (
+        resolved != archive_path
+        or not stat.S_ISREG(metadata.st_mode)
+        or archive_path.is_symlink()
+        or metadata.st_nlink != 1
+        or archive.get("bytes") != metadata.st_size
+        or metadata.st_size > (40 << 30)
+    ):
+        raise AdjudicationError("development capacity archive file identity changed")
+    archive_digest = hashlib.sha256()
+    try:
+        with archive_path.open("rb") as archive_stream:
+            for chunk in iter(lambda: archive_stream.read(1 << 20), b""):
+                archive_digest.update(chunk)
+        final_metadata = archive_path.lstat()
+    except OSError as error:
+        raise AdjudicationError(
+            "development capacity archive cannot be authenticated"
+        ) from error
+    if (
+        archive_digest.hexdigest() != archive.get("sha256")
+        or (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_mode,
+            metadata.st_nlink,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+        )
+        != (
+            final_metadata.st_dev,
+            final_metadata.st_ino,
+            final_metadata.st_mode,
+            final_metadata.st_nlink,
+            final_metadata.st_size,
+            final_metadata.st_mtime_ns,
+            final_metadata.st_ctime_ns,
+        )
+    ):
+        raise AdjudicationError(
+            "development capacity archive digest or stable identity changed"
+        )
+    rows: dict[str, Mapping[str, object]] = {}
+    ordered_paths: list[str] = []
+    for row in member_rows:
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {"path", "bytes", "sha256"}
+            or not isinstance(row.get("path"), str)
+            or type(row.get("bytes")) is not int
+            or cast(int, row["bytes"]) < 0
+            or not _is_sha256(row.get("sha256"))
+        ):
+            raise AdjudicationError("development capacity archive row is malformed")
+        path = cast(str, row["path"])
+        ordered_paths.append(path)
+        rows[path] = row
+    runtime_member = closure.get("audit_runtime_manifest_member")
+    invocation_member = closure.get("audit_invocation_manifest_member")
+    stderr_member = closure.get("audit_stderr_member")
+    audit_member = closure.get("independent_audit_member")
+    if not all(
+        isinstance(member, str)
+        for member in (runtime_member, invocation_member, stderr_member, audit_member)
+    ):
+        raise AdjudicationError("development capacity archive roles are malformed")
+    targets = {
+        "producer/producer-manifest.json",
+        "evidence/audit-reproduction.json",
+        "evidence/audit-execution-01.execution.json",
+        "evidence/audit-execution-02.execution.json",
+        cast(str, runtime_member),
+        cast(str, invocation_member),
+        cast(str, stderr_member),
+        cast(str, audit_member),
+    }
+    if (
+        ordered_paths != sorted(ordered_paths)
+        or len(rows) != len(member_rows)
+        or not targets <= set(rows)
+    ):
+        raise AdjudicationError("development capacity archive members are incomplete")
+    retained: dict[str, bytes] = {}
+    observed: list[str] = []
+    try:
+        with tarfile.open(archive_path, mode="r:") as tar:
+            for member in tar:
+                observed.append(member.name)
+                expected = rows.get(member.name)
+                if (
+                    expected is None
+                    or not member.isreg()
+                    or member.type != tarfile.REGTYPE
+                    or member.size != expected.get("bytes")
+                ):
+                    raise AdjudicationError("development capacity tar metadata changed")
+                if member.name in targets:
+                    if member.size > (64 << 20):
+                        raise AdjudicationError("development capacity evidence is oversized")
+                    member_stream = tar.extractfile(member)
+                    if member_stream is None:
+                        raise AdjudicationError("development capacity evidence is unreadable")
+                    payload = member_stream.read((64 << 20) + 1)
+                    if (
+                        len(payload) != member.size
+                        or _sha256(payload) != expected.get("sha256")
+                    ):
+                        raise AdjudicationError("development capacity evidence bytes changed")
+                    retained[member.name] = payload
+    except (OSError, tarfile.TarError) as error:
+        raise AdjudicationError("development capacity archive cannot be parsed") from error
+    if observed != ordered_paths or set(retained) != targets:
+        raise AdjudicationError("development capacity archive order or target set changed")
+
+    manifest_payload = retained["producer/producer-manifest.json"]
+    manifest = _parse_canonical_json_object(
+        manifest_payload,
+        label="archived development producer manifest for capacity",
+    )
+    manifest_rows = manifest.get("files")
+    if (
+        manifest.get("schema") != "prospect.wm001.producer-manifest.v1"
+        or manifest.get("experiment_id") != "WM-001"
+        or manifest.get("lane") != "development"
+        or manifest.get("status") != "completed"
+        or manifest.get("error") is not None
+        or not isinstance(manifest_rows, list)
+        or manifest.get("file_count") != len(manifest_rows)
+    ):
+        raise AdjudicationError("archived development producer manifest is invalid")
+    total = 0
+    result_bytes: int | None = None
+    paths: list[str] = []
+    for row in cast(list[object], manifest_rows):
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {"path", "bytes", "sha256"}
+            or not isinstance(row.get("path"), str)
+            or type(row.get("bytes")) is not int
+            or not 0 <= cast(int, row["bytes"]) <= (4 << 30)
+            or not _is_sha256(row.get("sha256"))
+        ):
+            raise AdjudicationError("archived capacity producer row is malformed")
+        path = cast(str, row["path"])
+        paths.append(path)
+        total += cast(int, row["bytes"])
+        if path == "result.json":
+            if result_bytes is not None:
+                raise AdjudicationError("archived capacity has duplicate results")
+            result_bytes = cast(int, row["bytes"])
+    if (
+        paths != sorted(set(paths))
+        or not 0 < total <= (8 << 30)
+        or result_bytes is None
+        or not 0 < result_bytes <= (2 << 30)
+    ):
+        raise AdjudicationError("archived capacity producer sizes are invalid")
+
+    receipt_payloads = [
+        retained[f"evidence/audit-execution-{ordinal:02d}.execution.json"]
+        for ordinal in (1, 2)
+    ]
+    receipts = [
+        _parse_canonical_json_object(
+            payload,
+            label=f"archived capacity execution receipt {ordinal}",
+        )
+        for ordinal, payload in enumerate(receipt_payloads, start=1)
+    ]
+    audit_payload = retained[cast(str, audit_member)]
+    runtime_payload = retained[cast(str, runtime_member)]
+    invocation_payload = retained[cast(str, invocation_member)]
+    stderr_payload = retained[cast(str, stderr_member)]
+    audit_report = _parse_canonical_json_object(
+        audit_payload,
+        label="archived development audit for capacity",
+    )
+    runtime = _parse_canonical_json_object(
+        runtime_payload,
+        label="archived development runtime for capacity",
+    )
+    invocation = _parse_canonical_json_object(
+        invocation_payload,
+        label="archived development invocation for capacity",
+    )
+    runtime_source = runtime.get("source")
+    runtime_fields = {
+        "schema",
+        "execution_role",
+        "assurance",
+        "bootstrap_sha256",
+        "python",
+        "required_flags",
+        "source",
+        "support_files",
+        "closure_import_roots",
+        "standard_library",
+        "environment",
+        "limits",
+    }
+    invocation_fields = {
+        "schema",
+        "runtime_manifest_sha256",
+        "working_directory",
+        "auditor_argv",
+    }
+    if (
+        audit_report.get("passed") is not True
+        or set(runtime) != runtime_fields
+        or runtime.get("schema") != "prospect.wm001.audit-runtime-manifest.v2"
+        or runtime.get("execution_role") != "outcome_audit"
+        or runtime.get("limits")
+        != {
+            "timeout_seconds": 10_800,
+            "stdout_bytes": 64 << 20,
+            "stderr_bytes": 16 << 20,
+        }
+        or not isinstance(runtime_source, Mapping)
+        or runtime_source.get("mode") != "descriptor"
+        or set(invocation) != invocation_fields
+        or invocation.get("schema")
+        != "prospect.wm001.audit-invocation-manifest.v1"
+        or invocation.get("runtime_manifest_sha256") != _sha256(runtime_payload)
+        or invocation.get("working_directory") != str(REPO)
+        or invocation.get("auditor_argv")
+        != [
+            closure.get("producer_root"),
+            "--producer-bootstrap",
+            "@captured/producer_bootstrap.py",
+        ]
+    ):
+        raise AdjudicationError("archived capacity did not measure the full outcome audit")
+    receipt_fields = {
+        "schema",
+        "returncode",
+        "passed",
+        "source_mode",
+        "command",
+        "stdout_file",
+        "stderr_file",
+        "runtime_manifest_file",
+        "invocation_manifest_file",
+        "stdout_bytes",
+        "stdout_sha256",
+        "stderr_bytes",
+        "stderr_sha256",
+        "runtime_manifest_bytes",
+        "runtime_manifest_sha256",
+        "invocation_manifest_bytes",
+        "invocation_manifest_sha256",
+        "bootstrap_sha256",
+        "auditor_source_sha256",
+        "support_files",
+        "subprocess_elapsed_ns",
+    }
+    for receipt in receipts:
+        if (
+            set(receipt) != receipt_fields
+            or receipt.get("schema") != "prospect.wm001.captured-audit-execution.v2"
+            or receipt.get("returncode") != 0
+            or receipt.get("passed") is not True
+            or receipt.get("source_mode") != "descriptor"
+            or receipt.get("stdout_bytes") != len(audit_payload)
+            or receipt.get("stdout_sha256") != _sha256(audit_payload)
+            or receipt.get("stderr_bytes") != len(stderr_payload)
+            or receipt.get("stderr_sha256") != _sha256(stderr_payload)
+            or receipt.get("runtime_manifest_bytes") != len(runtime_payload)
+            or receipt.get("runtime_manifest_sha256") != _sha256(runtime_payload)
+            or receipt.get("invocation_manifest_bytes") != len(invocation_payload)
+            or receipt.get("invocation_manifest_sha256") != _sha256(invocation_payload)
+            or receipt.get("support_files") != runtime.get("support_files")
+            or receipt.get("bootstrap_sha256") != runtime.get("bootstrap_sha256")
+            or receipt.get("auditor_source_sha256")
+            != cast(Mapping[str, object], runtime_source).get("sha256")
+            or type(receipt.get("subprocess_elapsed_ns")) is not int
+            or cast(int, receipt["subprocess_elapsed_ns"]) <= 0
+        ):
+            raise AdjudicationError("archived capacity execution receipt is invalid")
+    identical_fields = {
+        "stdout_bytes",
+        "stdout_sha256",
+        "stderr_bytes",
+        "stderr_sha256",
+        "runtime_manifest_bytes",
+        "runtime_manifest_sha256",
+        "invocation_manifest_bytes",
+        "invocation_manifest_sha256",
+        "bootstrap_sha256",
+        "auditor_source_sha256",
+        "support_files",
+    }
+    if any(
+        receipts[0].get(field) != receipts[1].get(field)
+        for field in identical_fields
+    ):
+        raise AdjudicationError(
+            "archived capacity executions are not byte-identical"
+        )
+    reproduction_payload = retained["evidence/audit-reproduction.json"]
+    reproduction = _parse_canonical_json_object(
+        reproduction_payload,
+        label="archived development reproduction for capacity",
+    )
+    reproduction_fields = {
+        "schema",
+        "experiment_id",
+        "protocol_version",
+        "supplied_audit_sha256",
+        "reproduced_audit_sha256",
+        "byte_identical",
+        "returncode",
+        "source_mode",
+        "stdout_bytes",
+        "stderr_file",
+        "stderr_bytes",
+        "stderr_sha256",
+        "runtime_manifest_file",
+        "runtime_manifest_bytes",
+        "runtime_manifest_sha256",
+        "invocation_manifest_file",
+        "invocation_manifest_bytes",
+        "invocation_manifest_sha256",
+        "bootstrap_sha256",
+        "runner_source_sha256",
+        "auditor_source_sha256",
+        "support_files",
+        "first_execution_receipt_file",
+        "first_execution_receipt_bytes",
+        "first_execution_receipt_sha256",
+        "replay_execution_receipt_file",
+        "replay_execution_receipt_bytes",
+        "replay_execution_receipt_sha256",
+        "capacity",
+        "passed",
+    }
+    if (
+        development.get("audit_reproduction_sha256")
+        != _sha256(reproduction_payload)
+        or set(reproduction) != reproduction_fields
+        or reproduction.get("schema") != "prospect.wm001.audit-reproduction.v3"
+        or reproduction.get("experiment_id") != "WM-001"
+        or reproduction.get("protocol_version") != "1.19.0"
+        or reproduction.get("byte_identical") is not True
+        or reproduction.get("returncode") != 0
+        or reproduction.get("source_mode") != "descriptor"
+        or reproduction.get("stdout_bytes") != len(audit_payload)
+        or reproduction.get("stderr_bytes") != len(stderr_payload)
+        or reproduction.get("stderr_sha256") != _sha256(stderr_payload)
+        or reproduction.get("stderr_file") != Path(cast(str, stderr_member)).name
+        or reproduction.get("runtime_manifest_bytes") != len(runtime_payload)
+        or reproduction.get("runtime_manifest_sha256") != _sha256(runtime_payload)
+        or reproduction.get("runtime_manifest_file")
+        != Path(cast(str, runtime_member)).name
+        or reproduction.get("invocation_manifest_bytes") != len(invocation_payload)
+        or reproduction.get("invocation_manifest_sha256")
+        != _sha256(invocation_payload)
+        or reproduction.get("invocation_manifest_file")
+        != Path(cast(str, invocation_member)).name
+        or reproduction.get("bootstrap_sha256")
+        != receipts[1].get("bootstrap_sha256")
+        or reproduction.get("auditor_source_sha256")
+        != receipts[1].get("auditor_source_sha256")
+        or reproduction.get("support_files") != receipts[1].get("support_files")
+        or reproduction.get("passed") is not True
+        or reproduction.get("supplied_audit_sha256") != _sha256(audit_payload)
+        or reproduction.get("reproduced_audit_sha256") != _sha256(audit_payload)
+        or reproduction.get("first_execution_receipt_file")
+        != "audit-execution-01.execution.json"
+        or reproduction.get("first_execution_receipt_bytes") != len(receipt_payloads[0])
+        or reproduction.get("first_execution_receipt_sha256")
+        != _sha256(receipt_payloads[0])
+        or reproduction.get("replay_execution_receipt_file")
+        != "audit-execution-02.execution.json"
+        or reproduction.get("replay_execution_receipt_bytes") != len(receipt_payloads[1])
+        or reproduction.get("replay_execution_receipt_sha256")
+        != _sha256(receipt_payloads[1])
+    ):
+        raise AdjudicationError("archived capacity reproduction is misbound")
+    capacity = reproduction.get("capacity")
+    fields = {
+        "schema", "producer_manifest_sha256", "development_total_bytes",
+        "development_result_bytes", "first_elapsed_ns", "replay_elapsed_ns",
+        "calibration_elapsed_ns", "producer_limit_bytes", "result_limit_bytes",
+        "safety_numerator", "safety_denominator", "aggregate_required_ns",
+        "result_required_ns", "combined_required_ns", "available_timeout_ns",
+        "passed",
+    }
+    integer_fields = fields - {"schema", "producer_manifest_sha256", "passed"}
+    if (
+        not isinstance(capacity, Mapping)
+        or set(capacity) != fields
+        or capacity.get("schema") != "prospect.wm001.audit-capacity.v1"
+        or capacity.get("producer_manifest_sha256") != _sha256(manifest_payload)
+        or capacity.get("development_total_bytes") != total
+        or capacity.get("development_result_bytes") != result_bytes
+        or capacity.get("first_elapsed_ns") != receipts[0].get("subprocess_elapsed_ns")
+        or capacity.get("replay_elapsed_ns") != receipts[1].get("subprocess_elapsed_ns")
+        or capacity.get("passed") is not True
+        or any(type(capacity.get(field)) is not int for field in integer_fields)
+    ):
+        raise AdjudicationError("archived capacity record is malformed or misbound")
+    calibration = max(
+        cast(int, capacity["first_elapsed_ns"]),
+        cast(int, capacity["replay_elapsed_ns"]),
+    )
+
+    def ceil_div(numerator: int, denominator: int) -> int:
+        return (numerator + denominator - 1) // denominator
+
+    aggregate = ceil_div(2 * calibration * (8 << 30), total)
+    result_required = ceil_div(2 * calibration * (2 << 30), result_bytes)
+    combined = aggregate + result_required
+    available = 10_800 * 1_000_000_000
+    expected = {
+        "calibration_elapsed_ns": calibration,
+        "producer_limit_bytes": 8 << 30,
+        "result_limit_bytes": 2 << 30,
+        "safety_numerator": 2,
+        "safety_denominator": 1,
+        "aggregate_required_ns": aggregate,
+        "result_required_ns": result_required,
+        "combined_required_ns": combined,
+        "available_timeout_ns": available,
+    }
+    if (
+        any(capacity.get(field) != value for field, value in expected.items())
+        or combined > available
+    ):
+        raise AdjudicationError("archived capacity arithmetic lacks sealed headroom")
+
+
 def _verify_launch(
     *,
     root: Path,
@@ -682,7 +1174,7 @@ def _verify_launch(
         set(launch) != expected_fields
         or launch.get("schema") != "prospect.wm001.formal-launch.v3"
         or launch.get("experiment_id") != "WM-001"
-        or launch.get("protocol_version") != "1.18.0"
+        or launch.get("protocol_version") != "1.19.0"
         or launch.get("formal_binding_sha256") != binding_sha256
         or canonical_binding_payload != binding_payload
         or launch.get("formal_binding_attempt_path") != str(binding_attempt)
@@ -720,7 +1212,7 @@ def _verify_launch(
         or marker_payload != launch_payload
         or not same_inode
     ):
-        raise AdjudicationError("formal result does not bind the unique v1.18 launch record")
+        raise AdjudicationError("formal result does not bind the unique v1.19 launch record")
     _manifested_digest(
         producer_manifest,
         filename="formal-launch.json",
@@ -832,17 +1324,22 @@ def _load_upstream(
         or result != verified_result
         or result.get("schema") != "prospect.world-model-lifecycle.raw-result.v9"
         or result.get("experiment_id") != "WM-001"
-        or result.get("protocol_version") != "1.18.0"
+        or result.get("protocol_version") != "1.19.0"
         or result.get("lane") != "formal"
         or result.get("claim_eligible") is not True
         or result.get("formal_binding_sha256") != binding_sha256
         or binding.get("schema") != "prospect.world-model-lifecycle.formal-binding.v10"
         or binding.get("experiment_id") != "WM-001"
         or not isinstance(protocol, Mapping)
-        or protocol.get("version") != "1.18.0"
+        or protocol.get("version") != "1.19.0"
         or protocol.get("sha256") != result.get("protocol_sha256")
     ):
         raise AdjudicationError("formal result, binding, and protocol identities do not agree")
+    _verify_development_capacity_independently(
+        root=root,
+        producer_manifest=producer_manifest,
+        binding=binding,
+    )
     launch, launch_payload = _verify_launch(
         root=root,
         producer_manifest=producer_manifest,
@@ -935,6 +1432,8 @@ def _load_upstream(
     runtime_support = runtime.get("support_files")
     if (
         _sha256(bootstrap_payload) != audit_execution.get("bootstrap_source_sha256")
+        or runtime.get("schema") != "prospect.wm001.audit-runtime-manifest.v2"
+        or runtime.get("execution_role") != "outcome_audit"
         or not isinstance(runtime_source, Mapping)
         or runtime_source.get("mode") != "descriptor"
         or runtime_source.get("path") != "artifact_audit.py"
@@ -957,7 +1456,7 @@ def _load_upstream(
         or runtime_support[0].get("sha256")
         != _sha256(source_payloads["producer_bootstrap.py"])
         or not isinstance(runtime_limits, Mapping)
-        or runtime_limits.get("timeout_seconds") != 600
+        or runtime_limits.get("timeout_seconds") != 10_800
         or runtime_limits.get("stdout_bytes") != _MAX_AUDIT_BYTES
         or runtime_limits.get("stderr_bytes") != _MAX_STDERR_BYTES
     ):
@@ -1109,14 +1608,14 @@ def _load_audit_attempt(path: Path) -> _AuditAttempt:
     if (
         manifest.get("schema") != "prospect.wm001.operator-attempt.v1"
         or manifest.get("experiment_id") != "WM-001"
-        or manifest.get("protocol_version") != "1.18.0"
+        or manifest.get("protocol_version") != "1.19.0"
         or manifest.get("kind") != "audit"
         or manifest.get("lane") != "formal"
         or manifest.get("status") not in {"accepted", "rejected", "failure"}
         or not isinstance(primary, dict)
         or not isinstance(rows, list)
     ):
-        raise AdjudicationError("operator evidence is not the formal v1.18 audit attempt")
+        raise AdjudicationError("operator evidence is not the formal v1.19 audit attempt")
     names: list[str] = []
     for row in rows:
         if (
@@ -1304,7 +1803,7 @@ def _formal_claim_value(
         set(claim) != expected
         or claim.get("schema") != "prospect.wm001.formal-audit-claim.v1"
         or claim.get("experiment_id") != "WM-001"
-        or claim.get("protocol_version") != "1.18.0"
+        or claim.get("protocol_version") != "1.19.0"
         or claim.get("claim_status") != "consumed"
         or claim.get("attempt_path") != str(FORMAL_AUDIT_ATTEMPT_PATH)
         or claim.get("marker_path") != str(operator_module.FORMAL_AUDIT_CLAIM_MARKER)
@@ -1466,6 +1965,7 @@ def _validate_attempt_execution(
         "bootstrap_sha256",
         "auditor_source_sha256",
         "support_files",
+        "subprocess_elapsed_ns",
     }
     dependencies = cast(Mapping[str, object], upstream.binding["dependencies"])
     command = receipt.get("command")
@@ -1485,7 +1985,9 @@ def _validate_attempt_execution(
     ).get("support_files")
     if (
         set(receipt) != expected_fields
-        or receipt.get("schema") != "prospect.wm001.captured-audit-execution.v1"
+        or receipt.get("schema") != "prospect.wm001.captured-audit-execution.v2"
+        or type(receipt.get("subprocess_elapsed_ns")) is not int
+        or cast(int, receipt["subprocess_elapsed_ns"]) <= 0
         or receipt.get("source_mode") != "descriptor"
         or runtime != upstream.outcome_runtime_payload
         or invocation != upstream.outcome_invocation_payload
@@ -1571,7 +2073,7 @@ def _input_failure_record(
     return {
         "schema": _INPUT_FAILURE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": assurance_record(),
         "failure_code": failure_code,
         "terminal": True,
@@ -1665,7 +2167,7 @@ def _review_binding(
     return {
         "schema": _SEMANTIC_REVIEW_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": assurance_record(),
         "evidence_kind": evidence.kind,
         "artifact_root": str(upstream.root),
@@ -1891,6 +2393,7 @@ class _Replay:
     auditor_source_sha256: str
     support_files: list[dict[str, object]]
     source_mode: str
+    subprocess_elapsed_ns: int
 
 
 @dataclass(frozen=True)
@@ -2023,6 +2526,8 @@ def _validate_replay_execution(
         or dict(execution.report) != report
         or type(report.get("passed")) is not bool
         or execution.returncode != (0 if report["passed"] is True else 1)
+        or type(execution.subprocess_elapsed_ns) is not int
+        or execution.subprocess_elapsed_ns <= 0
         or len(command) != 5
         or command[:4] != (expected_python, "-I", "-S", "-B")
         or not (command[4].startswith("/proc/self/fd/") or command[4].startswith("/dev/fd/"))
@@ -2040,6 +2545,7 @@ def _validate_replay_execution(
         auditor_source_sha256=execution.auditor_source_sha256,
         support_files=support_files,
         source_mode=execution.source_mode,
+        subprocess_elapsed_ns=execution.subprocess_elapsed_ns,
     )
 
 
@@ -2084,7 +2590,7 @@ def _execution_receipt(
     return {
         "schema": _EXECUTION_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": assurance_record(),
         "producer_root": str(upstream.root),
         "audit_attempt_path": str(attempt.root),
@@ -2096,6 +2602,7 @@ def _execution_receipt(
             "flags": ["-I", "-S", "-B"],
         },
         "returncode": replay.returncode,
+        "subprocess_elapsed_ns": replay.subprocess_elapsed_ns,
         "report_passed": replay.report["passed"],
         "stdout": {
             "file": REPRODUCED_AUDIT_NAME,
@@ -2176,7 +2683,7 @@ def _replay_failure_record(
     return {
         "schema": _REPLAY_FAILURE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": assurance_record(),
         "producer_root": str(upstream.root),
         "audit_attempt_path": str(attempt.root),
@@ -2291,8 +2798,8 @@ def _prepare_output_paths() -> Path:
         FORMAL_ADJUDICATION_CLAIM_MARKER,
         label="formal adjudication claim marker",
     )
-    if package.name != "formal-adjudication-v1.18.0" or marker.name != "formal-adjudication-v1.18.0.json":
-        raise AdjudicationError("formal adjudication paths are not version-scoped to v1.18.0")
+    if package.name != "formal-adjudication-v1.19.0" or marker.name != "formal-adjudication-v1.19.0.json":
+        raise AdjudicationError("formal adjudication paths are not version-scoped to v1.19.0")
     package.parent.mkdir(parents=True, exist_ok=True)
     marker.parent.mkdir(parents=True, exist_ok=True)
     _canonical_directory(
@@ -2304,7 +2811,7 @@ def _prepare_output_paths() -> Path:
         label="formal adjudication claim-marker parent",
     )
     if os.path.lexists(marker):
-        raise _AdjudicationRetired("WM-001 protocol 1.18 adjudication claim is already consumed")
+        raise _AdjudicationRetired("WM-001 protocol 1.19 adjudication claim is already consumed")
     if os.path.lexists(package):
         raise FileExistsError(f"refusing to replace formal adjudication package: {package}")
     return package
@@ -2321,7 +2828,7 @@ def _adjudication_claim_value(
     return {
         "schema": _CLAIM_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": assurance_record(),
         "claim_status": "consumed",
         "producer_root": str(upstream.root),
@@ -2368,12 +2875,12 @@ def _publish_adjudication_claim(
     marker = FORMAL_ADJUDICATION_CLAIM_MARKER
     payload = _canonical_json_bytes(value)
     if os.path.lexists(marker):
-        raise _AdjudicationRetired("WM-001 protocol 1.18 adjudication claim is already consumed")
+        raise _AdjudicationRetired("WM-001 protocol 1.19 adjudication claim is already consumed")
     _write_private_file(claim_path, payload)
     try:
         os.link(claim_path, marker, follow_symlinks=False)
     except FileExistsError as error:
-        raise _AdjudicationRetired("WM-001 protocol 1.18 adjudication claim is already consumed") from error
+        raise _AdjudicationRetired("WM-001 protocol 1.19 adjudication claim is already consumed") from error
     except OSError as error:
         raise AdjudicationError("formal adjudication claim marker could not be published") from error
     on_irreversible()
@@ -2451,7 +2958,7 @@ def _replay_started_record(
     return {
         "schema": _REPLAY_STARTED_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": assurance_record(),
         "producer_root": str(upstream.root),
         "producer_manifest_sha256": _sha256(upstream.producer_manifest_payload),
@@ -2513,7 +3020,7 @@ def _recovery_failure_record(
     return {
         "schema": _RECOVERY_FAILURE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": assurance_record(),
         "terminal": True,
         "disposition": "rejected",
@@ -2568,7 +3075,7 @@ def _manifest(
     return {
         "schema": _PACKAGE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": assurance_record(),
         "lane": "formal",
         "requested_disposition": requested_disposition,
@@ -2913,6 +3420,7 @@ def _verify_packaged_execution(
                 auditor_source_sha256="",
                 support_files=[],
                 source_mode="descriptor",
+                subprocess_elapsed_ns=1,
             ),
             supplied_audit_payload=b"",
         )
@@ -2921,7 +3429,7 @@ def _verify_packaged_execution(
         set(receipt) != expected_fields
         or receipt.get("schema") != _EXECUTION_SCHEMA
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.18.0"
+        or receipt.get("protocol_version") != "1.19.0"
         or receipt.get("producer_root") != str(upstream.root)
         or receipt.get("audit_attempt_path") != str(attempt.root)
         or receipt.get("audit_attempt_manifest_sha256") != attempt.terminal.sha256
@@ -2934,6 +3442,8 @@ def _verify_packaged_execution(
         }
         or type(report.get("passed")) is not bool
         or receipt.get("returncode") != (0 if report["passed"] is True else 1)
+        or type(receipt.get("subprocess_elapsed_ns")) is not int
+        or cast(int, receipt["subprocess_elapsed_ns"]) <= 0
         or receipt.get("report_passed") is not report["passed"]
         or runtime != upstream.outcome_runtime_payload
         or invocation != upstream.outcome_invocation_payload
@@ -3003,7 +3513,7 @@ def _verify_replay_failure(
         }
         or failure.get("schema") != _REPLAY_FAILURE_SCHEMA
         or failure.get("experiment_id") != "WM-001"
-        or failure.get("protocol_version") != "1.18.0"
+        or failure.get("protocol_version") != "1.19.0"
         or failure.get("producer_root") != str(upstream.root)
         or failure.get("audit_attempt_path") != str(attempt.root)
         or failure.get("audit_attempt_manifest_sha256") != attempt.terminal.sha256
@@ -3148,7 +3658,7 @@ def _verify_recovery_failure(
         )
         or failure.get("schema") != _RECOVERY_FAILURE_SCHEMA
         or failure.get("experiment_id") != "WM-001"
-        or failure.get("protocol_version") != "1.18.0"
+        or failure.get("protocol_version") != "1.19.0"
         or failure.get("terminal") is not True
         or failure.get("disposition") != "rejected"
         or failure.get("producer_root") != str(upstream.root)
@@ -3206,7 +3716,7 @@ def _verify_adjudication_package(
 ) -> dict[str, object]:
     package = _canonical_directory(path, label="adjudication package")
     if not allow_staging and package != FORMAL_ADJUDICATION_PACKAGE_PATH:
-        raise AdjudicationError("public adjudication verification requires the canonical v1.18 package")
+        raise AdjudicationError("public adjudication verification requires the canonical v1.19 package")
     if require_outer:
         try:
             operator_module.verify_outer_completion(package / ADJUDICATION_MANIFEST_NAME)
@@ -3235,7 +3745,7 @@ def _verify_adjudication_package(
             set(manifest) != _MANIFEST_FIELDS
             or manifest.get("schema") != _PACKAGE_SCHEMA
             or manifest.get("experiment_id") != "WM-001"
-            or manifest.get("protocol_version") != "1.18.0"
+            or manifest.get("protocol_version") != "1.19.0"
             or manifest.get("lane") != "formal"
             or manifest.get("requested_disposition") not in {"accepted", "rejected"}
             or manifest.get("disposition") not in {"accepted", "rejected"}
@@ -3645,7 +4155,7 @@ def _verify_adjudication_package(
 
 
 def verify_adjudication_package(path: Path) -> dict[str, object]:
-    """Verify only an outer-finalized canonical v1.18 adjudication package."""
+    """Verify only an outer-finalized canonical v1.19 adjudication package."""
 
     return _verify_adjudication_package(
         path,
@@ -3864,8 +4374,8 @@ def _recover_adjudication_package(
         label="formal adjudication claim marker",
     )
     if (
-        package.name != "formal-adjudication-v1.18.0"
-        or marker_path.name != "formal-adjudication-v1.18.0.json"
+        package.name != "formal-adjudication-v1.19.0"
+        or marker_path.name != "formal-adjudication-v1.19.0.json"
     ):
         raise AdjudicationError("formal adjudication recovery paths are not version-scoped")
     package.parent.mkdir(parents=True, exist_ok=True)
@@ -3901,7 +4411,7 @@ def _recover_adjudication_package(
             if completed is not None:
                 if not allow_completed:
                     raise _AdjudicationRetired(
-                        "WM-001 protocol 1.18 adjudication is already outer-finalized"
+                        "WM-001 protocol 1.19 adjudication is already outer-finalized"
                     )
                 return completed
             exact = _verify_adjudication_package(
@@ -4116,7 +4626,7 @@ def _recover_adjudication_package(
 
 
 def recover_adjudication_package() -> dict[str, object]:
-    """Finalize a consumed v1.18 claim without another audit replay."""
+    """Finalize a consumed v1.19 claim without another audit replay."""
 
     return _recover_adjudication_package(
         recovery_mode="explicit",
@@ -4132,7 +4642,7 @@ def create_adjudication_package(
     disposition: Disposition,
     semantic_review: Path,
 ) -> dict[str, object]:
-    """Consume v1.18 and publish one accepted/rejected terminal package."""
+    """Consume v1.19 and publish one accepted/rejected terminal package."""
 
     if disposition not in {"accepted", "rejected"}:
         raise AdjudicationError("adjudication is terminal; disposition must be accepted or rejected")

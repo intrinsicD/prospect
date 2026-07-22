@@ -58,15 +58,15 @@ def _patch_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     launch.write_bytes(b"# sealed launch fixture\n")
     bootstrap.write_bytes(b"# sealed producer fixture\n")
     results = source / "results"
-    operator_root = results / "operator-v1.18"
+    operator_root = results / "operator-v1.19"
     attempts = operator_root / "rehearsals"
-    attempt = attempts / "accepted-binding-rehearsal-v1.18.0"
-    claim_root = results / "rehearsals" / "v1.18"
-    completions = results / "outer-completions" / "v1.18"
+    attempt = attempts / "accepted-binding-rehearsal-v1.19.0"
+    claim_root = results / "rehearsals" / "v1.19"
+    completions = results / "outer-completions" / "v1.19"
     binding_path = (
         operator_root
         / "bindings"
-        / "formal-binding-v1.18.0"
+        / "formal-binding-v1.19.0"
         / "formal-binding.json"
     )
     values = {
@@ -94,7 +94,7 @@ def _binding() -> dict[str, object]:
     return {
         "schema": "prospect.world-model-lifecycle.formal-binding.v10",
         "experiment_id": "WM-001",
-        "protocol": {"version": "1.18.0"},
+        "protocol": {"version": "1.19.0"},
         "assurance": dict(ASSURANCE),
         "runtime": {"device": "cpu"},
         "dependencies": {
@@ -196,7 +196,7 @@ def _stdout(binding: dict[str, object]) -> bytes:
     fresh = {
         "schema": "prospect.wm001.fresh-runtime-identity-conformance.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "mode": "fresh-identity-conformance",
         "challenge": "8" * 64,
         "requesting_process_id": 100,
@@ -296,7 +296,7 @@ def _package(
     claim = {
         "schema": rehearsal.CLAIM_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": dict(ASSURANCE),
         "status": "consumed",
         "binding_path": str(binding_path),
@@ -333,7 +333,7 @@ def _package(
     terminal: dict[str, object] = {
         "schema": rehearsal.TERMINAL_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "assurance": dict(ASSURANCE),
         "status": status,
         "claim_file": rehearsal.CLAIM_NAME,

@@ -25,6 +25,7 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -33,9 +34,10 @@ from typing import Literal, NoReturn, cast
 
 from .assurance import ASSURANCE
 
-RUNTIME_MANIFEST_SCHEMA = "prospect.wm001.audit-runtime-manifest.v1"
+RUNTIME_MANIFEST_SCHEMA = "prospect.wm001.audit-runtime-manifest.v2"
 INVOCATION_MANIFEST_SCHEMA = "prospect.wm001.audit-invocation-manifest.v1"
 SourceMode = Literal["path", "descriptor"]
+ExecutionRole = Literal["conformance", "outcome_audit"]
 CAPTURED_ARGUMENT_PREFIX = "@captured/"
 
 _MAX_SOURCE_BYTES = 64 << 20
@@ -44,7 +46,14 @@ _MAX_MANIFEST_BYTES = 4 << 20
 _MAX_INVOCATION_BYTES = 1 << 20
 _MAX_REPORT_BYTES = 64 << 20
 _MAX_STDERR_BYTES = 16 << 20
-_AUDIT_TIMEOUT_SECONDS = 600
+CONFORMANCE_AUDIT_TIMEOUT_SECONDS = 600
+OUTCOME_AUDIT_TIMEOUT_SECONDS = 10_800
+_ROLE_TIMEOUT_SECONDS: Mapping[ExecutionRole, int] = MappingProxyType(
+    {
+        "conformance": CONFORMANCE_AUDIT_TIMEOUT_SECONDS,
+        "outcome_audit": OUTCOME_AUDIT_TIMEOUT_SECONDS,
+    }
+)
 _BOOTSTRAP_FAILURE = 125
 _CONTROL_PREFIX = "PROSPECT_AUDIT_RUNNER_"
 _PACKAGE_ROOT_DOMAIN = b"prospect.wm001.package-root.v2\0"
@@ -83,6 +92,12 @@ SAFE_RUNTIME_ENVIRONMENT_KEYS = frozenset(
 
 class AuditRunnerError(RuntimeError):
     """The isolated auditor could not be executed with intact custody."""
+
+
+def _timeout_for_role(execution_role: object) -> int:
+    if type(execution_role) is not str or execution_role not in _ROLE_TIMEOUT_SECONDS:
+        raise AuditRunnerError(f"unsupported audit execution role: {execution_role!r}")
+    return _ROLE_TIMEOUT_SECONDS[cast(ExecutionRole, execution_role)]
 
 
 class AuditExecutionFailure(AuditRunnerError):
@@ -146,6 +161,7 @@ class AuditExecution:
     auditor_source_sha256: str
     support_files: tuple[CapturedFileIdentity, ...]
     source_mode: SourceMode
+    subprocess_elapsed_ns: int
 
 
 @dataclass(frozen=True)
@@ -186,7 +202,7 @@ import sysconfig
 import traceback
 from pathlib import Path, PurePosixPath
 
-SCHEMA = "prospect.wm001.audit-runtime-manifest.v1"
+SCHEMA = "prospect.wm001.audit-runtime-manifest.v2"
 INVOCATION_SCHEMA = "prospect.wm001.audit-invocation-manifest.v1"
 CONTROL_PREFIX = "PROSPECT_AUDIT_RUNNER_"
 MANIFEST_FD_ENV = CONTROL_PREFIX + "MANIFEST_FD"
@@ -202,7 +218,10 @@ MAX_SOURCE = 64 << 20
 MAX_SUPPORT = 64 << 20
 MAX_REPORT = 64 << 20
 MAX_STDERR = 16 << 20
-TIMEOUT_SECONDS = 600
+ROLE_TIMEOUT_SECONDS = {
+    "conformance": 600,
+    "outcome_audit": 10800,
+}
 CAPTURED_ARGUMENT_PREFIX = "@captured/"
 PACKAGE_DOMAIN = b"prospect.wm001.package-root.v2\0"
 STDLIB_DOMAIN = b"prospect.wm001.standard-library.v2\0"
@@ -541,6 +560,7 @@ def validate_manifest(value):
         value,
         {
             "schema",
+            "execution_role",
             "assurance",
             "bootstrap_sha256",
             "python",
@@ -556,6 +576,9 @@ def validate_manifest(value):
     )
     if value["schema"] != SCHEMA:
         raise BootstrapError("runtime manifest schema is invalid")
+    role = value["execution_role"]
+    if type(role) is not str or role not in ROLE_TIMEOUT_SECONDS:
+        raise BootstrapError("runtime manifest execution role is invalid")
     if value["assurance"] != ASSURANCE:
         raise BootstrapError("runtime manifest assurance boundary is invalid")
     if not isinstance(value["bootstrap_sha256"], str) or len(value["bootstrap_sha256"]) != 64:
@@ -633,7 +656,7 @@ def validate_manifest(value):
     ):
         raise BootstrapError("runtime manifest environment is invalid")
     if value["limits"] != {
-        "timeout_seconds": TIMEOUT_SECONDS,
+        "timeout_seconds": ROLE_TIMEOUT_SECONDS[role],
         "stdout_bytes": MAX_REPORT,
         "stderr_bytes": MAX_STDERR,
     }:
@@ -1233,11 +1256,13 @@ def _prepare_inputs(
 def _manifest_from_inputs(
     source: _FileCapture,
     *,
+    execution_role: ExecutionRole,
     source_mode: SourceMode,
     supports: tuple[tuple[str, _FileCapture], ...],
     roots: tuple[Path, ...],
     environment: Mapping[str, str],
 ) -> bytes:
+    timeout_seconds = _timeout_for_role(execution_role)
     if source_mode not in {"path", "descriptor"}:
         raise AuditRunnerError(f"unsupported auditor source mode: {source_mode!r}")
     source_name = _validate_relative_capture_path(
@@ -1246,6 +1271,7 @@ def _manifest_from_inputs(
     )
     value: dict[str, object] = {
         "schema": RUNTIME_MANIFEST_SCHEMA,
+        "execution_role": execution_role,
         "assurance": dict(ASSURANCE),
         "bootstrap_sha256": BOOTSTRAP_SHA256,
         "python": {
@@ -1295,7 +1321,7 @@ def _manifest_from_inputs(
         ),
         "environment": dict(environment),
         "limits": {
-            "timeout_seconds": _AUDIT_TIMEOUT_SECONDS,
+            "timeout_seconds": timeout_seconds,
             "stdout_bytes": _MAX_REPORT_BYTES,
             "stderr_bytes": _MAX_STDERR_BYTES,
         },
@@ -1309,6 +1335,7 @@ def _manifest_from_inputs(
 def build_runtime_manifest(
     auditor_source: Path,
     *,
+    execution_role: ExecutionRole = "conformance",
     support_files: Mapping[str, Path] | None = None,
     closure_import_roots: Sequence[Path] = (),
     source_mode: SourceMode = "descriptor",
@@ -1328,6 +1355,7 @@ def build_runtime_manifest(
     )
     return _manifest_from_inputs(
         source,
+        execution_role=execution_role,
         source_mode=source_mode,
         supports=supports,
         roots=roots,
@@ -1481,6 +1509,7 @@ def _parse_report(stdout: bytes, *, returncode: int) -> dict[str, object]:
 def run_captured_auditor(
     auditor_source: Path,
     *,
+    execution_role: ExecutionRole = "conformance",
     auditor_arguments: Sequence[str] = (),
     support_files: Mapping[str, Path] | None = None,
     closure_import_roots: Sequence[Path] = (),
@@ -1489,7 +1518,6 @@ def run_captured_auditor(
     environment: Mapping[str, str] | None = None,
     runtime_manifest: bytes | None = None,
     invocation_manifest: bytes | None = None,
-    timeout: float | None = None,
 ) -> AuditExecution:
     """Run one captured auditor through the shared descriptor-bound bootstrap.
 
@@ -1500,8 +1528,7 @@ def run_captured_auditor(
     used by adjudication.
     """
 
-    if timeout not in {None, float(_AUDIT_TIMEOUT_SECONDS), _AUDIT_TIMEOUT_SECONDS}:
-        raise AuditRunnerError(f"isolated auditor timeout is fixed at {_AUDIT_TIMEOUT_SECONDS} seconds")
+    timeout_seconds = _timeout_for_role(execution_role)
     source, supports, roots, safe_environment = _prepare_inputs(
         auditor_source,
         support_files=support_files,
@@ -1510,6 +1537,7 @@ def run_captured_auditor(
     )
     derived_manifest = _manifest_from_inputs(
         source,
+        execution_role=execution_role,
         source_mode=source_mode,
         supports=supports,
         roots=roots,
@@ -1550,6 +1578,7 @@ def run_captured_auditor(
         for relative, capture in supports
     )
     completed: subprocess.CompletedProcess[bytes] | None = None
+    subprocess_elapsed_ns = 0
     subprocess_error: BaseException | None = None
     integrity_error: AuditRunnerError | None = None
     command: tuple[str, ...] = ()
@@ -1649,6 +1678,7 @@ def run_captured_auditor(
             completed_raw: subprocess.CompletedProcess[bytes] | None = None
             try:
                 with stdout_path.open("xb") as stdout_stream, stderr_path.open("xb") as stderr_stream:
+                    subprocess_started_ns = time.monotonic_ns()
                     completed_raw = subprocess.run(
                         command,
                         check=False,
@@ -1656,9 +1686,10 @@ def run_captured_auditor(
                         stderr=stderr_stream,
                         env=child_environment,
                         pass_fds=tuple(pass_fds),
-                        timeout=_AUDIT_TIMEOUT_SECONDS,
+                        timeout=timeout_seconds,
                         preexec_fn=_limit_output_files,
                     )
+                    subprocess_elapsed_ns = time.monotonic_ns() - subprocess_started_ns
                     stdout_stream.flush()
                     stderr_stream.flush()
                     os.fsync(stdout_stream.fileno())
@@ -1810,6 +1841,11 @@ def run_captured_auditor(
             "isolated auditor did not return a process result",
             returncode=None,
         )
+    if type(subprocess_elapsed_ns) is not int or subprocess_elapsed_ns <= 0:
+        fail(
+            "elapsed_time_validation",
+            "isolated auditor execution has no strict-positive elapsed time",
+        )
     if completed.returncode == _BOOTSTRAP_FAILURE:
         diagnostic = completed.stderr[:4096].decode("utf-8", errors="replace")
         fail(
@@ -1841,6 +1877,7 @@ def run_captured_auditor(
         auditor_source_sha256=_sha256(source.payload),
         support_files=support_identities,
         source_mode=source_mode,
+        subprocess_elapsed_ns=subprocess_elapsed_ns,
     )
 
 
@@ -1853,7 +1890,6 @@ def run_source_mode_conformance(
     working_directory: Path | None = None,
     environment: Mapping[str, str] | None = None,
     repeat_count: int = 3,
-    timeout: float | None = None,
 ) -> AuditConformance:
     """Require repeated byte identity in private-path and FD source modes."""
 
@@ -1863,13 +1899,13 @@ def run_source_mode_conformance(
     def execute(mode: SourceMode) -> AuditExecution:
         return run_captured_auditor(
             auditor_source,
+            execution_role="conformance",
             auditor_arguments=auditor_arguments,
             support_files=support_files,
             closure_import_roots=closure_import_roots,
             source_mode=mode,
             working_directory=working_directory,
             environment=environment,
-            timeout=timeout,
         )
 
     path_executions = tuple(execute("path") for _ in range(repeat_count))
@@ -1987,8 +2023,11 @@ __all__ = [
     "BOOTSTRAP_SHA256",
     "CAPTURED_ARGUMENT_PREFIX",
     "CapturedFileIdentity",
+    "CONFORMANCE_AUDIT_TIMEOUT_SECONDS",
+    "ExecutionRole",
     "INVOCATION_MANIFEST_SCHEMA",
     "RUNTIME_MANIFEST_SCHEMA",
+    "OUTCOME_AUDIT_TIMEOUT_SECONDS",
     "SAFE_RUNTIME_ENVIRONMENT_KEYS",
     "SourceMode",
     "bootstrap_source_bytes",

@@ -49,20 +49,20 @@ def _repository_root() -> Path:
     )
 
 
-PROTOCOL_VERSION = "1.18.0"
+PROTOCOL_VERSION = "1.19.0"
 REPO = _repository_root()
 RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results"
-OPERATOR_RESULTS_ROOT = RESULTS_ROOT / "operator-v1.18"
+OPERATOR_RESULTS_ROOT = RESULTS_ROOT / "operator-v1.19"
 REHEARSAL_ATTEMPTS_ROOT = OPERATOR_RESULTS_ROOT / "rehearsals"
 REHEARSAL_ATTEMPT_PATH = (
-    REHEARSAL_ATTEMPTS_ROOT / "accepted-binding-rehearsal-v1.18.0"
+    REHEARSAL_ATTEMPTS_ROOT / "accepted-binding-rehearsal-v1.19.0"
 )
-REHEARSAL_CLAIM_ROOT = RESULTS_ROOT / "rehearsals" / "v1.18"
-OUTER_COMPLETIONS_ROOT = RESULTS_ROOT / "outer-completions" / "v1.18"
+REHEARSAL_CLAIM_ROOT = RESULTS_ROOT / "rehearsals" / "v1.19"
+OUTER_COMPLETIONS_ROOT = RESULTS_ROOT / "outer-completions" / "v1.19"
 FORMAL_BINDING_PATH = (
     OPERATOR_RESULTS_ROOT
     / "bindings"
-    / "formal-binding-v1.18.0"
+    / "formal-binding-v1.19.0"
     / "formal-binding.json"
 )
 LAUNCH_BOOTSTRAP_PATH = (

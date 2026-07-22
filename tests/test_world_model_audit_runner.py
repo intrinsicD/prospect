@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
+from typing import BinaryIO, cast
 
 import pytest
 
+from bench.world_model_lifecycle import audit_runner as audit_runner_module
 from bench.world_model_lifecycle.audit_runner import (
     BOOTSTRAP_SHA256,
+    CONFORMANCE_AUDIT_TIMEOUT_SECONDS,
+    OUTCOME_AUDIT_TIMEOUT_SECONDS,
     AuditExecutionFailure,
     AuditRunnerError,
+    ExecutionRole,
     bootstrap_source_bytes,
     bootstrap_source_sha256,
     build_invocation_manifest,
@@ -106,7 +112,7 @@ def test_restart_runtime_conformance_is_result_free_repeated_and_adversarial(
     receipt = json.loads(conformance_receipt_bytes(conformance))
     assert report == {
         "schema": "prospect.wm001.restart-runtime-conformance.v1",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "support_files": [
             {
                 "path": path,
@@ -259,6 +265,16 @@ def test_path_and_descriptor_modes_are_byte_identical_and_repeatable(
     assert conformance.path_execution.stdout == conformance.descriptor_execution.stdout
     assert conformance.descriptor_execution.stdout == repeated.stdout
     assert conformance.descriptor_execution.runtime_manifest == repeated.runtime_manifest
+    assert type(repeated.subprocess_elapsed_ns) is int
+    assert repeated.subprocess_elapsed_ns > 0
+    assert all(
+        type(execution.subprocess_elapsed_ns) is int
+        and execution.subprocess_elapsed_ns > 0
+        for execution in (
+            *conformance.path_executions,
+            *conformance.descriptor_executions,
+        )
+    )
     assert conformance.repeat_count == 3
     assert len(conformance.path_executions) == len(conformance.descriptor_executions) == 3
     assert {execution.stdout for execution in conformance.path_executions} == {repeated.stdout}
@@ -324,6 +340,12 @@ def test_runtime_manifest_is_stable_prebindable_and_bootstrap_bound(
         source_mode="descriptor",
         environment={"OMP_NUM_THREADS": "1"},
     )
+    outcome = build_runtime_manifest(
+        auditor,
+        execution_role="outcome_audit",
+        source_mode="descriptor",
+        environment={"OMP_NUM_THREADS": "1"},
+    )
     execution = run_captured_auditor(
         auditor,
         auditor_arguments=("evidence",),
@@ -345,6 +367,20 @@ def test_runtime_manifest_is_stable_prebindable_and_bootstrap_bound(
     assert bootstrap_source_sha256() == BOOTSTRAP_SHA256
     assert hashlib.sha256(bootstrap_source_bytes()).hexdigest() == BOOTSTRAP_SHA256
     manifest = json.loads(first)
+    outcome_manifest = json.loads(outcome)
+    assert manifest["schema"] == "prospect.wm001.audit-runtime-manifest.v2"
+    assert manifest["execution_role"] == "conformance"
+    assert manifest["limits"]["timeout_seconds"] == 600
+    assert outcome_manifest["schema"] == "prospect.wm001.audit-runtime-manifest.v2"
+    assert outcome_manifest["execution_role"] == "outcome_audit"
+    assert outcome_manifest["limits"]["timeout_seconds"] == 10_800
+    assert CONFORMANCE_AUDIT_TIMEOUT_SECONDS == 600
+    assert OUTCOME_AUDIT_TIMEOUT_SECONDS == 10_800
+    normalized_outcome = dict(outcome_manifest)
+    normalized_outcome["execution_role"] = "conformance"
+    normalized_outcome["limits"] = dict(cast(dict[str, object], normalized_outcome["limits"]))
+    cast(dict[str, object], normalized_outcome["limits"])["timeout_seconds"] = 600
+    assert normalized_outcome == manifest
     assert manifest["bootstrap_sha256"] == BOOTSTRAP_SHA256
     assert manifest["assurance"] == {
         "trust_model_id": "prospect.wm001.trust-model.v1",
@@ -403,6 +439,114 @@ def test_runtime_manifest_is_stable_prebindable_and_bootstrap_bound(
             runtime_manifest=first,
             invocation_manifest=other_invocation,
         )
+
+
+@pytest.mark.parametrize(
+    "execution_role",
+    [None, True, 600, "formal"],
+)
+def test_runtime_manifest_rejects_invalid_execution_roles(
+    tmp_path: Path,
+    execution_role: object,
+) -> None:
+    auditor = _write_auditor(
+        tmp_path / "audit.py",
+        "emit({'passed': True})",
+    )
+
+    with pytest.raises(AuditRunnerError, match="unsupported audit execution role"):
+        build_runtime_manifest(
+            auditor,
+            execution_role=cast(ExecutionRole, execution_role),
+        )
+
+
+def test_bootstrap_rejects_role_timeout_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auditor = _write_auditor(
+        tmp_path / "audit.py",
+        "emit({'passed': True})",
+    )
+    manifest = json.loads(
+        build_runtime_manifest(
+            auditor,
+            execution_role="outcome_audit",
+        )
+    )
+    manifest["limits"]["timeout_seconds"] = 600
+    mismatched_manifest = (
+        json.dumps(
+            manifest,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        + b"\n"
+    )
+
+    def derive_mismatched_manifest(*args: object, **kwargs: object) -> bytes:
+        return mismatched_manifest
+
+    monkeypatch.setattr(
+        audit_runner_module,
+        "_manifest_from_inputs",
+        derive_mismatched_manifest,
+    )
+
+    with pytest.raises(AuditExecutionFailure) as caught:
+        run_captured_auditor(
+            auditor,
+            execution_role="outcome_audit",
+            working_directory=tmp_path,
+            runtime_manifest=mismatched_manifest,
+        )
+
+    assert caught.value.phase == "bootstrap_rejected"
+    assert caught.value.returncode == 125
+    assert b"runtime manifest execution limits are invalid" in caught.value.stderr
+
+
+@pytest.mark.parametrize(
+    ("execution_role", "expected_timeout"),
+    [
+        ("conformance", 600),
+        ("outcome_audit", 10_800),
+    ],
+)
+def test_execution_role_selects_bound_subprocess_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    execution_role: ExecutionRole,
+    expected_timeout: int,
+) -> None:
+    auditor = _write_auditor(
+        tmp_path / "audit.py",
+        "emit({'passed': True})",
+    )
+    observed_timeouts: list[object] = []
+
+    def spy_run(command: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        observed_timeouts.append(kwargs["timeout"])
+        stdout = cast(BinaryIO, kwargs["stdout"])
+        stdout.write(b'{"passed":true}\n')
+        return subprocess.CompletedProcess(args=command, returncode=0)
+
+    monkeypatch.setattr(audit_runner_module.subprocess, "run", spy_run)
+
+    execution = run_captured_auditor(
+        auditor,
+        execution_role=execution_role,
+        working_directory=tmp_path,
+    )
+
+    assert observed_timeouts == [expected_timeout]
+    assert json.loads(execution.runtime_manifest)["execution_role"] == execution_role
+    assert json.loads(execution.runtime_manifest)["limits"]["timeout_seconds"] == expected_timeout
+    assert type(execution.subprocess_elapsed_ns) is int
+    assert execution.subprocess_elapsed_ns > 0
 
 
 def test_captured_support_arguments_resolve_only_inside_private_capture(

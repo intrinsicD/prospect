@@ -1,4 +1,4 @@
-"""Atomic custody-preserving operator entry points for WM-001 protocol 1.18.
+"""Atomic custody-preserving operator entry points for WM-001 protocol 1.19.
 
 Every public entry point in this module is reached through
 ``producer_bootstrap.py``.  Outputs are complete attempt directories: work is
@@ -27,7 +27,7 @@ from .assurance import ASSURANCE, assurance_record
 
 _TERMINAL_MANIFEST = "operator-attempt.json"
 _ATTEMPT_SCHEMA = "prospect.wm001.operator-attempt.v1"
-_EXECUTION_SCHEMA = "prospect.wm001.captured-audit-execution.v1"
+_EXECUTION_SCHEMA = "prospect.wm001.captured-audit-execution.v2"
 _EXECUTION_FAILURE_EVIDENCE_SCHEMA = "prospect.wm001.captured-audit-execution-failure.v1"
 _FAILURE_SCHEMA = "prospect.wm001.operator-execution-failure.v2"
 _CLOSURE_REFERENCE_SCHEMA = "prospect.wm001.closure-reference.v1"
@@ -70,24 +70,24 @@ def _repository_root() -> Path:
 
 REPO = _repository_root()
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_QUALIFICATION_PATH = DEVELOPMENT_RESULTS_ROOT / "qualification-v1.18.0"
-OPERATOR_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "operator-v1.18"
+DEVELOPMENT_QUALIFICATION_PATH = DEVELOPMENT_RESULTS_ROOT / "qualification-v1.19.0"
+OPERATOR_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "operator-v1.19"
 BINDING_ATTEMPTS_ROOT = OPERATOR_RESULTS_ROOT / "bindings"
 AUDIT_ATTEMPTS_ROOT = OPERATOR_RESULTS_ROOT / "audits"
 CLOSURE_ATTEMPTS_ROOT = OPERATOR_RESULTS_ROOT / "closures"
-OUTER_COMPLETIONS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.18"
-FORMAL_BINDING_ATTEMPT_PATH = BINDING_ATTEMPTS_ROOT / "formal-binding-v1.18.0"
-DEVELOPMENT_AUDIT_ATTEMPT_PATH = AUDIT_ATTEMPTS_ROOT / "development-audit-v1.18.0"
-FORMAL_AUDIT_ATTEMPT_PATH = AUDIT_ATTEMPTS_ROOT / "formal-audit-v1.18.0"
+OUTER_COMPLETIONS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "outer-completions" / "v1.19"
+FORMAL_BINDING_ATTEMPT_PATH = BINDING_ATTEMPTS_ROOT / "formal-binding-v1.19.0"
+DEVELOPMENT_AUDIT_ATTEMPT_PATH = AUDIT_ATTEMPTS_ROOT / "development-audit-v1.19.0"
+FORMAL_AUDIT_ATTEMPT_PATH = AUDIT_ATTEMPTS_ROOT / "formal-audit-v1.19.0"
 FORMAL_AUDIT_CLAIM_MARKER = (
     REPO
     / "bench"
     / "world_model_lifecycle"
     / "results"
     / "formal"
-    / "formal-audit-v1.18.0.json"
+    / "formal-audit-v1.19.0.json"
 )
-CLOSURE_ATTEMPT_PATH = CLOSURE_ATTEMPTS_ROOT / "development-closure-v1.18.0"
+CLOSURE_ATTEMPT_PATH = CLOSURE_ATTEMPTS_ROOT / "development-closure-v1.19.0"
 
 
 class OperatorError(RuntimeError):
@@ -95,7 +95,7 @@ class OperatorError(RuntimeError):
 
 
 class _FormalAuditRetired(OperatorError):
-    """The sole protocol-1.18 formal audit claim has already been consumed."""
+    """The sole protocol-1.19 formal audit claim has already been consumed."""
 
 
 class _StoreOnce(argparse.Action):
@@ -531,7 +531,7 @@ def _failure_record(
     return {
         "schema": _FAILURE_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "kind": kind,
         "lane": lane,
         "phase": phase,
@@ -559,6 +559,8 @@ def _write_execution(
         or execution.returncode != (0 if passed else 1)
         or execution.runtime_manifest_sha256 != hashlib.sha256(execution.runtime_manifest).hexdigest()
         or execution.invocation_manifest_sha256 != hashlib.sha256(execution.invocation_manifest).hexdigest()
+        or type(execution.subprocess_elapsed_ns) is not int
+        or execution.subprocess_elapsed_ns <= 0
     ):
         raise OperatorError("captured audit execution identities are inconsistent")
     filenames = {
@@ -602,6 +604,7 @@ def _write_execution(
             }
             for row in execution.support_files
         ],
+        "subprocess_elapsed_ns": execution.subprocess_elapsed_ns,
     }
     receipt_file = f"{prefix}.execution.json"
     _write_json(staging / receipt_file, receipt)
@@ -758,6 +761,7 @@ def _verify_execution_receipt(
         "bootstrap_sha256",
         "auditor_source_sha256",
         "support_files",
+        "subprocess_elapsed_ns",
     }
     passed = receipt.get("passed")
     returncode = receipt.get("returncode")
@@ -776,6 +780,8 @@ def _verify_execution_receipt(
         or not _sha256_string(receipt.get("bootstrap_sha256"))
         or not _sha256_string(receipt.get("auditor_source_sha256"))
         or not isinstance(support_files, list)
+        or type(receipt.get("subprocess_elapsed_ns")) is not int
+        or cast(int, receipt["subprocess_elapsed_ns"]) <= 0
     ):
         raise OperatorError("captured audit execution receipt is malformed")
     support_paths: list[str] = []
@@ -825,6 +831,8 @@ def _verify_execution_receipt(
         raise OperatorError("captured audit receipt status differs from its stdout")
     return {
         "receipt": receipt,
+        "receipt_file": filename,
+        "receipt_payload": payload,
         "stdout": stdout,
         "stderr": stderr,
         "runtime": runtime,
@@ -938,7 +946,10 @@ def _verify_reproduction_receipt(
     filename: object,
     *,
     audit_payload: bytes,
+    first: Mapping[str, object],
     replay: Mapping[str, object],
+    producer_manifest: Mapping[str, object],
+    producer_manifest_sha256: str,
 ) -> dict[str, object]:
     payload = _attempt_file_payload(
         root,
@@ -972,14 +983,21 @@ def _verify_reproduction_receipt(
         "runner_source_sha256",
         "auditor_source_sha256",
         "support_files",
+        "first_execution_receipt_file",
+        "first_execution_receipt_bytes",
+        "first_execution_receipt_sha256",
+        "replay_execution_receipt_file",
+        "replay_execution_receipt_bytes",
+        "replay_execution_receipt_sha256",
+        "capacity",
         "passed",
     }
     audit_sha256 = hashlib.sha256(audit_payload).hexdigest()
     if (
         set(receipt) != expected
-        or receipt.get("schema") != "prospect.wm001.audit-reproduction.v2"
+        or receipt.get("schema") != "prospect.wm001.audit-reproduction.v3"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.18.0"
+        or receipt.get("protocol_version") != "1.19.0"
         or receipt.get("supplied_audit_sha256") != audit_sha256
         or receipt.get("reproduced_audit_sha256") != audit_sha256
         or receipt.get("byte_identical") is not True
@@ -991,8 +1009,51 @@ def _verify_reproduction_receipt(
         or not _sha256_string(receipt.get("runner_source_sha256"))
         or not _sha256_string(receipt.get("auditor_source_sha256"))
         or receipt.get("support_files") != cast(dict[str, object], replay["receipt"]).get("support_files")
+        or receipt.get("first_execution_receipt_file")
+        != first.get("receipt_file")
+        or receipt.get("first_execution_receipt_bytes")
+        != len(cast(bytes, first["receipt_payload"]))
+        or receipt.get("first_execution_receipt_sha256")
+        != hashlib.sha256(cast(bytes, first["receipt_payload"])).hexdigest()
+        or receipt.get("replay_execution_receipt_file")
+        != replay.get("receipt_file")
+        or receipt.get("replay_execution_receipt_bytes")
+        != len(cast(bytes, replay["receipt_payload"]))
+        or receipt.get("replay_execution_receipt_sha256")
+        != hashlib.sha256(cast(bytes, replay["receipt_payload"])).hexdigest()
     ):
         raise OperatorError("development audit reproduction is malformed")
+    from .binding import verify_audit_capacity_record
+
+    producer_rows = producer_manifest.get("files")
+    if not isinstance(producer_rows, list) or any(
+        not isinstance(row, Mapping)
+        or type(row.get("bytes")) is not int
+        for row in producer_rows
+    ):
+        raise OperatorError("development producer capacity rows are malformed")
+    result_rows = [
+        row
+        for row in producer_rows
+        if cast(Mapping[str, object], row).get("path") == "result.json"
+    ]
+    if len(result_rows) != 1:
+        raise OperatorError("development producer capacity has no unique result")
+
+    verify_audit_capacity_record(
+        receipt.get("capacity"),
+        producer_manifest_sha256=producer_manifest_sha256,
+        development_total_bytes=sum(
+            cast(int, cast(Mapping[str, object], row)["bytes"])
+            for row in producer_rows
+        ),
+        development_result_bytes=cast(
+            int,
+            cast(Mapping[str, object], result_rows[0])["bytes"],
+        ),
+        first_elapsed_ns=cast(int, cast(Mapping[str, object], first["receipt"])["subprocess_elapsed_ns"]),
+        replay_elapsed_ns=cast(int, cast(Mapping[str, object], replay["receipt"])["subprocess_elapsed_ns"]),
+    )
     stderr = _referenced_payload(
         root,
         receipt,
@@ -1012,7 +1073,8 @@ def _verify_reproduction_receipt(
         label="development reproduction invocation manifest",
     )
     if (
-        stderr != replay["stderr"]
+        first["stderr"] != replay["stderr"]
+        or stderr != replay["stderr"]
         or runtime != replay["runtime"]
         or invocation != replay["invocation"]
         or receipt.get("bootstrap_sha256") != cast(dict[str, object], replay["receipt"]).get("bootstrap_sha256")
@@ -1099,6 +1161,7 @@ def _verify_audit_primary(
             raise OperatorError("terminal audit status differs from its report")
         if lane == "development" and (
             executions[1]["stdout"] != executions[0]["stdout"]
+            or executions[1]["stderr"] != executions[0]["stderr"]
             or executions[1]["runtime"] != executions[0]["runtime"]
             or executions[1]["invocation"] != executions[0]["invocation"]
             or executions[1]["passed"] is not executions[0]["passed"]
@@ -1106,13 +1169,33 @@ def _verify_audit_primary(
             raise OperatorError("development audit replay is not byte-identical")
     reproduction_file = primary.get("reproduction_file")
     reproduction_runtime = primary.get("reproduction_runtime_file")
+    producer_manifest_rows = [
+        row
+        for row in inputs
+        if isinstance(row.get("path"), str)
+        and Path(cast(str, row["path"])).name == "producer-manifest.json"
+    ]
+    if len(producer_manifest_rows) != 1 or not _sha256_string(
+        producer_manifest_rows[0].get("sha256")
+    ):
+        raise OperatorError("audit producer-manifest input identity is malformed")
+    producer_manifest_sha256 = cast(str, producer_manifest_rows[0]["sha256"])
+    from .artifact import verify_producer_manifest
+
+    verified_producer_manifest = cast(
+        dict[str, object],
+        verify_producer_manifest(Path(producer_root)),
+    )
     if status == "accepted" and lane == "development":
         assert audit_payload is not None
         receipt = _verify_reproduction_receipt(
             root,
             reproduction_file,
             audit_payload=audit_payload,
+            first=executions[0],
             replay=executions[1],
+            producer_manifest=verified_producer_manifest,
+            producer_manifest_sha256=producer_manifest_sha256,
         )
         if receipt.get("runtime_manifest_file") != reproduction_runtime:
             raise OperatorError("development reproduction runtime reference changed")
@@ -1123,7 +1206,10 @@ def _verify_audit_primary(
             root,
             reproduction_file,
             audit_payload=audit_payload,
+            first=executions[0],
             replay=executions[1],
+            producer_manifest=verified_producer_manifest,
+            producer_manifest_sha256=producer_manifest_sha256,
         )
         if receipt.get("runtime_manifest_file") != reproduction_runtime:
             raise OperatorError("failure reproduction runtime reference changed")
@@ -1436,7 +1522,7 @@ def _verify_attempt_directory(
         set(manifest) != expected_fields
         or manifest.get("schema") != _ATTEMPT_SCHEMA
         or manifest.get("experiment_id") != "WM-001"
-        or manifest.get("protocol_version") != "1.18.0"
+        or manifest.get("protocol_version") != "1.19.0"
         or manifest.get("assurance") != ASSURANCE
         or kind not in {"binding", "audit", "closure"}
         or (
@@ -1528,7 +1614,7 @@ def _verify_attempt_directory(
             }
             or failure.get("schema") != _FAILURE_SCHEMA
             or failure.get("experiment_id") != "WM-001"
-            or failure.get("protocol_version") != "1.18.0"
+            or failure.get("protocol_version") != "1.19.0"
             or failure.get("kind") != kind
             or failure.get("lane") != lane
             or failure.get("phase") != _FAILURE_PHASE[cast(str, kind)]
@@ -1625,7 +1711,7 @@ def _verify_attempt_directory(
             }
             or reference.get("schema") != _CLOSURE_REFERENCE_SCHEMA
             or reference.get("experiment_id") != "WM-001"
-            or reference.get("protocol_version") != "1.18.0"
+            or reference.get("protocol_version") != "1.19.0"
             or not _sha256_string(reference.get("closure_sha256"))
             or not _sha256_string(reference.get("audit_attempt_manifest_sha256"))
             or reference.get("fresh_reopen_file")
@@ -1773,7 +1859,7 @@ def _verify_published_operator_attempt(
         "audit": (DEVELOPMENT_AUDIT_ATTEMPT_PATH if manifest["lane"] == "development" else FORMAL_AUDIT_ATTEMPT_PATH),
     }[cast(str, manifest["kind"])]
     if root != expected_attempt:
-        raise OperatorError("published operator attempt is not its canonical protocol-1.18 path")
+        raise OperatorError("published operator attempt is not its canonical protocol-1.19 path")
     verify_outer_completion(root / _TERMINAL_MANIFEST)
     return manifest
 
@@ -1813,7 +1899,7 @@ def inspect_unfinalized_operator_attempt(path: Path) -> dict[str, object]:
         "audit": (DEVELOPMENT_AUDIT_ATTEMPT_PATH if manifest["lane"] == "development" else FORMAL_AUDIT_ATTEMPT_PATH),
     }[cast(str, manifest["kind"])]
     if root != expected_attempt:
-        raise OperatorError("unfinalized operator attempt is not its canonical protocol-1.18 path")
+        raise OperatorError("unfinalized operator attempt is not its canonical protocol-1.19 path")
     terminal = root / _TERMINAL_MANIFEST
     marker = outer_completion_marker(terminal)
     if os.path.lexists(marker):
@@ -1871,7 +1957,7 @@ class _Attempt:
         manifest = {
             "schema": _ATTEMPT_SCHEMA,
             "experiment_id": "WM-001",
-            "protocol_version": "1.18.0",
+            "protocol_version": "1.19.0",
             "assurance": assurance_record(),
             "kind": self.kind,
             "lane": self.lane,
@@ -1951,7 +2037,7 @@ def _require_sealed_entry() -> None:
 
 def _binding_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create one atomic WM-001 v1.18 binding attempt",
+        description="Create one atomic WM-001 v1.19 binding attempt",
         allow_abbrev=False,
     )
     parser.add_argument("--output", required=True, type=Path, action=_StoreOnce)
@@ -2135,7 +2221,7 @@ def _formal_claim_value(
     return {
         "schema": _FORMAL_AUDIT_CLAIM_SCHEMA,
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "claim_status": "consumed",
         "attempt_path": str(output),
         "marker_path": str(FORMAL_AUDIT_CLAIM_MARKER),
@@ -2162,7 +2248,7 @@ def _publish_formal_audit_claim(
         label="formal audit claim marker directory",
     )
     if os.path.lexists(marker):
-        raise _FormalAuditRetired("WM-001 protocol 1.18 formal audit claim is already consumed")
+        raise _FormalAuditRetired("WM-001 protocol 1.19 formal audit claim is already consumed")
     launch_capture = _FileCapture.open(
         Path(__file__).with_name("launch_bootstrap.py"),
         label="formal audit launch bootstrap",
@@ -2179,7 +2265,7 @@ def _publish_formal_audit_claim(
         try:
             os.link(claim_path, marker, follow_symlinks=False)
         except FileExistsError as error:
-            raise _FormalAuditRetired("WM-001 protocol 1.18 formal audit claim is already consumed") from error
+            raise _FormalAuditRetired("WM-001 protocol 1.19 formal audit claim is already consumed") from error
         except OSError as error:
             raise OperatorError("formal audit claim marker could not be published") from error
         on_irreversible()
@@ -2306,7 +2392,7 @@ def _verify_formal_audit_claim(
         set(claim) != expected
         or claim.get("schema") != _FORMAL_AUDIT_CLAIM_SCHEMA
         or claim.get("experiment_id") != "WM-001"
-        or claim.get("protocol_version") != "1.18.0"
+        or claim.get("protocol_version") != "1.19.0"
         or claim.get("claim_status") != "consumed"
         or claim.get("attempt_path") != str(FORMAL_AUDIT_ATTEMPT_PATH)
         or claim.get("marker_path") != str(FORMAL_AUDIT_CLAIM_MARKER)
@@ -2402,7 +2488,7 @@ def binding_main(argv: Sequence[str] | None = None) -> int:
     arguments = _binding_parser().parse_args(argv)
     if arguments.output != FORMAL_BINDING_ATTEMPT_PATH:
         raise OperatorError(
-            f"formal binding output must be the canonical protocol-1.18 attempt path {FORMAL_BINDING_ATTEMPT_PATH}"
+            f"formal binding output must be the canonical protocol-1.19 attempt path {FORMAL_BINDING_ATTEMPT_PATH}"
         )
     output = _attempt_output(
         arguments.output,
@@ -2583,7 +2669,7 @@ def audit_main(argv: Sequence[str] | None = None) -> int:
         if arguments.output != DEVELOPMENT_AUDIT_ATTEMPT_PATH:
             raise OperatorError(
                 "development audit output must be the sole canonical "
-                f"protocol-1.18 attempt path {DEVELOPMENT_AUDIT_ATTEMPT_PATH}"
+                f"protocol-1.19 attempt path {DEVELOPMENT_AUDIT_ATTEMPT_PATH}"
             )
         if arguments.producer != DEVELOPMENT_QUALIFICATION_PATH:
             raise OperatorError(
@@ -2592,14 +2678,14 @@ def audit_main(argv: Sequence[str] | None = None) -> int:
         from . import binding as binding_module
 
         if os.path.lexists(binding_module.DEVELOPMENT_CLOSURE_PATH):
-            raise OperatorError("WM-001 protocol 1.18 development audit is retired after development closure")
+            raise OperatorError("WM-001 protocol 1.19 development audit is retired after development closure")
     else:
         if arguments.output != FORMAL_AUDIT_ATTEMPT_PATH:
             raise OperatorError(
-                f"formal audit output must be the sole canonical protocol-1.18 attempt path {FORMAL_AUDIT_ATTEMPT_PATH}"
+                f"formal audit output must be the sole canonical protocol-1.19 attempt path {FORMAL_AUDIT_ATTEMPT_PATH}"
             )
         if os.path.lexists(FORMAL_AUDIT_CLAIM_MARKER):
-            raise _FormalAuditRetired("WM-001 protocol 1.18 formal audit claim is already consumed")
+            raise _FormalAuditRetired("WM-001 protocol 1.19 formal audit claim is already consumed")
     output = _attempt_output(
         arguments.output,
         root=AUDIT_ATTEMPTS_ROOT,
@@ -2627,6 +2713,7 @@ def audit_main(argv: Sequence[str] | None = None) -> int:
             _require_sealed_entry()
             first = run_captured_auditor(
                 source,
+                execution_role="outcome_audit",
                 auditor_arguments=cast(
                     Sequence[str],
                     common["auditor_arguments"],
@@ -2684,6 +2771,7 @@ def audit_main(argv: Sequence[str] | None = None) -> int:
         if lane == "development":
             replay = run_captured_auditor(
                 source,
+                execution_role="outcome_audit",
                 auditor_arguments=cast(
                     Sequence[str],
                     common["auditor_arguments"],
@@ -2715,6 +2803,7 @@ def audit_main(argv: Sequence[str] | None = None) -> int:
             if (
                 replay_passed is not first_passed
                 or cast(Any, replay).stdout != first_stdout
+                or cast(Any, replay).stderr != cast(Any, first).stderr
                 or cast(Any, replay).runtime_manifest != cast(Any, first).runtime_manifest
                 or cast(Any, replay).invocation_manifest != cast(Any, first).invocation_manifest
             ):
@@ -2725,7 +2814,23 @@ def audit_main(argv: Sequence[str] | None = None) -> int:
                 reproduction_file = "audit-reproduction.json"
                 receipt = binding_module.create_audit_reproduction_receipt(
                     supplied_audit_path=attempt.staging / "independent-audit.json",
+                    first_execution=first,
                     execution=replay,
+                    first_execution_receipt_path=(
+                        attempt.staging
+                        / cast(str, first_row["receipt_file"])
+                    ),
+                    replay_execution_receipt_path=(
+                        attempt.staging
+                        / cast(str, replay_row["receipt_file"])
+                    ),
+                    producer_manifest=producer.manifest,
+                    producer_manifest_sha256=next(
+                        cast(str, row["sha256"])
+                        for row in producer.input_rows()
+                        if Path(cast(str, row["path"])).name
+                        == "producer-manifest.json"
+                    ),
                     output_path=attempt.staging / reproduction_file,
                 )
                 reproduction_runtime_file = cast(
@@ -2835,7 +2940,7 @@ def closure_main(argv: Sequence[str] | None = None) -> int:
     arguments = _closure_parser().parse_args(argv)
     if arguments.output != CLOSURE_ATTEMPT_PATH:
         raise OperatorError(
-            f"development closure output must be the canonical protocol-1.18 attempt path {CLOSURE_ATTEMPT_PATH}"
+            f"development closure output must be the canonical protocol-1.19 attempt path {CLOSURE_ATTEMPT_PATH}"
         )
     if arguments.producer != DEVELOPMENT_QUALIFICATION_PATH:
         raise OperatorError(
@@ -2846,7 +2951,7 @@ def closure_main(argv: Sequence[str] | None = None) -> int:
     marker = binding_module.DEVELOPMENT_CLOSURE_PATH
     if os.path.lexists(marker):
         raise OperatorError(
-            "WM-001 protocol 1.18 development closure marker already "
+            "WM-001 protocol 1.19 development closure marker already "
             "consumes the one-shot closure"
         )
     output = _attempt_output(
@@ -2856,7 +2961,7 @@ def closure_main(argv: Sequence[str] | None = None) -> int:
     )
     if arguments.audit_attempt != DEVELOPMENT_AUDIT_ATTEMPT_PATH:
         raise OperatorError(
-            f"development closure requires the canonical protocol-1.18 audit attempt {DEVELOPMENT_AUDIT_ATTEMPT_PATH}"
+            f"development closure requires the canonical protocol-1.19 audit attempt {DEVELOPMENT_AUDIT_ATTEMPT_PATH}"
         )
     audit_attempt = _canonical_existing_directory(
         arguments.audit_attempt,
@@ -2975,7 +3080,7 @@ def closure_main(argv: Sequence[str] | None = None) -> int:
         reference = {
             "schema": _CLOSURE_REFERENCE_SCHEMA,
             "experiment_id": "WM-001",
-            "protocol_version": "1.18.0",
+            "protocol_version": "1.19.0",
             "closure_marker": str(marker),
             "closure_sha256": hashlib.sha256(marker_payload).hexdigest(),
             "qualification_archive": closure["qualification_archive"],

@@ -87,7 +87,7 @@ def _repository_root() -> Path:
 REPO = _repository_root()
 LOCKFILE = REPO / "requirements-wm001.lock"
 DEVELOPMENT_RESULTS_ROOT = REPO / "bench" / "world_model_lifecycle" / "results" / "development"
-DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.18.0.json"
+DEVELOPMENT_CLOSURE_PATH = DEVELOPMENT_RESULTS_ROOT / "development-closure-v1.19.0.json"
 DEVELOPMENT_RESULT_QUALIFICATION_NAME = "development-result-qualification.json"
 ROOT_DISTRIBUTIONS = (
     "gymnasium",
@@ -141,6 +141,12 @@ FORMAL_CONFORMANCE_SAMPLES_PER_TASK = 512
 FORMAL_CONFORMANCE_SEED = 20260717
 FORMAL_OSCILLATOR_CONFORMANCE_CASES = 512
 FORMAL_OSCILLATOR_CONFORMANCE_SEED = 20260718
+AUDIT_CAPACITY_SCHEMA = "prospect.wm001.audit-capacity.v1"
+AUDIT_CAPACITY_SAFETY_NUMERATOR = 2
+AUDIT_CAPACITY_SAFETY_DENOMINATOR = 1
+OUTCOME_AUDIT_TIMEOUT_SECONDS = 10_800
+OUTCOME_AUDIT_RESULT_LIMIT_BYTES = 2 << 30
+OUTCOME_AUDIT_PRODUCER_LIMIT_BYTES = 8 << 30
 FORMAL_CONFORMANCE_TOLERANCES = {
     "observation_atol": 2e-6,
     "reward_atol": 1e-9,
@@ -638,7 +644,7 @@ def verify_bound_machine_test_report(
         inputs[name].get("path") != expected_path
         for name, expected_path in expected_input_paths.items()
     ):
-        raise RuntimeError("bound preformal input path is not canonical v1.18")
+        raise RuntimeError("bound preformal input path is not canonical v1.19")
 
     implementation = _bound_preformal_implementation_map(source)
     generator = implementation.get(preformal.SOURCE_RELATIVE_PATH)
@@ -1306,6 +1312,7 @@ def build_bound_audit_execution(
     }
     outcome_runtime = build_runtime_manifest(
         auditor_source,
+        execution_role="outcome_audit",
         support_files=outcome_support_files,
         closure_import_roots=roots,
         source_mode="descriptor",
@@ -1331,7 +1338,7 @@ def build_bound_audit_execution(
     restart_runtime_report_value = dict(restart_runtime_conformance.path_execution.report)
     if (
         restart_runtime_report_value.get("schema") != "prospect.wm001.restart-runtime-conformance.v1"
-        or restart_runtime_report_value.get("protocol_version") != "1.18.0"
+        or restart_runtime_report_value.get("protocol_version") != "1.19.0"
         or restart_runtime_report_value.get("passed") is not True
         or restart_runtime_conformance.path_execution.stdout != restart_runtime_conformance.descriptor_execution.stdout
     ):
@@ -1599,9 +1606,9 @@ def implementation_files() -> list[dict[str, object]]:
         REPO / "bench" / "world_model_lifecycle" / "protocol.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "raw-result.schema.json",
         REPO / "bench" / "world_model_lifecycle" / "schemas" / "formal-binding.schema.json",
-        REPO / "docs" / "wm001-v1180-confirmation-plan.md",
-        REPO / "docs" / "wm001-v1180-operator-runbook.md",
-        REPO / "docs" / "wm001-v1180-prospective-harness-review.json",
+        REPO / "docs" / "wm001-v1190-confirmation-plan.md",
+        REPO / "docs" / "wm001-v1190-operator-runbook.md",
+        REPO / "docs" / "wm001-v1190-prospective-harness-review.json",
     ]
     unique = sorted(set(candidates))
     return [
@@ -2217,10 +2224,194 @@ def verify_lockfile_rows(packages: list[dict[str, object]]) -> None:
         raise RuntimeError("WM-001 lockfile differs from the live installed dependency closure")
 
 
+def _ceil_div(numerator: int, denominator: int) -> int:
+    if type(numerator) is not int or type(denominator) is not int or numerator < 0 or denominator <= 0:
+        raise RuntimeError("audit-capacity arithmetic requires nonnegative integer inputs")
+    return (numerator + denominator - 1) // denominator
+
+
+def audit_capacity_record(
+    *,
+    producer_manifest: Mapping[str, object],
+    producer_manifest_sha256: str,
+    first_elapsed_ns: int,
+    replay_elapsed_ns: int,
+) -> dict[str, object]:
+    """Derive the sealed outcome-audit liveness gate from completed development work."""
+
+    rows = producer_manifest.get("files")
+    if (
+        not isinstance(rows, list)
+        or not rows
+        or not isinstance(producer_manifest_sha256, str)
+        or len(producer_manifest_sha256) != 64
+        or type(first_elapsed_ns) is not int
+        or first_elapsed_ns <= 0
+        or type(replay_elapsed_ns) is not int
+        or replay_elapsed_ns <= 0
+    ):
+        raise RuntimeError("audit-capacity inputs are incomplete")
+    byte_rows = [
+        row
+        for row in rows
+        if isinstance(row, Mapping)
+        and isinstance(row.get("path"), str)
+        and type(row.get("bytes")) is int
+        and cast(int, row["bytes"]) >= 0
+    ]
+    result_rows = [row for row in byte_rows if row.get("path") == "result.json"]
+    if len(byte_rows) != len(rows) or len(result_rows) != 1:
+        raise RuntimeError("audit-capacity producer rows are malformed")
+    development_total_bytes = sum(cast(int, row["bytes"]) for row in byte_rows)
+    development_result_bytes = cast(int, result_rows[0]["bytes"])
+    if (
+        development_total_bytes <= 0
+        or development_total_bytes > OUTCOME_AUDIT_PRODUCER_LIMIT_BYTES
+        or development_result_bytes <= 0
+        or development_result_bytes > OUTCOME_AUDIT_RESULT_LIMIT_BYTES
+        or development_result_bytes > development_total_bytes
+    ):
+        raise RuntimeError("audit-capacity calibration sizes must be positive")
+    calibration_elapsed_ns = max(first_elapsed_ns, replay_elapsed_ns)
+    aggregate_required_ns = _ceil_div(
+        AUDIT_CAPACITY_SAFETY_NUMERATOR
+        * calibration_elapsed_ns
+        * OUTCOME_AUDIT_PRODUCER_LIMIT_BYTES,
+        AUDIT_CAPACITY_SAFETY_DENOMINATOR * development_total_bytes,
+    )
+    result_required_ns = _ceil_div(
+        AUDIT_CAPACITY_SAFETY_NUMERATOR
+        * calibration_elapsed_ns
+        * OUTCOME_AUDIT_RESULT_LIMIT_BYTES,
+        AUDIT_CAPACITY_SAFETY_DENOMINATOR * development_result_bytes,
+    )
+    combined_required_ns = aggregate_required_ns + result_required_ns
+    available_timeout_ns = OUTCOME_AUDIT_TIMEOUT_SECONDS * 1_000_000_000
+    if combined_required_ns > available_timeout_ns:
+        raise RuntimeError("outcome-audit timeout lacks the sealed two-times capacity headroom")
+    return {
+        "schema": AUDIT_CAPACITY_SCHEMA,
+        "producer_manifest_sha256": producer_manifest_sha256,
+        "development_total_bytes": development_total_bytes,
+        "development_result_bytes": development_result_bytes,
+        "first_elapsed_ns": first_elapsed_ns,
+        "replay_elapsed_ns": replay_elapsed_ns,
+        "calibration_elapsed_ns": calibration_elapsed_ns,
+        "producer_limit_bytes": OUTCOME_AUDIT_PRODUCER_LIMIT_BYTES,
+        "result_limit_bytes": OUTCOME_AUDIT_RESULT_LIMIT_BYTES,
+        "safety_numerator": AUDIT_CAPACITY_SAFETY_NUMERATOR,
+        "safety_denominator": AUDIT_CAPACITY_SAFETY_DENOMINATOR,
+        "aggregate_required_ns": aggregate_required_ns,
+        "result_required_ns": result_required_ns,
+        "combined_required_ns": combined_required_ns,
+        "available_timeout_ns": available_timeout_ns,
+        "passed": True,
+    }
+
+
+def verify_audit_capacity_record(
+    value: object,
+    *,
+    producer_manifest_sha256: str,
+    development_total_bytes: int | None = None,
+    development_result_bytes: int | None = None,
+    first_elapsed_ns: int | None = None,
+    replay_elapsed_ns: int | None = None,
+) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise RuntimeError("audit-capacity record is not an object")
+    expected_fields = {
+        "schema",
+        "producer_manifest_sha256",
+        "development_total_bytes",
+        "development_result_bytes",
+        "first_elapsed_ns",
+        "replay_elapsed_ns",
+        "calibration_elapsed_ns",
+        "producer_limit_bytes",
+        "result_limit_bytes",
+        "safety_numerator",
+        "safety_denominator",
+        "aggregate_required_ns",
+        "result_required_ns",
+        "combined_required_ns",
+        "available_timeout_ns",
+        "passed",
+    }
+    integer_fields = expected_fields - {
+        "schema",
+        "producer_manifest_sha256",
+        "passed",
+    }
+    if (
+        set(value) != expected_fields
+        or value.get("schema") != AUDIT_CAPACITY_SCHEMA
+        or value.get("producer_manifest_sha256") != producer_manifest_sha256
+        or value.get("passed") is not True
+        or any(type(value.get(field)) is not int for field in integer_fields)
+    ):
+        raise RuntimeError("audit-capacity record has an invalid shape")
+    total = cast(int, value["development_total_bytes"])
+    result = cast(int, value["development_result_bytes"])
+    first = cast(int, value["first_elapsed_ns"])
+    replay = cast(int, value["replay_elapsed_ns"])
+    if (
+        total <= 0
+        or total > OUTCOME_AUDIT_PRODUCER_LIMIT_BYTES
+        or result <= 0
+        or result > OUTCOME_AUDIT_RESULT_LIMIT_BYTES
+        or result > total
+        or first <= 0
+        or replay <= 0
+    ):
+        raise RuntimeError("audit-capacity calibration values must be positive")
+    calibration = max(first, replay)
+    aggregate = _ceil_div(
+        AUDIT_CAPACITY_SAFETY_NUMERATOR
+        * calibration
+        * OUTCOME_AUDIT_PRODUCER_LIMIT_BYTES,
+        AUDIT_CAPACITY_SAFETY_DENOMINATOR * total,
+    )
+    result_required = _ceil_div(
+        AUDIT_CAPACITY_SAFETY_NUMERATOR
+        * calibration
+        * OUTCOME_AUDIT_RESULT_LIMIT_BYTES,
+        AUDIT_CAPACITY_SAFETY_DENOMINATOR * result,
+    )
+    combined = aggregate + result_required
+    available = OUTCOME_AUDIT_TIMEOUT_SECONDS * 1_000_000_000
+    expected_values = {
+        "calibration_elapsed_ns": calibration,
+        "producer_limit_bytes": OUTCOME_AUDIT_PRODUCER_LIMIT_BYTES,
+        "result_limit_bytes": OUTCOME_AUDIT_RESULT_LIMIT_BYTES,
+        "safety_numerator": AUDIT_CAPACITY_SAFETY_NUMERATOR,
+        "safety_denominator": AUDIT_CAPACITY_SAFETY_DENOMINATOR,
+        "aggregate_required_ns": aggregate,
+        "result_required_ns": result_required,
+        "combined_required_ns": combined,
+        "available_timeout_ns": available,
+    }
+    if (
+        (development_total_bytes is not None and total != development_total_bytes)
+        or (development_result_bytes is not None and result != development_result_bytes)
+        or (first_elapsed_ns is not None and first != first_elapsed_ns)
+        or (replay_elapsed_ns is not None and replay != replay_elapsed_ns)
+        or any(value.get(field) != expected for field, expected in expected_values.items())
+        or combined > available
+    ):
+        raise RuntimeError("audit-capacity arithmetic or evidence binding is invalid")
+    return value
+
+
 def create_audit_reproduction_receipt(
     *,
     supplied_audit_path: Path,
+    first_execution: object,
     execution: object,
+    first_execution_receipt_path: Path,
+    replay_execution_receipt_path: Path,
+    producer_manifest: Mapping[str, object],
+    producer_manifest_sha256: str,
     output_path: Path,
 ) -> dict[str, object]:
     """Preserve one actual descriptor-mode replay, never caller-supplied identities."""
@@ -2232,8 +2423,67 @@ def create_audit_reproduction_receipt(
         bootstrap_source_sha256,
     )
 
-    if not isinstance(execution, AuditExecution):
-        raise TypeError("audit reproduction requires one captured AuditExecution")
+    if not isinstance(first_execution, AuditExecution) or not isinstance(execution, AuditExecution):
+        raise TypeError("audit reproduction requires two captured AuditExecution values")
+    def captured_receipt(
+        path: Path,
+        *,
+        expected_name: str,
+        captured: AuditExecution,
+    ) -> tuple[bytes, dict[str, object]]:
+        if path.name != expected_name or path.parent != output_path.parent:
+            raise RuntimeError("audit reproduction execution receipt path is not canonical")
+        payload = _stable_regular_payload(
+            path,
+            label=f"captured audit execution receipt {expected_name}",
+        )
+        value = _canonical_json_object(
+            payload,
+            label=f"captured audit execution receipt {expected_name}",
+        )
+        support = [
+            {
+                "path": row.relative_path,
+                "bytes": row.bytes,
+                "sha256": row.sha256,
+            }
+            for row in captured.support_files
+        ]
+        if (
+            set(value) != _CAPTURED_AUDIT_EXECUTION_FIELDS
+            or value.get("schema") != "prospect.wm001.captured-audit-execution.v2"
+            or value.get("returncode") != captured.returncode
+            or value.get("passed") is not True
+            or value.get("source_mode") != captured.source_mode
+            or value.get("command") != list(captured.command)
+            or value.get("stdout_bytes") != len(captured.stdout)
+            or value.get("stdout_sha256") != hashlib.sha256(captured.stdout).hexdigest()
+            or value.get("stderr_bytes") != len(captured.stderr)
+            or value.get("stderr_sha256") != hashlib.sha256(captured.stderr).hexdigest()
+            or value.get("runtime_manifest_bytes") != len(captured.runtime_manifest)
+            or value.get("runtime_manifest_sha256") != captured.runtime_manifest_sha256
+            or value.get("invocation_manifest_bytes") != len(captured.invocation_manifest)
+            or value.get("invocation_manifest_sha256") != captured.invocation_manifest_sha256
+            or value.get("bootstrap_sha256") != captured.bootstrap_sha256
+            or value.get("auditor_source_sha256") != captured.auditor_source_sha256
+            or not _strict_json_equal(value.get("support_files"), support)
+            or value.get("subprocess_elapsed_ns") != captured.subprocess_elapsed_ns
+            or type(value.get("subprocess_elapsed_ns")) is not int
+            or cast(int, value["subprocess_elapsed_ns"]) <= 0
+        ):
+            raise RuntimeError("audit reproduction execution receipt is misbound")
+        return payload, value
+
+    first_receipt_payload, first_receipt = captured_receipt(
+        first_execution_receipt_path,
+        expected_name="audit-execution-01.execution.json",
+        captured=first_execution,
+    )
+    replay_receipt_payload, replay_receipt = captured_receipt(
+        replay_execution_receipt_path,
+        expected_name="audit-execution-02.execution.json",
+        captured=execution,
+    )
     supplied = _stable_regular_payload(
         supplied_audit_path,
         label="supplied independent audit",
@@ -2270,12 +2520,18 @@ def create_audit_reproduction_receipt(
         or dict(execution.report) != audit
         or execution.returncode != 0
         or execution.source_mode != "descriptor"
+        or first_execution.source_mode != "descriptor"
+        or first_execution.stdout != execution.stdout
+        or first_execution.stderr != execution.stderr
+        or first_execution.runtime_manifest != execution.runtime_manifest
+        or first_execution.invocation_manifest != execution.invocation_manifest
         or execution.runtime_manifest_sha256 != hashlib.sha256(execution.runtime_manifest).hexdigest()
         or execution.invocation_manifest_sha256 != hashlib.sha256(execution.invocation_manifest).hexdigest()
         or execution.bootstrap_sha256 != bootstrap_source_sha256()
         or execution.auditor_source_sha256 != sha256_file(auditor_source)
         or observed_support != expected_support
         or runtime.get("schema") != RUNTIME_MANIFEST_SCHEMA
+        or runtime.get("execution_role") != "outcome_audit"
         or runtime.get("bootstrap_sha256") != execution.bootstrap_sha256
         or runtime.get("source")
         != {
@@ -2285,10 +2541,22 @@ def create_audit_reproduction_receipt(
             "sha256": execution.auditor_source_sha256,
         }
         or runtime.get("support_files") != expected_support
+        or runtime.get("limits")
+        != {
+            "timeout_seconds": OUTCOME_AUDIT_TIMEOUT_SECONDS,
+            "stdout_bytes": 64 << 20,
+            "stderr_bytes": 16 << 20,
+        }
         or invocation.get("schema") != INVOCATION_MANIFEST_SCHEMA
         or invocation.get("runtime_manifest_sha256") != execution.runtime_manifest_sha256
     ):
         raise RuntimeError("development qualification requires one authentic passing descriptor audit")
+    capacity = audit_capacity_record(
+        producer_manifest=producer_manifest,
+        producer_manifest_sha256=producer_manifest_sha256,
+        first_elapsed_ns=cast(int, first_receipt["subprocess_elapsed_ns"]),
+        replay_elapsed_ns=cast(int, replay_receipt["subprocess_elapsed_ns"]),
+    )
     if output_path.exists():
         raise FileExistsError(f"refusing to replace audit reproduction receipt: {output_path}")
     runtime_filename = _content_addressed_filename(
@@ -2314,9 +2582,9 @@ def create_audit_reproduction_receipt(
     if any(output_path.with_name(filename).exists() for filename in sidecars):
         raise FileExistsError("refusing to replace audit reproduction sidecar")
     receipt = {
-        "schema": "prospect.wm001.audit-reproduction.v2",
+        "schema": "prospect.wm001.audit-reproduction.v3",
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "supplied_audit_sha256": hashlib.sha256(supplied).hexdigest(),
         "reproduced_audit_sha256": hashlib.sha256(execution.stdout).hexdigest(),
         "byte_identical": True,
@@ -2336,6 +2604,17 @@ def create_audit_reproduction_receipt(
         "runner_source_sha256": sha256_file(runner_source),
         "auditor_source_sha256": execution.auditor_source_sha256,
         "support_files": observed_support,
+        "first_execution_receipt_file": first_execution_receipt_path.name,
+        "first_execution_receipt_bytes": len(first_receipt_payload),
+        "first_execution_receipt_sha256": hashlib.sha256(
+            first_receipt_payload
+        ).hexdigest(),
+        "replay_execution_receipt_file": replay_execution_receipt_path.name,
+        "replay_execution_receipt_bytes": len(replay_receipt_payload),
+        "replay_execution_receipt_sha256": hashlib.sha256(
+            replay_receipt_payload
+        ).hexdigest(),
+        "capacity": capacity,
         "passed": True,
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2412,7 +2691,38 @@ _AUDIT_RECEIPT_FIELDS = {
     "runner_source_sha256",
     "auditor_source_sha256",
     "support_files",
+    "first_execution_receipt_file",
+    "first_execution_receipt_bytes",
+    "first_execution_receipt_sha256",
+    "replay_execution_receipt_file",
+    "replay_execution_receipt_bytes",
+    "replay_execution_receipt_sha256",
+    "capacity",
     "passed",
+}
+
+_CAPTURED_AUDIT_EXECUTION_FIELDS = {
+    "schema",
+    "returncode",
+    "passed",
+    "source_mode",
+    "command",
+    "stdout_file",
+    "stderr_file",
+    "runtime_manifest_file",
+    "invocation_manifest_file",
+    "stdout_bytes",
+    "stdout_sha256",
+    "stderr_bytes",
+    "stderr_sha256",
+    "runtime_manifest_bytes",
+    "runtime_manifest_sha256",
+    "invocation_manifest_bytes",
+    "invocation_manifest_sha256",
+    "bootstrap_sha256",
+    "auditor_source_sha256",
+    "support_files",
+    "subprocess_elapsed_ns",
 }
 
 _DEVELOPMENT_CLOSURE_FIELDS = {
@@ -2464,7 +2774,7 @@ _DEVELOPMENT_AUDIT_FIELDS = {
     "independence_limitations",
 }
 _DEVELOPMENT_AUDIT_RESOURCE_LIMITS = {
-    "result": 4 << 30,
+    "result": 2 << 30,
     "prediction_sidecar": 8 << 20,
     "owned_model_state": 256 << 20,
     "optimizer_manifest": 64 << 20,
@@ -2858,7 +3168,7 @@ def _validate_producer_custody(
         set(runtime_seal) != _DEVELOPMENT_RUNTIME_SEAL_FIELDS
         or runtime_seal.get("schema") != "prospect.wm001.runtime-seal.v1"
         or runtime_seal.get("experiment_id") != "WM-001"
-        or runtime_seal.get("protocol_version") != "1.18.0"
+        or runtime_seal.get("protocol_version") != "1.19.0"
         or not _strict_json_equal(runtime_seal.get("assurance"), ASSURANCE)
         or runtime_seal.get("git_commit") != execution["git_commit"]
         or runtime_seal.get("git_tree") != execution["git_tree"]
@@ -2972,6 +3282,7 @@ def _validate_development_audit_report(
 def _validate_development_audit_evidence(
     *,
     producer_root: Path,
+    producer_manifest: Mapping[str, object],
     producer_manifest_sha256: str,
     result_sha256: str,
     execution: dict[str, object],
@@ -2980,6 +3291,8 @@ def _validate_development_audit_evidence(
     runtime_payload: bytes,
     invocation_payload: bytes,
     stderr_payload: bytes,
+    first_execution_receipt_payload: bytes,
+    replay_execution_receipt_payload: bytes,
 ) -> tuple[dict[str, object], dict[str, object]]:
     from .audit_runner import (
         INVOCATION_MANIFEST_SCHEMA,
@@ -3000,15 +3313,23 @@ def _validate_development_audit_evidence(
         invocation_payload,
         label="development audit invocation manifest",
     )
+    first_execution_receipt = _canonical_json_object(
+        first_execution_receipt_payload,
+        label="first development audit execution receipt",
+    )
+    replay_execution_receipt = _canonical_json_object(
+        replay_execution_receipt_payload,
+        label="replay development audit execution receipt",
+    )
     auditor_sha256 = sha256_file(Path(__file__).with_name("artifact_audit.py"))
     runner_sha256 = sha256_file(Path(__file__).with_name("audit_runner.py"))
     support_rows = _expected_development_audit_support_rows()
     safe_environment = _audit_environment(cast(dict[str, str], execution["process_environment"]))
     if (
         set(receipt) != _AUDIT_RECEIPT_FIELDS
-        or receipt.get("schema") != "prospect.wm001.audit-reproduction.v2"
+        or receipt.get("schema") != "prospect.wm001.audit-reproduction.v3"
         or receipt.get("experiment_id") != "WM-001"
-        or receipt.get("protocol_version") != "1.18.0"
+        or receipt.get("protocol_version") != "1.19.0"
         or receipt.get("supplied_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("reproduced_audit_sha256") != hashlib.sha256(audit_payload).hexdigest()
         or receipt.get("byte_identical") is not True
@@ -3053,9 +3374,88 @@ def _validate_development_audit_evidence(
         or receipt.get("runner_source_sha256") != runner_sha256
         or receipt.get("auditor_source_sha256") != auditor_sha256
         or not _strict_json_equal(receipt.get("support_files"), support_rows)
+        or receipt.get("first_execution_receipt_file")
+        != "audit-execution-01.execution.json"
+        or receipt.get("first_execution_receipt_bytes")
+        != len(first_execution_receipt_payload)
+        or receipt.get("first_execution_receipt_sha256")
+        != hashlib.sha256(first_execution_receipt_payload).hexdigest()
+        or receipt.get("replay_execution_receipt_file")
+        != "audit-execution-02.execution.json"
+        or receipt.get("replay_execution_receipt_bytes")
+        != len(replay_execution_receipt_payload)
+        or receipt.get("replay_execution_receipt_sha256")
+        != hashlib.sha256(replay_execution_receipt_payload).hexdigest()
         or receipt.get("passed") is not True
     ):
         raise RuntimeError("development audit reproduction receipt is invalid")
+    audit_sha256 = hashlib.sha256(audit_payload).hexdigest()
+    runtime_sha256 = hashlib.sha256(runtime_payload).hexdigest()
+    invocation_sha256 = hashlib.sha256(invocation_payload).hexdigest()
+    stderr_sha256 = hashlib.sha256(stderr_payload).hexdigest()
+    for ordinal, captured in enumerate(
+        (first_execution_receipt, replay_execution_receipt),
+        start=1,
+    ):
+        prefix = f"audit-execution-{ordinal:02d}"
+        if (
+            set(captured) != _CAPTURED_AUDIT_EXECUTION_FIELDS
+            or captured.get("schema")
+            != "prospect.wm001.captured-audit-execution.v2"
+            or captured.get("returncode") != 0
+            or captured.get("passed") is not True
+            or captured.get("source_mode") != "descriptor"
+            or captured.get("stdout_file") != f"{prefix}.stdout.json"
+            or captured.get("stderr_file") != f"{prefix}.stderr.log"
+            or captured.get("runtime_manifest_file") != f"{prefix}.runtime.json"
+            or captured.get("invocation_manifest_file")
+            != f"{prefix}.invocation.json"
+            or captured.get("stdout_bytes") != len(audit_payload)
+            or captured.get("stdout_sha256") != audit_sha256
+            or captured.get("stderr_bytes") != len(stderr_payload)
+            or captured.get("stderr_sha256") != stderr_sha256
+            or captured.get("runtime_manifest_bytes") != len(runtime_payload)
+            or captured.get("runtime_manifest_sha256") != runtime_sha256
+            or captured.get("invocation_manifest_bytes")
+            != len(invocation_payload)
+            or captured.get("invocation_manifest_sha256") != invocation_sha256
+            or captured.get("bootstrap_sha256") != receipt.get("bootstrap_sha256")
+            or captured.get("auditor_source_sha256")
+            != receipt.get("auditor_source_sha256")
+            or not _strict_json_equal(
+                captured.get("support_files"),
+                receipt.get("support_files"),
+            )
+            or type(captured.get("subprocess_elapsed_ns")) is not int
+            or cast(int, captured["subprocess_elapsed_ns"]) <= 0
+        ):
+            raise RuntimeError("development captured audit receipt is invalid")
+    rows = producer_manifest.get("files")
+    if not isinstance(rows, list) or any(
+        not isinstance(row, Mapping) or type(row.get("bytes")) is not int
+        for row in rows
+    ):
+        raise RuntimeError("development producer cannot support audit-capacity verification")
+    result_rows = [row for row in rows if cast(Mapping[str, object], row).get("path") == "result.json"]
+    if len(result_rows) != 1:
+        raise RuntimeError("development producer has no unique capacity result row")
+    verify_audit_capacity_record(
+        receipt.get("capacity"),
+        producer_manifest_sha256=producer_manifest_sha256,
+        development_total_bytes=sum(
+            cast(int, cast(Mapping[str, object], row)["bytes"])
+            for row in rows
+        ),
+        development_result_bytes=cast(int, cast(Mapping[str, object], result_rows[0])["bytes"]),
+        first_elapsed_ns=cast(
+            int,
+            first_execution_receipt["subprocess_elapsed_ns"],
+        ),
+        replay_elapsed_ns=cast(
+            int,
+            replay_execution_receipt["subprocess_elapsed_ns"],
+        ),
+    )
     _validate_development_audit_report(
         audit,
         producer_root=producer_root,
@@ -3077,6 +3477,7 @@ def _validate_development_audit_evidence(
     runtime_version = runtime_python.get("version") if isinstance(runtime_python, dict) else None
     if (
         runtime.get("schema") != RUNTIME_MANIFEST_SCHEMA
+        or runtime.get("execution_role") != "outcome_audit"
         or not _strict_json_equal(runtime.get("assurance"), ASSURANCE)
         or runtime.get("bootstrap_sha256") != bootstrap_source_sha256()
         or not isinstance(runtime_python, dict)
@@ -3111,6 +3512,12 @@ def _validate_development_audit_evidence(
             execution["standard_library"],
         )
         or not _strict_json_equal(runtime.get("environment"), safe_environment)
+        or runtime.get("limits")
+        != {
+            "timeout_seconds": OUTCOME_AUDIT_TIMEOUT_SECONDS,
+            "stdout_bytes": 64 << 20,
+            "stderr_bytes": 16 << 20,
+        }
     ):
         raise RuntimeError("development audit runtime differs from the producer closure")
     if (
@@ -3190,7 +3597,7 @@ def _result_qualification_payload(
     value = {
         "schema": "prospect.wm001.development-result-qualification.v1",
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "protocol_sha256": sha256_file(PROTOCOL_PATH),
         "raw_result_sha256": result_sha256,
         "lane": "development",
@@ -3255,7 +3662,7 @@ def _validate_result_qualification(
         }
         or value.get("schema") != "prospect.wm001.development-result-qualification.v1"
         or value.get("experiment_id") != "WM-001"
-        or value.get("protocol_version") != "1.18.0"
+        or value.get("protocol_version") != "1.19.0"
         or value.get("protocol_sha256") != sha256_file(PROTOCOL_PATH)
         or value.get("raw_result_sha256") != archived_result_sha256
         or value.get("lane") != "development"
@@ -3942,7 +4349,7 @@ def verify_development_closure(
         set(closure) != _DEVELOPMENT_CLOSURE_FIELDS
         or closure.get("schema") != "prospect.wm001.development-closure.v2"
         or closure.get("experiment_id") != "WM-001"
-        or closure.get("protocol_version") != "1.18.0"
+        or closure.get("protocol_version") != "1.19.0"
         or closure.get("engineering_verified") is not True
         or closure.get("audit_reproduced") is not True
         or closure.get("performance_values_bound") is not False
@@ -4045,6 +4452,8 @@ def verify_development_closure(
         "evidence/development-result-qualification.json",
         "evidence/independent-audit.json",
         "evidence/audit-reproduction.json",
+        "evidence/audit-execution-01.execution.json",
+        "evidence/audit-execution-02.execution.json",
         *sidecar_roles,
         str(producer_custody["runtime_seal_member"]),
         str(producer_custody["producer_bootstrap_member"]),
@@ -4094,7 +4503,7 @@ def verify_development_closure(
         archive_identity,
         retained_members=retained_members,
     )
-    _validate_archived_producer(retained, member_rows)
+    archived_producer_manifest = _validate_archived_producer(retained, member_rows)
     manifest_rows = [
         row
         for row in member_rows
@@ -4130,6 +4539,7 @@ def verify_development_closure(
     stderr_member = str(closure["audit_stderr_member"])
     _, receipt = _validate_development_audit_evidence(
         producer_root=producer_root,
+        producer_manifest=archived_producer_manifest,
         producer_manifest_sha256=str(manifest_rows[0]["sha256"]),
         result_sha256=result_sha256,
         execution=execution,
@@ -4138,6 +4548,12 @@ def verify_development_closure(
         runtime_payload=retained[runtime_member],
         invocation_payload=retained[invocation_member],
         stderr_payload=retained[stderr_member],
+        first_execution_receipt_payload=retained[
+            "evidence/audit-execution-01.execution.json"
+        ],
+        replay_execution_receipt_payload=retained[
+            "evidence/audit-execution-02.execution.json"
+        ],
     )
     expected_source = {
         "git_commit": execution["git_commit"],
@@ -4252,9 +4668,13 @@ def create_development_closure(
     runtime_manifest_path: Path,
     output_path: Path = DEVELOPMENT_CLOSURE_PATH,
 ) -> dict[str, object]:
-    """Close the sole v1.18 qualification into one self-contained evidence archive."""
+    """Close the sole v1.19 qualification into one self-contained evidence archive."""
 
     from .artifact import verify_producer_manifest
+    from .operator import (
+        DEVELOPMENT_AUDIT_ATTEMPT_PATH,
+        verify_operator_attempt,
+    )
     from .verify import DEVELOPMENT_SEEDS, _verify_formal_matrix, verify_result
 
     expected_output = DEVELOPMENT_CLOSURE_PATH
@@ -4293,7 +4713,7 @@ def create_development_closure(
         not isinstance(replicates, list)
         or tuple(row.get("master_seed") if isinstance(row, dict) else None for row in replicates) != DEVELOPMENT_SEEDS
     ):
-        raise RuntimeError("development qualification requires exactly both fresh v1.18 seeds")
+        raise RuntimeError("development qualification requires exactly both fresh v1.19 seeds")
     for replicate in replicates:
         assert isinstance(replicate, dict)
         _verify_formal_matrix(
@@ -4335,6 +4755,31 @@ def create_development_closure(
     )
     if runtime_manifest_path != runtime_sidecar or runtime_manifest_path.is_symlink():
         raise RuntimeError("development runtime manifest argument differs from the receipt sidecar")
+    audit_attempt = verify_operator_attempt(DEVELOPMENT_AUDIT_ATTEMPT_PATH)
+    audit_primary = audit_attempt.get("primary")
+    if (
+        audit_attempt.get("kind") != "audit"
+        or audit_attempt.get("lane") != "development"
+        or audit_attempt.get("status") != "accepted"
+        or not isinstance(audit_primary, Mapping)
+        or audit_primary.get("executions")
+        != [
+            "audit-execution-01.execution.json",
+            "audit-execution-02.execution.json",
+        ]
+        or audit_primary.get("reproduction_file") != audit_reproduction_path.name
+    ):
+        raise RuntimeError("development closure has no accepted audit execution pair")
+    first_execution_receipt_payload = _stable_regular_payload(
+        DEVELOPMENT_AUDIT_ATTEMPT_PATH
+        / "audit-execution-01.execution.json",
+        label="first development audit execution receipt",
+    )
+    replay_execution_receipt_payload = _stable_regular_payload(
+        DEVELOPMENT_AUDIT_ATTEMPT_PATH
+        / "audit-execution-02.execution.json",
+        label="replay development audit execution receipt",
+    )
     result_sha256 = sha256_file(result_path)
     execution = _validate_execution_identity(
         result.get("execution"),
@@ -4342,6 +4787,10 @@ def create_development_closure(
     )
     _validate_development_audit_evidence(
         producer_root=producer_root,
+        producer_manifest=_load_canonical_json(
+            producer_root / "producer-manifest.json",
+            label="development producer manifest",
+        ),
         producer_manifest_sha256=sha256_file(
             producer_root / "producer-manifest.json"
         ),
@@ -4352,6 +4801,8 @@ def create_development_closure(
         runtime_payload=runtime_manifest,
         invocation_payload=invocation_manifest,
         stderr_payload=audit_stderr,
+        first_execution_receipt_payload=first_execution_receipt_payload,
+        replay_execution_receipt_payload=replay_execution_receipt_payload,
     )
     audit = _canonical_json_object(
         audit_payload,
@@ -4403,6 +4854,12 @@ def create_development_closure(
     evidence_payloads = {
         "evidence/independent-audit.json": audit_payload,
         "evidence/audit-reproduction.json": receipt_payload,
+        "evidence/audit-execution-01.execution.json": (
+            first_execution_receipt_payload
+        ),
+        "evidence/audit-execution-02.execution.json": (
+            replay_execution_receipt_payload
+        ),
         "evidence/development-result-qualification.json": (result_qualification_payload),
         "evidence/producer-runtime-seal.json": runtime_seal_payload,
         "evidence/producer-bootstrap.py": bootstrap_payload,
@@ -4419,7 +4876,7 @@ def create_development_closure(
     closure = {
         "schema": "prospect.wm001.development-closure.v2",
         "experiment_id": "WM-001",
-        "protocol_version": "1.18.0",
+        "protocol_version": "1.19.0",
         "source": {
             "git_commit": execution["git_commit"],
             "git_tree": execution["git_tree"],
@@ -4592,7 +5049,7 @@ def create_formal_binding(
     if conformance_cases != FORMAL_CONFORMANCE_CASES:
         raise ValueError("formal Pendulum conformance is fixed at exactly 1,024 cases (512 per task)")
     if development_closure_path is None or not development_closure_path.is_file():
-        raise RuntimeError("formal binding requires the immutable v1.18 development closure")
+        raise RuntimeError("formal binding requires the immutable v1.19 development closure")
     if device == "cuda" and os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8":
         raise RuntimeError("CUDA formal binding requires CUBLAS_WORKSPACE_CONFIG=:4096:8")
     if output_path.exists():
@@ -4755,7 +5212,7 @@ def create_formal_binding(
         "experiment_id": "WM-001",
         "assurance": assurance_record(),
         "protocol": {
-            "version": "1.18.0",
+            "version": "1.19.0",
             "sha256": sha256_file(PROTOCOL_PATH),
             "raw_result_schema_sha256": sha256_file(RESULT_SCHEMA_PATH),
             "binding_schema_sha256": sha256_file(BINDING_SCHEMA_PATH),
@@ -5064,6 +5521,7 @@ def run_bound_preflight_conformance(
     producer_environment = cast(dict[str, str], runtime["process_environment"])
     execution = run_captured_auditor(
         auditor_source,
+        execution_role="conformance",
         auditor_arguments=(
             "--prebinding-conformance",
             captured_support_argument("prebinding-request.json"),
@@ -5187,6 +5645,7 @@ def run_bound_outcome_audit(producer_root: Path) -> object:
     producer_bootstrap = root / "source" / "bench" / "world_model_lifecycle" / "producer_bootstrap.py"
     return run_captured_auditor(
         source,
+        execution_role="outcome_audit",
         auditor_arguments=(
             str(root),
             "--producer-bootstrap",
