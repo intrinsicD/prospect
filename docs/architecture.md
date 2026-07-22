@@ -512,6 +512,16 @@ and forbids same-version replay. This is an audit-capacity failure, not evidence
 for or against any scientific endpoint. The exact evidence and successor
 requirements are recorded in the
 [v1.18 formal-audit timeout](wm001-v1180-formal-audit-timeout.md).
+Protocol 1.19 repaired the missing scale/liveness contract with closed audit
+roles, two captured development executions, and independently recomputed
+capacity evidence. The complete development audit passed twice. Its sole
+closure transaction then exposed a separate custody-composition defect: the
+valid producer terminal and outer completion are one two-link inode, but the
+closure's generic canonical-JSON reader silently required one link. The
+authenticated failure occurred before canonical closure publication, so no
+binding, formal authority, or scientific outcome exists. The evidence and
+fresh-version correction are recorded in the
+[v1.19 development-closure custody failure](wm001-v1190-development-closure-custody-failure.md).
 
 ## Open engineering boundaries
 
@@ -520,10 +530,11 @@ requirements are recorded in the
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocols 1.10 through 1.18 are terminally retired. Version 1.18 reached a
-  formal producer but its independent audit timed out and its adjudication was
-  rejected. The complete lifecycle claim remains unestablished until a fresh
-  version's one formal artifact passes every audit and adjudication gate.
+- Protocols 1.10 through 1.19 are terminally retired. Version 1.19 verified its
+  development audit-capacity repair but failed before closure because one
+  consumer imposed the wrong hard-link contract. The complete lifecycle claim
+  remains unestablished until a fresh version's one formal artifact passes
+  every audit and adjudication gate.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External

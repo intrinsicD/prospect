@@ -18,14 +18,18 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.18.0 correctly resolved the rehearsal matrix identity through the
-sealed protocol: the production launcher and separate verifier accepted the
-same stored bytes. Its sole formal producer completed, but the sole bound
-formal-audit execution reached the frozen 600-second timeout before emitting a
-report. The outer-finalized adjudication performed zero replay and rejected
-the version. No K0–K7 gate or scientific endpoint is established in either
-direction. Protocol 1.18 is terminally retired; the exact evidence and
-fresh-version capacity requirements are in the
+Protocol 1.19.0 repaired the v1.18 audit-runtime defect: its complete
+development audit ran twice under the sealed outcome role and passed the exact
+capacity projection. Its sole development closure then rejected the valid
+outer-finalized producer manifest because a generic canonical-JSON reader
+silently enforced one link while that terminal is required to share its inode
+with the outer completion and therefore has two. No closure, binding, formal
+authority, or scientific endpoint exists. Protocol 1.19 is terminally retired;
+the exact evidence and fresh-version repair are in the
+[v1.19 failure record](../../docs/wm001-v1190-development-closure-custody-failure.md).
+Protocol 1.18.0 correctly resolved the rehearsal matrix identity and reached a
+formal producer, but its bound formal audit timed out and its adjudication was
+rejected as recorded in the
 [v1.18 failure record](../../docs/wm001-v1180-formal-audit-timeout.md).
 Protocol 1.17.0 repaired the real audit-package boundary and reached an
 authentic accepted, outer-finalized result-free rehearsal. The required
@@ -166,8 +170,9 @@ binding-keyed formal root consumed the sole formal attempt; the subsequent
 pre-producer refusal retired the version. The complete lifecycle claim remains
 unestablished.
 
-Protocols 1.18.0, 1.17.0, 1.16.0, 1.15.0, 1.14.0, 1.13.0, 1.12.0, 1.11.0,
-1.10.0, 1.9.0, 1.8.0, 1.7.0, 1.6.0, 1.5.0, and 1.4.0 are immutable and retired.
+Protocols 1.19.0, 1.18.0, 1.17.0, 1.16.0, 1.15.0, 1.14.0, 1.13.0, 1.12.0,
+1.11.0, 1.10.0, 1.9.0, 1.8.0, 1.7.0, 1.6.0, 1.5.0, and 1.4.0 are immutable
+and retired.
 Protocol 1.16.0 passed its prospective gates, result-free rehearsal,
 development, accepted audit, closure, sealed-runtime reopen, complete preformal
 report and accepted binding; the operator-recorded final stop/go also passed.
@@ -185,6 +190,14 @@ completed formal artifact, but its only independent audit timed out before a
 report and the adjudication terminally rejected it. The
 [v1.18 failure record](../../docs/wm001-v1180-formal-audit-timeout.md) defines
 the exact evidence and fresh-version repair boundary.
+Protocol 1.19.0's frozen
+[confirmation plan](../../docs/wm001-v1190-confirmation-plan.md) and
+[operator runbook](../../docs/wm001-v1190-operator-runbook.md) produced one
+completed development qualification and an accepted, twice-reproduced
+development audit. The sole closure then failed on the hidden one-link reader
+predicate. The
+[v1.19 failure record](../../docs/wm001-v1190-development-closure-custody-failure.md)
+defines the exact evidence and successor boundary.
 Protocol 1.15.0 passed its result-free rehearsal, development, accepted audit,
 closure, sealed-runtime reopen, preformal report, accepted binding, and the
 operator-recorded final stop/go gate. The sole formal invocation then returned

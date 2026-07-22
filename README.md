@@ -179,3 +179,12 @@ a report. The outer-finalized adjudication performed zero replay and rejected
 v1.18; no scientific endpoint is established in either direction. The exact
 evidence, claim limits, and fresh-version requirements are preserved in the
 [v1.18 formal-audit timeout record](docs/wm001-v1180-formal-audit-timeout.md).
+Protocol 1.19 repaired that audit-runtime defect: its complete development
+audit ran twice under the outcome role and passed the sealed capacity
+projection. Its sole development-closure transaction then rejected the valid
+outer-finalized producer manifest because a generic canonical-JSON reader
+silently required one link while the protocol requires the terminal and outer
+completion to be the same two-link inode. No closure, binding, formal authority,
+or scientific outcome exists. The exact evidence and fresh-version repair are
+preserved in the
+[v1.19 development-closure custody failure](docs/wm001-v1190-development-closure-custody-failure.md).
