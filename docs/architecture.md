@@ -495,14 +495,13 @@ preceded formal-root creation, no formal authority or outcome exists. Protocol
 1.16 is retired, and its bounded engineering evidence and fresh-version repair
 requirements are recorded in the
 [v1.16 accepted-binding rehearsal failure](wm001-v1160-accepted-binding-rehearsal-failure.md).
-Protocol 1.17 is the active prospective successor. It replaces duplicated
-sidecar literals with authenticated receipt joins, tests the real 15-member
-audit package across producer and consumers, and adds a single-use
-binding-keyed rehearsal claim, outer-finalized terminal, and formal-launch v3
-identity under held custody. Its
-[confirmation plan](wm001-v1170-confirmation-plan.md) and
-[operator runbook](wm001-v1170-operator-runbook.md) are sealed only after the
-prospective gates; no v1.17 outcome exists yet.
+Protocol 1.17 repaired the real 15-member audit-package boundary and reached an
+authentic accepted, outer-finalized result-free rehearsal. Its separate
+post-rehearsal verifier then rejected the valid matrix identity by reading a
+field forbidden by the production formal-binding v10 schema. No formal
+authority or outcome exists. The terminal evidence, counterfactual, and fixture
+gap are recorded in the
+[v1.17 independent rehearsal-verifier failure](wm001-v1170-independent-rehearsal-verifier-failure.md).
 
 ## Open engineering boundaries
 
@@ -511,13 +510,9 @@ prospective gates; no v1.17 outcome exists yet.
   → improve → retain claim remains unestablished until one formal artifact
   passes independent audit, semantic review, descriptor-bound reproduction, and
   external adjudication packaging.
-- Protocols 1.10 through 1.16 are terminally retired without formal authority.
-  Protocol 1.17 is the fresh prospective successor. It validates every
-  receipt-generated content-addressed audit sidecar, requires real
-  producer-to-consumer composition coverage, and makes the accepted-binding
-  rehearsal a one-shot authenticated transaction before formal authority.
-  The complete lifecycle claim remains unestablished until its one formal
-  artifact passes every audit and adjudication gate.
+- Protocols 1.10 through 1.17 are terminally retired without formal authority.
+  The complete lifecycle claim remains unestablished until a fresh successor's
+  one formal artifact passes every audit and adjudication gate.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External

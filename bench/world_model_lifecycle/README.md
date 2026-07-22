@@ -18,18 +18,16 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.17.0 is the active prospective candidate. It preserves the exact
-v1.4 model,
-learning algorithm, optimizer, planner, controller, budgets, controls, metrics,
-thresholds, and K0–K7 order. Its evidence repair follows the authenticated
-audit-reproduction receipt for all content-addressed sidecars, exercises the
-real 15-member audit package across producer and consumers, and places the
-accepted-binding inventory rehearsal behind a single-use claim and
-outer-finalized terminal. Formal-launch v3 binds the accepted rehearsal's live
-claim and completion identities under held custody. The plan and runbook are
-prospective; no v1.17 development or formal outcome exists yet. Protocol 1.16
-is terminally retired after its pre-root rehearsal exposed the stale fixed
-runtime-sidecar consumer predicate described below. Protocol 1.5 is retired
+Protocol 1.17.0 repaired the real audit-package boundary and reached an
+authentic accepted, outer-finalized result-free rehearsal. The required
+independent verifier then rejected the valid matrix identity because its test
+fixtures invented a field forbidden by formal-binding v10 and the production
+binding correctly omitted it. No formal authority or outcome exists. Protocol
+1.17 is terminally retired; the exact evidence and fresh-version repair are in
+the [v1.17 failure record](../../docs/wm001-v1170-independent-rehearsal-verifier-failure.md).
+Protocol 1.16 is likewise terminally retired after its pre-root rehearsal
+exposed the stale fixed runtime-sidecar consumer predicate described below.
+Protocol 1.5 is retired
 after its sole outcome-producing development qualification found that
 Gymnasium's lazy import added two unsealed process variables. That producer
 has no result, outer completion, development closure, binding, or formal
