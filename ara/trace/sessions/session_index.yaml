@@ -34,3 +34,10 @@ sessions:
     events_count: 14
     claims_touched: [C03, C04]
     open_threads: 1
+  - id: "2026-07-23_001"
+    date: "2026-07-23"
+    summary: "Accepted WM-001 v1.20 as Prospect's first bounded collect-to-persist lifecycle and opened the broader agent-maturity question."
+    turn_count: 1
+    events_count: 8
+    claims_touched: [C05]
+    open_threads: 1

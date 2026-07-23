@@ -105,3 +105,35 @@
 - **Architecture/constraint refs**: [A01, A02, R03, R08, R09]
 - **Tags**: world-model, no-formal-result, claim-ineligible, unresolved-capability
 - **From staging**: O17
+
+## C05: WM-001 v1.20 establishes the bounded lifecycle
+
+- **Statement**: Within the exact WM-001 protocol-1.20.0 eight-seed
+  Pendulum/learned-oscillator fixture and same-machine, same-dependency trust
+  boundary, one shared Prospect world model collected identified experience,
+  changed persistent state because of that experience, improved held-out
+  prediction and executed task-A behavior, learned a conflicting observed-
+  context task B, retained task-A behavior through balanced replay under
+  demonstrated naive interference, and reproduced the retained state and
+  behavior after a fresh-process restore. This does not establish mature
+  general agency or capability outside the sealed fixture.
+- **Status**: supported
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Authenticated reopening breaks experience or
+  update ancestry, raw-row recomputation reverses a prespecified K0-K7 gate,
+  supplied and adjudication-replayed audits differ, restore parity is nonzero,
+  or the terminal accepted package fails verification from the exact bound
+  candidate state.
+- **Proof**:
+  [`docs/wm001-v1200-formal-results.md`,
+  `bench/world_model_lifecycle/results/formal/4e4a88bc7ffa4245d1031263ef9d1bd9096ce87565c21ec15abb3516e4a743d6/confirmation-v1.20.0`,
+  `bench/world_model_lifecycle/results/operator-v1.20/audits/formal-audit-v1.20.0`,
+  `artifacts/wm001-reviews/formal-v1.20.0.json`,
+  `bench/world_model_lifecycle/results/adjudication-v1.20/formal-adjudication-v1.20.0`,
+  N30, N31]
+- **Dependencies**: []
+- **Architecture/constraint refs**: [A01, A02, R03, R05, R07, R08, R09]
+- **Tags**: world-model, causal-learning, behavior, interference, replay,
+  retention, persistence, formal-acceptance, bounded-evidence
+- **From staging**: O20

@@ -82,3 +82,12 @@ entries:
       - "Found no contradiction with C01 or C02: those historical claims remain fixture-bound, while v1.16 produced no formal outcome and development remains claim-ineligible."
       - "Left O03 unpromoted and unstale because its reservoir-replay wording still differs from the implemented balanced replay and WM-001 remains active."
       - "Preserved the rehearsal return code and exactly-once assertion only as trusted-operator diagnostics, not authenticated terminal evidence."
+  - turn: "2026-07-23_001#1"
+    notes:
+      - "Routed the v1.17, v1.18, and v1.19 terminal evidence-path outcomes as N27-N29 and the complete accepted v1.20 lifecycle as experiment N30."
+      - "Routed the bounded-versus-mature interpretation as decision N31 and the user's broader maturity problem as open question N32."
+      - "Staged and crystallized O20 as C05 through artifact commitment because the terminal accepted package and tracked results record now depend on the exact bounded claim."
+      - "Kept C05 fixture-, machine-, and dependency-bound; it does not contradict C01 or C02, which remain accurate histories of unaccepted earlier attempts."
+      - "Staged O21 but did not crystallize it: the WM-002 transfer/autonomy/calibration program is an AI proposal that the user has not yet selected."
+      - "Left O03 unpromoted: its reservoir-replay wording still differs from the balanced-replay implementation, so v1.20 does not retroactively make that exact observation mature."
+      - "Recorded the first post-outcome package-verifier failure as a documentation-order action, not a research node; the supported read-only verifier then passed from the exact clean bound commit without repeating any lifecycle authority."

@@ -1,0 +1,135 @@
+session:
+  id: "2026-07-23_001"
+  date: "2026-07-23"
+  started: "2026-07-23T09:10+02:00"
+  last_turn: "2026-07-23T09:10+02:00"
+  turn_count: 1
+  summary: "Accepted WM-001 v1.20 as Prospect's first bounded collect-to-persist lifecycle and opened the broader agent-maturity question."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: N27
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired v1.17 when its independent rehearsal verifier required a matrix field forbidden by the production binding schema."
+  - turn: 1
+    type: experiment
+    id: N28
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected v1.18 after its sole independent formal audit timed out without a report or scientific endpoint."
+  - turn: 1
+    type: experiment
+    id: N29
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired v1.19 after accepted capacity evidence reached a closure reader that imposed the wrong hard-link count."
+  - turn: 1
+    type: experiment
+    id: N30
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed and terminally accepted the eight-seed v1.20 formal lifecycle with K0-K7, audit, review, replay, and package verification all passing."
+  - turn: 1
+    type: decision
+    id: N31
+    routing: direct
+    provenance: ai-executed
+    summary: "Accepted the fixture-specific mechanism while refusing any inference of mature general agency."
+  - turn: 1
+    type: question
+    id: N32
+    routing: direct
+    provenance: user
+    summary: "Opened the next question: how to scale the accepted mechanism into a mature, broadly working agent."
+  - turn: 1
+    type: claim
+    id: O20
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the accepted bounded v1.20 lifecycle as C05 through artifact commitment."
+  - turn: 1
+    type: heuristic
+    id: O21
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged a WM-002 maturity program spanning transfer, active experience, calibration, adaptive replay, longer horizons, and external benchmarks."
+
+ai_actions:
+  - turn: 1
+    action: >-
+      Repaired and prospectively exercised the v1.17-v1.19 evidence path,
+      preserved each terminal failure without same-version retry, and isolated
+      independent rehearsal identity, audit capacity, and closure hard-link
+      defects before formal authority where applicable.
+    provenance: ai-executed
+    files_changed:
+      - "bench/world_model_lifecycle/"
+      - "tests/"
+      - "docs/wm001-v1170-independent-rehearsal-verifier-failure.md"
+      - "docs/wm001-v1180-formal-audit-timeout.md"
+      - "docs/wm001-v1190-development-closure-custody-failure.md"
+  - turn: 1
+    action: >-
+      Sealed v1.20 at commit 98acfdc after the full prospective suite,
+      development qualification, accepted audit, closure, sealed-runtime
+      reopen, ten preformal commands, accepted binding, and final stop/go.
+    provenance: ai-executed
+    files_changed:
+      - "bench/world_model_lifecycle/"
+      - "tests/"
+      - "docs/wm001-v1200-confirmation-plan.md"
+      - "docs/wm001-v1200-operator-runbook.md"
+      - "docs/wm001-v1200-prospective-harness-review.json"
+      - "requirements-wm001.lock"
+  - turn: 1
+    action: >-
+      Executed the sole v1.20 eight-seed formal producer, the sole formal audit,
+      three adversarial semantic referee passes, and single-use adjudication.
+      The audit passed 6,393,061 checks with no failure or gap; adjudication
+      reproduced it byte for byte and published a terminal accepted package.
+    provenance: ai-executed
+    files_changed:
+      - "bench/world_model_lifecycle/results/formal/"
+      - "bench/world_model_lifecycle/results/operator-v1.20/"
+      - "bench/world_model_lifecycle/results/adjudication-v1.20/"
+      - "artifacts/wm001-reviews/formal-v1.20.0.json"
+  - turn: 1
+    action: >-
+      Independently recomputed raw metrics and gates, verified the accepted
+      package from the exact clean bound commit, authored the formal results
+      record, corrected repository status surfaces, and crystallized the ARA.
+    provenance: ai-executed
+    files_changed:
+      - "docs/wm001-v1200-formal-results.md"
+      - "README.md"
+      - "bench/world_model_lifecycle/README.md"
+      - "docs/architecture.md"
+      - "ara/"
+
+claims_touched:
+  - id: C05
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: >-
+      The user's target was to demonstrate that Prospect collects experience,
+      learns from it, improves its behavior, and retains that improvement.
+  - turn: 1
+    excerpt: >-
+      The user asked for real numbers and a direct verdict on whether the agent
+      is working or still requires work.
+  - turn: 1
+    excerpt: >-
+      The accepted evidence answers yes for one sealed fixture and leaves broad
+      maturity, autonomy, transfer, calibration, and external competitiveness
+      unresolved.
+
+open_threads:
+  - "Design and prospectively seal a broader WM-002 maturity experiment with held-out task families, active experience selection, calibration, scalable replay, and an external benchmark."
+
+ai_suggestions_pending:
+  - "Freeze WM-001 as the causal foundation and make WM-002 a matched-budget transfer/autonomy/calibration benchmark rather than another same-fixture harness repair."

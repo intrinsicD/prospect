@@ -600,3 +600,118 @@ tree:
     also_depends_on: [N23, N24, N25]
     status: resolved
     children: []
+  - id: N27
+    type: experiment
+    title: "Retire v1.17 at independent rehearsal verification"
+    provenance: ai-executed
+    timestamp: "2026-07-23T09:10+02:00"
+    result: >-
+      Protocol v1.17 repaired the real audit-package consumer and reached an
+      authentic accepted, outer-finalized result-free rehearsal. Its mandatory
+      independent verifier then rejected the valid formal-binding v10 matrix
+      identity by requiring a field that the production schema forbids. No
+      formal authority, producer, outcome, or scientific result was created;
+      the version was retired without retry.
+    evidence:
+      - "docs/wm001-v1170-independent-rehearsal-verifier-failure.md"
+      - "README.md"
+    also_depends_on: [N23, N24, N25, N26]
+    status: resolved
+    children: []
+  - id: N28
+    type: experiment
+    title: "Reject v1.18 after formal-audit timeout"
+    provenance: ai-executed
+    timestamp: "2026-07-23T09:10+02:00"
+    result: >-
+      Protocol v1.18 repaired rehearsal verification and completed its sole
+      sealed formal producer. The only independent formal audit reached the
+      bound 600-second deadline before emitting any report. The authenticated
+      timeout carried no reviewed gates, adjudication performed zero replay,
+      and the terminal package rejected v1.18. The attempt resolves no
+      scientific endpoint in either direction.
+    evidence:
+      - "docs/wm001-v1180-formal-audit-timeout.md"
+      - "artifacts/wm001-reviews/formal-v1.18.0.json"
+    also_depends_on: [N27]
+    status: resolved
+    children: []
+  - id: N29
+    type: experiment
+    title: "Retire v1.19 at development-closure custody"
+    provenance: ai-executed
+    timestamp: "2026-07-23T09:10+02:00"
+    result: >-
+      Protocol v1.19 expanded the audit deadline and proved capacity with two
+      complete accepted development-audit executions. Its sole closure then
+      rejected the valid outer-finalized producer manifest because a generic
+      JSON reader silently required one hard link while the terminal and outer
+      completion correctly share one two-link inode. No closure, binding,
+      formal authority, or scientific outcome was created.
+    evidence:
+      - "docs/wm001-v1190-development-closure-custody-failure.md"
+      - "git:700c9ac"
+    also_depends_on: [N28]
+    status: resolved
+    children: []
+  - id: N30
+    type: experiment
+    title: "Accept the complete WM-001 v1.20 formal lifecycle"
+    provenance: ai-executed
+    timestamp: "2026-07-23T09:10+02:00"
+    result: >-
+      Protocol v1.20 repaired explicit two-link manifest capture and completed
+      one eight-seed formal producer. K0-K7 all passed. Task-A NLL improved by
+      3.6213 [3.5577, 3.6850] versus frozen and executed return improved by
+      955.49 [761.59, 1149.39] versus cold/frozen. Naive B-only learning forgot
+      task A by 1224.09 [1045.60, 1402.58], while replay beat naive on A by
+      1370.55 [1296.45, 1444.65] with no material B cost; every restore
+      difference was zero. The independent auditor passed 6,393,061 checks
+      with zero failures or gaps. Three semantic referee passes accepted the
+      bounded claim. Single-use adjudication reproduced the audit byte for byte,
+      published a terminal accepted package, and a clean bound-state supported
+      verifier exited zero and printed accepted.
+    evidence:
+      - "docs/wm001-v1200-formal-results.md"
+      - "bench/world_model_lifecycle/results/formal/4e4a88bc7ffa4245d1031263ef9d1bd9096ce87565c21ec15abb3516e4a743d6/confirmation-v1.20.0"
+      - "bench/world_model_lifecycle/results/operator-v1.20/audits/formal-audit-v1.20.0"
+      - "artifacts/wm001-reviews/formal-v1.20.0.json"
+      - "bench/world_model_lifecycle/results/adjudication-v1.20/formal-adjudication-v1.20.0"
+      - "git:98acfdcc51e76decab76835dc709f6e7400d06d4"
+    also_depends_on: [N29]
+    status: resolved
+    children: []
+  - id: N31
+    type: decision
+    title: "Accept the bounded mechanism without claiming maturity"
+    provenance: ai-executed
+    timestamp: "2026-07-23T09:10+02:00"
+    choice: >-
+      Treat v1.20 as the first accepted fixture-specific collect-to-persist
+      result, freeze WM-001 as the causal foundation, and explicitly leave
+      mature general agency, broad transfer, multimodal learning, autonomous
+      exploration, novelty, and benchmark superiority unresolved.
+    alternatives:
+      - "Infer mature general agency from one accepted Pendulum fixture."
+      - "Discard the accepted mechanism result because its scope is narrow."
+      - "Continue repairing or rerunning WM-001 instead of advancing scope."
+    evidence:
+      - N30
+      - "docs/wm001-v1200-formal-results.md"
+      - "artifacts/wm001-reviews/formal-v1.20.0.json"
+    also_depends_on: [N30]
+    status: resolved
+    children: []
+  - id: N32
+    type: question
+    title: "Scale the accepted mechanism toward agent maturity"
+    provenance: user
+    timestamp: "2026-07-23T09:10+02:00"
+    description: >-
+      Given that the bounded agent now works, what architecture, data,
+      uncertainty calibration, autonomous experience selection, continual-
+      learning scale, and external benchmark evidence are required for the
+      same mechanism to become a mature, broadly working agent?
+    also_depends_on: [N30, N31]
+    status: open
+    children: []

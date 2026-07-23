@@ -80,3 +80,41 @@
   audit, review, and adjudication all absent
 - **Forensic nodes**: N23, N24, N25, N26
 - **Crystallized claim**: C04
+
+## WM-001 protocol 1.20.0 accepted formal lifecycle
+
+- **Disposition**: terminally accepted for the exact bounded fixture claim
+- **Tracked results review**: `docs/wm001-v1200-formal-results.md`
+- **Bound commit**:
+  `98acfdcc51e76decab76835dc709f6e7400d06d4`
+- **Protocol SHA-256**:
+  `e3ca74157cde18ca9d1011d14a61e2bd756505e825f88965cd6ec4ea4749ffe2`
+- **Formal binding SHA-256**:
+  `4e4a88bc7ffa4245d1031263ef9d1bd9096ce87565c21ec15abb3516e4a743d6`
+- **Producer root**:
+  `bench/world_model_lifecycle/results/formal/4e4a88bc7ffa4245d1031263ef9d1bd9096ce87565c21ec15abb3516e4a743d6/confirmation-v1.20.0`
+- **Raw result SHA-256**:
+  `27834c95f37a74474e458300f399930e600b885a79759a9ab5031bb4c81f40c3`
+- **Producer manifest SHA-256**:
+  `25c3dfd6ddb2cd8163425cdfe6e461526edb9ae7000b6e95b13b486c0b468e79`
+- **Independent audit**:
+  `bench/world_model_lifecycle/results/operator-v1.20/audits/formal-audit-v1.20.0`
+  (`b55cb47eea9d230d8efd5e6b082a3d2acfdec8ab2c3ff7d91e4b2d4a65bae192`;
+  6,393,061 passed checks, zero failures, zero coverage gaps)
+- **Semantic review**:
+  `artifacts/wm001-reviews/formal-v1.20.0.json`
+  (`feeeee756294e2ae726b653a3f04483abd225efed9741f100498bb1dd95a9f4c`;
+  accepted, K0-K7 reviewed, zero fatal findings)
+- **Accepted adjudication**:
+  `bench/world_model_lifecycle/results/adjudication-v1.20/formal-adjudication-v1.20.0`
+  (manifest
+  `636804e7e74043386dd5ee8480a1bc48949ab38b434cc26a3ef769e1b3a9416c`;
+  supplied and reproduced audits byte-identical)
+- **Key effects (`n = 8`, paired 95% Student-t intervals)**:
+  task-A NLL gain vs frozen `3.6213 [3.5577, 3.6850]`; task-A
+  executed-return gain vs cold/frozen `955.49 [761.59, 1149.39]`; naive
+  task-A forgetting `1224.09 [1045.60, 1402.58]`; replay-vs-naive task-A
+  advantage `1370.55 [1296.45, 1444.65]`; all restore differences zero
+- **Exact pooled coverage**: `50,422 / 51,200 = 0.9848046875`
+- **Forensic nodes**: N27, N28, N29, N30, N31
+- **Crystallized claim**: C05

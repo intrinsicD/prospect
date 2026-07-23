@@ -3,10 +3,10 @@
 - **Working title:** Auditable Learning and Retention in World-Model Agents
 - **Author:** Alexander Dieckmann
 - **Venue:** Not selected
-- **Status:** WM-001 v1.16 completed engineering qualification through accepted
-  binding, but its mandatory result-free pre-root rehearsal failed before child
-  dispatch. No v1.16 formal authority, producer, outcome, or capability result
-  exists; the complete learning-and-retention claim remains unresolved
+- **Status:** WM-001 v1.20 is terminally accepted for one exact eight-seed
+  Pendulum/oscillator collect → learn → improve → retain → persist lifecycle.
+  The result establishes the bounded mechanism, not mature general agency,
+  broad task transfer, multimodal learning, autonomy, or benchmark superiority
 
 ## Layer index
 

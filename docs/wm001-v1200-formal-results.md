@@ -46,11 +46,15 @@ It is not evidence that Prospect is already a mature or general agent.
   `d2744e93f8c1f1b33a46ba50ddc997525764eacea39f2e3c1474696782be63a1`
 - Adjudication manifest:
   `636804e7e74043386dd5ee8480a1bc48949ab38b434cc26a3ef769e1b3a9416c`
+- Adjudication outer completion:
+  `d8ac19e9d30a4f5fa88a951ee9d32d53766c2bc95e039aa4e539f5c78a243af7.json`,
+  the same inode and bytes as the adjudication manifest
 - Auditor source:
   `fd722bc63fd483df7875bbf6b7ec77acba7e17310c748fa6fbbadc76b6bbf84e`
 
-The formal producer contains 429 manifested files and 4,401,570,918 declared
-bytes. It ran from `2026-07-22T23:42:20.983445Z` through
+The formal producer contains 429 manifested files plus its manifest: 430 files
+and 4,401,639,070 bytes total. The declared payload is 4,401,570,918 bytes. It
+ran from `2026-07-22T23:42:20.983445Z` through
 `2026-07-23T03:46:28.711266Z`. The fresh formal seeds were:
 
 ```text
@@ -153,8 +157,9 @@ auditor source and runtime, returned `0`, wrote empty stderr, and took
 1,153,999,216,409 ns. Supplied and reproduced reports are byte-identical at
 SHA-256 `b55cb47e...e192`.
 
-The terminal 31-file adjudication package has disposition `accepted`, outcome
-kind `audit_report`, `audit_byte_identical: true`,
+The terminal package has 31 manifest-listed files plus its manifest, 32 files
+and 1,926,157 bytes total. It has disposition `accepted`, outcome kind
+`audit_report`, `audit_byte_identical: true`,
 `supplied_audit_clean_for_claim: true`, and `terminal: true`. Same-version
 replay is forbidden.
 
@@ -176,6 +181,14 @@ It also:
 - checked the required hard-link custody relationships; and
 - verified the outer-finalized accepted package with the supported package
   verifier.
+
+One first post-outcome package-verifier invocation overlapped the documentation
+edits in this results record. Its live preformal identity check correctly
+rejected the dirty Git tree. No experiment, audit, adjudication, or evidence
+write was repeated. After the documentation was committed, the same read-only
+supported verifier was rerun from the exact clean bound commit
+`98acfdcc51e76decab76835dc709f6e7400d06d4`; it exited `0` and printed
+`accepted`.
 
 The final documentation correction changes the repository's current status
 from “no v1.20 result exists” and “the complete bounded lifecycle remains

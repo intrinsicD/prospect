@@ -335,3 +335,42 @@ observations:
     promoted_to: "logic/solution/constraints.md:R09"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O20
+    timestamp: "2026-07-23T09:10+02:00"
+    provenance: ai-suggested
+    content: >-
+      Within the exact WM-001 v1.20 eight-seed Pendulum and learned-oscillator
+      fixture, a terminal accepted package supports the continuous identified-
+      experience-to-shared-update-to-prediction-and-behavior-to-interference-
+      and-replay-to-fresh-process-persistence chain. This is bounded mechanism
+      evidence and does not establish a mature or general agent.
+    context: >-
+      K0-K7 passed; the independent auditor passed 6,393,061 checks with zero
+      failures or gaps; three semantic referee passes found no fatal defect;
+      and adjudication reproduced the audit byte for byte before publishing an
+      accepted package that a clean-state supported verifier reopened.
+    potential_type: claim
+    bound_to: [N30, N31]
+    promoted: true
+    promoted_to: "logic/claims.md:C05"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O21
+    timestamp: "2026-07-23T09:10+02:00"
+    provenance: ai-suggested
+    content: >-
+      The next maturity program should freeze WM-001 as the bounded causal
+      foundation and test the same architecture across broader held-out task
+      families, autonomous or uncertainty-directed experience selection,
+      calibrated uncertainty, adaptive replay, longer horizons, and an
+      externally recognizable benchmark under matched budgets.
+    context: >-
+      The user asked whether the agent now works and what remains. WM-001
+      resolves the existence of one working lifecycle but leaves generality,
+      autonomy, calibration, scale, and external competitiveness unopened.
+    potential_type: heuristic
+    bound_to: [N32]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
