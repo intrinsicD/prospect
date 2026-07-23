@@ -30,23 +30,21 @@ The repository contains:
   independent-evidence program in
   [WM-001](bench/world_model_lifecycle/README.md).
 
-WM-001 protocols 1.3.0 and 1.4.0 have each completed one eight-seed formal
-attempt. Both producer results passed K0–K7 with strong fixture-specific effects
-and exact fresh-process parity. Version 1.4 also passed a direct run of its
-corrected pre-bound auditor: 6,393,031 checks, zero failures, and zero coverage
-gaps.
+WM-001 protocol 1.20.0 completed one eight-seed formal lifecycle and is
+formally accepted for its exact bounded claim. Its producer passed K0–K7; the
+bound independent auditor passed 6,393,061 checks with zero failures and zero
+coverage gaps; and the single-use adjudicator reproduced that report byte for
+byte before publishing a terminal accepted package. The
+[v1.20 formal results](docs/wm001-v1200-formal-results.md) record the effects,
+evidence identities, adversarial review, limitations, and next-test boundary.
 
-Version 1.4 still did not receive formal acceptance. Mandatory adjudication runs
-the captured auditor under `python -I`; on the bound machine that hid the
-user-site locations from which two bound distributions had been resolved, so
-the adjudication-time audit could not reproduce the passing report. The
-accepted package was refused, and the harness also refused to package the
-failing audit as rejected. The repository therefore still has no accepted
-demonstration of the complete claim. The
-[v1.4 formal results review](docs/wm001-v140-formal-results.md) preserves the
-strong bounded evidence, the exact failure, and the requirements for a new
-protocol version. The earlier
-[v1.3 review](docs/wm001-v130-formal-results.md) remains immutable history.
+This establishes one fixture-specific collect → learn → improve → retain →
+persist chain on two observed-context Pendulum regimes. It does not establish a
+mature or general agent, broad continual learning, multimodal capability,
+autonomous exploration, novelty, or benchmark superiority. The
+[v1.4 formal results review](docs/wm001-v140-formal-results.md) and earlier
+[v1.3 review](docs/wm001-v130-formal-results.md) remain immutable attempt
+history.
 
 ## Layout
 
@@ -188,10 +186,12 @@ completion to be the same two-link inode. No closure, binding, formal authority,
 or scientific outcome exists. The exact evidence and fresh-version repair are
 preserved in the
 [v1.19 development-closure custody failure](docs/wm001-v1190-development-closure-custody-failure.md).
-Protocol 1.20 is the active prospective successor. It captures the finalized
-producer manifest under an explicit two-link contract, derives its canonical
-object and digest from the same bytes, and adds real closure-composition
-regressions. The scientific system and v1.19 audit-capacity contract are
-unchanged. Its [confirmation plan](docs/wm001-v1200-confirmation-plan.md) and
-[operator runbook](docs/wm001-v1200-operator-runbook.md) are pre-outcome; no
-v1.20 lifecycle claim or result exists yet.
+Protocol 1.20 repaired the closure-custody seam, passed its full prospective
+sequence, completed one eight-seed formal producer, passed an independent
+6,393,061-check audit, received an accepted semantic review, and reproduced
+the audit byte for byte during single-use adjudication. The outer-finalized
+package is terminally accepted for the exact bounded claim. Its frozen
+[confirmation plan](docs/wm001-v1200-confirmation-plan.md) and
+[operator runbook](docs/wm001-v1200-operator-runbook.md) remain pre-outcome
+records; the [formal results](docs/wm001-v1200-formal-results.md) are the
+post-outcome interpretation.

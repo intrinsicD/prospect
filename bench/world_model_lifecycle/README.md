@@ -18,14 +18,17 @@ that Prospect passes them.
 
 ## Current status
 
-Protocol 1.20.0 is the active prospective successor. It repairs only the
-closure custody seam: the finalized producer manifest is captured explicitly
-at two links, its object and digest come from those same bytes, and real
-composition tests reject one-link, overlinked, and verifier-divergent inputs.
-The scientific system and v1.19 audit-capacity contract are unchanged. Its
+Protocol 1.20.0 completed its entire prospectively sealed lifecycle and is
+terminally accepted for the exact bounded WM-001 claim. One eight-seed formal
+producer passed K0–K7; the bound independent auditor passed 6,393,061 checks
+with zero failures and zero coverage gaps; three adversarial semantic referee
+passes found no fatal defect; and single-use adjudication reproduced the audit
+byte for byte before publishing the accepted package. The
+[v1.20 formal results](../../docs/wm001-v1200-formal-results.md) record the
+effects, identities, limitations, and next-test boundary. The frozen
 [confirmation plan](../../docs/wm001-v1200-confirmation-plan.md) and
-[operator runbook](../../docs/wm001-v1200-operator-runbook.md) are pre-outcome;
-no v1.20 lifecycle claim exists yet.
+[operator runbook](../../docs/wm001-v1200-operator-runbook.md) remain the
+pre-outcome authority.
 Protocol 1.19.0 repaired the v1.18 audit-runtime defect: its complete
 development audit ran twice under the sealed outcome role and passed the exact
 capacity projection. Its sole development closure then rejected the valid
@@ -206,10 +209,11 @@ development audit. The sole closure then failed on the hidden one-link reader
 predicate. The
 [v1.19 failure record](../../docs/wm001-v1190-development-closure-custody-failure.md)
 defines the exact evidence and successor boundary.
-The active prospective repair is the
-[v1.20 confirmation plan](../../docs/wm001-v1200-confirmation-plan.md), with
-its one-shot sequence in the
-[v1.20 operator runbook](../../docs/wm001-v1200-operator-runbook.md).
+Protocol 1.20 completed the frozen
+[confirmation plan](../../docs/wm001-v1200-confirmation-plan.md) and one-shot
+[operator runbook](../../docs/wm001-v1200-operator-runbook.md). Its accepted
+post-outcome disposition is recorded in the
+[v1.20 formal results](../../docs/wm001-v1200-formal-results.md).
 Protocol 1.15.0 passed its result-free rehearsal, development, accepted audit,
 closure, sealed-runtime reopen, preformal report, accepted binding, and the
 operator-recorded final stop/go gate. The sole formal invocation then returned
@@ -402,6 +406,20 @@ complete producer file set by byte length and SHA-256. Attempts are never
 resumed, overwritten, or repaired in place.
 
 ## Two lanes and two seals
+
+The v1.20 development lane used two fresh claim-ineligible seeds at full
+budgets to qualify the implementation, audit capacity, closure, runtime reopen,
+and binding path. Its sole formal lane then used these eight fresh seeds:
+
+```text
+3772418031, 1586188972, 155797552, 2704051827,
+818738828, 4077496645, 1566512625, 2151461680
+```
+
+That formal result is the sole claim-eligible v1.20 outcome. It passed K0–K7,
+independent audit, semantic review, descriptor-bound reproduction, and
+adjudication packaging. Development values and all earlier versions remain
+ineligible as replications of the accepted result.
 
 The retired v1.16 development rehearsal used only seeds `3922749719` and
 `1847570536` and the complete formal budgets. It is useful only for schema, deterministic
@@ -643,15 +661,15 @@ advance only when all of the following are true:
 - an adversarial semantic review finds no critical lineage, leakage, mechanism,
   statistical, or scope error.
 
-If any condition fails, report the last valid rung and the failure evidence. Do
-not describe the complete collect → learn → improve → retain claim as
-demonstrated.
+If any condition fails, report the last valid rung and the failure evidence. A
+complete fixture claim is demonstrated only by a terminal accepted package;
+v1.20 is the first version to meet that condition.
 
 ## Interpretation boundary
 
-Even a complete WM-001 pass would establish one causal lifecycle on two
+The accepted v1.20 pass establishes one causal lifecycle on two
 observed-context variants of Pendulum-v1 under one bound software and hardware
-environment. It would not establish general intelligence, multimodal learning,
+environment. It does not establish general intelligence, multimodal learning,
 long-horizon exploration, cross-hardware bitwise reproducibility, architectural
 novelty, or superiority to published state of the art. Those require later
 experiments and external benchmarks.

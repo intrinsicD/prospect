@@ -522,27 +522,27 @@ authenticated failure occurred before canonical closure publication, so no
 binding, formal authority, or scientific outcome exists. The evidence and
 fresh-version correction are recorded in the
 [v1.19 development-closure custody failure](wm001-v1190-development-closure-custody-failure.md).
-Protocol 1.20 is the active prospective successor. It replaces the implicit
-one-link read with explicit two-link finalized-manifest capture, derives the
-canonical object and digest from those same bytes, and exercises the real
-producer-to-closure composition seam. Its scientific blocks, kernels,
-serialized representations, and v1.19 audit-capacity contract remain frozen.
-The [v1.20 confirmation plan](wm001-v1200-confirmation-plan.md) and
-[operator runbook](wm001-v1200-operator-runbook.md) define its pre-outcome
-evidence program; no v1.20 result exists yet.
+Protocol 1.20 repaired that custody seam without changing the scientific
+system, completed its frozen eight-seed formal lifecycle, and is terminally
+accepted for the exact bounded WM-001 claim. The producer passed K0–K7; the
+bound independent auditor passed 6,393,061 checks with zero failures or gaps;
+and adjudication reproduced the audit byte for byte before publishing the
+accepted package. The [v1.20 confirmation plan](wm001-v1200-confirmation-plan.md)
+and [operator runbook](wm001-v1200-operator-runbook.md) remain the pre-outcome
+authority. The [v1.20 formal results](wm001-v1200-formal-results.md) define the
+post-outcome evidence, scope, limitations, and next-test boundary.
 
 ## Open engineering boundaries
 
 - WM-001 supplies the first probabilistic neural world-model and fixed-budget
-  control backend without changing lifecycle semantics, but its collect → learn
-  → improve → retain claim remains unestablished until one formal artifact
-  passes independent audit, semantic review, descriptor-bound reproduction, and
-  external adjudication packaging.
-- Protocols 1.10 through 1.19 are terminally retired. Version 1.19 verified its
-  development audit-capacity repair but failed before closure because one
-  consumer imposed the wrong hard-link contract. Protocol 1.20 is the fresh
-  prospective repair. The complete lifecycle claim remains unestablished until
-  its one formal artifact passes every audit and adjudication gate.
+  control backend without changing lifecycle semantics. Protocol 1.20 now
+  establishes the fixture-specific collect → learn → improve → retain → persist
+  claim after independent audit, semantic review, byte-identical
+  descriptor-bound reproduction, and accepted adjudication packaging.
+- Protocols 1.10 through 1.19 remain terminally retired evidence-path history.
+  Version 1.20 is the first accepted bounded lifecycle, but it does not establish
+  mature general agency, transfer across task families, autonomous data
+  selection, multimodal learning, or external-benchmark competitiveness.
 - The custody layer is deliberately not hardened against the repository or
   environment owner, noncooperating same-account writers, privileged actors, a
   compromised kernel, or transient mutate-and-restore attacks. External
