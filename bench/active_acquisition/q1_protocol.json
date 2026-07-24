@@ -1,0 +1,544 @@
+{
+  "schema": "prospect.wm002.active-acquisition.q1-protocol.v1",
+  "experiment": {
+    "id": "WM-002-Q1",
+    "protocol_version": "0.3.0-q1",
+    "status": "prospective_claim_ineligible_runtime_qualification",
+    "claim_eligible": false,
+    "formal_authorized": false,
+    "execution_authorized": false,
+    "statement": "This successor protocol freezes the Q1 runtime qualification contract. Q1 execution remains disabled until a canonical Q1 entry-qualification report passes against these exact bytes, the frozen implementation manifest, the six frozen artifact schemas, the committed private salt, and the accepted Q0 binding."
+  },
+  "q0_binding": {
+    "report_sha256": "779e8d8128312da2239107058137faac54751df620efb31291c0af98c2b8f243",
+    "report_schema": "prospect.wm002.active-acquisition.q0-qualification.v1",
+    "protocol_sha256": "90b73ad4815380f113f91d0542bf7b91fd7e5196b5afd7f8c46b7fde9ec070cb",
+    "implementation_sha256": "c9e6689a0ce66e5b79f733c057b839a155500908ba21a5adbf64637cb090c324",
+    "required_flags": {
+      "passed": true,
+      "claim_eligible": false,
+      "formal_authorized": false,
+      "environment_interactions": 0
+    },
+    "rule": "The Q1 entry gate validates these three Q0 identities independently. The Q1 successor protocol digest is intentionally different from the accepted Q0 protocol digest."
+  },
+  "target": {
+    "id": "wm002-acquisition-observation-and-terminal-success",
+    "kind": "composite_observation_regime_and_outcome",
+    "description": "phase-qualified acquisition observation, inferred hidden actuator regime, and executed terminal success; the belief distribution represents the regime while action-conditional predictions represent the phase-qualified observable",
+    "prediction_support": [
+      "acquisition action-specific observed symbol",
+      "terminal failure or success"
+    ],
+    "rule": "Goal, Prediction, InformationValue, scoring, acquisition assessment, and terminal assessment use this same target identity and description."
+  },
+  "candidates": {
+    "acquisition_order": [
+      {
+        "ordinal": 0,
+        "semantic_id": "skip",
+        "domain_action_id": "acquisition:00:skip"
+      },
+      {
+        "ordinal": 1,
+        "semantic_id": "weak",
+        "domain_action_id": "acquisition:01:weak"
+      },
+      {
+        "ordinal": 2,
+        "semantic_id": "strong",
+        "domain_action_id": "acquisition:02:strong"
+      },
+      {
+        "ordinal": 3,
+        "semantic_id": "overpowered",
+        "domain_action_id": "acquisition:03:overpowered"
+      },
+      {
+        "ordinal": 4,
+        "semantic_id": "nuisance",
+        "domain_action_id": "acquisition:04:nuisance"
+      }
+    ],
+    "terminal_order": [
+      1,
+      -1
+    ],
+    "terminal_tie_break": 1,
+    "negative_pulses": "Q0-only non-candidate sign-label probes"
+  },
+  "fixture": {
+    "id": "wm002-hidden-actuator-v0",
+    "prior_direct": "1/2",
+    "actions": {
+      "skip": {
+        "outcomes": [
+          0
+        ],
+        "likelihood": "1",
+        "physical_action_cost": "0",
+        "information_acquisition_cost": "0",
+        "expected_prior_return": "1/2"
+      },
+      "weak": {
+        "outcomes": [
+          -1,
+          1
+        ],
+        "reliability": "7/10",
+        "physical_action_cost": "53/100",
+        "information_acquisition_cost": "0",
+        "expected_prior_return": "63/100"
+      },
+      "strong": {
+        "outcomes": [
+          -1,
+          1
+        ],
+        "reliability": "9/10",
+        "physical_action_cost": "29/50",
+        "information_acquisition_cost": "0",
+        "expected_prior_return": "37/50"
+      },
+      "overpowered": {
+        "outcomes": [
+          -1,
+          1
+        ],
+        "reliability": "1",
+        "physical_action_cost": "19/20",
+        "information_acquisition_cost": "0",
+        "expected_prior_return": "9/20"
+      },
+      "nuisance": {
+        "outcomes": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "likelihood_each": "1/4 independent of hidden regime",
+        "physical_action_cost": "0",
+        "information_acquisition_cost": "1/100",
+        "expected_prior_return": "49/100"
+      }
+    },
+    "pulse_immediate_payoff": "1[observed_symbol=+1]",
+    "terminal": {
+      "match_success_probability": "9/10",
+      "mismatch_success_probability": "1/10",
+      "reward": "1[success]"
+    },
+    "executed_episode_return": "task_payoff - physical_action_cost - information_acquisition_cost + terminal_success"
+  },
+  "arms": [
+    {
+      "id": "prospect_expected_return",
+      "selection_kind": "expected_episode_net_return",
+      "selection_unit": "return",
+      "required_prior_action": "strong"
+    },
+    {
+      "id": "independent_fraction_oracle",
+      "selection_kind": "independent_expected_episode_net_return",
+      "selection_unit": "return",
+      "required_prior_action": "strong"
+    },
+    {
+      "id": "goal_only",
+      "selection_kind": "goal_only_expected_return",
+      "selection_unit": "return",
+      "required_prior_action": "skip"
+    },
+    {
+      "id": "raw_observation_entropy",
+      "selection_kind": "raw_observation_entropy",
+      "selection_unit": "nats",
+      "required_prior_action": "nuisance"
+    },
+    {
+      "id": "eig_only",
+      "selection_kind": "expected_information_gain",
+      "selection_unit": "nats",
+      "required_prior_action": "overpowered"
+    },
+    {
+      "id": "shuffled_information",
+      "selection_kind": "shuffled_information_expected_episode_net_return",
+      "selection_unit": "return",
+      "required_prior_action": "weak",
+      "selection_information_source_by_action": {
+        "skip": "skip",
+        "weak": "overpowered",
+        "strong": "weak",
+        "overpowered": "strong",
+        "nuisance": "nuisance"
+      },
+      "learner_likelihood": "true likelihood of the executed action"
+    },
+    {
+      "id": "uniform_random",
+      "selection_kind": "uniform_random",
+      "selection_unit": null,
+      "required_prior_action": "seed_dependent"
+    }
+  ],
+  "runtime": {
+    "authoritative_path": "EpistemicAgent.interact -> EpistemicAgent.learn -> checkpoint -> EpistemicAgent.interact",
+    "steps_per_episode": 2,
+    "acquisition_updates_per_episode": 1,
+    "terminal_updates_per_episode": 0,
+    "fresh_component_graph_per_episode": true,
+    "restore_process_rule": "One verifier interpreter per (master, arm) is permitted; its PID must differ from the producer and it must construct a fresh component graph for every framed checkpoint.",
+    "checkpoint_frame_format": "At frame_offset, an 8-byte unsigned big-endian header equals frame_length; exactly frame_length checkpoint payload bytes follow; frames are contiguous and end exactly at file EOF.",
+    "model_schema": "prospect.wm002.posterior-model.v1",
+    "likelihood_version": "wm002-hidden-actuator-true-v1",
+    "no_op_assimilation": true,
+    "checkpoint_boundary": "after the sole acquisition update commits and before terminal assessment",
+    "checkpoint_components": [
+      "domain_custody",
+      "episode_accumulator",
+      "identity_counter",
+      "posterior_model",
+      "qualification_binding"
+    ],
+    "max_restore_concurrency": 4,
+    "process_watchdogs": {
+      "producer_stage_timeout_seconds": 3600.0,
+      "restore_child_timeout_seconds": 900.0,
+      "restore_stage_timeout_seconds": 7200.0,
+      "process_terminate_grace_seconds": 10.0,
+      "rule": "Any timeout or parent-side exception terminates, then kills if needed, and reaps every started child before a failed marker may be finalized; if quiescence cannot be proven, the marker remains started."
+    },
+    "process_launch": {
+      "parent_cli_prefix": [
+        "<sys.executable>",
+        "-S",
+        "-m",
+        "bench.active_acquisition.q1",
+        "run"
+      ],
+      "parent_cli_no_site_required": true,
+      "worker_base_command_token_count": 5,
+      "producer_base_command": [
+        "<sys.executable>",
+        "-S",
+        "-m",
+        "bench.active_acquisition.q1",
+        "_producer-master"
+      ],
+      "restore_base_command": [
+        "<sys.executable>",
+        "-S",
+        "-m",
+        "bench.active_acquisition.restore_worker",
+        "q1"
+      ],
+      "capability_argument": [
+        "--capability-fd",
+        "<inherited-fd>"
+      ],
+      "working_directory": "canonical repository root",
+      "stdin": "subprocess.DEVNULL",
+      "inherited_descriptor_count": 1,
+      "child_environment": {
+        "allowlisted_keys": [
+          "LANG",
+          "LC_ALL",
+          "PATH",
+          "TZ",
+          "PYTHONDONTWRITEBYTECODE",
+          "PYTHONHASHSEED",
+          "PYTHONIOENCODING",
+          "PYTHONNOUSERSITE",
+          "PYTHONPATH",
+          "PYTHONSAFEPATH",
+          "PYTHONUTF8"
+        ],
+        "fixed_values": {
+          "LANG": "C.UTF-8",
+          "LC_ALL": "C.UTF-8",
+          "PATH": "os.defpath",
+          "TZ": "UTC",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONHASHSEED": "0",
+          "PYTHONIOENCODING": "utf-8",
+          "PYTHONNOUSERSITE": "1",
+          "PYTHONSAFEPATH": "1",
+          "PYTHONUTF8": "1"
+        },
+        "pythonpath_rule": "Exact ordered os.pathsep join of the resolved canonical repository root, its src directory, then resolved sysconfig purelib and platlib directories with duplicate paths omitted; every dependency path must be a non-symlink directory.",
+        "site_processing": false
+      }
+    },
+    "worker_capability": {
+      "transport_family": "AF_UNIX",
+      "transport_type": "SOCK_STREAM",
+      "wire_format": "4-byte unsigned big-endian payload length || 32-byte secret || canonical payload || 32-byte HMAC-SHA256 authenticator",
+      "secret_bytes": 32,
+      "payload_max_bytes": 65536,
+      "authenticator_bytes": 32,
+      "authentication_algorithm": "HMAC-SHA256",
+      "authentication_domain_hex": "70726f73706563742e776d3030322e6163746976652d6163717569736974696f6e2e71312d776f726b65722d6361706162696c6974792e763100",
+      "payload_encoding": "finite sorted compact canonical ASCII JSON",
+      "payload_schema": "prospect.wm002.active-acquisition.q1-worker-capability.v1",
+      "payload_fields": [
+        "arm",
+        "child_pid",
+        "master",
+        "parent_pid",
+        "paths",
+        "role",
+        "run_identity",
+        "schema"
+      ],
+      "path_fields": [
+        "attempt_registry_directory",
+        "entry_report_path",
+        "execution_root",
+        "frame_path",
+        "incomplete_directory",
+        "index_path",
+        "master_directory",
+        "output_path",
+        "prospective_review_path",
+        "q0_report_path",
+        "raw_trace_path",
+        "secret_salt_path"
+      ],
+      "binding_rule": "The authenticated canonical payload binds the exact positive parent PID sampled before Popen, the exact positive child PID returned by Popen, producer or restore role, master and arm, complete Q1 run identity, and the exact normalized absolute path field set.",
+      "marker_commitment": "SHA256 of the exact 32-byte operational capability secret",
+      "parent_half_close": "socket.SHUT_WR after the complete authenticated wire",
+      "acknowledgement_bytes": 32,
+      "acknowledgement_algorithm": "HMAC-SHA256",
+      "acknowledgement_domain_hex": "70726f73706563742e776d3030322e6163746976652d6163717569736974696f6e2e71312d776f726b65722d6361706162696c6974792d61636b2e763100",
+      "acknowledgement_rule": "HMAC-SHA256(secret, acknowledgement_domain || SHA256(canonical payload) || wire authenticator), followed by exact peer EOF with no trailing byte",
+      "shared_exchange_timeout_seconds": 10.0,
+      "deadline_origin": "One monotonic sample immediately after Popen returns is shared by complete wire delivery, parent half-close, exact acknowledgement, and peer EOF.",
+      "local_assurance_boundary": "PID bindings and inherited-descriptor custody are local same-account process checks. They do not claim PID-reuse resistance, kernel-backed peer identity, hostile same-account process exclusion, or external attestation."
+    },
+    "worker_capture": {
+      "stdout_max_bytes": 0,
+      "stderr_max_bytes": 65536,
+      "bounded_memory_tail_bytes": 2000,
+      "capture_finish_timeout_seconds": 2.0,
+      "rule": "Parent-owned CLOEXEC pipes are continuously drained after Popen. Any stdout byte, stderr overflow, drain failure, or capture that cannot finish inside the bound terminates and fails the worker; only the bounded tail may appear in diagnostics."
+    },
+    "filesystem_custody": {
+      "directory_mode": "0700",
+      "private_artifact_file_mode": "0600",
+      "public_report_file_mode": "0644",
+      "regular_file_link_count": 1,
+      "directory_identity_fields": [
+        "canonical_path",
+        "file_type",
+        "mode",
+        "st_dev",
+        "st_gid",
+        "st_ino",
+        "st_uid"
+      ],
+      "authority_roots": [
+        "execution_root",
+        "attempt_registry_directory"
+      ],
+      "authority_root_rule": "Both roots are exact-0700 non-symlink directories owned by the effective user, are bound by all seven directory identity fields, and must be distinct and nonnested.",
+      "publication_rule": "All six Q1 artifacts are one-link regular files with exact mode 0600 inside an exact-0700 output directory; entry-qualification and independent-audit reports are one-link regular files with exact mode 0644."
+    },
+    "external_inputs": {
+      "document_max_bytes": 8388608,
+      "secret_salt_min_bytes": 32,
+      "secret_salt_max_bytes": 8388608,
+      "secret_salt_mode": "0600",
+      "regular_file_link_count": 1,
+      "read_rule": "Every protocol, accepted-Q0, prospective-review, entry-report, schema, and private-salt input is read once from a bounded no-follow regular descriptor and rejected if its descriptor metadata or path identity changes before completion.",
+      "json_rule": "JSON documents are finite UTF-8 values with duplicate object keys rejected; documents required to be canonical must exactly equal their canonical newline-terminated bytes."
+    },
+    "identity_counter": {
+      "initial_value": 0,
+      "checkpoint_preterminal_value": 43,
+      "checkpoint_decode_max_next_counter": 64,
+      "rule": "Every acquisition checkpoint must decode to exact next_counter 43 before any range or set construction, and all checkpoint decoders reject values above 64 before allocation or iteration."
+    },
+    "final_output_files": [
+      "raw-trace.jsonl",
+      "private-audit.jsonl",
+      "checkpoint-index.jsonl",
+      "checkpoint-frames.bin",
+      "restored-trace.jsonl",
+      "aggregate.json"
+    ],
+    "temporary_worker_rule": "Master worker trees remain under the incomplete directory on failure and are removed only after all six consolidated artifacts validate, immediately before atomic publication.",
+    "initial_model_payload_utf8": "{\"evidence_count\":0,\"last_experience_id\":null,\"last_transition_id\":null,\"likelihood_version\":\"wm002-hidden-actuator-true-v1\",\"posterior_direct\":{\"denominator\":2,\"numerator\":1},\"schema\":\"prospect.wm002.posterior-model.v1\"}",
+    "initial_model_sha256": "cf2d08e552dc26826b388581052589a2ad26006d3f159e4416bfe135c54eded4",
+    "initial_model_version": "wm002-model-sha256:cf2d08e552dc26826b388581052589a2ad26006d3f159e4416bfe135c54eded4"
+  },
+  "truthful_assessment": {
+    "unit": "return",
+    "utility": "prior-optimal terminal value plus expected immediate acquisition payoff",
+    "information_reduction": "expected decision value of the acquisition observation",
+    "information_cost": "information-acquisition cost",
+    "action_cost": "physical action cost",
+    "total": "utility plus information_reduction minus information_cost minus action_cost",
+    "control_rule": "Arm-specific scores live only in bench diagnostic rows. Every core CandidateAssessment retains the truthful expected episode net return."
+  },
+  "privacy": {
+    "private_values": [
+      "secret salt",
+      "hidden regime",
+      "private HMAC bytes",
+      "balanced-order position",
+      "unchosen potential outcomes",
+      "future terminal outcomes"
+    ],
+    "agent_visible_acquisition_observation_fields": [
+      "phase",
+      "semantic_action",
+      "observed_symbol"
+    ],
+    "agent_visible_acquisition_outcome_fields": [
+      "information_acquisition_cost",
+      "net_reward",
+      "physical_action_cost",
+      "task_payoff"
+    ],
+    "agent_visible_terminal_observation_fields": [
+      "phase"
+    ],
+    "agent_visible_terminal_outcome_fields": [
+      "executed_terminal_action",
+      "success",
+      "terminal_reward"
+    ],
+    "public_reference_rule": "Public artifacts contain SHA256(secret_salt), canonical semantic-key digests, and execution facts only. They never contain the salt, private HMAC result, hidden regime, or unchosen realization.",
+    "sentinel_rule": "Recursive tests use recognizable salt, HMAC, counterfactual, and future-draw sentinels and must find none in serialized agent-visible records, model bytes, checkpoint components, restored traces, or public result rows.",
+    "hidden_regime_rule": "Because the private regime values -1 and +1 also legitimately occur as public actions and observations, value scanning cannot isolate them. Hidden-regime isolation instead requires strict field allowlists plus acquisition/learner noninterference under changed inaccessible regime and counterfactual tables while the visible executed transition is held fixed."
+  },
+  "seeding": {
+    "algorithm": "HMAC-SHA256",
+    "protocol_prefix": "WM-002|0.3.0-q1",
+    "private_namespaces": [
+      "q1v3-theta-balanced-order",
+      "q1v3-pulse-outcome",
+      "q1v3-nuisance-outcome",
+      "q1v3-terminal-outcome"
+    ],
+    "theta_schedule": "For each master, sort episode indices 0..1023 by the private q1v3-theta-balanced-order HMAC with episode index as final tie-break; assign -1 to the first 512 and +1 to the rest.",
+    "potential_outcomes": "Each draw is keyed independently by protocol version, namespace, master, episode, semantic action or terminal decision, and draw role.",
+    "uniform_selector": {
+      "private_salt_used": false,
+      "payload_utf8": "WM-002|0.3.0-q1|q1v3-uniform|<canonical master>|<canonical episode>",
+      "ordinal": "unsigned big-endian SHA256(payload_utf8) modulo 5"
+    },
+    "identity_counter_initialization": "Public constant zero in every fresh master/arm/episode-specific identity namespace; no secret salt or HMAC is used.",
+    "salt_commitment": "SHA256(secret_salt)",
+    "salt_custody": "The raw salt is supplied only to the trusted private execution lane (parent orchestrator, producer workers, and restore workers) and separately to the independent auditor. It is never serialized into a Q1 artifact.",
+    "public_semantic_key_field": "raw_trace.semantic_key_sha256 is SHA256 of the non-secret q1v3-theta-balanced-order semantic key for that master and episode; it is not an HMAC output or regime value."
+  },
+  "budget": {
+    "masters": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "arms": 7,
+    "episodes_per_master_arm": 1024,
+    "episodes_total": 28672,
+    "environment_steps_total": 57344,
+    "transitions_total": 57344,
+    "acquisition_updates_total": 28672,
+    "terminal_updates_total": 0,
+    "inference_unit": "master",
+    "overrun_rule": "Missing, duplicated, excluded, early-stopped, retried, or extra episodes, interactions, checkpoints, restores, or update invocations fail Q1-K0."
+  },
+  "attempt_integrity": {
+    "run_identity": "run_sha256 = SHA256(canonical JSON of schema=prospect.wm002.active-acquisition.q1-run-identity.v1, protocol_version, protocol_sha256, implementation_sha256, q0_report_sha256, entry_qualification_sha256, and salt_commitment_sha256); run_id = wm002-q1-<run_sha256>.",
+    "attempt_identity": "attempt_id = <run_id>-attempt-0001 records the complete immutable run binding inside the one experiment-global marker; changing run_id, salt commitment, entry qualification, or another binding never creates another attempt slot.",
+    "registry_rule": "Before the first Q1 private draw, the parent creates the fixed wm002-q1.attempt.json tombstone with O_CREAT|O_EXCL relative to an exact-0700 permission-restricted external registry descriptor, forces exact-0600 marker permissions, requires one hard link, and fsyncs file and directory. Any existing marker, regardless of embedded run identity or started, failed, or completed status, rejects execution.",
+    "failure_rule": "Once O_EXCL creates the fixed tombstone, even an initialization failure that leaves a partial marker consumes the sole attempt and rejects every local Q1 retry under any run identity. Later failure preserves the incomplete output tree and serially finalizes the marker as failed when possible; abrupt termination leaves started.",
+    "completion_rule": "Completion holds the registry lock, verifies the started marker has not changed, atomically binds SHA-256 of the exact six published artifacts in the same fixed marker, and fsyncs the replacement and registry directory.",
+    "artifact_binding": "run_id and attempt_id occur in every raw, private, checkpoint-index, restored, aggregate, audit, and checkpoint qualification-binding record.",
+    "assurance_boundary": "This is a local fail-closed study-integrity control. Immutable external attempt attestation remains future assurance and is not claimed by Q1."
+  },
+  "schemas": {
+    "raw_trace": "schemas/q1-raw-trace.schema.json",
+    "private_audit": "schemas/q1-private-audit.schema.json",
+    "checkpoint_frame": "schemas/q1-checkpoint-frame.schema.json",
+    "restored_trace": "schemas/q1-restored-trace.schema.json",
+    "aggregate": "schemas/q1-aggregate.schema.json",
+    "audit_output": "schemas/q1-audit-output.schema.json"
+  },
+  "entry_qualification": {
+    "report_schema": "prospect.wm002.active-acquisition.q1-entry-qualification.v1",
+    "must_pass_before_first_q1_draw": true,
+    "check_order": [
+      "accepted_q0_binding",
+      "successor_protocol_boundary",
+      "protocol_code_parity",
+      "artifact_schema_contract",
+      "selected_source_implementation_binding",
+      "private_salt_custody",
+      "authoritative_runtime_checkpoint_privacy_probe",
+      "execution_resource_and_single_attempt_preflight",
+      "emitted_artifact_schema_and_mutation_probe",
+      "independent_prospective_review"
+    ],
+    "required_checks": [
+      "canonical accepted Q0 report and three-part binding",
+      "canonical successor protocol identity and prospective authority boundary",
+      "complete selected-source Q1 implementation manifest",
+      "six strict artifact schemas and schema mutation rejection",
+      "exact candidate, arm, target, cost, update, checkpoint, budget, and seed parity",
+      "model codec and composed predecessor-relative validator invariants",
+      "recursive actual-value privacy allowlists and sentinels",
+      "learner counterfactual, hidden-regime, terminal-table, and future-draw causal noninterference",
+      "one synthetic authoritative acquisition-update-terminal path",
+      "one in-memory checkpoint round trip and fresh-process synthetic terminal replay",
+      "authenticated bounded synthetic orchestration of four producer and twenty-eight restore processes",
+      "five-token site-disabled worker commands, exact child environment, authenticated capability exchange, bounded capture, and watchdog failure semantics",
+      "stable bounded external inputs, exact directory identities, distinct nonnested authority roots, exact custody modes, and single-link files",
+      "exact preterminal identity counter 43 and fail-fast checkpoint decoder maximum 64",
+      "independent prospective implementation review"
+    ],
+    "interaction_boundary": "Qualification fixtures use only explicitly synthetic development values and namespace. They are not Q1 budget episodes, do not use a Q1 private schedule, and produce no Q1 outcome."
+  },
+  "analysis": {
+    "primary_comparison": "prospect_expected_return minus shuffled_information",
+    "conjunctive_non_oracle_controls": [
+      "goal_only",
+      "raw_observation_entropy",
+      "eig_only",
+      "shuffled_information",
+      "uniform_random"
+    ],
+    "master_statistic": "paired mean episode-return difference within each master",
+    "interval": "two-sided 95% Student-t interval over exactly four master-level paired mean differences",
+    "student_t_critical_df3": 3.182446305284263,
+    "standard_error": "sample standard deviation of the four master differences with denominator n-1, divided by sqrt(4)",
+    "positive_gate": "mean > 0 and confidence interval lower bound > 0 for every conjunctive comparison",
+    "return_reconstruction": "task_payoff - physical_action_cost - information_acquisition_cost + terminal_success",
+    "producer_aggregates_authoritative": false
+  },
+  "ordered_gates": [
+    "Q1-K0 prospective binding and exact budget",
+    "Q1-K1 lineage, primitive return, and hidden-state isolation",
+    "Q1-K2 truthful assessments and selector identities",
+    "Q1-K3 acquisition-linked transactional model change",
+    "Q1-K4 paired executed-return advantage",
+    "Q1-K5 fresh-process restoration parity"
+  ],
+  "audit": {
+    "module_separation": "The independent auditor may import fixture constants and low-level canonical codecs but must not import producer aggregates, producer gate booleans, or producer analysis functions.",
+    "private_recomputation": "The auditor receives the salt separately, reconstructs every private schedule and potential outcome, and verifies private sidecar membership.",
+    "raw_recomputation": "The auditor reopens raw and restored rows, resolves canonical ancestry, reconstructs all returns, selectors, posterior updates, counts, master statistics, intervals, ordered gates, and parity.",
+    "failure_rule": "A failed earlier gate terminates the accepted prefix. A later pass cannot rescue it."
+  },
+  "formal_boundary": {
+    "authorized": false,
+    "formal_protocol_version": null,
+    "formal_seed_set": [],
+    "formal_result_schema": null,
+    "statement": "Q0 and Q1 are permanently claim-ineligible. Passing Q1 qualifies only this exact known-model runtime chain and cannot be relabeled as learned uncertainty, general active learning, or formal capability evidence."
+  }
+}

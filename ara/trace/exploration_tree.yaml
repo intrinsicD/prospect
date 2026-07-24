@@ -715,3 +715,279 @@ tree:
     also_depends_on: [N30, N31]
     status: open
     children: []
+  - id: N33
+    type: decision
+    title: "Decompose agent maturity into a staged evidence program"
+    provenance: user-revised
+    timestamp: "2026-07-24T00:51+02:00"
+    choice: >-
+      Preserve the accepted maturity gaps as the research roadmap, but design
+      around them as causally isolated experiments rather than one monolithic
+      task. Keep assurance-only work on a parallel engineering track.
+    alternatives:
+      - "Test transfer, active acquisition, replay scale, multimodality, long horizons, and external competitiveness in one task."
+      - "Treat every missing diagnostic or benchmark adapter as an equally difficult scientific gap."
+      - "Drop the broader gaps and continue optimizing only the accepted WM-001 fixture."
+    evidence:
+      - N32
+      - O21
+      - "https://proceedings.mlr.press/v119/sekar20a.html"
+      - "https://automl.github.io/CARL/main/"
+      - "https://proceedings.neurips.cc/paper/2021/file/ef8446f35513a8d6aa2308357a268a7e-Paper.pdf"
+    also_depends_on: [N30, N31, N32]
+    status: resolved
+    children: []
+  - id: N34
+    type: decision
+    title: "Materialize the maturity backlog and start WM-002"
+    provenance: user-revised
+    timestamp: "2026-07-24T02:58+02:00"
+    choice: >-
+      Create dependency-ordered, falsifiable task documents; keep scientific
+      capability work separate from assurance; insert learned uncertainty as
+      U-001; split zero-shot transfer from online adaptation; branch continual
+      scale and partial observability after adaptation; and begin only WM-002's
+      claim-ineligible exact qualification.
+    alternatives:
+      - "Treat every maturity gap as one implementation task."
+      - "Proceed directly to transfer without first testing learned uncertainty."
+      - "Run Q1 or a formal attempt before exact Q0 protocol completeness."
+    evidence:
+      - N33
+      - O22
+      - "docs/maturity-roadmap.md"
+      - "docs/u001-learned-uncertainty-plan.md"
+      - "docs/wm003-heldout-transfer-plan.md"
+      - "docs/wm003b-online-adaptation-plan.md"
+    also_depends_on: [N32, N33]
+    status: resolved
+    children: []
+  - id: N35
+    type: dead_end
+    title: "Reject incomplete WM-002 Q0 proof surfaces"
+    provenance: ai-executed
+    timestamp: "2026-07-24T02:58+02:00"
+    hypothesis: >-
+      Correct marginalized exact-versus-float values, selector identities, and
+      a self-hashed protocol would be sufficient to accept Q0 as exhaustive and
+      protocol-complete.
+    failure_mode: >-
+      The first independent audit found no explicit 88-cell realization matrix,
+      shallow protocol and authority parity, incomplete cost and source
+      coverage, and overbroad boundaries. After those repairs, a systematic
+      mutation sweep still found normative fixture, prior, equation, control,
+      scope, vector-count, and authority fields that failed only through the
+      changed manifest digest rather than their named semantic gate.
+    lesson: >-
+      Self-binding bytes do not establish semantic parity. A finite exact
+      qualification requires explicit path enumeration, a complete normative
+      protocol projection, private audit-only cells, and targeted mutations
+      proving that every claim-bearing declaration fails closed independently
+      of the manifest hash.
+    evidence:
+      - N34
+      - "docs/wm002-q0-results.md"
+      - "bench/active_acquisition/qualification.py"
+      - "tests/test_active_acquisition_qualification.py"
+    also_depends_on: [N34]
+    status: resolved
+    children: []
+  - id: N36
+    type: experiment
+    title: "Accept WM-002 Q0 protocol qualification"
+    provenance: ai-executed
+    timestamp: "2026-07-24T02:58+02:00"
+    result: >-
+      The final analytical runner enumerated 88 unique exact cells and recovered
+      expected returns 1/2, 63/100, 37/50, 9/20, and 49/100. All matrix,
+      normative-protocol, authority, selector, cost, schema, and five-vector
+      gates passed with maximum float error 1.1102230246251565e-16. Eighty-two
+      focused tests and 167 repository checks passed. The independent auditor
+      reproduced the report byte-for-byte, recomputed the exact matrix and
+      selected-source manifest, found zero required misses in a 41-mutation
+      sweep, and accepted Q0 protocol completeness only. No environment,
+      learning, persistence, improvement, retention, Q1, restore, or formal
+      evidence ran.
+    evidence:
+      - N35
+      - "docs/wm002-q0-results.md"
+      - "bench/active_acquisition/protocol.json"
+      - "bench/active_acquisition/qualification.py"
+      - "tests/test_active_acquisition_qualification.py"
+      - "report-sha256:779e8d8128312da2239107058137faac54751df620efb31291c0af98c2b8f243"
+    also_depends_on: [N34, N35]
+    status: resolved
+    children: []
+  - id: N37
+    type: experiment
+    title: "Implement and result-free qualify the WM-002 Q1 runtime"
+    provenance: ai-executed
+    timestamp: "2026-07-24T13:10+02:00"
+    result: >-
+      Implemented the authoritative producer, fresh-process restore, streaming
+      consolidation, exact run/attempt binding, transactional rollback probe,
+      noninterference probe, no-replace publication, child watchdogs, and
+      selected-source entrypoint checks. The focused producer/restore suite
+      passed 17 tests and the adjacent Q1 integration set passed 205 tests;
+      the final independent static pass later reported 298 active-acquisition
+      tests, 112 focused authority/audit tests, Ruff, and 37-file Mypy clean.
+      No Q1 environment interaction, private schedule draw, outcome, attempt
+      claim, or capability result was produced because execution authorization
+      remains false.
+    evidence:
+      - N36
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/restore_worker.py"
+      - "tests/test_active_acquisition_q1.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "docs/wm002-q1-runtime-design.md"
+    also_depends_on: [N34, N36]
+    status: resolved
+    children: []
+  - id: N38
+    type: experiment
+    title: "Audit WM-002 Q1 design-to-code traceability"
+    provenance: ai-executed
+    timestamp: "2026-07-24T13:44+02:00"
+    result: >-
+      A result-free static trace plus pytest collection of 299
+      active-acquisition items found two pre-execution readiness gaps. The
+      counterfactual and future-draw noninterference probes vary arguments that
+      never enter the exercised runtime, and no happy-path test covers the
+      complete four-producer, 28-restore-lane, merge, validation, publication,
+      and completion-marker orchestration. The design was corrected for those
+      blocker dispositions, actual private-state ownership, checkpoint restore
+      order, and the current 62-file configured/34-file Q1-scoped Mypy counts.
+      Claim eligibility, formal authorization, and execution authorization
+      remain false; no private schedule, Q1 result, or final artifact was
+      accessed or produced.
+    evidence:
+      - N37
+      - "docs/wm002-q1-runtime-design.md"
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/checkpoint.py"
+      - "tests/test_active_acquisition_runtime_lane.py"
+      - "tests/test_active_acquisition_q1.py"
+      - "pytest-collect-only:299"
+    also_depends_on: [N34, N36, N37]
+    status: resolved
+    children: []
+  - id: N39
+    type: experiment
+    title: "Fault-inject and harden the WM-002 Q1 runtime"
+    provenance: ai-executed
+    timestamp: "2026-07-24T14:08+02:00"
+    result: >-
+      A result-free fault-injection audit replaced three optimized-Python-
+      removable production assertions with explicit failures; rejected
+      optimized parent and child interpreters; stripped hostile inherited
+      PYTHON variables while preventing child bytecode writes; bounded JSONL,
+      checkpoint-frame, and synthetic-restore resource use; made restore
+      outputs atomic no-replace; and bound restored checkpoint components,
+      checkpoint semantics, model identity, posterior, and consolidation
+      parity to producer records. Focused Q1/transaction tests passed 102/102
+      and the complete active-acquisition suite passed 337/337; Ruff lint and
+      touched-file format checks passed. Configured Mypy exposed one concurrent
+      unrelated test typing error after all audit-owned errors were repaired.
+      No Q1 authority, private schedule, environment outcome, attempt, or final
+      artifact was accessed or created.
+    evidence:
+      - N37
+      - N38
+      - "bench/active_acquisition/problem.py"
+      - "bench/active_acquisition/runtime_lane.py"
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "bench/active_acquisition/restore_worker.py"
+      - "tests/test_active_acquisition_q1.py"
+      - "pytest-focused:102-passed"
+      - "pytest-active-acquisition:337-passed"
+    also_depends_on: [N34, N36, N37, N38]
+    status: resolved
+    children: []
+  - id: N40
+    type: experiment
+    title: "Bind WM-002 Q1 private directory identities"
+    provenance: ai-executed
+    timestamp: "2026-07-24T15:37+02:00"
+    result: >-
+      Replaced path-only execution-root and attempt-registry qualification
+      fields with immutable identities binding canonical path, device, inode,
+      owner, group, directory type, and exact 0700 mode. Qualification now
+      opens both roots with directory, no-follow, and close-on-exec flags;
+      compares descriptor and final path identities; rejects shared or nested
+      roots; and rechecks both identities after the atomic publication probe.
+      The same stable JSON reader now rejects nested duplicate object keys
+      without echoing key values. Forty-two focused tests passed; Ruff,
+      formatting, and focused Mypy were clean. This was result-free: no Q1
+      private draw, environment interaction, attempt claim, or outcome ran.
+    evidence:
+      - N37
+      - N38
+      - N39
+      - "bench/active_acquisition/q1_qualification.py"
+      - "bench/active_acquisition/schemas/q1-entry-qualification.schema.json"
+      - "tests/test_active_acquisition_q1_qualification.py"
+      - "pytest-focused:42-passed"
+    also_depends_on: [N37, N38, N39]
+    status: resolved
+    children: []
+
+  - id: N41
+    type: dead_end
+    title: "Reject enqueue-only Q1 worker capability delivery"
+    provenance: ai-executed
+    timestamp: "2026-07-24T16:12+02:00"
+    hypothesis: >-
+      A bounded nonblocking parent write to a unique inherited pipe is enough to
+      prove that a Q1 child consumed its authenticated operational capability.
+    failure_mode: >-
+      The real approximately 1.5 KiB capability wire entered an unread Linux
+      pipe immediately; the prior timeout regression passed only by replacing
+      the bounded production wire with a non-production 2 MiB payload. The
+      parent therefore proved kernel enqueue, not child decode or consumption.
+    lesson: >-
+      Secret-bearing child bootstrap requires a positive authenticated
+      consumption acknowledgement under the same launch-based deadline. A
+      write-completion timer alone cannot establish receiver progress.
+    evidence:
+      - O23
+      - "bench/active_acquisition/q1.py"
+      - "tests/test_active_acquisition_q1.py"
+    also_depends_on: [N39]
+    status: resolved
+    children: []
+  - id: N42
+    type: experiment
+    title: "Implement and fault-inject authenticated Q1 worker bootstrap"
+    provenance: ai-executed
+    timestamp: "2026-07-24T16:12+02:00"
+    result: >-
+      Implemented marker-v2 commitment to a fresh 32-byte operational secret;
+      strict role, run, PID, master, arm, and normalized-path capability
+      payloads; one inherited AF_UNIX stream FD with HMAC wire authentication
+      and an exact 32-byte domain-separated consumption acknowledgement;
+      five-token Python -S worker launch; exact environment allowlisting and
+      DEVNULL stdin; and continuously drained captures bounded at zero stdout
+      bytes and 65,536 stderr bytes. Decoder mutations, high descriptors, a
+      real normal-size nonreader, missing or forged progress, multi-megabyte
+      sibling stderr, capture overflow, hostile site startup, timeout, and
+      cleanup paths fail closed. The final attempt/capability/orchestrator
+      slice passed 61 tests in 1.51 seconds under a hard external bound; Ruff,
+      Pycompile, and focused Mypy passed. No Q1 schedule draw, environment
+      interaction, attempt execution, outcome, or final artifact was produced.
+    evidence:
+      - N39
+      - N41
+      - O23
+      - "bench/active_acquisition/attempt.py"
+      - "bench/active_acquisition/worker_capability.py"
+      - "bench/active_acquisition/schemas/q1-worker-capability.schema.json"
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/restore_worker.py"
+      - "tests/test_active_acquisition_worker_capability.py"
+      - "tests/test_active_acquisition_q1.py"
+      - "pytest-focused:61-passed"
+    also_depends_on: [N37, N38, N39, N40, N41]
+    status: resolved
+    children: []

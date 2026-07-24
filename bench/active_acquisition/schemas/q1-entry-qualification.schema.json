@@ -1,0 +1,471 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prospect.invalid/schemas/wm002/q1-entry-qualification.schema.json",
+  "title": "WM-002 Q1 canonical result-free entry qualification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "protocol_version",
+    "protocol_sha256",
+    "q0_report_sha256",
+    "q0_protocol_sha256",
+    "q0_implementation_sha256",
+    "implementation_sha256",
+    "implementation_manifest",
+    "dependency_versions",
+    "schema_sha256",
+    "salt_commitment_sha256",
+    "prospective_review_sha256",
+    "interpreter_identity",
+    "q1_environment_interactions",
+    "q1_private_draws",
+    "synthetic_development_interactions",
+    "resource_preflight",
+    "claim_eligible",
+    "formal_authorized",
+    "checks",
+    "passed"
+  ],
+  "properties": {
+    "schema": {
+      "const": "prospect.wm002.active-acquisition.q1-entry-qualification.v1"
+    },
+    "protocol_version": {
+      "const": "0.3.0-q1"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "q0_report_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "q0_protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "q0_implementation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "implementation_sha256": {
+      "$ref": "#/$defs/sha256_or_empty"
+    },
+    "implementation_manifest": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/manifest"
+      }
+    },
+    "dependency_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonschema"
+      ],
+      "properties": {
+        "jsonschema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "schema_sha256": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "aggregate",
+        "audit_output",
+        "checkpoint_frame",
+        "private_audit",
+        "raw_trace",
+        "restored_trace"
+      ],
+      "properties": {
+        "aggregate": {
+          "$ref": "#/$defs/sha256"
+        },
+        "audit_output": {
+          "$ref": "#/$defs/sha256"
+        },
+        "checkpoint_frame": {
+          "$ref": "#/$defs/sha256"
+        },
+        "private_audit": {
+          "$ref": "#/$defs/sha256"
+        },
+        "raw_trace": {
+          "$ref": "#/$defs/sha256"
+        },
+        "restored_trace": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "salt_commitment_sha256": {
+      "$ref": "#/$defs/sha256_or_empty"
+    },
+    "prospective_review_sha256": {
+      "$ref": "#/$defs/sha256_or_empty"
+    },
+    "interpreter_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "q1_environment_interactions": {
+      "const": 0
+    },
+    "q1_private_draws": {
+      "const": 0
+    },
+    "synthetic_development_interactions": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 19
+    },
+    "resource_preflight": {
+      "$ref": "#/$defs/resource_preflight"
+    },
+    "claim_eligible": {
+      "const": false
+    },
+    "formal_authorized": {
+      "const": false
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "accepted_q0_binding"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "successor_protocol_boundary"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "protocol_code_parity"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "artifact_schema_contract"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "selected_source_implementation_binding"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "private_salt_custody"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "authoritative_runtime_checkpoint_privacy_probe"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "execution_resource_and_single_attempt_preflight"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "emitted_artifact_schema_and_mutation_probe"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/check"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "independent_prospective_review"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "items": false
+    },
+    "passed": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sha256_or_empty": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{64})?$"
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relative_path",
+        "sha256",
+        "size_bytes"
+      ],
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "passed",
+        "summary",
+        "violations"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "directory_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical_path",
+        "st_dev",
+        "st_ino",
+        "st_uid",
+        "st_gid",
+        "file_type",
+        "mode"
+      ],
+      "properties": {
+        "canonical_path": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "st_dev": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "st_ino": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "st_uid": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "st_gid": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "file_type": {
+          "const": "directory"
+        },
+        "mode": {
+          "const": "0700"
+        }
+      }
+    },
+    "resource_preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_root",
+        "attempt_registry_directory",
+        "raw_trace_max_bytes",
+        "private_audit_max_bytes",
+        "checkpoint_index_max_bytes",
+        "checkpoint_frame_max_bytes",
+        "restored_trace_max_bytes",
+        "estimated_canonical_bytes",
+        "required_free_bytes",
+        "max_restore_concurrency",
+        "sampled_arms",
+        "probe_duration_under_30_seconds",
+        "passed"
+      ],
+      "properties": {
+        "execution_root": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/directory_identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempt_registry_directory": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/directory_identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "raw_trace_max_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "private_audit_max_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkpoint_index_max_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkpoint_frame_max_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "restored_trace_max_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_canonical_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "required_free_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_restore_concurrency": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sampled_arms": {
+          "const": 7
+        },
+        "probe_duration_under_30_seconds": {
+          "type": "boolean"
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prospect.invalid/schemas/wm002/q1-prospective-review.schema.json",
+  "title": "WM-002 Q1 result-free prospective implementation review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "protocol_version",
+    "protocol_sha256",
+    "implementation_sha256",
+    "reviewer",
+    "review_method",
+    "assurance_boundary",
+    "reviewed_source_count",
+    "review_scope",
+    "blocking_findings",
+    "nonblocking_findings",
+    "q1_environment_interactions",
+    "q1_private_draws",
+    "claim_eligible",
+    "formal_authorized",
+    "passed",
+    "statement"
+  ],
+  "properties": {
+    "schema": {
+      "const": "prospect.wm002.active-acquisition.q1-prospective-review.v1"
+    },
+    "protocol_version": {
+      "const": "0.3.0-q1"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "implementation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_method": {
+      "const": "adversarial_result_free_selected_source_review"
+    },
+    "assurance_boundary": {
+      "const": "local_procedural_review_without_external_signature"
+    },
+    "reviewed_source_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "review_scope": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "prefixItems": [
+        {
+          "const": "accepted_q0_and_successor_authority"
+        },
+        {
+          "const": "runtime_semantics_and_transactional_causality"
+        },
+        {
+          "const": "private_seed_exactness_and_noninterference"
+        },
+        {
+          "const": "checkpoint_and_fresh_process_restore"
+        },
+        {
+          "const": "artifact_schemas_attempt_integrity_and_resources"
+        },
+        {
+          "const": "independent_auditor_recomputation_and_scale"
+        },
+        {
+          "const": "evidence_and_claim_boundary"
+        }
+      ],
+      "items": false
+    },
+    "blocking_findings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "nonblocking_findings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "q1_environment_interactions": {
+      "const": 0
+    },
+    "q1_private_draws": {
+      "const": 0
+    },
+    "claim_eligible": {
+      "const": false
+    },
+    "formal_authorized": {
+      "const": false
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

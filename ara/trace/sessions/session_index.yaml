@@ -41,3 +41,10 @@ sessions:
     events_count: 8
     claims_touched: [C05]
     open_threads: 1
+  - id: "2026-07-24_001"
+    date: "2026-07-24"
+    summary: "Accepted Q0 and hardened disabled Q1 through strict directory identity plus authenticated, site-disabled, bounded worker bootstrap; integration remains open."
+    turn_count: 9
+    events_count: 15
+    claims_touched: []
+    open_threads: 3

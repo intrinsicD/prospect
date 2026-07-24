@@ -55,3 +55,20 @@
 - **Evidence**: [N24, N26,
   `docs/wm001-v1160-accepted-binding-rehearsal-failure.md`]
 - **From staging**: O18
+
+## H04: Stage maturity gaps as causally isolated experiments
+
+- **Rationale**: Freeze WM-001 as the bounded causal foundation, but do not
+  change experience acquisition, task distribution, replay, representation,
+  planning horizon, and benchmark regime in one confirmatory task. Each
+  scientific experiment should introduce one primary causal delta while
+  treating prerequisite diagnostics as qualification gates; otherwise neither
+  failure nor success can be attributed to a mechanism.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Code ref**:
+  [`[pending: TODO bind to the selected WM-002 protocol and later staged
+  protocols]`]
+- **Evidence**: [N32, N33]
+- **From staging**: O21

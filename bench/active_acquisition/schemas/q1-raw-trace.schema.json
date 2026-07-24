@@ -1,0 +1,547 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prospect.invalid/schemas/wm002/q1-raw-trace.schema.json",
+  "title": "WM-002 Q1 public raw trace row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "protocol_version",
+    "run_id",
+    "attempt_id",
+    "protocol_sha256",
+    "implementation_sha256",
+    "entry_qualification_sha256",
+    "q0_report_sha256",
+    "salt_commitment_sha256",
+    "master",
+    "arm",
+    "episode",
+    "producer_pid",
+    "semantic_key_sha256",
+    "candidate_rows",
+    "candidate_rows_sha256",
+    "acquisition",
+    "checkpoint",
+    "terminal",
+    "counts"
+  ],
+  "properties": {
+    "schema": {
+      "const": "prospect.wm002.active-acquisition.q1-raw-trace.v1"
+    },
+    "protocol_version": {
+      "const": "0.3.0-q1"
+    },
+    "run_id": {
+      "$ref": "#/$defs/run_id"
+    },
+    "attempt_id": {
+      "$ref": "#/$defs/attempt_id"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "implementation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "entry_qualification_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "q0_report_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "salt_commitment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "master": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "arm": {
+      "$ref": "#/$defs/arm"
+    },
+    "episode": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1023
+    },
+    "producer_pid": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "semantic_key_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidate_rows": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/candidate"
+        },
+        {
+          "$ref": "#/$defs/candidate"
+        },
+        {
+          "$ref": "#/$defs/candidate"
+        },
+        {
+          "$ref": "#/$defs/candidate"
+        },
+        {
+          "$ref": "#/$defs/candidate"
+        }
+      ],
+      "items": false
+    },
+    "candidate_rows_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selected_action",
+        "uniform_selector_sha256",
+        "observed_symbol",
+        "task_payoff",
+        "physical_action_cost",
+        "information_acquisition_cost",
+        "net_reward",
+        "decision_id",
+        "intention_id",
+        "execution_id",
+        "observation_id",
+        "outcome_id",
+        "experience_id",
+        "transition_id",
+        "receipt_id",
+        "model_before_sha256",
+        "model_after_sha256",
+        "model_before_version",
+        "model_after_version",
+        "posterior_before",
+        "posterior_after",
+        "evidence_count_before",
+        "evidence_count_after"
+      ],
+      "properties": {
+        "selected_action": {
+          "$ref": "#/$defs/action"
+        },
+        "uniform_selector_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_symbol": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 3
+        },
+        "task_payoff": {
+          "type": "number"
+        },
+        "physical_action_cost": {
+          "type": "number"
+        },
+        "information_acquisition_cost": {
+          "type": "number"
+        },
+        "net_reward": {
+          "type": "number"
+        },
+        "decision_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "intention_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "execution_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "observation_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "outcome_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "experience_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "transition_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "receipt_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "model_before_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model_after_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model_before_version": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "model_after_version": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "posterior_before": {
+          "$ref": "#/$defs/rational"
+        },
+        "posterior_after": {
+          "$ref": "#/$defs/rational"
+        },
+        "evidence_count_before": {
+          "const": 0
+        },
+        "evidence_count_after": {
+          "const": 1
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "size_bytes",
+        "component_sha256"
+      ],
+      "properties": {
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "component_sha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "domain_custody",
+            "episode_accumulator",
+            "identity_counter",
+            "posterior_model",
+            "qualification_binding"
+          ],
+          "properties": {
+            "domain_custody": {
+              "$ref": "#/$defs/sha256"
+            },
+            "episode_accumulator": {
+              "$ref": "#/$defs/sha256"
+            },
+            "identity_counter": {
+              "$ref": "#/$defs/sha256"
+            },
+            "posterior_model": {
+              "$ref": "#/$defs/sha256"
+            },
+            "qualification_binding": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_rows",
+        "candidate_rows_sha256",
+        "selected_action",
+        "success",
+        "terminal_reward",
+        "episode_return",
+        "decision_id",
+        "intention_id",
+        "execution_id",
+        "observation_id",
+        "outcome_id",
+        "experience_id",
+        "transition_id"
+      ],
+      "properties": {
+        "candidate_rows": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/terminal_candidate"
+                },
+                {
+                  "properties": {
+                    "ordinal": {
+                      "const": 0
+                    },
+                    "terminal_action": {
+                      "const": 1
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/terminal_candidate"
+                },
+                {
+                  "properties": {
+                    "ordinal": {
+                      "const": 1
+                    },
+                    "terminal_action": {
+                      "const": -1
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "items": false
+        },
+        "candidate_rows_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "selected_action": {
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "terminal_reward": {
+          "type": "number"
+        },
+        "episode_return": {
+          "type": "number"
+        },
+        "decision_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "intention_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "execution_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "observation_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "outcome_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "experience_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "transition_id": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decisions",
+        "executions",
+        "experiences",
+        "transitions",
+        "acquisition_updates",
+        "terminal_updates"
+      ],
+      "properties": {
+        "decisions": {
+          "const": 2
+        },
+        "executions": {
+          "const": 2
+        },
+        "experiences": {
+          "const": 2
+        },
+        "transitions": {
+          "const": 2
+        },
+        "acquisition_updates": {
+          "const": 1
+        },
+        "terminal_updates": {
+          "const": 0
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rational": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?$"
+    },
+    "action": {
+      "enum": [
+        "skip",
+        "weak",
+        "strong",
+        "overpowered",
+        "nuisance"
+      ]
+    },
+    "arm": {
+      "enum": [
+        "prospect_expected_return",
+        "independent_fraction_oracle",
+        "goal_only",
+        "raw_observation_entropy",
+        "eig_only",
+        "shuffled_information",
+        "uniform_random"
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "assessment_id",
+        "semantic_action",
+        "expected_episode_value",
+        "expected_immediate_payoff",
+        "expected_terminal_value",
+        "expected_decision_value",
+        "expected_information_gain_nats",
+        "raw_observation_entropy_nats",
+        "physical_action_cost",
+        "information_acquisition_cost",
+        "arm_selection_score",
+        "selection_unit"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "assessment_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "semantic_action": {
+          "$ref": "#/$defs/action"
+        },
+        "expected_episode_value": {
+          "type": "number"
+        },
+        "expected_immediate_payoff": {
+          "type": "number"
+        },
+        "expected_terminal_value": {
+          "type": "number"
+        },
+        "expected_decision_value": {
+          "type": "number"
+        },
+        "expected_information_gain_nats": {
+          "type": "number"
+        },
+        "raw_observation_entropy_nats": {
+          "type": "number"
+        },
+        "physical_action_cost": {
+          "type": "number"
+        },
+        "information_acquisition_cost": {
+          "type": "number"
+        },
+        "arm_selection_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selection_unit": {
+          "enum": [
+            "return",
+            "nats",
+            null
+          ]
+        }
+      }
+    },
+    "terminal_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "assessment_id",
+        "terminal_action",
+        "prediction_id",
+        "expected_success",
+        "unit"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "assessment_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "terminal_action": {
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "prediction_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "expected_success": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "unit": {
+          "const": "return"
+        }
+      }
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^wm002-q1-[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^wm002-q1-[0-9a-f]{64}-attempt-0001$"
+    }
+  }
+}

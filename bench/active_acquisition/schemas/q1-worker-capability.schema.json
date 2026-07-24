@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prospect.invalid/schemas/wm002/q1-worker-capability.schema.json",
+  "title": "WM-002 Q1 parent-authenticated worker capability payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "role",
+    "run_identity",
+    "parent_pid",
+    "child_pid",
+    "master",
+    "arm",
+    "paths"
+  ],
+  "properties": {
+    "schema": {
+      "const": "prospect.wm002.active-acquisition.q1-worker-capability.v1"
+    },
+    "role": {
+      "enum": [
+        "producer",
+        "restore"
+      ]
+    },
+    "run_identity": {
+      "$ref": "#/$defs/run_identity"
+    },
+    "parent_pid": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "child_pid": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "master": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "arm": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "enum": [
+            "prospect_expected_return",
+            "independent_fraction_oracle",
+            "goal_only",
+            "raw_observation_entropy",
+            "eig_only",
+            "shuffled_information",
+            "uniform_random"
+          ]
+        }
+      ]
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_registry_directory",
+        "entry_report_path",
+        "execution_root",
+        "frame_path",
+        "incomplete_directory",
+        "index_path",
+        "master_directory",
+        "output_path",
+        "prospective_review_path",
+        "q0_report_path",
+        "raw_trace_path",
+        "secret_salt_path"
+      ],
+      "properties": {
+        "attempt_registry_directory": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "entry_report_path": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "execution_root": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "frame_path": {
+          "$ref": "#/$defs/nullable_absolute_path"
+        },
+        "incomplete_directory": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "index_path": {
+          "$ref": "#/$defs/nullable_absolute_path"
+        },
+        "master_directory": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "output_path": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "prospective_review_path": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "q0_report_path": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "raw_trace_path": {
+          "$ref": "#/$defs/nullable_absolute_path"
+        },
+        "secret_salt_path": {
+          "$ref": "#/$defs/absolute_path"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "producer"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "arm": {
+            "type": "null"
+          },
+          "paths": {
+            "properties": {
+              "frame_path": {
+                "type": "null"
+              },
+              "index_path": {
+                "type": "null"
+              },
+              "raw_trace_path": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "arm": {
+            "type": "string"
+          },
+          "paths": {
+            "properties": {
+              "frame_path": {
+                "$ref": "#/$defs/absolute_path"
+              },
+              "index_path": {
+                "$ref": "#/$defs/absolute_path"
+              },
+              "raw_trace_path": {
+                "$ref": "#/$defs/absolute_path"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "absolute_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/"
+    },
+    "nullable_absolute_path": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/absolute_path"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^wm002-q1-[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^wm002-q1-[0-9a-f]{64}-attempt-0001$"
+    },
+    "run_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "protocol_version",
+        "protocol_sha256",
+        "implementation_sha256",
+        "q0_report_sha256",
+        "entry_qualification_sha256",
+        "salt_commitment_sha256",
+        "run_sha256",
+        "run_id",
+        "attempt_id"
+      ],
+      "properties": {
+        "schema": {
+          "const": "prospect.wm002.active-acquisition.q1-run-identity.v1"
+        },
+        "protocol_version": {
+          "const": "0.3.0-q1"
+        },
+        "protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "implementation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "q0_report_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "entry_qualification_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "salt_commitment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "run_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/attempt_id"
+        }
+      }
+    }
+  }
+}

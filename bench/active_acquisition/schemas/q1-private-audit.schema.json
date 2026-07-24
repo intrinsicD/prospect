@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prospect.invalid/schemas/wm002/q1-private-audit.schema.json",
+  "title": "WM-002 Q1 permissioned private seed audit row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "attempt_id",
+    "salt_commitment_sha256",
+    "master",
+    "episode",
+    "arm_id",
+    "theta",
+    "hmac_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "prospect.wm002.q1-private-seed-material.v1"
+    },
+    "run_id": {
+      "$ref": "#/$defs/run_id"
+    },
+    "attempt_id": {
+      "$ref": "#/$defs/attempt_id"
+    },
+    "salt_commitment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "master": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "episode": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1023
+    },
+    "arm_id": {
+      "$ref": "#/$defs/arm"
+    },
+    "theta": {
+      "enum": [
+        -1,
+        1
+      ]
+    },
+    "hmac_sha256": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuisance",
+        "pulse",
+        "terminal",
+        "theta_order"
+      ],
+      "properties": {
+        "nuisance": {
+          "$ref": "#/$defs/sha256"
+        },
+        "pulse": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "weak",
+            "strong",
+            "overpowered"
+          ],
+          "properties": {
+            "weak": {
+              "$ref": "#/$defs/sha256"
+            },
+            "strong": {
+              "$ref": "#/$defs/sha256"
+            },
+            "overpowered": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "terminal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "+1",
+            "-1"
+          ],
+          "properties": {
+            "+1": {
+              "$ref": "#/$defs/sha256"
+            },
+            "-1": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "theta_order": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "arm": {
+      "enum": [
+        "prospect_expected_return",
+        "independent_fraction_oracle",
+        "goal_only",
+        "raw_observation_entropy",
+        "eig_only",
+        "shuffled_information",
+        "uniform_random"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^wm002-q1-[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^wm002-q1-[0-9a-f]{64}-attempt-0001$"
+    }
+  }
+}

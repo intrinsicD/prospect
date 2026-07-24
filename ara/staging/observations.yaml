@@ -357,7 +357,7 @@ observations:
     stale: false
   - id: O21
     timestamp: "2026-07-23T09:10+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >-
       The next maturity program should freeze WM-001 as the bounded causal
       foundation and test the same architecture across broader held-out task
@@ -370,7 +370,58 @@ observations:
       autonomy, calibration, scale, and external competitiveness unopened.
     potential_type: heuristic
     bound_to: [N32]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H04"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O22
+    timestamp: "2026-07-24T00:51+02:00"
+    provenance: user-revised
+    content: >-
+      WM-002 isolates known-model decision-relevant active experience
+      acquisition. Q0 qualifies exact finite arithmetic, controls, and protocol
+      semantics without interaction; only a later authorized Q1 may test the
+      continuous execute-to-update-to-act-to-restore chain under matched
+      budgets. Learning and calibrating uncertainty is a separate U-001
+      experiment, and transfer, replay scale, partial observability, learned
+      observations, external evaluation, and assurance remain separate claims.
+    context: >-
+      The accepted WM-001 lifecycle leaves several orthogonal maturity gaps.
+      The user commissioned the dependency-ordered task program and WM-002
+      implementation. Independent roadmap review found that known likelihoods
+      cannot establish learned uncertainty, so U-001 was inserted before
+      transfer. Two adversarial Q0 audits then forced complete 88-cell and
+      normative-protocol coverage before accepting the semantic gate.
+    potential_type: architecture
+    bound_to: [N32, N33, N34, N35, N36]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A03"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O23
+    timestamp: "2026-07-24T14:18+02:00"
+    provenance: ai-suggested
+    content: >-
+      Q1 producer and restore workers should require a one-attempt operational
+      capability before reading entry or salt inputs: a fresh 32-byte parent
+      secret is committed in the fixed marker, while each exact role, run,
+      process, and absolute path binding is authenticated in a bounded
+      canonical payload delivered through a unique inherited pipe rather than
+      argv or environment state. The secret is neither a scientific draw nor
+      a result artifact.
+    context: >-
+      A design-only follow-up requested an exact patch plan for preventing
+      unparented or path-forged Q1 worker invocation while authorization remains
+      false. No implementation, private input, final artifact, or Q1 execution
+      occurred in this turn.
+    potential_type: architecture
+    bound_to: [N37, N38, N39]
+    resolution: >-
+      Artifact commitment retained the attempt-scoped capability architecture
+      but replaced the proposed one-way pipe with one bidirectional AF_UNIX
+      stream after N41 showed that enqueue completion does not prove child
+      consumption.
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A04"
+    crystallized_via: artifact-commitment
     stale: false

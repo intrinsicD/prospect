@@ -1,5 +1,5 @@
 .RECIPEPREFIX = >
-.PHONY: install install-runtime test test-runtime lint fmt typecheck typecheck-runtime epistemic-diagnostics epistemic-gate wm001-development check check-runtime tree
+.PHONY: install install-runtime test test-runtime lint fmt typecheck typecheck-runtime epistemic-diagnostics epistemic-gate wm002-q0 wm001-development check check-runtime tree
 
 install:
 > python -m pip install -e ".[dev]"
@@ -8,7 +8,7 @@ install-runtime:
 > python -m pip install -e ".[dev,runtime]"
 
 test:
-> pytest -q tests/test_epistemic_*.py
+> pytest -q tests/test_epistemic_*.py tests/test_active_acquisition_*.py
 
 test-runtime:
 > pytest -q tests/test_world_model_*.py
@@ -43,6 +43,9 @@ epistemic-diagnostics:
 
 epistemic-gate:
 > PYTHONPATH=src python -m bench.epistemic.run_maturity
+
+wm002-q0:
+> PYTHONPATH=src python -m bench.active_acquisition.run
 
 wm001-development:
 > @echo "Direct WM-001 entry is disabled; use docs/wm001-v1200-operator-runbook.md" >&2

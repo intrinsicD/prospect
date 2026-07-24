@@ -98,6 +98,10 @@ Assimilation and learning are different operations:
 If learning changes a model or representation version, it must also provide a
 linked resulting belief under the new version; a snapshot may not pair new model
 weights with an old-model belief.
+`latest_update` names the latest persistent learning receipt, not necessarily the
+latest observation-assimilation event. A later assimilated belief may retain that
+receipt only when its evidence strictly extends the receipt's resulting belief,
+keeps the same target, and is causally no earlier.
 
 Prospect calls a result **knowledge** only within a declared scope when:
 
@@ -548,8 +552,23 @@ post-outcome evidence, scope, limitations, and next-test boundary.
   compromised kernel, or transient mutate-and-restore attacks. External
   attestation, read-only media, or an independently operated transparency log
   would be needed for a stronger trust model.
-- Value-of-information estimates require their own calibration and adversarial
-  controls.
+- [WM-002](wm002-active-acquisition-plan.md) begins with an exact known-model
+  Q0 for value-of-information arithmetic, control separation, and protocol
+  parity. Its [Q0 result](wm002-q0-results.md) is independently accepted for
+  protocol completeness only. Q0 performs no interaction and cannot establish
+  learned uncertainty, learning, persistence, or improvement. The Q1 runtime,
+  result-free entry gate, strict artifacts, and independent auditor are now
+  implemented, but result-free qualification has been reopened and is not
+  green until every newly found blocker closes. Implemented custody controls
+  include the fixed experiment-global one-shot tombstone, independent auditor
+  validation and entry binding of the exact prospective review, and
+  descriptor-stable selected-source reads. The last control binds observed
+  source bytes, not already-loaded bytecode, and does not protect against a
+  malicious coordinated same-account writer. Q1 execution authorization
+  remains false, 4,096 episodes are allocated per arm (28,672 total), and no
+  Q1 outcome or capability evidence exists. The last completed combined
+  result-free checkpoint before subsequent integration changes reached 339
+  active-acquisition tests; it is not a readiness claim.
 - The current in-memory lifecycle journal exposes partial completion but cannot
   automatically continue or survive restart. Durable idempotent recovery is still
   required; the transactional learning path handles in-process failures but not
@@ -564,3 +583,7 @@ post-outcome evidence, scope, limitations, and next-test boundary.
   only the first bounded test.
 - External benchmark results and strong published baselines are required before
   making a capability or novelty claim.
+
+The dependency order and killing gates for these scientific and assurance gaps
+are indexed in the [Prospect maturity roadmap](maturity-roadmap.md). Each task
+isolates one primary causal delta before any broader maturity interpretation.

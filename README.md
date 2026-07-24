@@ -25,7 +25,9 @@ The repository contains:
 - failure-atomic in-process learning across owned model bytes, runtime state, and
   the update ledger;
 - canonical replay custody plus optional TorchRL/TensorDict sampling;
-- integrity-checked component checkpoints; and
+- integrity-checked component checkpoints;
+- a claim-ineligible exact active-acquisition qualification in
+  [WM-002](bench/active_acquisition/README.md); and
 - an executable probabilistic world-model, CEM control, retention, restart, and
   independent-evidence program in
   [WM-001](bench/world_model_lifecycle/README.md).
@@ -46,6 +48,22 @@ autonomous exploration, novelty, or benchmark superiority. The
 [v1.3 review](docs/wm001-v130-formal-results.md) remain immutable attempt
 history.
 
+The dependency-ordered [maturity roadmap](docs/maturity-roadmap.md) now makes
+WM-002 the active scientific task and separates learned uncertainty, zero-shot
+transfer, online adaptation, continual scale, partial observability, learned
+observations, external evaluation, and runtime-assurance work. WM-002 Q0 is
+independently accepted for protocol completeness only. The Q1 runtime and
+independent auditor are implemented, but result-free qualification has been
+reopened and is not green until every newly found blocker closes. Recent
+hardening includes the fixed experiment-global one-shot tombstone, independent
+auditor validation of the exact prospective review, and descriptor-stable
+selected-source reads. Those reads bind the bytes observed, not already-loaded
+bytecode, and do not defend against a malicious coordinated same-account
+writer. The last completed combined result-free checkpoint before subsequent
+integration changes reached 339 active-acquisition tests; that is a historical
+test fact, not readiness or evidence. Q1 execution authorization remains false,
+and no Q1 outcome or capability evidence exists.
+
 ## Layout
 
 ```text
@@ -53,9 +71,12 @@ src/prospect/             current agent implementation
 bench/epistemic/          exact semantic and lifecycle references
 bench/world_model_lifecycle/
                           WM-001 protocol, implementation, evidence, and runbook
+bench/active_acquisition/
+                          WM-002 exact Q0 and implemented Q1 qualification
 tests/                    active unit, adversarial, and integration tests
 docs/architecture.md      canonical system definition
 datasets/                 preserved reusable inputs and checksums
+docs/maturity-roadmap.md  dependency-ordered scientific and assurance tasks
 .agents/skills/           project research and results-audit skills
 ```
 
@@ -74,10 +95,13 @@ make check-runtime
 make epistemic-diagnostics
 make epistemic-gate
 python -m bench.world_model_lifecycle.verify protocol
+make wm002-q0
 ```
 
-`make check` covers the backend-neutral core. `make check-runtime` adds the
-world-model implementation and adversarial tests. Direct WM-001 execution
+`make check` covers the backend-neutral core, including WM-002 Q0 tests.
+`make wm002-q0` emits one canonical, claim-ineligible semantic report and never
+authorizes Q1 or formal evidence. `make check-runtime` adds the world-model
+implementation and adversarial tests. Direct WM-001 execution
 through `make wm001-development` is deliberately disabled so it cannot bypass
 the versioned evidence lifecycle. Protocol 1.5 is retired after an unfinalized
 development qualification exposed a lazy Gymnasium environment-custody gap;

@@ -1,0 +1,371 @@
+session:
+  id: "2026-07-24_001"
+  date: "2026-07-24"
+  started: "2026-07-24T00:51+02:00"
+  last_turn: "2026-07-24T16:12+02:00"
+  turn_count: 9
+  summary: "Accepted Q0 and hardened disabled Q1 through strict directory identity plus authenticated, site-disabled, bounded worker bootstrap; integration remains open."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: N33
+    routing: direct
+    provenance: user-revised
+    summary: "Accepted the maturity roadmap but split its orthogonal gaps into causally isolated experiments and a parallel assurance track."
+  - turn: 1
+    type: heuristic
+    id: O21
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized staged causal experiments as H04 through the user's explicit affirmation and scope correction."
+  - turn: 1
+    type: architecture
+    id: O22
+    routing: staged
+    provenance: ai-suggested
+    summary: "Proposed an exact-oracle hidden-dynamics active-acquisition test as the sole new WM-002 capability."
+  - turn: 2
+    type: decision
+    id: N34
+    routing: direct
+    provenance: user-revised
+    summary: "Created the scientific and assurance backlog, inserted learned uncertainty, split transfer stages, and began WM-002 only."
+  - turn: 2
+    type: architecture
+    id: O22
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized known-model active acquisition as A03 and separated learned uncertainty into U-001."
+  - turn: 2
+    type: dead_end
+    id: N35
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected two incomplete Q0 proof surfaces despite correct arithmetic because semantic coverage did not fail closed."
+  - turn: 2
+    type: experiment
+    id: N36
+    routing: direct
+    provenance: ai-executed
+    summary: "Accepted the final 88-cell, normatively bound Q0 as claim-ineligible protocol qualification only."
+  - turn: 3
+    type: experiment
+    id: N37
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and result-free qualified the Q1 runtime; execution remains disabled and no Q1 private state or outcome was produced."
+  - turn: 4
+    type: experiment
+    id: N38
+    routing: direct
+    provenance: ai-executed
+    summary: "Reopened Q1 readiness for vacuous noninterference probes and missing complete-orchestration happy-path coverage."
+  - turn: 5
+    type: experiment
+    id: N39
+    routing: direct
+    provenance: ai-executed
+    summary: "Fault-injected Q1 resource, restore-integrity, child-environment, and optimized-Python boundaries without running Q1."
+  - turn: 6
+    type: architecture
+    id: O23
+    routing: staged
+    provenance: ai-suggested
+    summary: "Designed marker-committed, pipe-delivered producer and restore capabilities; no implementation or Q1 execution occurred."
+
+  - turn: 8
+    type: experiment
+    id: N40
+    routing: direct
+    provenance: ai-executed
+    summary: "Bound both private Q1 roots to strict descriptor-verified identities and rejected duplicate JSON keys without running Q1."
+
+  - turn: 9
+    type: dead_end
+    id: N41
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected enqueue-only pipe delivery because the production-size wire fits an unread pipe and proves no child consumption."
+  - turn: 9
+    type: experiment
+    id: N42
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and fault-injected marker-bound, acknowledged, site-disabled, bounded Q1 worker bootstrap without running Q1."
+  - turn: 9
+    type: architecture
+    id: O23
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized attempt-scoped authenticated worker bootstrap as A04, with the proposed pipe revised to an acknowledged AF_UNIX stream."
+
+
+ai_actions:
+  - turn: 1
+    action: >-
+      Decomposed the maturity gaps by causal coupling and effort, audited the
+      sequence against primary work on active world-model exploration,
+      contextual adaptation, and continual learning, and recorded the accepted
+      program-level decision.
+    provenance: ai-executed
+    files_changed:
+      - "ara/staging/observations.yaml"
+      - "ara/logic/solution/heuristics.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 2
+    action: >-
+      Authored the dependency-ordered scientific and assurance task plans,
+      implemented WM-002's exact fixture, controls, oracle, Q0 runner, and
+      adversarial mutations, rejected incomplete passes through two independent
+      audits, repaired every required semantic gap, reran repository checks,
+      and recorded the bounded accepted disposition without running Q1.
+    provenance: ai-executed
+    files_changed:
+      - "docs/maturity-roadmap.md"
+      - "docs/u001-learned-uncertainty-plan.md"
+      - "docs/wm002-active-acquisition-plan.md"
+      - "docs/wm002-q0-results.md"
+      - "docs/wm002-q1-runtime-design.md"
+      - "bench/active_acquisition/protocol.json"
+      - "bench/active_acquisition/qualification.py"
+      - "tests/test_active_acquisition_qualification.py"
+      - "ara/logic/solution/architecture.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+  - turn: 3
+    action: >-
+      Implemented the authoritative Q1 producer and fresh-process restore path,
+      streamed consolidation and aggregation, exact source/run/attempt binding,
+      transactional and noninterference probes, atomic publication, bounded
+      child cleanup, and pre-claim identity coherence; then passed focused,
+      adjacent, type, lint, and independent result-free review without creating
+      Q1 evidence.
+    provenance: ai-executed
+    files_changed:
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/restore_worker.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "tests/test_active_acquisition_q1.py"
+      - "docs/wm002-q1-runtime-design.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+  - turn: 4
+    action: >-
+      Traced Q1 design requirements to implementation and tests without
+      executing Q1, collected the 299-item public test surface, identified two
+      unresolved readiness gaps, and corrected the result-free design status,
+      environment ownership, restore order, and Mypy counts.
+    provenance: ai-executed
+    files_changed:
+      - "docs/wm002-q1-runtime-design.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+  - turn: 5
+    action: >-
+      Audited Q1 watchdog, process, checkpoint, restore, publication, source,
+      and optimized-interpreter failure paths; implemented bounded-input,
+      no-replace, restored-identity, child-environment, and explicit-failure
+      hardening; added adversarial regressions; and ran focused and complete
+      active-acquisition tests without creating Q1 evidence.
+    provenance: ai-executed
+    files_changed:
+      - "bench/active_acquisition/problem.py"
+      - "bench/active_acquisition/runtime_lane.py"
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "bench/active_acquisition/restore_worker.py"
+      - "tests/test_active_acquisition_problem.py"
+      - "tests/test_active_acquisition_runtime_lane.py"
+      - "tests/test_active_acquisition_q1.py"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+  - turn: 6
+    action: >-
+      Produced a bounded implementation plan for attempt-scoped operational
+      capability commitment, HMAC-framed canonical worker payloads, exact
+      producer/restore path binding, inherited-FD lifecycle, independent marker
+      audit, and adversarial tests without editing Q1 runtime files.
+    provenance: ai-executed
+    files_changed:
+      - "ara/staging/observations.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+  - turn: 7
+    action: >-
+      Corrected six companion status documents to keep Q1 qualification
+      reopened and not green, record the implemented global tombstone,
+      prospective-review audit, and descriptor-stable source binding with its
+      trust limit, disambiguate the per-arm and total budget, and preserve
+      false authorization and absence of Q1 evidence.
+    provenance: ai-executed
+    files_changed:
+      - "README.md"
+      - "bench/active_acquisition/README.md"
+      - "docs/architecture.md"
+      - "docs/maturity-roadmap.md"
+      - "docs/wm002-active-acquisition-plan.md"
+      - "docs/wm002-q1-runtime-design.md"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+  - turn: 8
+    action: >-
+      Replaced path-only Q1 resource fields with descriptor-verified immutable
+      directory identities, enforced owner/mode/disjointness and pre/post-probe
+      stability, rejected duplicate JSON keys without value echo, and passed 42
+      focused tests plus Ruff, formatting, and focused Mypy.
+    provenance: ai-executed
+    files_changed:
+      - "bench/active_acquisition/q1_qualification.py"
+      - "bench/active_acquisition/schemas/q1-entry-qualification.schema.json"
+      - "tests/test_active_acquisition_q1_qualification.py"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+  - turn: 9
+    action: >-
+      Implemented strict worker-capability codec and schema, marker-v2 secret
+      commitment, authenticated AF_UNIX consumption acknowledgement, Python -S
+      and exact child environment isolation, DEVNULL stdin, bounded concurrent
+      capture monitors, parent no-site enforcement, and adversarial regressions;
+      then passed 61 focused tests plus Ruff, Pycompile, and focused Mypy.
+    provenance: ai-executed
+    files_changed:
+      - "bench/active_acquisition/attempt.py"
+      - "bench/active_acquisition/worker_capability.py"
+      - "bench/active_acquisition/schemas/q1-worker-capability.schema.json"
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/restore_worker.py"
+      - "tests/test_active_acquisition_attempt.py"
+      - "tests/test_active_acquisition_worker_capability.py"
+      - "tests/test_active_acquisition_q1.py"
+      - "ara/logic/solution/architecture.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: >-
+      The user accepted designing around the identified maturity gaps but
+      questioned whether they were too numerous for one task.
+  - turn: 1
+    excerpt: >-
+      The gaps are real and heterogeneous: benchmark adapters and diagnostics
+      are moderate engineering, while active acquisition, transfer, continual
+      retention, multimodality, and long-horizon autonomy are separate
+      research problems.
+
+  - turn: 2
+    excerpt: >-
+      The user directed creation of tasks from the identified gaps and asked to
+      begin the next task, authorizing the staged backlog and WM-002 Q0 work.
+  - turn: 2
+    excerpt: >-
+      Independent audit accepted only exact Q0 protocol completeness after two
+      rejected proof surfaces; no environment, learning, persistence,
+      improvement, retention, Q1, restore, or formal evidence ran.
+
+  - turn: 3
+    excerpt: >-
+      The user commissioned end-to-end implementation and qualification of the
+      Q1 runtime while remaining away, authorizing autonomous iteration but not
+      a result-bearing Q1 attempt.
+  - turn: 3
+    excerpt: >-
+      Result-free qualification closed runtime, restore, privacy, custody,
+      source-binding, process-lifecycle, and pre-claim coherence blockers; the
+      successor protocol still has execution_authorized false, so no Q1 draw or
+      capability result exists.
+  - turn: 4
+    excerpt: >-
+      Static traceability superseded the prior blocker disposition: structural
+      privacy and lifecycle primitives exist, but current noninterference
+      probes are causally vacuous and the complete orchestration lacks a
+      result-free happy-path test.
+  - turn: 4
+    excerpt: >-
+      The protocol remains claim-ineligible, formally unauthorized, and
+      execution-disabled; this audit accessed no private schedule, Q1 result,
+      or final artifact.
+
+  - turn: 5
+    excerpt: >-
+      The user commissioned a result-free fault-injection and concurrency audit
+      with narrow fixes and regressions while preserving false execution
+      authority and the canonical protocol bytes.
+  - turn: 5
+    excerpt: >-
+      The audit closed concrete optimized-interpreter, inherited-environment,
+      unbounded-input, restore-integrity, and output-collision defects; serial
+      child pipe draining remains a fail-closed liveness risk, not capability
+      evidence.
+  - turn: 6
+    excerpt: >-
+      The follow-up requested design only: authenticate every producer and
+      restore child through a fresh operational secret and exact pipe-delivered
+      role, run, process, and path payload before any entry or salt read.
+  - turn: 6
+    excerpt: >-
+      The plan keeps the capability outside run identity and scientific state,
+      commits only its SHA-256 in marker v2, and leaves authorization false.
+  - turn: 7
+    excerpt: >-
+      The documentation-only integration pass must not claim readiness: all
+      newly found blockers must close, authorization stays false, and the
+      historical 339-test checkpoint is not Q1 outcome or capability evidence.
+
+  - turn: 8
+    excerpt: >-
+      The user directed autonomous implementation and qualification of the Q1
+      runtime while execution authority remains false.
+  - turn: 8
+    excerpt: >-
+      Strict root identities and duplicate-key rejection passed 42 focused
+      tests, but Q1 runtime and auditor consumers must adopt the new identity
+      objects before the integrated qualification can be considered green.
+  - turn: 9
+    excerpt: >-
+      Fault injection showed that the production-size capability wire fits an
+      unread pipe, so parent write completion cannot establish child
+      consumption; the design pivoted to an authenticated socket acknowledgement.
+  - turn: 9
+    excerpt: >-
+      Worker hardening stayed result-free: authorization remains false and no
+      Q1 private draw, interaction, attempt execution, outcome, or final
+      artifact was produced.
+
+open_threads:
+  - "Implement non-vacuous private-input noninterference and complete-orchestration happy-path coverage, rerun result-free qualification, then regenerate exact-source review and entry qualification before any authorization."
+  - "After WM-002 reaches a terminal disposition, test learned uncertainty in U-001 before zero-shot transfer, adaptation, scale, or partial observability."
+  - "Complete integration of strict directory identities, custody, protocol parity, and independent audit around the hardened worker bootstrap before regenerating exact-source qualification."
+
+ai_suggestions_pending:
+  - "Use the existing Q1 runtime design to close schemas, serialized-value isolation, private-salt custody, and Q0 binding before proposing an authorized successor protocol."
+  - "Keep Q1 execution disabled until N38's two readiness gaps are independently closed."

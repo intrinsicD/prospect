@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prospect.invalid/schemas/wm002/q1-restored-trace.schema.json",
+  "title": "WM-002 Q1 restored terminal trace row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "protocol_version",
+    "run_id",
+    "attempt_id",
+    "protocol_sha256",
+    "implementation_sha256",
+    "entry_qualification_sha256",
+    "q0_report_sha256",
+    "salt_commitment_sha256",
+    "master",
+    "arm",
+    "episode",
+    "producer_pid",
+    "restorer_pid",
+    "checkpoint_sha256",
+    "component_sha256",
+    "model_sha256",
+    "model_version",
+    "configuration_version",
+    "posterior_direct",
+    "acquisition_experience_id",
+    "acquisition_transition_id",
+    "acquisition_receipt_id",
+    "identity_counter_sha256",
+    "terminal_candidate_rows",
+    "terminal_candidate_rows_sha256",
+    "selected_terminal_action",
+    "terminal_success",
+    "episode_return",
+    "terminal_decision_id",
+    "terminal_intention_id",
+    "terminal_execution_id",
+    "terminal_observation_id",
+    "terminal_outcome_id",
+    "terminal_experience_id",
+    "terminal_transition_id"
+  ],
+  "properties": {
+    "schema": {
+      "const": "prospect.wm002.active-acquisition.q1-restored-trace.v1"
+    },
+    "protocol_version": {
+      "const": "0.3.0-q1"
+    },
+    "run_id": {
+      "$ref": "#/$defs/run_id"
+    },
+    "attempt_id": {
+      "$ref": "#/$defs/attempt_id"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "implementation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "entry_qualification_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "q0_report_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "salt_commitment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "master": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "arm": {
+      "$ref": "#/$defs/arm"
+    },
+    "episode": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1023
+    },
+    "producer_pid": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "restorer_pid": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "checkpoint_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "component_sha256": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain_custody",
+        "episode_accumulator",
+        "identity_counter",
+        "posterior_model",
+        "qualification_binding"
+      ],
+      "properties": {
+        "domain_custody": {
+          "$ref": "#/$defs/sha256"
+        },
+        "episode_accumulator": {
+          "$ref": "#/$defs/sha256"
+        },
+        "identity_counter": {
+          "$ref": "#/$defs/sha256"
+        },
+        "posterior_model": {
+          "$ref": "#/$defs/sha256"
+        },
+        "qualification_binding": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "model_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_version": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "configuration_version": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "posterior_direct": {
+      "$ref": "#/$defs/rational"
+    },
+    "acquisition_experience_id": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "acquisition_transition_id": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "acquisition_receipt_id": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "identity_counter_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "terminal_candidate_rows": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/terminal_candidate"
+            },
+            {
+              "properties": {
+                "ordinal": {
+                  "const": 0
+                },
+                "terminal_action": {
+                  "const": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/terminal_candidate"
+            },
+            {
+              "properties": {
+                "ordinal": {
+                  "const": 1
+                },
+                "terminal_action": {
+                  "const": -1
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "items": false
+    },
+    "terminal_candidate_rows_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "selected_terminal_action": {
+      "enum": [
+        -1,
+        1
+      ]
+    },
+    "terminal_success": {
+      "type": "boolean"
+    },
+    "episode_return": {
+      "type": "number"
+    },
+    "terminal_decision_id": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "terminal_intention_id": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "terminal_execution_id": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "terminal_observation_id": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "terminal_outcome_id": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "terminal_experience_id": {
+      "$ref": "#/$defs/nonempty"
+    },
+    "terminal_transition_id": {
+      "$ref": "#/$defs/nonempty"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rational": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?$"
+    },
+    "arm": {
+      "enum": [
+        "prospect_expected_return",
+        "independent_fraction_oracle",
+        "goal_only",
+        "raw_observation_entropy",
+        "eig_only",
+        "shuffled_information",
+        "uniform_random"
+      ]
+    },
+    "terminal_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "assessment_id",
+        "terminal_action",
+        "prediction_id",
+        "expected_success",
+        "unit"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "assessment_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "terminal_action": {
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "prediction_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "expected_success": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "unit": {
+          "const": "return"
+        }
+      }
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^wm002-q1-[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^wm002-q1-[0-9a-f]{64}-attempt-0001$"
+    }
+  }
+}

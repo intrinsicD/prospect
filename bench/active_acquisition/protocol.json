@@ -1,0 +1,518 @@
+{
+  "schema": "prospect.wm002.active-acquisition.qualification-protocol.v0",
+  "experiment": {
+    "id": "WM-002",
+    "title": "Exact decision-relevant active acquisition killing test",
+    "protocol_version": "0.2.0-q",
+    "status": "prospective_claim_ineligible_qualification_only",
+    "implemented": false,
+    "q0_implemented": true,
+    "q1_implemented": false,
+    "sealed": false,
+    "formal_authorized": false,
+    "formal_result_schema_exists": false,
+    "statement": "This document authorizes only claim-ineligible Q0 semantic qualification. It describes Q1 prospectively, but Q1 is blocked and execution_authorized is false until every declared entry requirement closes in a revised protocol. It cannot authorize a formal attempt or a capability claim."
+  },
+  "research_question": "Under matched interaction and evaluation budgets on the exact hidden-actuator fixture, does selecting one acquisition action by full expected episode net return, including decision-relevant value of information, cause higher downstream executed net return than the predeclared non-oracle controls?",
+  "qualification_claim": "If a later-authorized Q1 passes after accepted Q0 binding, the exact Prospect decision path correctly uses known-model expected episode net return to select strong acquisition, consumes that exact real transition in persistent state change, improves paired executed net return over every non-oracle control on this fixture, and reproduces the pre-terminal decision after restoration in verifier processes distinct from the producer.",
+  "null_hypothesis": {
+    "id": "H0-WM-002-Q",
+    "statement": "The exact Prospect expected-return path either diverges from the independent oracle, leaks the hidden actuator sign, fails to bind the selected real transition to persistent state change, fails to improve paired executed net return over the strongest non-oracle control, or fails verifier-process restore parity.",
+    "rejection_rule": "Q0 and every ordered Q1 killing gate must pass. A later gate cannot rescue an earlier failure."
+  },
+  "scope": {
+    "q0_establishes_if_qualification_passes": [
+      "the exact known-model VOI selector and independent oracle agree on this finite fixture",
+      "the 88-cell exact semantic matrix is complete, normalized, and aggregates to all five declared expected returns",
+      "the structured fixture, policy, public-vector, report, and authority declarations match the Q0 implementation",
+      "Q0 used no environment realization and remains claim-ineligible with Q1 and formal execution unauthorized"
+    ],
+    "later_q1_must_establish": [
+      "one active Prospect arm forms a continuous acquisition-to-update-to-executed-behavior chain",
+      "the exact selected acquisition transition is the only transition eligible for the pre-terminal persistent update",
+      "the pre-terminal state and selected terminal decision survive a fresh process"
+    ],
+    "does_not_establish": [
+      "a learned information-value estimator",
+      "calibrated learned uncertainty",
+      "general active learning or general dual control",
+      "neural world-model improvement",
+      "transfer to unseen dynamics or task families",
+      "continual-learning scale, multimodality, or long-horizon autonomy",
+      "superiority to published baselines or state of the art",
+      "formal WM-002 evidence"
+    ],
+    "exact_oracle_boundary": "Prospect and the independent oracle are intentionally equal in this qualification. Their agreement is a semantic and integration check, not evidence that uncertainty or VOI was learned."
+  },
+  "fixture": {
+    "id": "wm002-hidden-actuator-v0",
+    "latent_state": {
+      "name": "theta",
+      "support": [
+        -1,
+        1
+      ],
+      "prior": [
+        "1/2",
+        "1/2"
+      ],
+      "lifetime": "fixed for one episode",
+      "visibility": "harness-private; theta, private seeds, the environment salt, and keyed private potential-outcome material must not occur in an agent-visible observation, outcome, decision, experience, transition, update receipt, checkpoint component, or public result row"
+    },
+    "episode_sequence": [
+      "initialize the exact prior over theta",
+      "assess all five acquisition actions from one immutable pre-action snapshot",
+      "execute exactly one selected acquisition action",
+      "record its real observation, payoff, cost, experience, and epistemic transition",
+      "perform exactly one declared persistent update from that acquisition transition",
+      "checkpoint at the pre-terminal boundary",
+      "choose exactly one terminal action d in {-1,+1} with learning disabled",
+      "execute the terminal action and record success and net episode return",
+      "restore batched checkpoints in one or more verifier processes whose PID differs from the producer, construct a fresh component graph per episode, and reproduce each terminal assessment and action"
+    ],
+    "actions": [
+      {
+        "id": "skip",
+        "kind": "acquisition",
+        "outcomes": [
+          "null"
+        ],
+        "likelihood": "P(null | theta, skip) = 1",
+        "immediate_task_payoff": "0",
+        "action_cost": "0",
+        "acquisition_cost": "0",
+        "expected_net_return_at_prior": "1/2"
+      },
+      {
+        "id": "weak",
+        "kind": "pulse",
+        "outcomes": [
+          -1,
+          1
+        ],
+        "reliability_q": "7/10",
+        "likelihood": "P(y = theta | theta, weak) = 7/10",
+        "immediate_task_payoff": "1[y = +1]",
+        "action_cost": "53/100",
+        "acquisition_cost": "0",
+        "expected_net_return_at_prior": "63/100"
+      },
+      {
+        "id": "strong",
+        "kind": "pulse",
+        "outcomes": [
+          -1,
+          1
+        ],
+        "reliability_q": "9/10",
+        "likelihood": "P(y = theta | theta, strong) = 9/10",
+        "immediate_task_payoff": "1[y = +1]",
+        "action_cost": "58/100",
+        "acquisition_cost": "0",
+        "expected_net_return_at_prior": "74/100"
+      },
+      {
+        "id": "overpowered",
+        "kind": "pulse",
+        "outcomes": [
+          -1,
+          1
+        ],
+        "reliability_q": "1",
+        "likelihood": "P(y = theta | theta, overpowered) = 1",
+        "immediate_task_payoff": "1[y = +1]",
+        "action_cost": "95/100",
+        "acquisition_cost": "0",
+        "expected_net_return_at_prior": "45/100"
+      },
+      {
+        "id": "nuisance",
+        "kind": "nuisance_scan",
+        "outcomes": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "likelihood": "P(z = k | theta, nuisance) = 1/4 for every k and theta",
+        "immediate_task_payoff": "0",
+        "action_cost": "0",
+        "acquisition_cost": "1/100",
+        "expected_net_return_at_prior": "49/100"
+      }
+    ],
+    "terminal_decision": {
+      "actions": [
+        1,
+        -1
+      ],
+      "success_likelihood": "P(success | d = theta) = 9/10 and P(success | d != theta) = 1/10",
+      "match_success_probability": "9/10",
+      "mismatch_success_probability": "1/10",
+      "outcomes": ["failure", "success"],
+      "payoff": "1[success]",
+      "tie_break": "When posterior terminal values tie, choose d=+1.",
+      "learning_allowed": false,
+      "update_eligibility": "terminal observations and outcomes are never eligible for the pre-terminal model update"
+    },
+    "q0_only_non_candidate_fixtures": [
+      "weak:sign_inverted_non_candidate",
+      "strong:sign_inverted_non_candidate",
+      "overpowered:sign_inverted_non_candidate"
+    ],
+    "non_candidate_rule": "The sign-inverted pulse variants exist only for Q0 sign-label invariance checks. They are never selectable and never appear in Q1 candidate lists.",
+    "net_return": "immediate acquisition task payoff + terminal success - action_cost - acquisition_cost",
+    "cost_rule": "action_cost is physical pulse/resource cost; acquisition_cost is information-acquisition cost. Each selected component is subtracted exactly once. Unselected candidate costs are forecasts only and are never charged."
+  },
+  "decision_semantics": {
+    "prospect_total_value": "expected immediate acquisition task payoff + prior-optimal terminal value + expected decision value of the acquisition observation - action_cost - acquisition_cost",
+    "expected_decision_value": "expected posterior-optimal terminal success probability minus prior-optimal terminal success probability",
+    "information_gain": "prior entropy over theta minus expected posterior entropy over theta",
+    "raw_observation_entropy": "entropy of the acquisition observation marginal, without conditioning on relevance to theta or terminal utility",
+    "tie_break": "candidate ties are resolved by declared list order: skip, weak, strong, overpowered, nuisance; terminal value ties choose d=+1",
+    "candidate_order": ["skip", "weak", "strong", "overpowered", "nuisance"],
+    "candidate_assessment_contract": "Every core CandidateAssessment describes the real canonical action under the true model. Its total_value is always the full expected episode net return in return units, for every arm; controls must not overwrite it with arm-specific surrogate scores.",
+    "candidate_total_value_unit": "executed episode return",
+    "arm_selection_diagnostic_contract": "A bench-only ArmSelectionDiagnostic records arm_id, action_id, selection_kind, selection_unit, and nullable selection_score. Utility diagnostics include the prior-optimal terminal value. raw_observation_entropy and eig_only use nats; uniform_random has a null score.",
+    "arm_decision_policy_contract": "Bench-only ArmDecisionPolicy selects from ArmSelectionDiagnostic records and links its chosen action to the unchanged canonical CandidateAssessment for that action.",
+    "fraction_exact_boundary": "Likelihoods, probabilities, reachable posteriors, expected task payoff, prior and posterior-optimal terminal values, EVSI, both cost components, and expected episode net returns are rational and must be checked exactly with fractions.Fraction.",
+    "floating_log_boundary": "Entropy and EIG contain logarithms and are not Fraction-exact. They must be independently recomputed from explicit log formulas and compared to Prospect floating values within absolute tolerance 1e-12.",
+    "cost_accounting": "action_cost and acquisition_cost are distinct return-unit components and each is subtracted exactly once in forecasts and realized net return.",
+    "required_prior_values": {
+      "skip": "1/2",
+      "weak": "63/100",
+      "strong": "74/100",
+      "overpowered": "45/100",
+      "nuisance": "49/100"
+    }
+  },
+  "arms": [
+    {
+      "id": "prospect_expected_return",
+      "selector": "maximize full expected episode net return",
+      "selection_kind": "expected_episode_net_return",
+      "selection_unit": "return",
+      "required_action_at_prior": "strong",
+      "role": "primary"
+    },
+    {
+      "id": "independent_fraction_oracle",
+      "selector": "independently enumerate exact Fraction-valued likelihoods, posteriors, terminal decisions, costs, and full expected episode net returns",
+      "selection_kind": "independent_expected_episode_net_return",
+      "selection_unit": "return",
+      "required_action_at_prior": "strong",
+      "role": "ceiling_and_semantic_oracle"
+    },
+    {
+      "id": "goal_only",
+      "selector": "set expected decision value to zero and maximize expected immediate acquisition payoff plus prior-optimal terminal value minus action_cost minus acquisition_cost",
+      "selection_kind": "goal_only_expected_return",
+      "selection_unit": "return",
+      "required_action_at_prior": "skip",
+      "role": "non_oracle_control"
+    },
+    {
+      "id": "raw_observation_entropy",
+      "selector": "maximize raw acquisition-observation entropy; apply canonical list-order tie break",
+      "selection_kind": "raw_observation_entropy",
+      "selection_unit": "nats",
+      "required_action_at_prior": "nuisance",
+      "role": "non_oracle_control"
+    },
+    {
+      "id": "eig_only",
+      "selector": "maximize expected information gain about theta while ignoring task payoff and both costs",
+      "selection_kind": "expected_information_gain",
+      "selection_unit": "nats",
+      "required_action_at_prior": "overpowered",
+      "role": "non_oracle_control"
+    },
+    {
+      "id": "shuffled_information",
+      "selector": "use the fixed selection-diagnostic permutation weak<-overpowered, strong<-weak, overpowered<-strong; leave skip and nuisance unchanged; every utility diagnostic includes the prior-optimal terminal value",
+      "selection_kind": "shuffled_information_expected_episode_net_return",
+      "selection_unit": "return",
+      "information_source_by_action": {
+        "skip": "skip",
+        "weak": "overpowered",
+        "strong": "weak",
+        "overpowered": "strong",
+        "nuisance": "nuisance"
+      },
+      "selection_only_perturbation": true,
+      "learner_likelihood": "executed_action_true_likelihood",
+      "update_model": "after weak is selected and executed, update with the true executed weak likelihood q=7/10; no likelihood or posterior update is permuted",
+      "required_action_at_prior": "weak",
+      "role": "non_oracle_marginal_preserving_control"
+    },
+    {
+      "id": "uniform_random",
+      "selector": "deterministic SHA-256 selection over the canonical five-action order using the public rule in uniform_selector",
+      "selection_kind": "uniform_random",
+      "selection_unit": null,
+      "required_action_at_prior": "seed_dependent",
+      "role": "non_oracle_control"
+    }
+  ],
+  "uniform_selector": {
+    "accepted_input": "nonnegative integer seed represented in canonical decimal with no sign, leading zero, or whitespace except the integer zero itself",
+    "payload_utf8": "WM-002|0.2.0-q|uniform|<canonical decimal seed>",
+    "digest": "SHA256(payload_utf8)",
+    "index": "unsigned big-endian integer represented by the full 32-byte digest modulo 5",
+    "candidate_order": ["skip", "weak", "strong", "overpowered", "nuisance"],
+    "fixed_vectors": [
+      {"seed": 0, "digest": "006b40064bcd685b5e890c3794e41ab25b40053dc2861c896fdfb3a1afd3bd29", "index": 4, "action": "nuisance"},
+      {"seed": 1, "digest": "02bf7b3fdfb2a8d53d7d04800b863768187668d305b25faffa662e5a228b5b89", "index": 2, "action": "strong"},
+      {"seed": 2, "digest": "4805ec631c7edff2ab0e3762693e41fa20cfed98f6d07cdab5bed8e2fa74d9c0", "index": 3, "action": "overpowered"},
+      {"seed": 7, "digest": "7623677590477eb4e14002c70682034b26171e3b4c3c48fd3a15e2bae5bd7e1f", "index": 0, "action": "skip"},
+      {"seed": 13, "digest": "70f8689ab3da324ca541d91a4cf6fb1bf19f9ac603f05bb5814c164c8bfec5c0", "index": 1, "action": "weak"}
+    ]},
+  "q0": {
+    "name": "exact_semantic_matrix",
+    "claim_eligible": false,
+    "environment_interactions": 0,
+    "report_schema": "prospect.wm002.active-acquisition.q0-qualification.v1",
+    "absolute_tolerance": "1e-12",
+    "semantic_matrix_cell_count": 88,
+    "requirements": [
+      "enumerate both theta values, every acquisition action, every supported observation, both terminal decisions, and both terminal outcomes",
+      "compute the full oracle using fractions.Fraction without importing the Prospect selector",
+      "compute the Prospect path through the generic floating Bayes, EIG, and EVSI functions",
+      "match every reachable posterior, expected decision value, information gain, raw observation entropy, action total, and selector within absolute tolerance 1e-12",
+      "match the five hand-derived expected net returns exactly in the Fraction oracle and within 1e-12 in the floating path",
+      "require Prospect and the independent oracle to select strong",
+      "require goal-only to select skip, raw entropy to select nuisance, EIG-only to select overpowered, and shuffled information to select weak",
+      "verify sign-label permutation invariance",
+      "verify nuisance outcomes have zero information gain and zero expected decision value despite maximal raw entropy",
+      "verify action_cost and acquisition_cost are each charged exactly once",
+      "verify declared public record field sets and every emitted Q0 payload contain no theta, hidden-regime, private-seed, or latent-state field; Q1 must separately test actual serialized runtime values"
+    ],
+    "on_failure": "Stop WM-002. Fix semantics or retire the formulation before any Q1 run."
+  },
+  "q1": {
+    "name": "claim_ineligible_causal_killing_test",
+    "claim_eligible": false,
+    "execution_authorized": false,
+    "entry_requirements_before_authorization": [
+      "a canonical passing Q0 report and its SHA-256 are independently audited and bound",
+      "the Q1 implementation binding and exact raw, private-audit, checkpoint-frame, restored-trace, aggregate, and audit-output schemas are frozen",
+      "recursive schema and sentinel tests demonstrate private-state exclusion from actual serialized agent-visible, checkpoint, and public values",
+      "the private environment-salt commitment and auditor custody procedure are frozen"
+    ],
+    "master_seed_count": 4,
+    "episodes_per_master_per_arm": 1024,
+    "paired_episode_count_per_arm": 4096,
+    "steps_per_episode_per_arm": {
+      "acquisition": 1,
+      "terminal": 1,
+      "total": 2
+    },
+    "agent_update_calls_per_episode": 1,
+    "checkpoint_boundary": "after the acquisition transition and persistent update, before terminal assessment",
+    "pairing": "Every arm sees the same harness-private balanced theta schedule and counterfactual potential-outcome keys. The hidden values and keys never enter agent-visible records.",
+    "inference_unit": "master seed",
+    "confidence_interval": "two-sided 95% Student-t interval over four master-level paired mean differences",
+    "primary_comparison": "prospect_expected_return minus shuffled_information executed net episode return",
+    "conjunctive_comparisons": [
+      "prospect_expected_return minus goal_only",
+      "prospect_expected_return minus raw_observation_entropy",
+      "prospect_expected_return minus eig_only",
+      "prospect_expected_return minus shuffled_information",
+      "prospect_expected_return minus uniform_random"
+    ],
+    "on_failure": "Stop WM-002. Do not inspect later gates as rescue evidence, tune on Q1 outcomes, add a learned estimator, or open a formal lane."
+  },
+  "seed_schedule": {
+    "status": "prospective design; unavailable until Q1 authorization",
+    "private_algorithm": "HMAC-SHA256 with the environment-only secret salt as key and canonical UTF-8 message 'WM-002|0.2.0-q|q1v2|' plus the namespace and canonical semantic key fields; interpret the full digest as an unsigned big-endian integer",
+    "salt_commitment": "Publish SHA256(secret_salt) before Q1. Keep the salt outside agent-visible and public artifacts; disclose it only to the independent auditor under the frozen custody procedure.",
+    "q1_master_indices": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "formal_master_indices": [],
+    "namespaces": [
+      "q1v2-theta-balanced-order",
+      "q1v2-pulse-outcome",
+      "q1v2-nuisance-outcome",
+      "q1v2-terminal-outcome",
+      "q1v2-identity-counter",
+      "q1v2-restore-challenge"
+    ],
+    "theta_schedule": "For each master, rank episode indices 0..1023 by their q1v2-theta-balanced-order HMAC digest with episode index as the final tie-break; assign theta=-1 to the first 512 and theta=+1 to the rest.",
+    "counterfactual_pairing": "Stochastic potential-outcome draws are full HMAC digests keyed by master, episode, semantic action or terminal decision, and draw role, mapped to [0,1) by division by 2^256; they are never consumed from one order-dependent stream.",
+    "uniform_policy_rule": "Uniform arm selection uses the separate public uniform_selector rule after deriving a public nonnegative episode seed from the frozen Q1 implementation; it does not use or expose the environment secret salt.",
+    "record_rule": "Public rows contain the salt commitment and semantic-key/draw digests needed for membership checks, never the salt, theta, or private preimages. Private reconstruction material is available only in the permissioned auditor sidecar. No formal seed is allocated by this protocol."
+  },
+  "budgets": {
+    "q0_environment_steps": 0,
+    "q1_master_seeds": 4,
+    "q1_episodes_per_master_per_arm": 1024,
+    "q1_total_episodes_per_arm": 4096,
+    "q1_environment_steps_per_episode_per_arm": 2,
+    "q1_total_environment_steps_per_arm": 8192,
+    "q1_acquisition_updates_per_episode_per_arm": 1,
+    "q1_terminal_updates_per_episode_per_arm": 0,
+    "matched_rule": "All non-oracle and primary arms receive the same number of candidate assessments, acquisition opportunities, executed terminal opportunities, update invocations, checkpoint/restore operations, and paired latent/potential-outcome episodes. The oracle may perform independent exact arithmetic but cannot supply values to the Prospect arm.",
+    "overrun_rule": "Extra episodes, repeated failed episodes, extra acquisition actions, terminal learning, or outcome-dependent exclusion fails Q1-K0."
+  },
+  "persistent_update": {
+    "owner": "prospect.runtime.VersionedModelOwner",
+    "state": "canonical exact posterior-model bytes plus declared evidence-count/version metadata",
+    "transaction": "prepare from immutable pre-action model bytes, validate the sole acquisition-transition identity, then commit through the authoritative transactional runtime",
+    "eligibility": "the exact acquisition transition from the same episode and arm only",
+    "forbidden_inputs": [
+      "theta",
+      "theta derivation seed",
+      "another arm's experience",
+      "terminal observation or success",
+      "future potential outcomes",
+      "oracle-private arithmetic"
+    ],
+    "required_primary_change": "The Prospect strong-pulse update must change persistent model bytes and model version, and its UpdateReceipt must name exactly the consumed acquisition transition."
+  },
+  "metrics": {
+    "selection": [
+      "selected_action",
+      "all_candidate_expected_goal_values",
+      "all_candidate_expected_decision_values",
+      "all_candidate_information_gains",
+      "all_candidate_raw_observation_entropies",
+      "all_candidate_costs",
+      "all_candidate_total_values"
+    ],
+    "learning": [
+      "prior_posterior_theta_probability",
+      "post_acquisition_posterior_theta_probability",
+      "model_predecessor_sha256",
+      "model_candidate_sha256",
+      "consumed_transition_ids"
+    ],
+    "behavior": {
+      "primary": "executed net episode return",
+      "components": [
+        "executed acquisition payoff",
+        "executed acquisition cost",
+        "selected terminal action",
+        "executed terminal success"
+      ],
+      "higher_is_better": true
+    },
+    "restore": [
+      "component digests",
+      "model and configuration versions",
+      "candidate assessment digest",
+      "selected terminal action",
+      "executed terminal success",
+      "net episode return"
+    ],
+    "aggregation": "Average within each master and arm first. All intervals and killing comparisons operate on the four paired master-level differences, never on 4,096 episodes as independent replicates."
+  },
+  "q1_gates": [
+    {
+      "gate": "Q1-K0",
+      "name": "prospective protocol, seed, matrix, and matched-budget completeness",
+      "requirements": [
+        "an independently audited canonical passing Q0 report SHA-256 is bound before the first Q1 environment interaction",
+        "the authorized successor implementation reports its exact protocol and Q0 digests",
+        "the Q1 implementation binding, result/checkpoint schemas, private salt commitment, and recursive sentinel tests are frozen",
+        "execution_authorized is true only in that prospectively revised successor protocol",
+        "all four masters, every arm, 1,024 paired episodes per master, two executed steps per episode, and one acquisition-update invocation per episode are present",
+        "there are no missing, repeated, excluded, early-stopped, or extra episodes or updates",
+        "formal authority and formal result paths remain absent"
+      ]
+    },
+    {
+      "gate": "Q1-K1",
+      "name": "canonical trace integrity and hidden-state isolation",
+      "requirements": [
+        "every acquisition and terminal step has unique decide, execute, observe, experience, and transition identity",
+        "recursive allowlist and sentinel scans of actual serialized values find no theta, private salt, seed, counterfactual, or private preimage in agent-visible records, checkpoint components, or public rows",
+        "no future, terminal, other-arm, oracle-private, or counterfactual outcome is available at acquisition decision time or update time",
+        "action_cost and acquisition_cost are each charged exactly once and primitive executed reward components reconstruct net return"
+      ]
+    },
+    {
+      "gate": "Q1-K2",
+      "name": "selector and action-value integrity",
+      "requirements": [
+        "every decision records all five truthful return-unit core assessments plus unit-labeled bench selection diagnostics from one immutable pre-action snapshot",
+        "Prospect and the independent oracle select strong on every episode",
+        "goal-only selects skip, raw observation entropy selects nuisance, EIG-only selects overpowered, and shuffled information selects weak on every episode",
+        "uniform random selection exactly replays the declared public SHA-256 selector",
+        "the shuffled arm updates from the true likelihood of the executed weak action",
+        "each arm differs only by its declared selection rule"
+      ]
+    },
+    {
+      "gate": "Q1-K3",
+      "name": "acquisition-linked persistent model change",
+      "requirements": [
+        "the Prospect predecessor and candidate model digests differ",
+        "each Prospect UpdateReceipt binds exactly its own strong acquisition transition, predecessor digest, candidate digest, and committed model version",
+        "the committed posterior is the exact Bayes posterior under the strong likelihood",
+        "the terminal assessment uses the committed post-acquisition model and terminal learning is disabled"
+      ]
+    },
+    {
+      "gate": "Q1-K4",
+      "name": "paired executed net-return advantage",
+      "requirements": [
+        "the mean Prospect-minus-shuffled master-level net-return difference is strictly positive",
+        "the two-sided 95% Student-t interval lower bound for Prospect minus shuffled information is strictly greater than zero",
+        "the mean and interval lower bound are strictly greater than zero for Prospect against goal-only, raw observation entropy, EIG-only, and uniform random",
+        "the independent analyzer reconstructs all arm means and paired differences from executed payoff, cost, and terminal-success rows rather than stored aggregate values"
+      ]
+    },
+    {
+      "gate": "Q1-K5",
+      "name": "fresh-process pre-terminal persistence",
+      "requirements": [
+        "a fresh process restores all declared Q1 checkpoint components before terminal assessment",
+        "live and restored model bytes, versions, evidence ancestry, receipt identity, candidate-assessment digest, and selected terminal action are exact matches",
+        "paired live and restored terminal execution uses the same keyed potential outcome and yields identical terminal success and net episode return",
+        "the independent auditor reopens both raw traces instead of trusting producer parity booleans"
+      ]
+    }
+  ],
+  "killing_order": [
+    "Q0",
+    "Q1-K0",
+    "Q1-K1",
+    "Q1-K2",
+    "Q1-K3",
+    "Q1-K4",
+    "Q1-K5"
+  ],
+  "audit_strategy": {
+    "producer_analysis_is_not_authoritative": true,
+    "independent_requirements": [
+      "implement the Fraction oracle independently from the Prospect selector",
+      "reconstruct theta and every action-dependent potential outcome from private seed keys",
+      "recompute every reachable Bayes posterior, EVSI, EIG, entropy, action total, and required selector",
+      "resolve every consumed transition identity against canonical real experience",
+      "reconstruct executed net returns from primitive payoff, cost, and terminal-success rows",
+      "recompute paired master-level means, Student-t intervals, and the ordered killing prefix",
+      "reopen the checkpoint in a fresh process and compare raw live/restored terminal traces"
+    ],
+    "forbidden_shortcuts": [
+      "importing producer aggregate metrics or gate booleans as evidence",
+      "reading theta from agent-visible records",
+      "treating Q0 or Q1 as formal evidence",
+      "treating Prospect-oracle equality as learned or calibrated uncertainty"
+    ]
+  },
+  "formal_boundary": {
+    "authorized": false,
+    "formal_protocol_version": null,
+    "formal_seed_set": [],
+    "formal_thresholds": null,
+    "formal_binding": null,
+    "formal_result_schema": null,
+    "promotion_rule": "Only after Q0 and Q1 pass, their independent audit passes, and the exact formulation survives a prospective review may a new separately versioned formal protocol be proposed. That protocol must allocate fresh seeds and freeze its own claim, thresholds, schemas, implementation binding, and audit contract before any formal interaction.",
+    "q0_q1_outcome_use": "Q0 and Q1 remain permanently claim-ineligible. They may kill or redesign the formulation and qualify the harness, but cannot be relabeled as confirmation or pooled with future formal evidence."
+  }
+}
+
