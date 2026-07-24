@@ -27,9 +27,9 @@ Q1_SCHEMA_PATHS: Final = {
     "raw_trace": Q1_SCHEMA_DIRECTORY / "q1-raw-trace.schema.json",
     "restored_trace": Q1_SCHEMA_DIRECTORY / "q1-restored-trace.schema.json",
 }
-Q0_REPORT_SHA256: Final = "779e8d8128312da2239107058137faac54751df620efb31291c0af98c2b8f243"
+Q0_REPORT_SHA256: Final = "e5aa897a2143cc9211572a3a5ac388edb346aab4f813eb650d23aae7cd6487b5"
 Q0_PROTOCOL_SHA256: Final = "90b73ad4815380f113f91d0542bf7b91fd7e5196b5afd7f8c46b7fde9ec070cb"
-Q0_IMPLEMENTATION_SHA256: Final = "c9e6689a0ce66e5b79f733c057b839a155500908ba21a5adbf64637cb090c324"
+Q0_IMPLEMENTATION_SHA256: Final = "bf8dc1bbd5c4ae560c658e848e39598e713569098602ce6a0536493e7a4883f5"
 
 ARM_ORDER: Final = (
     "prospect_expected_return",

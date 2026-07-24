@@ -52,17 +52,19 @@ The dependency-ordered [maturity roadmap](docs/maturity-roadmap.md) now makes
 WM-002 the active scientific task and separates learned uncertainty, zero-shot
 transfer, online adaptation, continual scale, partial observability, learned
 observations, external evaluation, and runtime-assurance work. WM-002 Q0 is
-independently accepted for protocol completeness only. The Q1 runtime and
-independent auditor are implemented, but result-free qualification has been
-reopened and is not green until every newly found blocker closes. Recent
+independently accepted for protocol completeness only, and was rebound after
+two of its bound sources changed. The Q1 runtime and independent auditor are
+implemented, and the two blockers that reopened result-free qualification are
+closed: private-input noninterference now carries mutation controls that make
+the probe fail on an injected leak, and the complete four-producer,
+28-restore-lane, merge, validation, publication, and completed-marker
+orchestration runs end to end under a result-free rehearsal mode. Recent
 hardening includes the fixed experiment-global one-shot tombstone, independent
 auditor validation of the exact prospective review, and descriptor-stable
 selected-source reads. Those reads bind the bytes observed, not already-loaded
 bytecode, and do not defend against a malicious coordinated same-account
-writer. The last completed combined result-free checkpoint before subsequent
-integration changes reached 339 active-acquisition tests; that is a historical
-test fact, not readiness or evidence. Q1 execution authorization remains false,
-and no Q1 outcome or capability evidence exists.
+writer. Q1 execution authorization remains false, and no Q1 outcome or
+capability evidence exists.
 
 ## Layout
 

@@ -156,3 +156,12 @@ entries:
       - "Did not stage or crystallize a Q1 capability claim because execution authorization remains false and no private draw, interaction, attempt execution, outcome, or final artifact was produced."
       - "Closed the serial pipe-backpressure and unimplemented O23 threads; kept directory-identity, custody, protocol-parity, audit integration, and exact-source regeneration open."
       - "Found no contradiction with C05 or A03: this turn added result-free runtime assurance only."
+
+  - turn: "2026-07-24_001#10"
+    notes:
+      - "Routed the unreproducible accepted Q0 binding as dead end N43 and rebound it only after confirming every substantive Q0 output was byte-identical."
+      - "Added a permanent Q0 regeneration test rather than recording the stale binding as a one-time repair, because the failure mode was silence, not error."
+      - "Routed the noninterference mutation controls and the complete-orchestration rehearsal as experiment N44, closing the two blockers that reopened result-free qualification."
+      - "Chose protocol-selected mutually exclusive execution modes over a runtime flag so a rehearsal is unreachable exactly when the authorized attempt is reachable."
+      - "Did not stage or crystallize a capability claim: the rehearsal executes fixture interactions under its own run identity at 1/512 of one arm's budget, and the independent auditor rejects its artifacts."
+      - "Kept the final protocol/review/entry authorization sequence and every downstream WM-002 gate untouched."

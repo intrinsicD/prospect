@@ -991,3 +991,66 @@ tree:
     also_depends_on: [N37, N38, N39, N40, N41]
     status: resolved
     children: []
+  - id: N43
+    type: dead_end
+    title: "Reject the accepted Q0 binding as reproducible"
+    provenance: ai-executed
+    timestamp: "2026-07-24T21:40+02:00"
+    result: >-
+      Regenerating Q0 to feed the rehearsal showed the accepted report digest
+      779e8d81 and manifest digest c9e6689a no longer reproduce, because
+      bench/active_acquisition/problem.py and src/prospect/domain/records.py
+      changed after acceptance. No check detected this; it surfaced only
+      because a new path regenerated Q0. Every substantive output stayed
+      byte-identical—protocol, oracle, 88-cell matrix, uniform vectors, all
+      five exact returns, all six selectors, passed true—so the disposition
+      held while the binding did not.
+    lesson: >-
+      An accepted digest over selected sources is evidence only while those
+      sources still produce it. Acceptance must be paired with a regeneration
+      check, or a stale binding survives silently until someone reruns it.
+    evidence:
+      - N36
+      - "bench/active_acquisition/contracts.py"
+      - "bench/active_acquisition/q1_protocol.json"
+      - "docs/wm002-q0-results.md"
+      - "tests/test_active_acquisition_contracts.py"
+    also_depends_on: [N36]
+    status: resolved
+    children: []
+  - id: N44
+    type: experiment
+    title: "Close Q1 noninterference and complete-orchestration blockers"
+    provenance: ai-executed
+    timestamp: "2026-07-24T21:55+02:00"
+    result: >-
+      Added five mutation controls proving the causal noninterference probe
+      fails when a leak is injected: hidden sign into the public acquisition
+      or checkpoint section, private-dependent checkpoint payload, unvaried
+      private derivation, replayed reference material, and a flattened
+      terminal sensitivity control. Introduced a protocol-selected execution
+      mode where execution_authorized true permits only the full-budget
+      attempt and false permits only a two-episode rehearsal, so the modes are
+      never simultaneously reachable and children derive the mode from
+      protocol bytes rather than the parent. The rehearsal ran the complete
+      four-producer, 28-restore-lane, merge, validation, publication, and
+      completed-marker orchestration with real authenticated children in 4.9
+      seconds: 56 rows per artifact in canonical order, every arm's declared
+      selection, 28 distinct restorer PIDs disjoint from 4 producer PIDs, no
+      private material in public rows. The independent auditor rejects those
+      artifacts at Q1-K0 on execution_authorized and at K1, K3, K4, and K5.
+      make check passed with 513 tests. Execution authorization remains false
+      and no Q1 draw, outcome, or capability evidence exists.
+    evidence:
+      - N38
+      - N43
+      - "bench/active_acquisition/rehearsal.py"
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/seeding.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "tests/test_active_acquisition_rehearsal.py"
+      - "tests/test_active_acquisition_runtime_lane.py"
+      - "make-check:513-passed"
+    also_depends_on: [N37, N38, N42, N43]
+    status: resolved
+    children: []

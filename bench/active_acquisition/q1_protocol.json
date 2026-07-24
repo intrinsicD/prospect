@@ -10,10 +10,10 @@
     "statement": "This successor protocol freezes the Q1 runtime qualification contract. Q1 execution remains disabled until a canonical Q1 entry-qualification report passes against these exact bytes, the frozen implementation manifest, the six frozen artifact schemas, the committed private salt, and the accepted Q0 binding."
   },
   "q0_binding": {
-    "report_sha256": "779e8d8128312da2239107058137faac54751df620efb31291c0af98c2b8f243",
+    "report_sha256": "e5aa897a2143cc9211572a3a5ac388edb346aab4f813eb650d23aae7cd6487b5",
     "report_schema": "prospect.wm002.active-acquisition.q0-qualification.v1",
     "protocol_sha256": "90b73ad4815380f113f91d0542bf7b91fd7e5196b5afd7f8c46b7fde9ec070cb",
-    "implementation_sha256": "c9e6689a0ce66e5b79f733c057b839a155500908ba21a5adbf64637cb090c324",
+    "implementation_sha256": "bf8dc1bbd5c4ae560c658e848e39598e713569098602ce6a0536493e7a4883f5",
     "required_flags": {
       "passed": true,
       "claim_eligible": false,

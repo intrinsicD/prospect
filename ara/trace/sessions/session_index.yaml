@@ -43,8 +43,8 @@ sessions:
     open_threads: 1
   - id: "2026-07-24_001"
     date: "2026-07-24"
-    summary: "Accepted Q0 and hardened disabled Q1 through strict directory identity plus authenticated, site-disabled, bounded worker bootstrap; integration remains open."
-    turn_count: 9
-    events_count: 15
+    summary: "Accepted and rebound Q0, hardened disabled Q1, and closed both reopened blockers with noninterference mutation controls and a complete result-free orchestration rehearsal."
+    turn_count: 10
+    events_count: 17
     claims_touched: []
-    open_threads: 3
+    open_threads: 2

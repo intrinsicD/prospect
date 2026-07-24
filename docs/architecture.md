@@ -555,20 +555,23 @@ post-outcome evidence, scope, limitations, and next-test boundary.
 - [WM-002](wm002-active-acquisition-plan.md) begins with an exact known-model
   Q0 for value-of-information arithmetic, control separation, and protocol
   parity. Its [Q0 result](wm002-q0-results.md) is independently accepted for
-  protocol completeness only. Q0 performs no interaction and cannot establish
-  learned uncertainty, learning, persistence, or improvement. The Q1 runtime,
-  result-free entry gate, strict artifacts, and independent auditor are now
-  implemented, but result-free qualification has been reopened and is not
-  green until every newly found blocker closes. Implemented custody controls
-  include the fixed experiment-global one-shot tombstone, independent auditor
-  validation and entry binding of the exact prospective review, and
-  descriptor-stable selected-source reads. The last control binds observed
-  source bytes, not already-loaded bytecode, and does not protect against a
-  malicious coordinated same-account writer. Q1 execution authorization
-  remains false, 4,096 episodes are allocated per arm (28,672 total), and no
-  Q1 outcome or capability evidence exists. The last completed combined
-  result-free checkpoint before subsequent integration changes reached 339
-  active-acquisition tests; it is not a readiness claim.
+  protocol completeness only, and was rebound after two bound sources changed;
+  a regeneration test now fails if the bound digests drift again. Q0 performs
+  no interaction and cannot establish learned uncertainty, learning,
+  persistence, or improvement. The Q1 runtime, result-free entry gate, strict
+  artifacts, and independent auditor are implemented, and the two blockers that
+  reopened result-free qualification are closed: private-input noninterference
+  now carries mutation controls that make the probe fail on an injected leak,
+  and the complete orchestration runs end to end under a result-free rehearsal
+  mode that the protocol's authorization bit makes mutually exclusive with the
+  real attempt. Implemented custody controls include the fixed
+  experiment-global one-shot tombstone, independent auditor validation and
+  entry binding of the exact prospective review, and descriptor-stable
+  selected-source reads. The last control binds observed source bytes, not
+  already-loaded bytecode, and does not protect against a malicious coordinated
+  same-account writer. Q1 execution authorization remains false, 4,096 episodes
+  are allocated per arm (28,672 total), and no Q1 outcome or capability
+  evidence exists.
 - The current in-memory lifecycle journal exposes partial completion but cannot
   automatically continue or survive restart. Durable idempotent recovery is still
   required; the transactional learning path handles in-process failures but not

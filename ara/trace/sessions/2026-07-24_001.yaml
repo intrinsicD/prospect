@@ -2,9 +2,9 @@ session:
   id: "2026-07-24_001"
   date: "2026-07-24"
   started: "2026-07-24T00:51+02:00"
-  last_turn: "2026-07-24T16:12+02:00"
-  turn_count: 9
-  summary: "Accepted Q0 and hardened disabled Q1 through strict directory identity plus authenticated, site-disabled, bounded worker bootstrap; integration remains open."
+  last_turn: "2026-07-24T22:05+02:00"
+  turn_count: 10
+  summary: "Accepted and rebound Q0, hardened disabled Q1 through authenticated worker bootstrap, and closed both reopened blockers with noninterference mutation controls and a complete result-free orchestration rehearsal."
 
 events_logged:
   - turn: 1
@@ -99,6 +99,19 @@ events_logged:
     routing: crystallized
     provenance: ai-suggested
     summary: "Crystallized attempt-scoped authenticated worker bootstrap as A04, with the proposed pipe revised to an acknowledged AF_UNIX stream."
+
+  - turn: 10
+    type: dead_end
+    id: N43
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected the accepted Q0 binding as reproducible after two bound sources changed, then rebound it on byte-identical substantive outputs."
+  - turn: 10
+    type: experiment
+    id: N44
+    routing: direct
+    provenance: ai-executed
+    summary: "Closed both reopened Q1 blockers with noninterference mutation controls and a complete result-free orchestration rehearsal."
 
 
 ai_actions:
@@ -268,6 +281,41 @@ ai_actions:
       - "ara/trace/sessions/session_index.yaml"
       - "ara/trace/pm_reasoning_log.yaml"
 
+  - turn: 10
+    action: >-
+      Committed and pushed the outstanding WM-002 and shared-storage work,
+      found and rebound the unreproducible accepted Q0 binding with a
+      permanent regeneration test, added five mutation controls that make the
+      causal noninterference probe fail on an injected leak, introduced
+      protocol-selected mutually exclusive execution modes, and ran the
+      complete four-producer, 28-restore-lane, merge, validation, publication,
+      and completed-marker orchestration end to end under the result-free
+      rehearsal budget without producing any Q1 evidence.
+    provenance: ai-executed
+    files_changed:
+      - "bench/active_acquisition/rehearsal.py"
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "bench/active_acquisition/restore_worker.py"
+      - "bench/active_acquisition/seeding.py"
+      - "bench/active_acquisition/contracts.py"
+      - "bench/active_acquisition/q1_protocol.json"
+      - "tests/test_active_acquisition_rehearsal.py"
+      - "tests/test_active_acquisition_runtime_lane.py"
+      - "tests/test_active_acquisition_contracts.py"
+      - "tests/test_active_acquisition_q1.py"
+      - "docs/wm002-q0-results.md"
+      - "docs/wm002-q1-runtime-design.md"
+      - "docs/wm002-active-acquisition-plan.md"
+      - "docs/architecture.md"
+      - "README.md"
+      - "bench/active_acquisition/README.md"
+      - "Makefile"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
 claims_touched: []
 
 key_context:
@@ -361,10 +409,25 @@ key_context:
       Q1 private draw, interaction, attempt execution, outcome, or final
       artifact was produced.
 
+  - turn: 10
+    excerpt: >-
+      The user directed committing and pushing the outstanding work and then
+      continuing the real research toward a working agent.
+  - turn: 10
+    excerpt: >-
+      Regenerating Q0 for the rehearsal exposed that the accepted binding no
+      longer reproduced; the disposition survived only because every
+      substantive output was byte-identical.
+  - turn: 10
+    excerpt: >-
+      Both reopened blockers closed: the noninterference probe now fails under
+      five injected leaks, and the complete orchestration runs end to end in a
+      rehearsal mode the protocol's authorization bit makes mutually exclusive
+      with the real attempt.
+
 open_threads:
-  - "Implement non-vacuous private-input noninterference and complete-orchestration happy-path coverage, rerun result-free qualification, then regenerate exact-source review and entry qualification before any authorization."
+  - "Regenerate the independent exact-source prospective review and entry qualification against the final bytes, then decide whether to enable execution_authorized for the sole Q1 attempt."
   - "After WM-002 reaches a terminal disposition, test learned uncertainty in U-001 before zero-shot transfer, adaptation, scale, or partial observability."
-  - "Complete integration of strict directory identities, custody, protocol parity, and independent audit around the hardened worker bootstrap before regenerating exact-source qualification."
 
 ai_suggestions_pending:
   - "Use the existing Q1 runtime design to close schemas, serialized-value isolation, private-salt custody, and Q0 binding before proposing an authorized successor protocol."

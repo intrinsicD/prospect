@@ -1,5 +1,5 @@
 .RECIPEPREFIX = >
-.PHONY: install install-runtime test test-runtime lint fmt typecheck typecheck-runtime epistemic-diagnostics epistemic-gate wm002-q0 wm001-development check check-runtime tree
+.PHONY: install install-runtime test test-runtime lint fmt typecheck typecheck-runtime epistemic-diagnostics epistemic-gate wm002-q0 wm002-q1-rehearsal wm001-development check check-runtime tree
 
 install:
 > python -m pip install -e ".[dev]"
@@ -46,6 +46,14 @@ epistemic-gate:
 
 wm002-q0:
 > PYTHONPATH=src python -m bench.active_acquisition.run
+
+# Result-free orchestration mechanics only. It requires an unauthorized
+# protocol, produces no Q1 draw or outcome, and its artifacts fail the
+# independent auditor by construction. ROOT must not exist.
+wm002-q1-rehearsal:
+> @test -n "$(ROOT)" || { echo "usage: make wm002-q1-rehearsal ROOT=/path/to/fresh/dir" >&2; exit 2; }
+> PYTHONPATH=.:src:$$(python -c 'import sysconfig;print(sysconfig.get_path("purelib"))') \
+>   python -S -m bench.active_acquisition.rehearsal --root "$(ROOT)"
 
 wm001-development:
 > @echo "Direct WM-001 entry is disabled; use docs/wm001-v1200-operator-runbook.md" >&2

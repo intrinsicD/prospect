@@ -1,18 +1,24 @@
 # WM-002 active-acquisition qualification plan
 
-Status: **Q0 is independently accepted for protocol completeness only. Q1
-protocol `0.3.0-q1`, runtime, strict artifacts, entry gate, and independent
-auditor are implemented, but result-free qualification has been reopened and
-is not green until every newly found blocker closes. Execution authorization
-remains false, and no Q1 outcome or capability evidence exists.**
+Status: **Q0 is independently accepted for protocol completeness only and was
+rebound on 2026-07-24 after two bound sources changed. Q1 protocol
+`0.3.0-q1`, runtime, strict artifacts, entry gate, and independent auditor are
+implemented, and both blockers that reopened result-free qualification are
+closed. Execution authorization remains false, and no Q1 outcome or capability
+evidence exists.**
 
-The fixed experiment-global one-shot tombstone, independent auditor validation
-of the exact prospective review, and descriptor-stable selected-source reads
-are implemented. The source binding covers bytes observed during the read, not
-already-loaded bytecode, and does not defend against a malicious coordinated
-same-account writer. The last completed combined result-free checkpoint before
-subsequent integration changes reached 339 active-acquisition tests; it is not
-a readiness claim.
+The two closures are: causal private-input noninterference, now backed by five
+mutation controls that make the probe fail when a leak is injected; and the
+complete four-producer, 28-restore-lane, merge, validation, publication, and
+completed-marker orchestration, now executed end to end by the result-free
+rehearsal mode described in the
+[runtime design](wm002-q1-runtime-design.md). The fixed experiment-global
+one-shot tombstone, independent auditor validation of the exact prospective
+review, and descriptor-stable selected-source reads are implemented. The source
+binding covers bytes observed during the read, not already-loaded bytecode, and
+does not defend against a malicious coordinated same-account writer. The
+combined result-free suite is 512 tests; that is a test fact, not a readiness
+claim, and the remaining authorization steps are unchanged.
 
 WM-002 begins with one small question and one cheap killing fixture. It does
 not yet test transfer, learned uncertainty, continual-learning scale,

@@ -14,6 +14,7 @@ import pytest
 
 import bench.active_acquisition.q1 as q1
 from bench.active_acquisition.contracts import canonical_json_bytes, validate_artifact
+from bench.active_acquisition.seeding import Q1ExecutionMode
 from bench.active_acquisition.worker_capability import (
     DecodedWorkerCapability,
     consume_worker_capability_fd,
@@ -942,6 +943,7 @@ def _test_q1_authority(
     *,
     execution_root: Path | None = None,
     attempt_registry_directory: Path | None = None,
+    execution_mode: Q1ExecutionMode = Q1ExecutionMode.PRODUCTION,
 ) -> q1.Q1ExecutionAuthority:
     identity = _test_q1_identity()
     if (execution_root is None) != (attempt_registry_directory is None):
@@ -979,6 +981,7 @@ def _test_q1_authority(
         run_identity=identity,
         execution_root_identity=execution_identity,
         attempt_registry_identity=registry_identity,
+        execution_mode=execution_mode,
         secret_salt=b"s" * 32,
     )
 
@@ -1195,9 +1198,7 @@ def test_run_q1_bounded_authenticated_happy_path_publishes_and_completes(
         "prospective_review_path": tmp_path / "missing-review.json",
     }
 
-    monkeypatch.setattr(q1, "EPISODES_PER_MASTER", 1)
-    monkeypatch.setattr(q1, "EPISODES_TOTAL", q1.MASTER_COUNT * len(q1.ARM_ORDER))
-    monkeypatch.setattr(q1, "ENVIRONMENT_STEPS_TOTAL", 2 * q1.EPISODES_TOTAL)
+    monkeypatch.setattr(q1, "episodes_per_master", lambda _mode: 1)
     monkeypatch.setattr(q1, "validate_q1_execution_authority", lambda **_kwargs: authority)
 
     def forbidden_q1_private_path(*_args: object, **_kwargs: object) -> None:

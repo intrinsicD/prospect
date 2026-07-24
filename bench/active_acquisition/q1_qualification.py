@@ -41,13 +41,14 @@ from bench.active_acquisition.contracts import (
     implementation_manifest,
     sha256_bytes,
 )
+from bench.active_acquisition.seeding import Q1ExecutionMode
 
 ENTRY_REPORT_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-entry-qualification.v1"
 ENTRY_REPORT_SCHEMA_PATH: Final = Path(__file__).with_name("schemas") / "q1-entry-qualification.schema.json"
 PROSPECTIVE_REVIEW_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-prospective-review.v1"
 PROSPECTIVE_REVIEW_SCHEMA_PATH: Final = Path(__file__).with_name("schemas") / "q1-prospective-review.schema.json"
 Q1_JSONSCHEMA_VERSION: Final = "4.25.1"
-_Q1_NORMALIZED_PROTOCOL_SHA256: Final = "14d22a0544377b4a1c754f109c25c1f23d67d05ad1f1aef978fcf04628a78fe5"
+_Q1_NORMALIZED_PROTOCOL_SHA256: Final = "e015c8b519a10eeab19ecda1384071b17c450484c06ebbd4142d95143c92353b"
 _Q1_PRETERMINAL_IDENTITY_COUNTER: Final = 43
 _MAX_QUALIFICATION_INPUT_BYTES: Final = 8 * 1024 * 1024
 _QUALIFICATION_READ_CHUNK_BYTES: Final = 1024 * 1024
@@ -475,8 +476,16 @@ def run_entry_qualification(
     execution_root: Path,
     attempt_registry_directory: Path,
     protocol_path: Path = Q1_PROTOCOL_PATH,
+    execution_mode: Q1ExecutionMode = Q1ExecutionMode.PRODUCTION,
 ) -> Q1EntryQualificationReport:
-    """Run all result-free entry checks against exact external inputs."""
+    """Run all result-free entry checks against exact external inputs.
+
+    ``execution_mode`` selects the required protocol authorization bit and is
+    never inferred from the document: production demands
+    ``execution_authorized: true`` and rehearsal demands ``false``, so one
+    protocol document can qualify for exactly one mode. The emitted report
+    carries no separate mode field because ``protocol_sha256`` already binds it.
+    """
 
     checks: list[QualificationCheck] = []
     protocol_sha256, protocol = _protocol_snapshot(protocol_path)
@@ -491,7 +500,7 @@ def run_entry_qualification(
         )
     )
 
-    protocol_violations = _protocol_boundary_violations(protocol)
+    protocol_violations = _protocol_boundary_violations(protocol, execution_mode=execution_mode)
     checks.append(
         _check(
             "successor_protocol_boundary",
@@ -707,7 +716,11 @@ def _q0_binding_violations(
     return violations
 
 
-def _protocol_boundary_violations(protocol: Mapping[str, object]) -> list[str]:
+def _protocol_boundary_violations(
+    protocol: Mapping[str, object],
+    *,
+    execution_mode: Q1ExecutionMode,
+) -> list[str]:
     violations: list[str] = []
     if sys.flags.optimize != 0:
         violations.append("optimized Python interpreter is forbidden")
@@ -720,7 +733,7 @@ def _protocol_boundary_violations(protocol: Mapping[str, object]) -> list[str]:
         "protocol_version": Q1_PROTOCOL_VERSION,
         "claim_eligible": False,
         "formal_authorized": False,
-        "execution_authorized": True,
+        "execution_authorized": execution_mode is Q1ExecutionMode.PRODUCTION,
     }
     for key, value in expected.items():
         actual = experiment.get(key)
@@ -1741,6 +1754,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--execution-root", required=True, type=Path)
     parser.add_argument("--attempt-registry", required=True, type=Path)
     parser.add_argument("--protocol", default=Q1_PROTOCOL_PATH, type=Path)
+    parser.add_argument(
+        "--execution-mode",
+        default=Q1ExecutionMode.PRODUCTION.value,
+        choices=[mode.value for mode in Q1ExecutionMode],
+    )
     parser.add_argument("--output", type=Path)
     arguments = parser.parse_args(argv)
     report = run_entry_qualification(
@@ -1750,6 +1768,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         execution_root=arguments.execution_root,
         attempt_registry_directory=arguments.attempt_registry,
         protocol_path=arguments.protocol,
+        execution_mode=Q1ExecutionMode(arguments.execution_mode),
     )
     if arguments.output is not None:
         write_report(report, arguments.output)

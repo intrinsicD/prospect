@@ -1,19 +1,30 @@
 # WM-002: Exact active acquisition qualification
 
-Status: **Q0 is independently accepted for protocol completeness only. The
-claim-ineligible Q1 runtime, entry gate, and independent auditor are
-implemented, but result-free qualification has been reopened and is not green
-until every newly found blocker closes. Execution authorization remains false;
-no Q1 outcome or capability evidence exists.**
+Status: **Q0 is independently accepted for protocol completeness only and was
+rebound after two bound sources changed. The claim-ineligible Q1 runtime, entry
+gate, and independent auditor are implemented, and both blockers that reopened
+result-free qualification are closed. Execution authorization remains false; no
+Q1 outcome or capability evidence exists.**
 
 Implemented safeguards now include a fixed experiment-global one-shot
 `wm002-q1.attempt.json` tombstone, independent auditor reopening and validation
 of the exact prospective review, and descriptor-stable selected-source reads.
 The source binding covers the bytes observed during those reads, not
 already-loaded bytecode, and is not protection from a malicious coordinated
-same-account writer. The last completed combined result-free checkpoint before
-subsequent integration changes reached 339 active-acquisition tests. That
-checkpoint does not establish readiness.
+same-account writer.
+
+`rehearsal.py` runs the complete orchestration result-free at a two-episode
+lane budget:
+
+```bash
+make wm002-q1-rehearsal ROOT=/path/to/fresh/dir
+```
+
+A rehearsal requires `execution_authorized: false`, so it is unreachable
+exactly when the real attempt is reachable. Its artifacts carry a distinct
+aggregate schema and a budget every frozen Q1 contract rejects; running the
+independent auditor over them fails Q1-K0 on `execution_authorized`. It is
+mechanics coverage, never evidence.
 
 This directory contains the Q0 exact-semantic runner and the implemented WM-002
 Q1 qualification runtime. It contains no formal seal, formal seed set, or
@@ -101,10 +112,9 @@ schemas, actual serialized-value leakage tests, private-salt custody,
 single-attempt marker, watchdogs, streaming publication, and independent
 auditor now exist. The attempt marker is one fixed experiment-global tombstone,
 not one marker per proposed run identity, and the auditor independently
-revalidates and binds the exact result-free prospective review. These
-implemented controls do not return the reopened qualification to green. The
-final protocol/review/entry sequence remains mandatory after all blockers
-close.
+revalidates and binds the exact result-free prospective review. The rehearsal
+covers the orchestration mechanics but produces no Q1 outcome. The final
+protocol/review/entry sequence remains mandatory.
 Neither stage shows learned or calibrated uncertainty, general active learning,
 dual control, or superiority to a published method.
 

@@ -45,19 +45,43 @@ error is `1.1102230246251565e-16`, below the `1e-12` boundary.
 
 | Evidence | SHA-256 |
 |---|---|
-| Canonical Q0 report | `779e8d8128312da2239107058137faac54751df620efb31291c0af98c2b8f243` |
+| Canonical Q0 report | `e5aa897a2143cc9211572a3a5ac388edb346aab4f813eb650d23aae7cd6487b5` |
 | Protocol | `90b73ad4815380f113f91d0542bf7b91fd7e5196b5afd7f8c46b7fde9ec070cb` |
-| Selected-source implementation manifest | `c9e6689a0ce66e5b79f733c057b839a155500908ba21a5adbf64637cb090c324` |
+| Selected-source implementation manifest | `bf8dc1bbd5c4ae560c658e848e39598e713569098602ce6a0536493e7a4883f5` |
 | Exact oracle | `e8987af521e00ace0ab15047847275cea1073d0bbe46fc77b3ec804c19bc8e55` |
 | 88-cell matrix | `0a29e4a48ca9187e7825d2a8823f251699aa8df255fe0cf824ffeefcc5510e8e` |
 | Uniform-vector rows | `a3f4be077e222a9c3e1aa674763cdc8f86b09dff7bac9528e77a475eb1d30879` |
 
-The generated canonical report remains untracked at
-`/tmp/wm002-q0-report.json`; it is reproduced with:
+The generated canonical report remains untracked; it is reproduced with:
 
 ```bash
-PYTHONPATH=src python -m bench.active_acquisition.run
+make wm002-q0
 ```
+
+### Rebound on 2026-07-24 after two bound sources changed
+
+The originally accepted report digest
+`779e8d8128312da2239107058137faac54751df620efb31291c0af98c2b8f243` and manifest
+digest `c9e6689a0ce66e5b79f733c057b839a155500908ba21a5adbf64637cb090c324` stopped
+reproducing, because two files inside the Q0 selected-source manifest changed
+after acceptance: `bench/active_acquisition/problem.py` (Q1 fault-injection
+hardening) and `src/prospect/domain/records.py` (the snapshot later-assimilation
+descendant rule). The stale binding was found by regenerating Q0 rather than by
+any check, so nothing would have blocked an operator from binding an
+unreproducible Q0 report.
+
+Q0 was rerun against the current sources and rebound. Every substantive output
+is byte-identical to the accepted report: the same protocol digest, exact oracle
+digest `e8987af5…`, 88-cell matrix digest `0a29e4a4…`, uniform-vector digest
+`a3f4be07…`, all five exact expected returns, all six deterministic selectors,
+and `passed: true`. Only the two source rows, the manifest digest, and therefore
+the report digest changed. The Q1 protocol `q0_binding` and its normalized
+contract digest were rebound to match.
+
+The accepted disposition is unchanged. To stop this class of stale binding from
+recurring silently, `tests/test_active_acquisition_contracts.py` now regenerates
+Q0 on every run and fails if the report, protocol, or manifest digest drifts
+from the bound constants.
 
 ## Verification and independent audit
 

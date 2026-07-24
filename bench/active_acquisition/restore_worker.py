@@ -45,10 +45,7 @@ from bench.active_acquisition.runtime_lane import (
     decode_posterior_model,
     validate_posterior_model_state,
 )
-from bench.active_acquisition.seeding import (
-    EPISODES_PER_MASTER,
-    PrivateQ1SeedSchedule,
-)
+from bench.active_acquisition.seeding import PrivateQ1SeedSchedule
 from bench.active_acquisition.worker_capability import (
     Q1WorkerCapability,
     consume_worker_capability_fd,
@@ -62,7 +59,7 @@ def restore_q1_lane(
     capability: Q1WorkerCapability,
     worker_capability_sha256: str,
 ) -> None:
-    """Restore exactly 1,024 frames for one authenticated master/arm launch."""
+    """Restore one authenticated master/arm lane's exact frame budget."""
 
     _require_local_worker_capability(
         capability,
@@ -131,8 +128,8 @@ def restore_q1_lane(
             )
             output.write(canonical_json_bytes(restored, newline=True))
             episode_count += 1
-        if episode_count != EPISODES_PER_MASTER:
-            raise Q1ExecutionError("restore lane does not contain exactly 1,024 episodes")
+        if episode_count != authority.episodes_per_master:
+            raise Q1ExecutionError("restore lane does not contain its exact per-lane episode budget")
         if frame_stream.tell() != os.fstat(frame_stream.fileno()).st_size:
             raise Q1ExecutionError("restore lane checkpoint sidecar contains trailing bytes")
     _require_private_directory(

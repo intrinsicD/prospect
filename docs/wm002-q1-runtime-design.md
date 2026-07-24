@@ -1,13 +1,13 @@
 # WM-002 Q1 authoritative-runtime design
 
-Status: **Q0 is independently accepted for protocol completeness only. The Q1
-runtime and independent auditor are implemented, but result-free qualification
-has been reopened and is not green until every newly found blocker closes.
-Recent hardening implements the fixed experiment-global one-shot tombstone,
-independent auditor validation of the exact prospective review, and
-descriptor-stable selected-source reads. These controls do not establish
-readiness. Q1 execution authorization remains false, and no Q1 outcome or
-capability evidence exists.**
+Status: **Q0 is independently accepted for protocol completeness only and was
+rebound on 2026-07-24 after two bound sources changed. The Q1 runtime and
+independent auditor are implemented. The two blockers that reopened result-free
+qualification — causal noninterference and complete-orchestration coverage —
+are now closed with negative controls and an end-to-end rehearsal. What remains
+before authorization is procedural, not structural: regenerate the exact-source
+prospective review and entry qualification against the final bytes. Q1 execution
+authorization remains false, and no Q1 outcome or capability evidence exists.**
 
 This document describes the implemented authoritative runtime for the
 five-action hidden-actuator qualification fixture. Successor protocol
@@ -675,13 +675,18 @@ is not a readiness disposition:
    terminal `+1` tie rule are machine-bound and independently recomputed.
 4. **Hidden schedule — closed locally.** Four private HMAC namespaces use a
    committed exact-0600 salt; public uniform selection is salt-independent.
-5. **Serialized leakage contract — structural coverage implemented; causal
-   noninterference unresolved.** Strict recursive schemas, actual-sample scans,
-   checkpoint private-key scans, and the auditor's global private-prefix scan
-   cover emitted shapes and known private byte prefixes. The current
-   counterfactual/future-draw noninterference probes vary arguments that are not
-   connected to the exercised runtime, so they do not yet establish the
-   required causal noninterference.
+5. **Serialized leakage contract — closed with negative controls.** Strict
+   recursive schemas, actual-sample scans, checkpoint private-key scans, and the
+   auditor's global private-prefix scan cover emitted shapes and known private
+   byte prefixes. The causal probe now varies the hidden sign and every private
+   HMAC field through the exercised runtime while holding the visible executed
+   transition fixed, and requires byte-identical acquisition probes, checkpoint
+   payloads, checkpoint indices, and public trace projections. Five mutation
+   controls establish that the probe can fail: leaking the hidden sign into the
+   public acquisition or checkpoint section, making the checkpoint payload
+   depend on it, deriving both arms from unvaried private material, replaying
+   the reference material where the variant belongs, and flattening the
+   terminal sensitivity control are each detected.
 6. **Q0 authority — closed.** The accepted canonical Q0 report, protocol, and
    implementation digests are hard entry and audit bindings.
 7. **Restore interpretation — closed.** Each `(master, arm)` uses a distinct
@@ -698,15 +703,48 @@ is not a readiness disposition:
    source origins, and the sorted implementation manifest are bound.
    Descriptor-stable reads bind observed source bytes but not already-loaded
    bytecode and do not resist a malicious coordinated same-account writer.
-10. **Lifecycle and resource safety — primitives covered; orchestration happy
-    path unresolved.** The fixed experiment-global
-    `wm002-q1.attempt.json` tombstone is claimed before a private schedule
-    exists and cannot be bypassed with another run identity; watchdog cleanup,
-    exact permissions, conservative disk sizing, actual-filesystem no-replace
-    publication, durable completion, and failure preservation have focused
-    tests. No result-free happy-path test currently exercises the complete
-    four-producer, 28-restore-lane, merge, validation, publication, and
-    completed-marker orchestration.
+10. **Lifecycle and resource safety — closed by the orchestration rehearsal.**
+    The fixed experiment-global `wm002-q1.attempt.json` tombstone is claimed
+    before a private schedule exists and cannot be bypassed with another run
+    identity; watchdog cleanup, exact permissions, conservative disk sizing,
+    actual-filesystem no-replace publication, durable completion, and failure
+    preservation have focused tests. The complete four-producer,
+    28-restore-lane, merge, validation, publication, and completed-marker
+    sequence now runs end to end in the rehearsal mode described below, with
+    real authenticated children, a genuine entry qualification, and no
+    monkeypatched runtime.
+
+## Rehearsal mode
+
+The entry gate requires `execution_authorized: true`, so before this change the
+whole-orchestration path could only be approximated with stubs. Rehearsal mode
+removes that gap without touching the authorization boundary:
+
+- `execution_authorized` selects the mode. `true` permits only the sole
+  full-budget production attempt; `false` permits only a rehearsal. Callers must
+  state the mode they intend, so authorization can never silently downgrade a
+  production run to a rehearsal or promote a rehearsal to the real attempt, and
+  the two modes are never simultaneously reachable.
+- Children never trust the parent for the mode. Each derives it from the
+  canonical protocol bytes it reads itself, and the entry report it must match
+  already binds those bytes by digest.
+- A rehearsal lane holds two episodes instead of 1,024. `bench/active_acquisition/rehearsal.py`
+  regenerates the accepted Q0 report, mints a throwaway salt, writes a
+  self-declared rehearsal-only prospective review, runs a genuine entry
+  qualification, and executes the identical orchestration.
+
+A rehearsal is mechanics coverage and never evidence. Its hidden-regime
+schedule is unbalanced at two episodes, its arm means are statistically
+meaningless, its aggregate carries a separate rehearsal schema whose budget
+constants are exact, and its parent process loads a module outside the
+selected-source closure. Running the independent auditor over a rehearsal fails
+Q1-K0 on `execution_authorized`, Q1-K1, Q1-K3, Q1-K4, and Q1-K5; that rejection
+is itself a test.
+
+The rehearsal does execute real environment interactions on the fixture under
+its own run identity and salt. It is not a Q1 draw: the Q1 attempt is a
+different run identity under different protocol bytes, and the rehearsal budget
+is 1/512 of one arm's, far too small to inform any threshold or interval.
 
 The last completed result-free checkpoint before subsequent integration
 changes recorded:

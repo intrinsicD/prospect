@@ -46,6 +46,7 @@ from bench.active_acquisition.runtime_lane import (
     validate_agent_visible_environment_step,
     validate_posterior_model_state,
 )
+from bench.active_acquisition.seeding import PrivateEpisodeSeedMaterial
 from prospect.decision import DecisionError
 from prospect.domain import EpistemicEffectKind, TimePoint, UpdateReceipt, UpdateStatus
 from prospect.runtime import InteractionContext, InteractionResult, ModelState
@@ -741,6 +742,163 @@ def test_acquisition_public_state_is_byte_identical_under_private_noninterferenc
         salt_commitment_sha256=salt_commitment_sha256,
         public_samples={},
     )
+
+
+def _noninterference_fixture() -> tuple[QualificationBinding, dict[str, str], object]:
+    """Build one accepted baseline the mutation controls can corrupt."""
+
+    digests = {
+        name: hashlib.sha256(f"synthetic-noninterference-{name}".encode()).hexdigest()
+        for name in ("protocol", "implementation", "q0", "entry", "salt")
+    }
+    binding = QualificationBinding(
+        protocol_version="0.3.0-q1",
+        protocol_sha256=digests["protocol"],
+        implementation_sha256=digests["implementation"],
+        q0_report_sha256=digests["q0"],
+        entry_qualification_sha256=digests["entry"],
+        salt_commitment_sha256=digests["salt"],
+    )
+    baseline = q1_producer._run_synthetic_episode(
+        arm=ArmMode.PROSPECT,
+        synthetic_ordinal=0,
+        binding=binding,
+        protocol_sha256=digests["protocol"],
+        implementation_sha256=digests["implementation"],
+        q0_report_sha256=digests["q0"],
+        salt_commitment_sha256=digests["salt"],
+    )
+    return binding, digests, baseline
+
+
+def _exercise_noninterference(binding: QualificationBinding, digests: dict[str, str], baseline: object) -> None:
+    q1_producer._exercise_synthetic_noninterference(
+        artifact=cast(q1_producer.EpisodeArtifacts, baseline),
+        binding=binding,
+        protocol_sha256=digests["protocol"],
+        implementation_sha256=digests["implementation"],
+        q0_report_sha256=digests["q0"],
+        salt_commitment_sha256=digests["salt"],
+        public_samples={},
+    )
+
+
+@pytest.mark.parametrize(
+    ("leaked_field", "expected_message"),
+    [
+        ("acquisition", "changed the acquisition/public trace projection"),
+        ("checkpoint", "changed the acquisition/public trace projection"),
+    ],
+)
+def test_noninterference_probe_detects_private_state_leaking_into_public_rows(
+    monkeypatch: pytest.MonkeyPatch,
+    leaked_field: str,
+    expected_message: str,
+) -> None:
+    """A probe that cannot fail proves nothing; make the leak and require detection."""
+
+    binding, digests, baseline = _noninterference_fixture()
+    real_run_live_episode = q1_producer._run_live_episode
+
+    def leaking_episode(**kwargs: object) -> q1_producer.EpisodeArtifacts:
+        artifact = real_run_live_episode(**kwargs)  # type: ignore[arg-type]
+        private = cast(PrivateEpisodeSeedMaterial, kwargs["private_audit"])
+        raw = dict(artifact.raw_trace)
+        section = dict(cast(dict, raw[leaked_field]))
+        section["observed_symbol_count"] = private.theta
+        raw[leaked_field] = section
+        return q1_producer.EpisodeArtifacts(
+            raw_trace=raw,
+            private_audit=artifact.private_audit,
+            checkpoint_index=artifact.checkpoint_index,
+            checkpoint_payload=artifact.checkpoint_payload,
+            acquisition_public_probe=artifact.acquisition_public_probe,
+        )
+
+    monkeypatch.setattr(q1_producer, "_run_live_episode", leaking_episode)
+    with pytest.raises(q1_producer.Q1ExecutionError, match=expected_message):
+        _exercise_noninterference(binding, digests, baseline)
+
+
+def test_noninterference_probe_detects_a_private_dependent_checkpoint_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding, digests, baseline = _noninterference_fixture()
+    real_run_live_episode = q1_producer._run_live_episode
+
+    def leaking_episode(**kwargs: object) -> q1_producer.EpisodeArtifacts:
+        artifact = real_run_live_episode(**kwargs)  # type: ignore[arg-type]
+        private = cast(PrivateEpisodeSeedMaterial, kwargs["private_audit"])
+        return q1_producer.EpisodeArtifacts(
+            raw_trace=artifact.raw_trace,
+            private_audit=artifact.private_audit,
+            checkpoint_index=artifact.checkpoint_index,
+            checkpoint_payload=artifact.checkpoint_payload + str(private.theta).encode("ascii"),
+            acquisition_public_probe=artifact.acquisition_public_probe,
+        )
+
+    monkeypatch.setattr(q1_producer, "_run_live_episode", leaking_episode)
+    with pytest.raises(q1_producer.Q1ExecutionError, match="changed the preterminal checkpoint payload"):
+        _exercise_noninterference(binding, digests, baseline)
+
+
+def test_noninterference_probe_rejects_a_private_variant_that_never_varied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Equal public bytes are only evidence when the private input actually changed."""
+
+    binding, digests, baseline = _noninterference_fixture()
+    real_run_live_episode = q1_producer._run_live_episode
+    reference_material: list[object] = []
+
+    def frozen_private_episode(**kwargs: object) -> q1_producer.EpisodeArtifacts:
+        if not reference_material:
+            reference_material.append(kwargs["private_audit"])
+        kwargs["private_audit"] = reference_material[0]
+        return real_run_live_episode(**kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(q1_producer, "_run_live_episode", frozen_private_episode)
+    with pytest.raises(q1_producer.Q1ExecutionError, match="private material"):
+        _exercise_noninterference(binding, digests, baseline)
+
+
+def test_noninterference_probe_rejects_an_unvaried_private_derivation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The two arms of the probe must derive genuinely different private material."""
+
+    binding, digests, baseline = _noninterference_fixture()
+    real_material = q1_producer._synthetic_private_material
+
+    def constant_material(**kwargs: object) -> PrivateEpisodeSeedMaterial:
+        kwargs.pop("private_variant", None)
+        kwargs.pop("theta", None)
+        return real_material(**kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(q1_producer, "_synthetic_private_material", constant_material)
+    with pytest.raises(
+        q1_producer.Q1ExecutionError,
+        match="did not vary every private theta/HMAC field",
+    ):
+        _exercise_noninterference(binding, digests, baseline)
+
+
+def test_noninterference_probe_rejects_an_insensitive_terminal_control(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The terminal control must move executed success, or the probe is vacuous."""
+
+    binding, digests, baseline = _noninterference_fixture()
+    real_run_live_episode = q1_producer._run_live_episode
+
+    def insensitive_episode(**kwargs: object) -> q1_producer.EpisodeArtifacts:
+        callback = cast(object, kwargs["terminal_success"])
+        kwargs["terminal_success"] = lambda decision: bool(callback(decision)) and False  # type: ignore[operator]
+        return real_run_live_episode(**kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(q1_producer, "_run_live_episode", insensitive_episode)
+    with pytest.raises(q1_producer.Q1ExecutionError, match="terminal sensitivity control did not vary"):
+        _exercise_noninterference(binding, digests, baseline)
 
 
 def test_runtime_components_satisfy_prospect_behavior_protocols() -> None:

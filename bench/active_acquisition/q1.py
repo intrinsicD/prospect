@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import ctypes
 import errno
 import hashlib
@@ -37,7 +38,7 @@ from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from fractions import Fraction
-from functools import lru_cache
+from functools import cache, lru_cache
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, BinaryIO, Final, Literal, cast
@@ -84,7 +85,9 @@ from bench.active_acquisition.seeding import (
     MASTER_COUNT,
     PrivateEpisodeSeedMaterial,
     PrivateQ1SeedSchedule,
+    Q1ExecutionMode,
     derive_public_uniform_selection,
+    episodes_per_master,
     nuisance_observation_from_digest,
     private_material_paths,
     public_identity_counter_initialization,
@@ -112,6 +115,7 @@ RAW_TRACE_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-raw-trace.v1"
 CHECKPOINT_FRAME_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-checkpoint-frame.v1"
 RESTORED_TRACE_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-restored-trace.v1"
 AGGREGATE_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-aggregate.v1"
+REHEARSAL_AGGREGATE_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-rehearsal-aggregate.v1"
 AUDIT_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-independent-audit.v2"
 
 EPISODES_TOTAL: Final = MASTER_COUNT * len(ARM_ORDER) * EPISODES_PER_MASTER
@@ -215,11 +219,21 @@ class Q1ExecutionAuthority:
     run_identity: Q1RunIdentity
     execution_root_identity: Q1RuntimeDirectoryIdentity
     attempt_registry_identity: Q1RuntimeDirectoryIdentity
+    execution_mode: Q1ExecutionMode
     secret_salt: bytes = field(repr=False)
+
+    @property
+    def episodes_per_master(self) -> int:
+        return episodes_per_master(self.execution_mode)
+
+    @property
+    def episodes_total(self) -> int:
+        return MASTER_COUNT * len(ARM_ORDER) * self.episodes_per_master
 
     def __repr__(self) -> str:
         return (
             "Q1ExecutionAuthority("
+            f"execution_mode={self.execution_mode.value!r}, "
             f"protocol_sha256={self.protocol_sha256!r}, "
             f"implementation_sha256={self.implementation_sha256!r}, "
             f"q0_report_sha256={self.q0_report_sha256!r}, "
@@ -645,8 +659,19 @@ def _read_stable_protocol_payload(protocol_path: Path) -> bytes:
     return payload
 
 
-def _validate_q1_protocol_execution_boundary(protocol_path: Path) -> str:
-    """Bind one stable protocol payload and require the enabled Q1 boundary."""
+def _validate_q1_protocol_execution_boundary(
+    protocol_path: Path,
+    *,
+    execution_mode: Q1ExecutionMode,
+) -> str:
+    """Bind one stable protocol payload and require the mode's exact boundary.
+
+    ``execution_authorized`` selects the mode: ``true`` permits only the sole
+    full-budget production attempt and ``false`` permits only a miniature
+    rehearsal. The caller must state which mode it intends, so authorization
+    can never silently downgrade a production run into a rehearsal or promote a
+    rehearsal into the authorized attempt.
+    """
 
     if protocol_path.resolve() != Q1_PROTOCOL_PATH.resolve():
         raise Q1ExecutionError("Q1 execution requires the canonical successor protocol path")
@@ -663,12 +688,24 @@ def _validate_q1_protocol_execution_boundary(protocol_path: Path) -> str:
         "protocol_version": Q1_PROTOCOL_VERSION,
         "claim_eligible": False,
         "formal_authorized": False,
-        "execution_authorized": True,
+        "execution_authorized": execution_mode is Q1ExecutionMode.PRODUCTION,
     }
     for name, expected in expected_boundary.items():
-        if experiment.get(name) != expected:
+        actual = experiment.get(name)
+        if type(actual) is not type(expected) or actual != expected:
             raise Q1ExecutionError(f"successor protocol execution boundary mismatch: {name}")
     return sha256_bytes(protocol_payload)
+
+
+def _protocol_execution_mode(protocol_path: Path) -> tuple[str, Q1ExecutionMode]:
+    """Derive the single mode the canonical protocol bytes currently permit."""
+
+    for mode in (Q1ExecutionMode.PRODUCTION, Q1ExecutionMode.REHEARSAL):
+        try:
+            return _validate_q1_protocol_execution_boundary(protocol_path, execution_mode=mode), mode
+        except Q1ExecutionError:
+            continue
+    raise Q1ExecutionError("successor protocol satisfies no Q1 execution boundary")
 
 
 def _parse_q1_runtime_directory_identity(
@@ -815,11 +852,15 @@ def validate_q1_execution_authority(
     prospective_review_path: Path,
     execution_root: Path,
     attempt_registry_directory: Path,
+    execution_mode: Q1ExecutionMode = Q1ExecutionMode.PRODUCTION,
 ) -> Q1ExecutionAuthority:
     """Validate every execution binding before constructing private schedule state."""
 
     _validate_selected_module_origins()
-    protocol_sha256 = _validate_q1_protocol_execution_boundary(protocol_path)
+    protocol_sha256 = _validate_q1_protocol_execution_boundary(
+        protocol_path,
+        execution_mode=execution_mode,
+    )
 
     secret_salt = _read_private_salt(secret_salt_path)
     salt_commitment = hashlib.sha256(secret_salt).hexdigest()
@@ -833,6 +874,7 @@ def validate_q1_execution_authority(
         execution_root=execution_root,
         attempt_registry_directory=attempt_registry_directory,
         protocol_path=protocol_path,
+        execution_mode=execution_mode,
     )
     recomputed_value = recomputed.as_dict()
     expected_recomputed_identity = {
@@ -863,7 +905,10 @@ def validate_q1_execution_authority(
         recomputed_registry_identity,
         label="fresh Q1 attempt registry",
     )
-    final_protocol_sha256 = _validate_q1_protocol_execution_boundary(protocol_path)
+    final_protocol_sha256 = _validate_q1_protocol_execution_boundary(
+        protocol_path,
+        execution_mode=execution_mode,
+    )
     if final_protocol_sha256 != protocol_sha256:
         raise Q1ExecutionError("successor protocol changed across fresh entry qualification")
     final_salt_commitment = hashlib.sha256(_read_private_salt(secret_salt_path)).hexdigest()
@@ -921,6 +966,7 @@ def validate_q1_execution_authority(
         run_identity=run_identity,
         execution_root_identity=entry_execution_identity,
         attempt_registry_identity=entry_registry_identity,
+        execution_mode=execution_mode,
         secret_salt=secret_salt,
     )
 
@@ -948,10 +994,15 @@ def validate_q1_child_execution_authority(
     attempt_registry_directory: Path,
     protocol_path: Path = Q1_PROTOCOL_PATH,
 ) -> Q1ExecutionAuthority:
-    """Verify immutable parent-qualified inputs without rerunning synthetic probes."""
+    """Verify immutable parent-qualified inputs without rerunning synthetic probes.
+
+    The child never trusts its parent for the execution mode: it derives the
+    mode from the canonical protocol bytes it reads itself, and the entry
+    report it must match already binds those bytes by digest.
+    """
 
     _validate_selected_module_origins()
-    protocol_sha256 = _validate_q1_protocol_execution_boundary(protocol_path)
+    protocol_sha256, execution_mode = _protocol_execution_mode(protocol_path)
     if sha256_bytes(q0_report_path.read_bytes()) != Q0_REPORT_SHA256:
         raise Q1ExecutionError("Q1 child accepted Q0 report digest mismatch")
 
@@ -1032,6 +1083,7 @@ def validate_q1_child_execution_authority(
         run_identity=run_identity,
         execution_root_identity=entry_execution_identity,
         attempt_registry_identity=entry_registry_identity,
+        execution_mode=execution_mode,
         secret_salt=secret_salt,
     )
 
@@ -1089,6 +1141,62 @@ def run_q1(
 ) -> Q1RunOutputs:
     """Claim and run the sole full-budget Q1 attempt without a retry path."""
 
+    return _run_q1_attempt(
+        entry_report_path=entry_report_path,
+        q0_report_path=q0_report_path,
+        secret_salt_path=secret_salt_path,
+        prospective_review_path=prospective_review_path,
+        execution_root=execution_root,
+        attempt_registry_directory=attempt_registry_directory,
+        output_directory=output_directory,
+        execution_mode=Q1ExecutionMode.PRODUCTION,
+    )
+
+
+def run_q1_orchestration_rehearsal(
+    *,
+    entry_report_path: Path,
+    q0_report_path: Path,
+    secret_salt_path: Path,
+    prospective_review_path: Path,
+    execution_root: Path,
+    attempt_registry_directory: Path,
+    output_directory: Path,
+) -> Q1RunOutputs:
+    """Run the identical orchestration at the miniature rehearsal budget.
+
+    This is result-free mechanics coverage for the four-producer,
+    28-restore-lane, merge, validation, publication, and completed-marker path.
+    It requires ``execution_authorized: false``, so it is unreachable once the
+    protocol authorizes Q1, and its artifacts carry the rehearsal aggregate
+    schema and a two-episode lane budget that every frozen Q1 contract rejects.
+    """
+
+    return _run_q1_attempt(
+        entry_report_path=entry_report_path,
+        q0_report_path=q0_report_path,
+        secret_salt_path=secret_salt_path,
+        prospective_review_path=prospective_review_path,
+        execution_root=execution_root,
+        attempt_registry_directory=attempt_registry_directory,
+        output_directory=output_directory,
+        execution_mode=Q1ExecutionMode.REHEARSAL,
+    )
+
+
+def _run_q1_attempt(
+    *,
+    entry_report_path: Path,
+    q0_report_path: Path,
+    secret_salt_path: Path,
+    prospective_review_path: Path,
+    execution_root: Path,
+    attempt_registry_directory: Path,
+    output_directory: Path,
+    execution_mode: Q1ExecutionMode,
+) -> Q1RunOutputs:
+    """Claim one attempt registry and execute exactly one orchestration."""
+
     _validate_q1_execution_root(
         execution_root=execution_root,
         output_directory=output_directory,
@@ -1100,6 +1208,7 @@ def run_q1(
         prospective_review_path=prospective_review_path,
         execution_root=execution_root,
         attempt_registry_directory=attempt_registry_directory,
+        execution_mode=execution_mode,
     )
     execution_root = authority.execution_root
     attempt_registry_directory = authority.attempt_registry_directory
@@ -1295,8 +1404,9 @@ def _execute_claimed_q1(
         index_path=index_path,
         frames_path=frames_path,
         restored_path=restored_path,
+        execution_mode=authority.execution_mode,
     )
-    _validate_artifact_fast("aggregate", aggregate)
+    _validate_aggregate(aggregate, execution_mode=authority.execution_mode)
     with _private_binary_writer(aggregate_path) as aggregate_stream:
         aggregate_stream.write(canonical_json_bytes(aggregate, newline=True))
     canonical_paths = (
@@ -1971,7 +2081,7 @@ def _run_master_worker(
             frame_path = output_directory / f"{arm_name}.frames.bin"
             index_path = output_directory / f"{arm_name}.index.jsonl"
             with _private_binary_writer(frame_path) as frame_stream, _private_binary_writer(index_path) as index_stream:
-                for episode in range(EPISODES_PER_MASTER):
+                for episode in range(authority.episodes_per_master):
                     artifact = _run_q1_episode(
                         authority=authority,
                         schedule=schedule,
@@ -2040,9 +2150,12 @@ def _stream_validate_and_aggregate(
     index_path: Path,
     frames_path: Path,
     restored_path: Path,
+    execution_mode: Q1ExecutionMode,
 ) -> dict[str, object]:
     """Validate consolidated artifacts in lockstep while retaining bounded state."""
 
+    lane_episodes = episodes_per_master(execution_mode)
+    episodes_total = MASTER_COUNT * len(ARM_ORDER) * lane_episodes
     totals = {(master, arm): 0.0 for master in range(MASTER_COUNT) for arm in ARM_ORDER}
     counts = {(master, arm): 0 for master in range(MASTER_COUNT) for arm in ARM_ORDER}
     binding_fields = (
@@ -2067,11 +2180,11 @@ def _stream_validate_and_aggregate(
     try:
         with _private_binary_reader(frames_path) as frame_stream:
             for ordinal, (raw, private, index, restored) in enumerate(rows):
-                if ordinal >= EPISODES_TOTAL:
+                if ordinal >= episodes_total:
                     raise Q1ExecutionError("consolidated artifacts exceed the frozen episode budget")
-                master = ordinal // (len(ARM_ORDER) * EPISODES_PER_MASTER)
-                arm = ARM_ORDER[(ordinal // EPISODES_PER_MASTER) % len(ARM_ORDER)]
-                episode = ordinal % EPISODES_PER_MASTER
+                master = ordinal // (len(ARM_ORDER) * lane_episodes)
+                arm = ARM_ORDER[(ordinal // lane_episodes) % len(ARM_ORDER)]
+                episode = ordinal % lane_episodes
                 expected = (master, arm, episode)
                 if (
                     (raw.get("master"), raw.get("arm"), raw.get("episode")) != expected
@@ -2117,12 +2230,13 @@ def _stream_validate_and_aggregate(
                 raise Q1ExecutionError("consolidated checkpoint frames contain trailing bytes")
     except ValueError as error:
         raise Q1ExecutionError("consolidated artifact row counts differ") from error
-    if row_count != EPISODES_TOTAL or aggregate_binding is None:
+    if row_count != episodes_total or aggregate_binding is None:
         raise Q1ExecutionError("consolidated artifacts differ from the exact episode budget")
     return _producer_aggregate(
         totals=totals,
         counts=counts,
         binding=aggregate_binding,
+        execution_mode=execution_mode,
     )
 
 
@@ -2215,22 +2329,25 @@ def _producer_aggregate(
     totals: Mapping[tuple[int, str], float],
     counts: Mapping[tuple[int, str], int],
     binding: Mapping[str, object],
+    execution_mode: Q1ExecutionMode,
 ) -> dict[str, object]:
     """Compute a convenience summary; it is explicitly non-authoritative."""
 
+    lane_episodes = episodes_per_master(execution_mode)
+    episodes_total = MASTER_COUNT * len(ARM_ORDER) * lane_episodes
     arm_means: list[dict[str, object]] = []
     means: dict[tuple[int, str], float] = {}
     for master in range(MASTER_COUNT):
         for arm in ARM_ORDER:
-            if counts[(master, arm)] != EPISODES_PER_MASTER:
+            if counts[(master, arm)] != lane_episodes:
                 raise Q1ExecutionError("producer aggregate saw an incomplete master/arm lane")
-            mean = totals[(master, arm)] / EPISODES_PER_MASTER
+            mean = totals[(master, arm)] / lane_episodes
             means[(master, arm)] = mean
             arm_means.append(
                 {
                     "master": master,
                     "arm": arm,
-                    "episode_count": EPISODES_PER_MASTER,
+                    "episode_count": lane_episodes,
                     "mean_return": mean,
                 }
             )
@@ -2252,7 +2369,9 @@ def _producer_aggregate(
             }
         )
     return {
-        "schema": AGGREGATE_SCHEMA,
+        "schema": (
+            AGGREGATE_SCHEMA if execution_mode is Q1ExecutionMode.PRODUCTION else REHEARSAL_AGGREGATE_SCHEMA
+        ),
         "protocol_version": Q1_PROTOCOL_VERSION,
         "run_id": binding["run_id"],
         "attempt_id": binding["attempt_id"],
@@ -2267,17 +2386,67 @@ def _producer_aggregate(
         "counts": {
             "masters": MASTER_COUNT,
             "arms": len(ARM_ORDER),
-            "episodes": EPISODES_TOTAL,
-            "environment_steps": ENVIRONMENT_STEPS_TOTAL,
-            "transitions": ENVIRONMENT_STEPS_TOTAL,
-            "acquisition_updates": EPISODES_TOTAL,
+            "episodes": episodes_total,
+            "environment_steps": 2 * episodes_total,
+            "transitions": 2 * episodes_total,
+            "acquisition_updates": episodes_total,
             "terminal_updates": 0,
-            "checkpoints": EPISODES_TOTAL,
-            "restores": EPISODES_TOTAL,
+            "checkpoints": episodes_total,
+            "restores": episodes_total,
         },
         "arm_means": arm_means,
         "comparisons": comparisons,
     }
+
+
+def _rehearsal_aggregate_schema_document() -> dict[str, object]:
+    """Build the rehearsal aggregate schema from the frozen production schema.
+
+    The rehearsal budget is a different exact contract, not a relaxation: every
+    production constant is replaced by its rehearsal counterpart and the schema
+    identifier changes, so a rehearsal aggregate can never satisfy the frozen
+    Q1 aggregate schema the independent auditor requires.
+    """
+
+    lane_episodes = episodes_per_master(Q1ExecutionMode.REHEARSAL)
+    episodes_total = MASTER_COUNT * len(ARM_ORDER) * lane_episodes
+    document = copy.deepcopy(dict(schema_documents()["aggregate"]))
+    properties = cast(dict[str, Any], document["properties"])
+    properties["schema"] = {"const": REHEARSAL_AGGREGATE_SCHEMA}
+    counts = cast(dict[str, Any], properties["counts"])["properties"]
+    for name, value in (
+        ("episodes", episodes_total),
+        ("environment_steps", 2 * episodes_total),
+        ("transitions", 2 * episodes_total),
+        ("acquisition_updates", episodes_total),
+        ("checkpoints", episodes_total),
+        ("restores", episodes_total),
+    ):
+        counts[name] = {"const": value}
+    arm_means = cast(dict[str, Any], properties["arm_means"])
+    cast(dict[str, Any], arm_means["items"])["properties"]["episode_count"] = {"const": lane_episodes}
+    return document
+
+
+@cache
+def _rehearsal_aggregate_validator() -> Any:
+    from jsonschema import Draft202012Validator
+
+    document = _rehearsal_aggregate_schema_document()
+    Draft202012Validator.check_schema(document)
+    return Draft202012Validator(document)
+
+
+def _validate_aggregate(value: Mapping[str, object], *, execution_mode: Q1ExecutionMode) -> None:
+    """Validate one aggregate against the exact schema its mode requires."""
+
+    if execution_mode is Q1ExecutionMode.PRODUCTION:
+        _validate_artifact_fast("aggregate", value)
+        return
+    errors = sorted(_rehearsal_aggregate_validator().iter_errors(value), key=lambda row: list(row.path))
+    if errors:
+        location = "/".join(str(part) for part in errors[0].absolute_path) or "<root>"
+        raise Q1ExecutionError(f"rehearsal aggregate violates its schema at {location}")
 
 
 def _remove_worker_trees_and_require_exact_artifacts(

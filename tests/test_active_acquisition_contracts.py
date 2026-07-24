@@ -44,6 +44,24 @@ def test_q1_protocol_freezes_runtime_identity_and_q0_binding() -> None:
     assert q0["implementation_sha256"] == Q0_IMPLEMENTATION_SHA256
 
 
+def test_bound_q0_digests_still_regenerate_from_the_current_sources() -> None:
+    """A bound Q0 report that no longer reproduces is stale evidence, not evidence.
+
+    The originally accepted digests silently stopped reproducing when two files
+    inside the Q0 selected-source manifest changed. Regenerating Q0 here fails
+    the moment that happens again.
+    """
+
+    from bench.active_acquisition.qualification import PROTOCOL_PATH, run_qualification
+
+    report = run_qualification(PROTOCOL_PATH)
+    payload = canonical_json_bytes(report.as_dict(), newline=True)
+    assert report.passed is True
+    assert report.protocol_sha256 == Q0_PROTOCOL_SHA256
+    assert report.implementation_sha256 == Q0_IMPLEMENTATION_SHA256
+    assert contracts.sha256_bytes(payload) == Q0_REPORT_SHA256
+
+
 def test_protocol_document_rejects_nested_duplicate_keys_without_echo(tmp_path: Path) -> None:
     private_key = "recognizable-private-duplicate-key"
     path = tmp_path / "duplicate-protocol.json"

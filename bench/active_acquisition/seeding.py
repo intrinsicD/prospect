@@ -21,6 +21,7 @@ import math
 import pickle
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from fractions import Fraction
 from hashlib import sha256
 from typing import Final, NoReturn
@@ -38,6 +39,7 @@ Q1_KEY_VERSION: Final = "q1v3"
 MASTER_COUNT: Final = 4
 EPISODES_PER_MASTER: Final = 1024
 REGIMES_PER_MASTER: Final = EPISODES_PER_MASTER // 2
+REHEARSAL_EPISODES_PER_MASTER: Final = 2
 _DIGEST_DENOMINATOR: Final = 1 << 256
 _MINIMUM_SALT_BYTES: Final = 32
 
@@ -76,6 +78,32 @@ _CANONICAL_PREFIX: Final = f"{EXPERIMENT_ID}|{PROTOCOL_VERSION}|{Q1_KEY_VERSION}
 
 class SeedContractError(ValueError):
     """A value cannot identify one canonical Q1 random variable."""
+
+
+class Q1ExecutionMode(StrEnum):
+    """Mutually exclusive orchestration modes selected by protocol bytes.
+
+    ``PRODUCTION`` is the sole full-budget Q1 attempt and requires
+    ``execution_authorized: true``. ``REHEARSAL`` exercises the identical
+    orchestration shape at a deliberately tiny episode budget and requires
+    ``execution_authorized: false``, so exactly one mode is reachable for any
+    protocol document. A rehearsal is mechanics coverage, never Q1 evidence:
+    its schedule is unbalanced at this budget, its artifacts carry a distinct
+    aggregate schema, and its episode counts fail every frozen Q1 contract.
+    """
+
+    PRODUCTION = "production"
+    REHEARSAL = "rehearsal"
+
+
+def episodes_per_master(mode: Q1ExecutionMode) -> int:
+    """Return the exact per-master/arm episode budget for one execution mode."""
+
+    if mode is Q1ExecutionMode.PRODUCTION:
+        return EPISODES_PER_MASTER
+    if mode is Q1ExecutionMode.REHEARSAL:
+        return REHEARSAL_EPISODES_PER_MASTER
+    raise SeedContractError(f"unknown Q1 execution mode {mode!r}")
 
 
 class PrivateMaterialLeakError(ValueError):
@@ -773,13 +801,16 @@ __all__ = (
     "PublicUniformSelection",
     "Q1_ARM_IDS",
     "Q1_KEY_VERSION",
+    "Q1ExecutionMode",
     "REGIMES_PER_MASTER",
+    "REHEARSAL_EPISODES_PER_MASTER",
     "SEMANTIC_ACTION_IDS",
     "SeedContractError",
     "TERMINAL_OUTCOME_NAMESPACE",
     "THETA_BALANCED_ORDER_NAMESPACE",
     "canonical_public_json",
     "derive_public_uniform_selection",
+    "episodes_per_master",
     "nuisance_observation_from_digest",
     "private_material_paths",
     "pulse_observation_from_digest",
