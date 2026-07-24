@@ -1117,8 +1117,35 @@ class AgentSnapshot:
             )
             if any(snapshot != receipt for snapshot, receipt in expected_versions):
                 raise DomainInvariantError("snapshot versions do not match its latest update")
-            if receipt.resulting_belief is not None and self.belief.belief_id != receipt.resulting_belief.belief_id:
-                raise DomainInvariantError("snapshot belief does not match the update's resulting belief")
+            resulting = receipt.resulting_belief
+            if resulting is not None and self.belief.belief_id != resulting.belief_id:
+                resulting_evidence = {
+                    observation.observation_id
+                    for observation in resulting.information_set.observations
+                }
+                current_evidence = {
+                    observation.observation_id
+                    for observation in self.belief.information_set.observations
+                }
+                if not resulting_evidence < current_evidence:
+                    raise DomainInvariantError(
+                        "snapshot belief is neither the update's resulting belief "
+                        "nor a strict later-assimilation descendant"
+                    )
+                if self.belief.target.target_id != resulting.target.target_id:
+                    raise DomainInvariantError(
+                        "snapshot belief descendant changes the update target"
+                    )
+                _not_before(
+                    "snapshot descendant information",
+                    self.belief.information_set.as_of,
+                    resulting.information_set.as_of,
+                )
+                _not_before(
+                    "snapshot descendant formation",
+                    self.belief.formed_at,
+                    resulting.formed_at,
+                )
 
 
 @dataclass(frozen=True, slots=True)

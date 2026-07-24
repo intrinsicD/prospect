@@ -977,7 +977,7 @@ def test_model_update_requires_a_causally_valid_resulting_belief() -> None:
         )
 
 
-def test_snapshot_must_use_latest_updates_resulting_belief_identity() -> None:
+def test_snapshot_requires_latest_update_result_or_strict_assimilation_descendant() -> None:
     graph = _graph()
     rebased = replace(
         graph.posterior,
@@ -1009,6 +1009,43 @@ def test_snapshot_must_use_latest_updates_resulting_belief_identity() -> None:
             representation_version="representation-v2",
             latest_update=receipt,
         )
+
+    later_observation = Observation(
+        observation_id="obs-after-learning",
+        agent_id="agent-1",
+        modality="state",
+        evidence=_evidence(
+            "obs-after-learning",
+            occurred=10,
+            available=10,
+            payload=(0.5, 0.2),
+        ),
+    )
+    descendant_information = replace(
+        rebased.information_set,
+        information_set_id="information-after-learning",
+        as_of=_time(10),
+        observations=(*rebased.information_set.observations, later_observation),
+        memory_version="memory-after-learning",
+    )
+    descendant = replace(
+        rebased,
+        belief_id="belief-after-later-assimilation",
+        information_set=descendant_information,
+        formed_at=_time(10),
+    )
+    snapshot = replace(
+        graph.snapshot,
+        snapshot_id="snapshot-after-later-assimilation",
+        captured_at=_time(10),
+        belief=descendant,
+        memory_version=descendant_information.memory_version,
+        model_version="model-v2",
+        representation_version="representation-v2",
+        latest_update=receipt,
+    )
+    assert snapshot.latest_update is receipt
+    assert snapshot.belief is descendant
 
 
 def test_snapshot_rejects_version_mismatch() -> None:

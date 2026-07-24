@@ -15,6 +15,16 @@ from .checkpoint import (
     CheckpointIntegrityError,
     CheckpointManifest,
     LoadedCheckpoint,
+    checkpoint_manifest_bytes,
+    checkpoint_manifest_sha256,
+)
+from .domain_graph import (
+    GRAPH_SCHEMA,
+    belief_external_reference,
+    decode_domain_graph,
+    encode_domain_graph,
+    transition_external_reference,
+    update_external_reference,
 )
 from .ledger import EpistemicLedger, LedgerIntegrityError
 from .memory import (
@@ -42,6 +52,7 @@ __all__ = (
     "DuplicateRecordError",
     "EpistemicLedger",
     "ExperienceTensorCodec",
+    "GRAPH_SCHEMA",
     "InMemoryExperienceStore",
     "LoadedCheckpoint",
     "LedgerIntegrityError",
@@ -49,5 +60,12 @@ __all__ = (
     "StorageError",
     "TensorDictExperienceReplay",
     "TorchRLUnavailableError",
+    "belief_external_reference",
+    "checkpoint_manifest_bytes",
+    "checkpoint_manifest_sha256",
+    "decode_domain_graph",
+    "encode_domain_graph",
     "torchrl_available",
+    "transition_external_reference",
+    "update_external_reference",
 )

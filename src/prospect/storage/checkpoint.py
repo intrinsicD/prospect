@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import re
@@ -214,6 +215,69 @@ class CheckpointCoordinator:
         self._max_component_bytes = max_component_bytes
         self._max_total_bytes = max_total_bytes
 
+    def dump_bytes(
+        self,
+        *,
+        checkpoint_id: str,
+        agent_id: str,
+        created_at: TimePoint,
+        components: Mapping[str, CheckpointComponent],
+        versions: Mapping[str, str],
+        metadata: Mapping[str, str] | None = None,
+    ) -> bytes:
+        """Return one deterministic checkpoint archive without filesystem I/O."""
+
+        _require_identifier("checkpoint_id", checkpoint_id)
+        _require_identifier("agent_id", agent_id)
+        if not components:
+            raise ValueError("checkpoint requires at least one component")
+
+        ordered_components: list[CheckpointComponent] = []
+        total_bytes = 0
+        for key, component in sorted(components.items()):
+            _require_component_name(key)
+            if key != component.name:
+                raise ValueError(f"component mapping key {key!r} does not match name {component.name!r}")
+            size = len(component.payload)
+            if size > self._max_component_bytes:
+                raise ValueError(f"component {component.name!r} exceeds checkpoint byte limit")
+            total_bytes += size
+            ordered_components.append(component)
+        if total_bytes > self._max_total_bytes:
+            raise ValueError("checkpoint exceeds total byte limit")
+
+        entries = tuple(
+            CheckpointComponentManifest(
+                name=component.name,
+                version=component.version,
+                path=f"components/{component.name}.bin",
+                sha256=hashlib.sha256(component.payload).hexdigest(),
+                size_bytes=len(component.payload),
+                media_type=component.media_type,
+            )
+            for component in ordered_components
+        )
+        manifest = CheckpointManifest(
+            checkpoint_id=checkpoint_id,
+            agent_id=agent_id,
+            created_at=created_at,
+            versions=_normalize_string_map("versions", versions),
+            metadata=_normalize_string_map("metadata", metadata),
+            components=entries,
+        )
+        manifest_bytes = _encode_manifest(manifest)
+        destination = io.BytesIO()
+        with zipfile.ZipFile(
+            destination,
+            mode="w",
+            compression=zipfile.ZIP_STORED,
+            allowZip64=True,
+        ) as archive:
+            _write_entry(archive, _MANIFEST_PATH, manifest_bytes)
+            for component, entry in zip(ordered_components, entries, strict=True):
+                _write_entry(archive, entry.path, component.payload)
+        return destination.getvalue()
+
     def save(
         self,
         path: str | Path,
@@ -350,6 +414,85 @@ class CheckpointCoordinator:
             raise CheckpointFormatError("checkpoint is not a valid ZIP bundle") from error
         return LoadedCheckpoint(manifest=manifest, payloads=tuple(payloads))
 
+    def load_bytes(
+        self,
+        payload: bytes,
+        *,
+        expected_agent_id: str | None = None,
+    ) -> LoadedCheckpoint:
+        """Load canonical in-memory bytes without executable deserialization."""
+
+        if not isinstance(payload, bytes):
+            raise TypeError("checkpoint payload must be bytes")
+        if len(payload) > self._max_total_bytes + (2 << 20):
+            raise CheckpointFormatError("checkpoint archive exceeds its encoded byte limit")
+        try:
+            with zipfile.ZipFile(io.BytesIO(payload), mode="r") as archive:
+                infos = archive.infolist()
+                names = [info.filename for info in infos]
+                if len(names) != len(set(names)):
+                    raise CheckpointFormatError("checkpoint archive contains duplicate member paths")
+                if _MANIFEST_PATH not in names:
+                    raise CheckpointFormatError("checkpoint archive has no manifest")
+                manifest_info = archive.getinfo(_MANIFEST_PATH)
+                if manifest_info.file_size > 1 << 20:
+                    raise CheckpointFormatError("checkpoint manifest is unreasonably large")
+                raw_manifest = archive.read(manifest_info)
+                manifest = _decode_manifest(raw_manifest)
+                if raw_manifest != _encode_manifest(manifest):
+                    raise CheckpointFormatError("checkpoint manifest is not canonical JSON")
+                if expected_agent_id is not None and manifest.agent_id != expected_agent_id:
+                    raise CheckpointIntegrityError(
+                        f"checkpoint belongs to agent {manifest.agent_id!r}, not {expected_agent_id!r}"
+                    )
+
+                expected_paths = {
+                    _MANIFEST_PATH,
+                    *(component.path for component in manifest.components),
+                }
+                if set(names) != expected_paths:
+                    raise CheckpointFormatError("checkpoint archive members do not match its manifest")
+                total_bytes = 0
+                component_payloads: list[tuple[str, bytes]] = []
+                for component in manifest.components:
+                    info = archive.getinfo(component.path)
+                    if info.file_size != component.size_bytes:
+                        raise CheckpointIntegrityError(f"component {component.name!r} size disagrees with manifest")
+                    if info.file_size > self._max_component_bytes:
+                        raise CheckpointIntegrityError(f"component {component.name!r} exceeds checkpoint byte limit")
+                    total_bytes += info.file_size
+                    if total_bytes > self._max_total_bytes:
+                        raise CheckpointIntegrityError("checkpoint exceeds total byte limit")
+                    component_payload = archive.read(info)
+                    digest = hashlib.sha256(component_payload).hexdigest()
+                    if digest != component.sha256:
+                        raise CheckpointIntegrityError(f"component {component.name!r} failed sha256 verification")
+                    component_payloads.append((component.name, component_payload))
+        except zipfile.BadZipFile as error:
+            raise CheckpointFormatError("checkpoint is not a valid ZIP bundle") from error
+
+        loaded = LoadedCheckpoint(manifest=manifest, payloads=tuple(component_payloads))
+        entries = {entry.name: entry for entry in manifest.components}
+        canonical = self.dump_bytes(
+            checkpoint_id=manifest.checkpoint_id,
+            agent_id=manifest.agent_id,
+            created_at=manifest.created_at,
+            components={
+                name: CheckpointComponent(
+                    name=name,
+                    version=entries[name].version,
+                    payload=component_payload,
+                    media_type=entries[name].media_type,
+                )
+                for name, component_payload in loaded.payloads
+            },
+            versions=manifest.version_map,
+            metadata=manifest.metadata_map,
+        )
+        if payload != canonical:
+            raise CheckpointFormatError("checkpoint archive is not canonically encoded")
+        return loaded
+
     def restore(
         self,
         path: str | Path,
@@ -403,6 +546,20 @@ def _encode_manifest(manifest: CheckpointManifest) -> bytes:
     except (TypeError, ValueError) as error:
         raise CheckpointFormatError("checkpoint manifest is not JSON encodable") from error
     return encoded.encode("utf-8")
+
+
+def checkpoint_manifest_bytes(manifest: CheckpointManifest) -> bytes:
+    """Return the canonical public representation used inside the archive."""
+
+    if not isinstance(manifest, CheckpointManifest):
+        raise TypeError("manifest must be a CheckpointManifest")
+    return _encode_manifest(manifest)
+
+
+def checkpoint_manifest_sha256(manifest: CheckpointManifest) -> str:
+    """Return the digest of :func:`checkpoint_manifest_bytes`."""
+
+    return hashlib.sha256(checkpoint_manifest_bytes(manifest)).hexdigest()
 
 
 def _decode_manifest(payload: bytes) -> CheckpointManifest:
@@ -516,4 +673,6 @@ __all__ = (
     "CheckpointIntegrityError",
     "CheckpointManifest",
     "LoadedCheckpoint",
+    "checkpoint_manifest_bytes",
+    "checkpoint_manifest_sha256",
 )

@@ -135,6 +135,7 @@ CHECKPOINT_IMPLEMENTATION_SOURCES = (
     "domain_graph.py",
     "experiment.py",
     "parity.py",
+    "../../src/prospect/storage/domain_graph.py",
 )
 FORMAL_CONFORMANCE_CASES = 1024
 FORMAL_CONFORMANCE_SAMPLES_PER_TASK = 512
