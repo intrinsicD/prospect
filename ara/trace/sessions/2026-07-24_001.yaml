@@ -2,8 +2,8 @@ session:
   id: "2026-07-24_001"
   date: "2026-07-24"
   started: "2026-07-24T00:51+02:00"
-  last_turn: "2026-07-24T22:05+02:00"
-  turn_count: 10
+  last_turn: "2026-07-25T11:20+02:00"
+  turn_count: 11
   summary: "Accepted and rebound Q0, hardened disabled Q1 through authenticated worker bootstrap, and closed both reopened blockers with noninterference mutation controls and a complete result-free orchestration rehearsal."
 
 events_logged:
@@ -112,6 +112,13 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Closed both reopened Q1 blockers with noninterference mutation controls and a complete result-free orchestration rehearsal."
+
+  - turn: 11
+    type: experiment
+    id: N45
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed an adversarial self-review of the 48-source Q1 closure, fixing two defects and recording four boundaries with no blocking finding."
 
 
 ai_actions:
@@ -425,8 +432,29 @@ key_context:
       rehearsal mode the protocol's authorization bit makes mutually exclusive
       with the real attempt.
 
+ai_review:
+  - turn: 11
+    action: >-
+      Reviewed the seven declared scopes over the 48-source closure with
+      executable probes, fixed a symlink-following rehearsal directory helper
+      and the entry gate's inability to refuse its own machine-generated
+      prospective review, and recorded the review with its independence
+      limitation stated first.
+    provenance: ai-executed
+    files_changed:
+      - "docs/wm002-q1-prospective-review.md"
+      - "bench/active_acquisition/rehearsal.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "bench/active_acquisition/contracts.py"
+      - "tests/test_active_acquisition_rehearsal.py"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-07-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
 open_threads:
-  - "Regenerate the independent exact-source prospective review and entry qualification against the final bytes, then decide whether to enable execution_authorized for the sole Q1 attempt."
+  - "Obtain a prospective review from an agent or person who did not write the code; the completed review is self-review and the entry gate cannot verify independence."
+  - "Regenerate the canonical review artifact and entry qualification against the final bytes, then decide whether to enable execution_authorized for the sole Q1 attempt."
   - "After WM-002 reaches a terminal disposition, test learned uncertainty in U-001 before zero-shot transfer, adaptation, scale, or partial observability."
 
 ai_suggestions_pending:

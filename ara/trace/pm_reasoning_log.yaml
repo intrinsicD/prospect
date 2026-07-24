@@ -165,3 +165,11 @@ entries:
       - "Chose protocol-selected mutually exclusive execution modes over a runtime flag so a rehearsal is unreachable exactly when the authorized attempt is reachable."
       - "Did not stage or crystallize a capability claim: the rehearsal executes fixture interactions under its own run identity at 1/512 of one arm's budget, and the independent auditor rejects its artifacts."
       - "Kept the final protocol/review/entry authorization sequence and every downstream WM-002 gate untouched."
+
+  - turn: "2026-07-24_001#11"
+    notes:
+      - "Routed the adversarial self-review as experiment N45 and refused to route it as the independent prospective review the entry gate requires."
+      - "Executed every scope check as a probe—forged artifact, injected leaks, second attempt claim, interval arithmetic—rather than accepting a reading of the code."
+      - "Fixed both defects in place because each was small and in this turn's own surface; recorded the four unfixable boundaries as review content instead of pretending they were closed."
+      - "Made review independence machine-checkable only in the direction that catches accidents: the gate refuses the harness's own mark and a rehearsal refuses an independent review."
+      - "Opened reviewer independence as a standing thread; a second non-author reviewer is required before authorization, and the implementation digest changed with the fixes."

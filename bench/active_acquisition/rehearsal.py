@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Final
 
 from bench.active_acquisition.contracts import (
+    MACHINE_GENERATED_REVIEWER_MARK,
     Q0_REPORT_SHA256,
     Q1_PROTOCOL_PATH,
     Q1_PROTOCOL_VERSION,
@@ -59,7 +60,7 @@ from bench.active_acquisition.qualification import run_qualification
 from bench.active_acquisition.seeding import Q1ExecutionMode
 
 REHEARSAL_REVIEWER: Final = (
-    "wm002-orchestration-rehearsal-harness (machine-generated, rehearsal-only; "
+    f"wm002-orchestration-rehearsal-harness ({MACHINE_GENERATED_REVIEWER_MARK}; "
     "not the independent prospective review required before Q1 authorization)"
 )
 _SALT_BYTES: Final = 32
@@ -194,10 +195,31 @@ def _rehearsal_review(
 
 
 def _mkdir_exact(path: Path, *, mode: int) -> None:
-    path.mkdir(mode=mode, parents=True, exist_ok=True)
-    os.chmod(path, mode)
-    metadata = path.stat()
-    if not stat.S_ISDIR(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != mode:
+    """Create or adopt one private directory without ever following a symlink.
+
+    The entry gate's resource preflight also refuses a symlinked root, but only
+    after this helper has run. Checking here first means a hostile link target
+    is never chmod-ed on the way to that refusal.
+    """
+
+    try:
+        path.mkdir(mode=mode, parents=True)
+    except FileExistsError:
+        pass
+    metadata = path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+        raise Q1ExecutionError(f"rehearsal path is not a regular directory: {path}")
+    if metadata.st_uid != os.geteuid():
+        raise Q1ExecutionError(f"rehearsal directory is not owned by this user: {path}")
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        os.fchmod(descriptor, mode)
+        confirmed = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    if (confirmed.st_dev, confirmed.st_ino) != (metadata.st_dev, metadata.st_ino):
+        raise Q1ExecutionError(f"rehearsal directory changed identity during setup: {path}")
+    if not stat.S_ISDIR(confirmed.st_mode) or stat.S_IMODE(confirmed.st_mode) != mode:
         raise Q1ExecutionError(f"rehearsal directory custody differs: {path}")
 
 

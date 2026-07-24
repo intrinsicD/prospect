@@ -1054,3 +1054,45 @@ tree:
     also_depends_on: [N37, N38, N42, N43]
     status: resolved
     children: []
+  - id: N45
+    type: experiment
+    title: "Adversarial self-review of the Q1 selected-source closure"
+    provenance: ai-executed
+    timestamp: "2026-07-25T11:20+02:00"
+    result: >-
+      Reviewed all seven declared scopes over 48 selected sources by executing
+      probes rather than reading. Found and fixed two defects: the rehearsal
+      directory helper chmod-ed a symlink target before the entry gate refused
+      the run, and the entry gate could not distinguish the harness's
+      machine-generated prospective review from an independent one, so
+      production now refuses that mark and a rehearsal now requires it.
+      Confirmed by probe that the auditor recomputes rather than trusts—a
+      coherent forged episode_return with a re-signed marker was caught by both
+      primitive reconstruction and restored parity—that the shuffled control
+      learns from the true executed likelihood while selecting on permuted
+      diagnostics, that all 280 core assessments equal their exact Q0 returns
+      with arm objectives unit-labelled separately, that uniform selection
+      replays from public SHA-256 alone, that the tombstone refuses a second
+      claim, that the production aggregate still satisfies the frozen
+      28,672-episode schema after the mode refactor, and that the paired
+      interval arithmetic matches hand computation. Recorded four boundaries:
+      four masters make the test underpowered against a null, source binding
+      does not cover parent-process patching, public traces are correlated with
+      the hidden sign by construction, and a one-shot Q1 report cannot be
+      protected by a regeneration check. No blocking finding.
+    lesson: >-
+      A review by the code's own author can execute every check and still miss
+      what the author never thought to build. The entry gate cannot verify
+      reviewer independence, so independence stays a procedural assumption that
+      a second reviewer must supply.
+    evidence:
+      - N44
+      - "docs/wm002-q1-prospective-review.md"
+      - "bench/active_acquisition/rehearsal.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "bench/active_acquisition/contracts.py"
+      - "tests/test_active_acquisition_rehearsal.py"
+      - "make-check:516-passed"
+    also_depends_on: [N42, N44]
+    status: resolved
+    children: []

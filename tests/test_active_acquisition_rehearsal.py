@@ -25,9 +25,14 @@ from bench.active_acquisition.contracts import (
     ARM_ORDER,
     Q1_PROTOCOL_PATH,
     ContractError,
+    canonical_json_bytes,
     validate_artifact,
 )
-from bench.active_acquisition.q1_qualification import _protocol_boundary_violations, _protocol_snapshot
+from bench.active_acquisition.q1_qualification import (
+    _prospective_review_violations,
+    _protocol_boundary_violations,
+    _protocol_snapshot,
+)
 from bench.active_acquisition.seeding import MASTER_COUNT, Q1ExecutionMode, episodes_per_master
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -238,6 +243,75 @@ def test_rehearsal_is_disabled_once_the_protocol_authorizes_q1(monkeypatch: pyte
     )
     with pytest.raises(q1.Q1ExecutionError, match="disabled once the protocol authorizes"):
         rehearsal.require_rehearsal_protocol()
+
+
+def test_production_entry_refuses_the_machine_generated_rehearsal_review(tmp_path: Path) -> None:
+    """The gate cannot verify independence, but it can refuse its own harness's review.
+
+    Nothing else in the entry chain distinguishes a machine-generated review
+    from an independent one: the reviewer field is free text and every digest,
+    scope, and counter check passes either way.
+    """
+
+    review = rehearsal._rehearsal_review(
+        protocol_sha256="a" * 64,
+        implementation_sha256="b" * 64,
+        reviewed_source_count=7,
+    )
+    path = tmp_path / "review.json"
+    path.write_bytes(canonical_json_bytes(review, newline=True))
+    _digest, production = _prospective_review_violations(
+        path,
+        protocol_sha256="a" * 64,
+        implementation_sha256="b" * 64,
+        reviewed_source_count=7,
+        execution_mode=Q1ExecutionMode.PRODUCTION,
+    )
+    assert "prospective review is the machine-generated rehearsal review" in production
+    _digest, rehearsal_violations = _prospective_review_violations(
+        path,
+        protocol_sha256="a" * 64,
+        implementation_sha256="b" * 64,
+        reviewed_source_count=7,
+        execution_mode=Q1ExecutionMode.REHEARSAL,
+    )
+    assert rehearsal_violations == []
+
+
+def test_rehearsal_entry_refuses_to_consume_an_independent_review(tmp_path: Path) -> None:
+    """A rehearsal must never burn the independent review written for Q1."""
+
+    review = dict(
+        rehearsal._rehearsal_review(
+            protocol_sha256="a" * 64,
+            implementation_sha256="b" * 64,
+            reviewed_source_count=7,
+        )
+    )
+    review["reviewer"] = "an independent human reviewer"
+    path = tmp_path / "independent-review.json"
+    path.write_bytes(canonical_json_bytes(review, newline=True))
+    _digest, violations = _prospective_review_violations(
+        path,
+        protocol_sha256="a" * 64,
+        implementation_sha256="b" * 64,
+        reviewed_source_count=7,
+        execution_mode=Q1ExecutionMode.REHEARSAL,
+    )
+    assert "rehearsal entry must not consume an independent prospective review" in violations
+
+
+def test_rehearsal_directory_setup_refuses_a_symlinked_root(tmp_path: Path) -> None:
+    """Refuse the link before chmod-ing whatever it points at."""
+
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir(mode=0o755)
+    root = tmp_path / "root"
+    root.mkdir(mode=0o700)
+    (root / "execution").symlink_to(elsewhere)
+    with pytest.raises(q1.Q1ExecutionError, match="not a regular directory"):
+        rehearsal.prepare_rehearsal_inputs(root)
+    assert stat.S_IMODE(elsewhere.stat().st_mode) == 0o755
 
 
 def test_rehearsal_review_is_self_declared_rehearsal_only_and_result_free() -> None:

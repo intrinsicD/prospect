@@ -43,8 +43,8 @@ sessions:
     open_threads: 1
   - id: "2026-07-24_001"
     date: "2026-07-24"
-    summary: "Accepted and rebound Q0, hardened disabled Q1, and closed both reopened blockers with noninterference mutation controls and a complete result-free orchestration rehearsal."
-    turn_count: 10
-    events_count: 17
+    summary: "Accepted and rebound Q0, closed both reopened Q1 blockers, and completed an adversarial self-review that fixed two defects and left reviewer independence as the open assurance gap."
+    turn_count: 11
+    events_count: 18
     claims_touched: []
-    open_threads: 2
+    open_threads: 3

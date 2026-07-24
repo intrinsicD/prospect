@@ -12,7 +12,10 @@ mutation controls that make the probe fail when a leak is injected; and the
 complete four-producer, 28-restore-lane, merge, validation, publication, and
 completed-marker orchestration, now executed end to end by the result-free
 rehearsal mode described in the
-[runtime design](wm002-q1-runtime-design.md). The fixed experiment-global
+[runtime design](wm002-q1-runtime-design.md). A
+[prospective review](wm002-q1-prospective-review.md) then fixed two further
+defects and recorded four boundaries with no blocking finding — but it is
+self-review, so an independent review remains required before authorization. The fixed experiment-global
 one-shot tombstone, independent auditor validation of the exact prospective
 review, and descriptor-stable selected-source reads are implemented. The source
 binding covers bytes observed during the read, not already-loaded bytecode, and

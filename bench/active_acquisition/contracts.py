@@ -27,6 +27,16 @@ Q1_SCHEMA_PATHS: Final = {
     "raw_trace": Q1_SCHEMA_DIRECTORY / "q1-raw-trace.schema.json",
     "restored_trace": Q1_SCHEMA_DIRECTORY / "q1-restored-trace.schema.json",
 }
+MACHINE_GENERATED_REVIEWER_MARK: Final = "machine-generated, rehearsal-only"
+"""Substring the rehearsal harness must stamp into its own reviewer identity.
+
+The entry gate cannot verify that a prospective review is independent; it can
+only check schema, digests, scope, and result-free counters. Rejecting this
+exact mark stops the harness's own review from being pointed at an authorized
+protocol by mistake. It is not protection from a determined operator, who is
+already inside the trust model.
+"""
+
 Q0_REPORT_SHA256: Final = "e5aa897a2143cc9211572a3a5ac388edb346aab4f813eb650d23aae7cd6487b5"
 Q0_PROTOCOL_SHA256: Final = "90b73ad4815380f113f91d0542bf7b91fd7e5196b5afd7f8c46b7fde9ec070cb"
 Q0_IMPLEMENTATION_SHA256: Final = "bf8dc1bbd5c4ae560c658e848e39598e713569098602ce6a0536493e7a4883f5"
@@ -490,6 +500,7 @@ __all__ = (
     "ACTION_ORDER",
     "ARM_ORDER",
     "CHECKPOINT_COMPONENTS",
+    "MACHINE_GENERATED_REVIEWER_MARK",
     "ContractError",
     "ManifestEntry",
     "Q0_IMPLEMENTATION_SHA256",

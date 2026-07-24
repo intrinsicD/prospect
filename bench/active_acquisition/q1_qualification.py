@@ -29,6 +29,7 @@ from bench.active_acquisition.contracts import (
     ACTION_ORDER,
     ARM_ORDER,
     CHECKPOINT_COMPONENTS,
+    MACHINE_GENERATED_REVIEWER_MARK,
     Q0_IMPLEMENTATION_SHA256,
     Q0_PROTOCOL_SHA256,
     Q0_REPORT_SHA256,
@@ -627,6 +628,7 @@ def run_entry_qualification(
             protocol_sha256=protocol_sha256,
             implementation_sha256=implementation_sha256,
             reviewed_source_count=len(manifest),
+            execution_mode=execution_mode,
         )
     else:
         review_violations.append("review cannot bind a missing implementation digest")
@@ -1481,6 +1483,7 @@ def _prospective_review_violations(
     protocol_sha256: str,
     implementation_sha256: str,
     reviewed_source_count: int,
+    execution_mode: Q1ExecutionMode = Q1ExecutionMode.PRODUCTION,
 ) -> tuple[str, list[str]]:
     violations: list[str] = []
     digest = ""
@@ -1518,6 +1521,12 @@ def _prospective_review_violations(
             violations.append("review scope differs from the exact required scope and order")
         if review.get("q1_environment_interactions") != 0 or review.get("q1_private_draws") != 0:
             violations.append("prospective review is not result-free")
+        reviewer = review.get("reviewer")
+        machine_generated = isinstance(reviewer, str) and MACHINE_GENERATED_REVIEWER_MARK in reviewer
+        if execution_mode is Q1ExecutionMode.PRODUCTION and machine_generated:
+            violations.append("prospective review is the machine-generated rehearsal review")
+        if execution_mode is Q1ExecutionMode.REHEARSAL and not machine_generated:
+            violations.append("rehearsal entry must not consume an independent prospective review")
     except Exception as error:
         violations.append(f"prospective review validation failed:{type(error).__name__}")
     return digest, violations
