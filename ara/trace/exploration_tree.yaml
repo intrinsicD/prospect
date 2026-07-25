@@ -1134,7 +1134,41 @@ tree:
           - "make-check:520-passed"
         also_depends_on: [N44, N45]
         status: resolved
-        children: []
+        children:
+          - id: N47
+            type: dead_end
+            title: "Reject Q1 authorization at 03cd3fc on incomplete custody closure"
+            provenance: ai-executed
+            timestamp: "2026-07-25T13:05+02:00"
+            result: >-
+              A second fresh non-author review confirmed F1, F2, and F4 closed
+              but found F3 only partially closed. The directory check and
+              hashing pass enforce exact 0600 on all six artifacts, but two
+              later reopens did not: the aggregate reload and the semantic
+              stream reopen, both after the committed hash pass. A probe that
+              flipped the five non-sidecar files to 0644 at that phase boundary
+              audited clean, because the committed digest catches content drift
+              while nothing rechecked mode. Every reopen now enforces 0600, the
+              publication contract is revalidated after the semantic pass, and
+              a regression flips modes at the real phase boundary through
+              audit_q1_directory. The regression fails without the fix. make
+              check passes at 522 tests.
+            lesson: >-
+              Fixing the call sites a finding names is not the same as fixing
+              the class the finding belongs to. A custody check that runs once
+              at the start of a multi-phase audit protects only the first
+              phase; enforcement has to hold at every reopen and be revalidated
+              at the end.
+            evidence:
+              - N46
+              - "ara/evidence/wm002-q1-fresh-review-2026-07-25.md"
+              - "bench/active_acquisition/q1_audit.py"
+              - "tests/test_active_acquisition_q1_audit.py"
+              - "tests/test_active_acquisition_rehearsal.py"
+              - "make-check:522-passed"
+            also_depends_on: [N45, N46]
+            status: resolved
+            children: []
   - id: N46
     type: experiment
     title: "Independently reject WM-002 Q1 authorization at 52744be"
@@ -1168,5 +1202,38 @@ tree:
       - "make-check:516-passed"
       - "result-free-q1-rehearsal:passed"
     also_depends_on: [N44, N45]
+    status: resolved
+    children: []
+  - id: N47
+    type: experiment
+    title: "Reject Q1 at cf7cdfe2 after fresh non-author review"
+    provenance: ai-executed
+    timestamp: "2026-07-25T13:55+02:00"
+    result: >-
+      Reviewed clean pushed commit 03cd3fc against the exact 48-file
+      selected-source digest cf7cdfe2ababbd361a10c0284544261a04cf5fad56e771326f7f2cafed5e5352.
+      The stale normalized-protocol constant, Python -m self-origin, and
+      machine-generated reviewer-mark findings are closed; the initial
+      all-six-artifact mode check is also corrected. make check passed 520
+      tests, the complete result-free rehearsal passed, and the real
+      site-disabled auditor reported the exact new implementation digest with
+      no normalized-protocol or source-origin error. A fresh phase-boundary
+      probe nevertheless found a blocking residual of artifact custody: after
+      all six files passed the 0600 directory and committed-hash phases, five
+      were left at 0644 before the semantic reopen. The aggregate and four
+      public/checkpoint semantic readers consumed them and the auditor emitted
+      no mode violation because those second opens do not request private mode.
+      Disposition: do not authorize Q1 at this digest. No Q1 private draw,
+      production interaction, outcome, or attempt occurred.
+    evidence:
+      - "03cd3fc489a62eb687c6545b885c80a5c12602dc"
+      - "ara/evidence/wm002-q1-fresh-review-2026-07-25.md"
+      - "bench/active_acquisition/q1_audit.py"
+      - "bench/active_acquisition/q1_protocol.json"
+      - "tests/test_active_acquisition_q1_audit.py"
+      - "tests/test_active_acquisition_rehearsal.py"
+      - "make-check:520-passed"
+      - "result-free-q1-rehearsal:passed"
+    also_depends_on: [N45]
     status: resolved
     children: []

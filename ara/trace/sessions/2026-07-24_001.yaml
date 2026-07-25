@@ -2,8 +2,8 @@ session:
   id: "2026-07-24_001"
   date: "2026-07-24"
   started: "2026-07-24T00:51+02:00"
-  last_turn: "2026-07-25T12:40+02:00"
-  turn_count: 12
+  last_turn: "2026-07-25T13:10+02:00"
+  turn_count: 13
   summary: "Accepted and rebound Q0, hardened disabled Q1 through authenticated worker bootstrap, and closed both reopened blockers with noninterference mutation controls and a complete result-free orchestration rehearsal."
 
 events_logged:
@@ -113,6 +113,12 @@ events_logged:
     provenance: ai-executed
     summary: "Closed both reopened Q1 blockers with noninterference mutation controls and a complete result-free orchestration rehearsal."
 
+  - turn: 13
+    type: dead_end
+    id: N47
+    routing: direct
+    provenance: ai-executed
+    summary: "Refused Q1 authorization at 03cd3fc after a second fresh review found artifact-mode custody unenforced at every post-hash reopen, then closed the class and revalidated after the semantic pass."
   - turn: 12
     type: dead_end
     id: N46
@@ -459,7 +465,7 @@ ai_review:
       - "ara/trace/pm_reasoning_log.yaml"
 
 open_threads:
-  - "Obtain a fresh non-author prospective review over the changed implementation digest; the prior non-author review rejected authorization at 52744be and its findings are now fixed."
+  - "Obtain a fresh non-author prospective review over the changed implementation digest; two successive non-author reviews rejected authorization at 52744be and 03cd3fc and all their findings are now fixed."
   - "Regenerate the canonical review artifact and entry qualification against the final bytes, then decide whether to enable execution_authorized for the sole Q1 attempt."
   - "After WM-002 reaches a terminal disposition, test learned uncertainty in U-001 before zero-shot transfer, adaptation, scale, or partial observability."
 

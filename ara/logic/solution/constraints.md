@@ -130,3 +130,21 @@
 - **Evidence**: [N23, N25, N26,
   `docs/wm001-v1160-accepted-binding-rehearsal-failure.md`]
 - **From staging**: O19
+
+## R10: Independently re-review final Q1 bytes before authorization
+
+- **Statement**: WM-002 Q1 must remain execution-disabled until every
+  prospective-review blocker is corrected, result-free qualification is
+  repeated, and a non-author reviewer accepts the exact final protocol and
+  selected-source implementation bytes. Any source or protocol correction
+  changes the implementation binding and invalidates an earlier review.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Code refs**:
+  [`bench/active_acquisition/q1_qualification.py`,
+  `bench/active_acquisition/q1_audit.py`,
+  `bench/active_acquisition/q1_protocol.json`]
+- **Evidence**:
+  [N46, N47, `ara/evidence/wm002-q1-independent-review-2026-07-25.md`,
+  `ara/evidence/wm002-q1-fresh-review-2026-07-25.md`]
+- **From staging**: O24

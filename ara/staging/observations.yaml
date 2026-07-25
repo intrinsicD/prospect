@@ -48,7 +48,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O04
     timestamp: "2026-07-17T19:11+02:00"
     provenance: ai-suggested
@@ -427,7 +427,7 @@ observations:
     stale: false
   - id: O24
     timestamp: "2026-07-25T12:12+02:00"
-    provenance: ai-suggested
+    provenance: user-revised
     content: >-
       WM-002 Q1 at commit 52744be must remain execution-disabled until the
       independent auditor's stale normalized-protocol digest, Python -m
@@ -441,6 +441,24 @@ observations:
       parity gap before any private Q1 draw or production interaction.
     potential_type: constraint
     bound_to: [N46]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:R10"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O25
+    timestamp: "2026-07-25T13:55+02:00"
+    provenance: ai-suggested
+    content: >-
+      Exact artifact custody is a per-consumer and terminal-state obligation:
+      checking mode 0600 during directory validation and a committed hash does
+      not cover later semantic reopens or the publication state at audit
+      completion.
+    context: >-
+      The fresh review of digest cf7cdfe2 left five unchanged artifacts at mode
+      0644 after their protected hash phase. The later aggregate and streaming
+      semantic consumers accepted them and produced no Q1-K0 mode violation.
+    potential_type: constraint
+    bound_to: [N47]
     promoted: false
     promoted_to: null
     crystallized_via: null

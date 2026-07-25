@@ -43,15 +43,15 @@ sessions:
     open_threads: 1
   - id: "2026-07-24_001"
     date: "2026-07-24"
-    summary: "Accepted and rebound Q0, closed both reopened Q1 blockers, and refused Q1 authorization after a non-author review found three blocking defects the self-review missed."
-    turn_count: 12
-    events_count: 19
+    summary: "Accepted and rebound Q0, closed both reopened Q1 blockers, and refused Q1 authorization twice as successive non-author reviews found defects the author's own review missed."
+    turn_count: 13
+    events_count: 20
     claims_touched: []
     open_threads: 3
   - id: "2026-07-25_001"
     date: "2026-07-25"
-    summary: "Independent review rejected WM-002 Q1 authorization after finding two deterministic audit failures, one custody-enforcement omission, and one review-parity gap."
-    turn_count: 1
-    events_count: 2
+    summary: "Two non-author reviews kept WM-002 Q1 disabled; the fresh review closed three findings but exposed exact-mode custody loss across semantic artifact reopens."
+    turn_count: 2
+    events_count: 5
     claims_touched: []
-    open_threads: 4
+    open_threads: 3

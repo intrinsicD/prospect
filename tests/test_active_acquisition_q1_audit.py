@@ -1598,3 +1598,39 @@ def test_auditor_refuses_the_machine_generated_rehearsal_review(tmp_path: Path) 
             implementation_sha256=_SHA_B,
             reviewed_source_count=47,
         )
+
+
+def test_artifact_mode_drift_after_the_hash_pass_is_reported(tmp_path: Path) -> None:
+    """Mode custody must hold across the whole audit, not just at its first check.
+
+    Content drift after hashing is caught by the committed digest. Mode drift
+    was not: the aggregate reopen and the semantic stream reopen skipped
+    private-mode enforcement, so files flipped to 0644 between phases audited
+    clean against the frozen all-six-0600 publication rule.
+    """
+
+    directory = tmp_path / "result"
+    _make_exact_publication(directory)
+    q1_audit._validate_artifact_directory(directory)
+
+    drifted = [name for name in sorted(q1_audit._ARTIFACT_FILENAMES) if name != q1_audit.PRIVATE_AUDIT_FILENAME]
+    for name in drifted:
+        os.chmod(directory / name, 0o644)
+
+    with pytest.raises(q1_audit.Q1AuditError, match="exact private mode 0600"):
+        q1_audit._validate_artifact_directory(directory)
+
+    paths = q1_audit._artifact_paths(directory)
+    for key, path in paths.items():
+        if path.name not in drifted:
+            continue
+        with pytest.raises(q1_audit.Q1AuditError, match="exact private mode 0600"):
+            q1_audit._open_regular_descriptor(path, label=key, private=True)
+        with pytest.raises(q1_audit.Q1AuditError, match="exact private mode 0600"):
+            q1_audit._read_regular_file(path, label=key, private=True)
+
+    violations = q1_audit._Violations()
+    digests = q1_audit._hash_artifacts(paths, violations)
+    hashing_rows = violations.rows("Q1-K0")
+    assert any("exact private mode 0600" in row for row in hashing_rows), hashing_rows
+    assert set(digests) == set(paths)

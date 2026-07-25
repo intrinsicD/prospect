@@ -190,3 +190,21 @@ entries:
       - "Kept the auditor's duplicated protocol constant duplicated for independence and pinned it with a parity test instead of importing the producer's copy."
       - "Did not stage or crystallize a capability claim: authorization remains false and no Q1 draw, interaction, attempt, or outcome occurred."
       - "Left authorization blocked on a fresh non-author review because the implementation digest changed again with these fixes."
+  - turn: "2026-07-25_001#2"
+    notes:
+      - "Routed the completed fresh non-author review and its executable probes directly as experiment N47."
+      - "Accepted F1, F2, and F4 as closed only after comparing both normalizers, exercising the real Python -S -m entrypoint, and observing the machine-review rejection."
+      - "Classified F3 as partially closed: its initial scan and hash enforce all-six 0600, but the aggregate and stream semantic reopens do not."
+      - "Classified the persistent post-hash 0644 acceptance as blocking rather than an out-of-scope mutate-and-restore attack because the final visible publication remains noncompliant and the auditor reports no mode violation."
+      - "Crystallized O24 as R10 through the user's explicit adoption of fresh non-author review before authorization; staged the narrower per-consumer custody rule as O25."
+      - "Marked O03 stale after more than three session-days without a Pendulum/reservoir-replay revisit or an open thread."
+      - "Did not stage a Q1 capability claim: authorization remains false and no private draw, production interaction, outcome, or attempt occurred."
+
+  - turn: "2026-07-24_001#13"
+    notes:
+      - "Verified the partial-closure finding against both named reopens before accepting it; each reproduced, and the committed digest confirmed content drift was already covered while mode drift was not."
+      - "Routed the second rejection as dead end N47 rather than folding it into N46, because an incomplete closure is its own disposition."
+      - "Closed the class rather than the two named call sites: every reopen now enforces exact 0600 and the publication contract is revalidated after the semantic pass."
+      - "Proved the regression non-vacuous by stashing the fix and observing the test fail, applying the earlier lesson that an assertion which cannot fail proves nothing."
+      - "Did not stage or crystallize a capability claim: authorization remains false and no Q1 draw, interaction, attempt, or outcome occurred."
+      - "Left authorization blocked on another fresh non-author review because the implementation digest changed again."

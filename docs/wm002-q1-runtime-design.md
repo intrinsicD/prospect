@@ -4,13 +4,15 @@ Status: **Q0 is independently accepted for protocol completeness only and was
 rebound on 2026-07-24 after two bound sources changed. The Q1 runtime and
 independent auditor are implemented. The two blockers that reopened result-free
 qualification — causal noninterference and complete-orchestration coverage —
-are now closed with negative controls and an end-to-end rehearsal. An
+are now closed with negative controls and an end-to-end rehearsal. A
 non-author review then refused authorization at commit `52744be` with three
 blocking findings that the author's own
 [prospective review](wm002-q1-prospective-review.md) had missed, including a
 stale auditor constant that would have failed Q1-K0 only after the one-shot
-attempt was consumed. All findings are fixed, the implementation digest changed
-again, and a fresh non-author review is required before authorization. Q1
+attempt was consumed. A second fresh review refused `03cd3fc` because artifact
+mode custody was still unenforced at every post-hash reopen. All findings from
+both rounds are fixed, the implementation digest changed again, and a fresh
+non-author review is required before authorization. Q1
 execution authorization remains false, and no Q1 outcome or capability evidence
 exists.**
 

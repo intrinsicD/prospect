@@ -16,7 +16,7 @@ import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -227,6 +227,47 @@ def test_independent_auditor_rejects_the_rehearsal_as_q1_evidence(
         assert "were not loaded" not in violation, violation
         assert "origin differs from hashed source" not in violation, violation
         assert "unoptimized Python interpreter" not in violation, violation
+
+
+def test_auditor_detects_publication_mode_drift_across_the_hash_boundary(
+    published: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Flip modes after hashing, exactly at the phase boundary a review probed."""
+
+    from bench.active_acquisition import q1_audit
+
+    directory = tmp_path / "drifting"
+    directory.mkdir(mode=0o700)
+    for name in CANONICAL_ARTIFACTS:
+        target = directory / name
+        target.write_bytes((published["output_directory"] / name).read_bytes())
+        os.chmod(target, 0o600)
+
+    real_hash_artifacts = q1_audit._hash_artifacts
+
+    def hash_then_drift(paths: Any, violations: Any) -> Any:
+        digests = real_hash_artifacts(paths, violations)
+        for path in paths.values():
+            if path.name != q1_audit.PRIVATE_AUDIT_FILENAME:
+                os.chmod(path, 0o644)
+        return digests
+
+    monkeypatch.setattr(q1_audit, "_hash_artifacts", hash_then_drift)
+    root = published["root"]
+    audit = q1_audit.audit_q1_directory(
+        directory,
+        secret_salt_path=root / "rehearsal-salt.bin",
+        q0_report_path=root / "q0-report.json",
+        entry_report_path=root / "rehearsal-entry.json",
+        prospective_review_path=root / "rehearsal-review.json",
+        attempt_marker_path=root / "registry" / "wm002-q1.attempt.json",
+    )
+    gates = cast(list[dict[str, Any]], audit["gates"])
+    k0 = cast(list[str], next(row for row in gates if row["gate"] == "Q1-K0")["violations"])
+    assert any("custody drifted during the audit" in violation for violation in k0), k0
+    assert audit["passed"] is False
 
 
 def test_public_rehearsal_rows_carry_no_private_hidden_state(published: dict[str, Any]) -> None:

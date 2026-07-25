@@ -1,9 +1,11 @@
 # WM-002 Q1 prospective implementation review
 
 Status: **Superseded in part. This self-review missed three blocking defects
-that a non-author review then found at commit `52744be`; all three are fixed
-below. Q1 authorization remains refused, and a fresh non-author review over the
-changed implementation digest is required.**
+that a non-author review found at commit `52744be`, and a second fresh review
+then refused authorization at `03cd3fc` because one of those fixes was
+incomplete. All findings from both rounds are fixed below. Q1 authorization
+remains refused, and a fresh non-author review over the changed implementation
+digest is required.**
 
 The independent reviewer's evidence is
 [`ara/evidence/wm002-q1-independent-review-2026-07-25.md`](../ara/evidence/wm002-q1-independent-review-2026-07-25.md).
@@ -176,6 +178,20 @@ the test suite as a specification of intended behavior instead of checking it
 against the protocol text, so a fixture encoding the defect read as
 confirmation. The fixture is corrected.
 
+**B3 was only partially closed, and a second fresh review caught that too.**
+Fixing the first two reads left two later reopens unprotected: the aggregate
+reload and the semantic stream reopen, both of which happen *after* the hash
+pass. A probe that flipped the five non-sidecar files to 0644 at that phase
+boundary audited clean, because the committed digest catches content drift but
+nothing was re-checking mode. All reopens now enforce 0600, and the publication
+contract is revalidated after the semantic pass, so custody must hold across the
+whole audit rather than only at its first check.
+
+**How the first fix fell short.** I fixed the two call sites the finding named
+and did not enumerate every reopen of the same files. Fixing where a defect was
+reported is not the same as fixing the class it belongs to. The regression now
+flips modes at the real phase boundary and fails without the fix.
+
 ### B4 — reviewer-mark parity
 
 The entry gate refused the machine-generated rehearsal reviewer mark; the
@@ -188,18 +204,22 @@ The self-review below executed a forgery attack, five leak injections, and
 several independent recomputations, and every one of those probes was sound.
 It still missed three blocking defects, and the pattern is consistent: each
 miss came from trusting an artifact of my own construction — my grep pattern, my
-test's assertion, my test's fixture. Adversarial effort does not substitute for
-a reviewer who does not share the author's mental model. **Do not treat a future
-self-review as satisfying the independent-review requirement.**
+test's assertion, my test's fixture. The follow-up round added a fourth
+instance: I fixed the two call sites a finding named rather than the class of
+reopen it belonged to, and a second fresh review found the remainder.
+Adversarial effort does not substitute for a reviewer who does not share the
+author's mental model. **Do not treat a future self-review as satisfying the
+independent-review requirement.**
 
 ## Disposition
 
-**Q1 authorization refused at commit `52744be`.** Three blocking defects and one
-gap from the independent review are fixed, along with the two defects found
-here; six boundaries and misses are recorded. The implementation digest has
-changed again, so the canonical review artifact, entry qualification, and run
-identity must be regenerated, and a **fresh non-author review over the new
-digest is required before authorization**.
+**Q1 authorization refused at commits `52744be` and `03cd3fc`.** Three blocking
+defects and one gap from the first independent review are fixed, the incomplete
+custody closure the second review found is fixed, and the two defects found by
+this self-review are fixed. The implementation digest has changed again, so the
+canonical review artifact, entry qualification, and run identity must be
+regenerated, and a **fresh non-author review over the new digest is required
+before authorization**.
 
 This review does not authorize Q1. It does not establish that Prospect uses
 information value well, that any agent learned anything, or that any capability

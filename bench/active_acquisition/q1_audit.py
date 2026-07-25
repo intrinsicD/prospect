@@ -1491,6 +1491,16 @@ def audit_q1_directory(
         expected_binding=expected_binding,
         violations=violations,
     )
+    try:
+        # Custody must hold across the whole audit, not only at its first
+        # check. Re-running the publication contract after the semantic pass
+        # closes the window between hashing and streaming.
+        _validate_artifact_directory(directory)
+    except Exception as error:
+        violations.add(
+            "Q1-K0",
+            f"artifact directory custody drifted during the audit: {type(error).__name__}:{error}",
+        )
     arm_mean_rows, arm_mean_values = _recompute_arm_means(streamed.returns, violations)
     comparisons = _comparison_rows(arm_mean_values)
     counts = dict(streamed.counts)
@@ -2390,7 +2400,7 @@ def _load_streaming_aggregate(
     violations: _Violations,
 ) -> Mapping[str, object] | None:
     try:
-        payload = _read_regular_file(path, label="producer aggregate")
+        payload = _read_regular_file(path, label="producer aggregate", private=True)
         if sha256_bytes(payload) != expected_digest:
             raise Q1AuditError("producer aggregate changed after the committed hash pass")
         aggregate = _decode_canonical_document(payload, "producer aggregate", violations)
@@ -2536,11 +2546,10 @@ def _stream_audit_evidence(
     stream_metadata: dict[str, os.stat_result] = {}
     try:
         for name in (*stream_names, "checkpoint_frames"):
-            descriptor = _open_regular_descriptor(
-                paths[name],
-                label=name,
-                private=name == "private_audit",
-            )
+            # Every published artifact is exact-0600, and this reopen happens
+            # after the hash pass: content drift is caught by digest, mode
+            # drift only by re-checking custody here.
+            descriptor = _open_regular_descriptor(paths[name], label=name, private=True)
             stream_metadata[name] = os.fstat(descriptor)
             streams[name] = os.fdopen(descriptor, "rb")
     except Exception as error:
