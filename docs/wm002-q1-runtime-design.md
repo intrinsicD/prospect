@@ -5,12 +5,14 @@ rebound on 2026-07-24 after two bound sources changed. The Q1 runtime and
 independent auditor are implemented. The two blockers that reopened result-free
 qualification — causal noninterference and complete-orchestration coverage —
 are now closed with negative controls and an end-to-end rehearsal. An
-adversarial [prospective review](wm002-q1-prospective-review.md) fixed two
-further defects and found nothing blocking, but it is self-review: the reviewer
-wrote the code, and the entry gate cannot verify reviewer independence. A second
-non-author review, then a regenerated review artifact and entry qualification
-against the final bytes, remain required. Q1 execution authorization remains
-false, and no Q1 outcome or capability evidence exists.**
+non-author review then refused authorization at commit `52744be` with three
+blocking findings that the author's own
+[prospective review](wm002-q1-prospective-review.md) had missed, including a
+stale auditor constant that would have failed Q1-K0 only after the one-shot
+attempt was consumed. All findings are fixed, the implementation digest changed
+again, and a fresh non-author review is required before authorization. Q1
+execution authorization remains false, and no Q1 outcome or capability evidence
+exists.**
 
 This document describes the implemented authoritative runtime for the
 five-action hidden-actuator qualification fixture. Successor protocol

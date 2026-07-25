@@ -1,0 +1,57 @@
+session:
+  id: "2026-07-25_001"
+  date: "2026-07-25"
+  started: "2026-07-25T12:12+02:00"
+  last_turn: "2026-07-25T12:12+02:00"
+  turn_count: 1
+  summary: "Independent review rejected WM-002 Q1 authorization after finding two deterministic audit failures, one custody-enforcement omission, and one review-parity gap."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: N46
+    routing: direct
+    provenance: ai-executed
+    summary: "A non-author review reproduced the green suite and rehearsal, then rejected Q1 authorization on three blocking auditor defects."
+  - turn: 1
+    type: constraint
+    id: O24
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the requirement to keep Q1 disabled until the three blockers are fixed and independently re-reviewed."
+
+ai_actions:
+  - turn: 1
+    action: >-
+      Reviewed commit 52744be result-free, ran the 516-test check and complete
+      rehearsal, invoked the auditor as a Python module, executed protocol-hash,
+      file-mode, and review-marker probes, and recorded a reject disposition.
+    provenance: ai-executed
+    files_changed:
+      - "ara/evidence/wm002-q1-independent-review-2026-07-25.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/sessions/2026-07-25_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: >-
+      The user requested a second review by someone who did not write the Q1
+      code before authorizing the one-shot experiment.
+  - turn: 1
+    excerpt: >-
+      The independent disposition is do not authorize at 52744be; no Q1 private
+      draw, production interaction, outcome, or attempt occurred.
+
+open_threads:
+  - "Repair the auditor's normalized protocol digest and Python -m selected-source self-origin handling."
+  - "Enforce exact mode 0600 for every Q1 artifact and mirror the production machine-review mark rejection."
+  - "After fixes and result-free qualification, obtain a fresh non-author review over the final implementation digest before authorization."
+  - "After WM-002 reaches a terminal disposition, test learned uncertainty in U-001 before transfer or broader maturity claims."
+
+ai_suggestions_pending:
+  - "Add subprocess regressions that fail on any unexpected Q1-K0 rehearsal violation rather than asserting only the expected authorization failure."

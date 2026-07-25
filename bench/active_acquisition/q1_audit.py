@@ -40,6 +40,7 @@ from bench.active_acquisition.checkpoint import (
 from bench.active_acquisition.contracts import (
     ACTION_ORDER,
     ARM_ORDER,
+    MACHINE_GENERATED_REVIEWER_MARK,
     Q0_IMPLEMENTATION_SHA256,
     Q0_PROTOCOL_SHA256,
     Q0_REPORT_SHA256,
@@ -132,7 +133,7 @@ _MAX_REPORTED_VIOLATIONS: Final = 128
 _MAX_JSONL_ROW_BYTES: Final = 32 * 1024 * 1024
 _MAX_CHECKPOINT_FRAME_BYTES: Final = 32 * 1024 * 1024
 _MAX_SMALL_DOCUMENT_BYTES: Final = 8 * 1024 * 1024
-_NORMALIZED_Q1_PROTOCOL_SHA256: Final = "14d22a0544377b4a1c754f109c25c1f23d67d05ad1f1aef978fcf04628a78fe5"
+_NORMALIZED_Q1_PROTOCOL_SHA256: Final = "e015c8b519a10eeab19ecda1384071b17c450484c06ebbd4142d95143c92353b"
 _RUN_IDENTITY_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-run-identity.v1"
 _ATTEMPT_MARKER_SCHEMA: Final = "prospect.wm002.active-acquisition.q1-attempt-marker.v2"
 _ATTEMPT_MARKER_FILENAME: Final = "wm002-q1.attempt.json"
@@ -667,8 +668,11 @@ def _load_validated_prospective_review(
     nonblocking = review.get("nonblocking_findings")
     if not isinstance(nonblocking, list) or any(type(row) is not str or not row for row in nonblocking):
         raise Q1AuditError("prospective review nonblocking findings are not nonempty strings")
-    if not isinstance(review.get("reviewer"), str) or not cast(str, review.get("reviewer")):
+    reviewer = review.get("reviewer")
+    if not isinstance(reviewer, str) or not reviewer:
         raise Q1AuditError("prospective review reviewer is not a nonempty string")
+    if MACHINE_GENERATED_REVIEWER_MARK in reviewer:
+        raise Q1AuditError("prospective review is the machine-generated rehearsal review")
     if not isinstance(review.get("statement"), str) or not cast(str, review.get("statement")):
         raise Q1AuditError("prospective review statement is not a nonempty string")
     return digest
@@ -813,9 +817,16 @@ def _validate_loaded_source_origins() -> None:
         "prospect",
         "prospect.runtime",
     }
+    main_module = sys.modules.get("__main__")
+    main_name = getattr(getattr(main_module, "__spec__", None), "name", None)
     loaded_required: set[str] = set()
     for name, expected_relative in selected_modules.items():
         module = sys.modules.get(name)
+        if module is None and name == main_name:
+            # `python -S -m bench.active_acquisition.q1_audit` registers this
+            # module as __main__, not under its package name. Bind the running
+            # entrypoint by origin instead of declaring it absent.
+            module = main_module
         if module is None:
             continue
         if name in required_modules:
@@ -2132,8 +2143,10 @@ def _validate_artifact_directory(directory: Path) -> None:
             raise Q1AuditError(f"Q1 publication entry is not a non-symlink regular file:{entry.name}")
         if entry_metadata.st_nlink != 1:
             raise Q1AuditError(f"Q1 publication entry must have exactly one hard link:{entry.name}")
-        if entry.name == PRIVATE_AUDIT_FILENAME and stat.S_IMODE(entry_metadata.st_mode) != 0o600:
-            raise Q1AuditError("Q1 private audit publication must have exact private mode 0600")
+        if stat.S_IMODE(entry_metadata.st_mode) != 0o600:
+            # The protocol's publication rule covers all six artifacts, not only
+            # the private sidecar.
+            raise Q1AuditError(f"Q1 publication entry must have exact private mode 0600:{entry.name}")
 
 
 def _artifact_paths(directory: Path) -> dict[str, Path]:
@@ -2151,11 +2164,9 @@ def _hash_artifacts(paths: Mapping[str, Path], violations: _Violations) -> dict[
     digests: dict[str, str] = {}
     for name, path in paths.items():
         try:
-            digests[name] = _stream_file_sha256(
-                path,
-                label=name,
-                private=name == "private_audit",
-            )
+            # Every published artifact is exact-0600 under the protocol's
+            # publication rule, so hash them all through the private reader.
+            digests[name] = _stream_file_sha256(path, label=name, private=True)
         except Exception as error:
             violations.add("Q1-K0", f"cannot hash {name}: {type(error).__name__}:{error}")
             digests[name] = _ZERO_SHA256

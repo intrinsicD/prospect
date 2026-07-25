@@ -759,7 +759,8 @@ def _make_exact_publication(directory: Path) -> None:
     for name in q1_audit._ARTIFACT_FILENAMES:
         path = directory / name
         path.write_bytes(b"\n")
-        path.chmod(0o600 if name == q1_audit.PRIVATE_AUDIT_FILENAME else 0o644)
+        # The protocol's publication rule is exact 0600 for all six artifacts.
+        path.chmod(0o600)
 
 
 def test_publication_set_rejects_extra_and_symlink_entries(tmp_path: Path) -> None:
@@ -1526,3 +1527,74 @@ def test_result_free_real_checkpoint_passes_deep_independent_audit() -> None:
         violations=violations,
     )
     assert {gate: violations.rows(gate) for gate in q1_audit.GATE_ORDER if violations.rows(gate)} == {}
+
+
+def test_auditor_frozen_normalized_protocol_digest_matches_the_entry_gate() -> None:
+    """The auditor duplicates this constant on purpose; drift burns the one-shot attempt.
+
+    A stale copy here is invisible until an authorized run has already consumed
+    the single Q1 attempt and then fails Q1-K0. The duplication is deliberate
+    auditor independence, so pin the two copies against each other instead of
+    importing one into the other.
+    """
+
+    from bench.active_acquisition.contracts import Q1_PROTOCOL_PATH
+    from bench.active_acquisition.q1_qualification import (
+        _Q1_NORMALIZED_PROTOCOL_SHA256,
+        _normalized_protocol_contract_sha256,
+        _protocol_snapshot,
+    )
+
+    _digest, protocol = _protocol_snapshot(Q1_PROTOCOL_PATH)
+    live = _normalized_protocol_contract_sha256(protocol)
+    assert q1_audit._NORMALIZED_Q1_PROTOCOL_SHA256 == _Q1_NORMALIZED_PROTOCOL_SHA256
+    assert q1_audit._NORMALIZED_Q1_PROTOCOL_SHA256 == live
+
+
+def test_auditor_binds_its_own_entrypoint_when_run_as_main(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`python -S -m ...q1_audit` registers the auditor as __main__, not by name."""
+
+    import sys
+    from types import ModuleType
+
+    main_module = ModuleType("__main__")
+    main_module.__file__ = q1_audit.__file__
+    main_module.__spec__ = SimpleNamespace(name="bench.active_acquisition.q1_audit")  # type: ignore[assignment]
+    monkeypatch.setitem(sys.modules, "__main__", main_module)
+    monkeypatch.delitem(sys.modules, "bench.active_acquisition.q1_audit", raising=False)
+
+    q1_audit._validate_loaded_source_origins()
+
+
+def test_auditor_requires_exact_private_mode_on_every_published_artifact(tmp_path: Path) -> None:
+    """The protocol's publication rule covers all six artifacts, not just the sidecar."""
+
+    directory = tmp_path / "result"
+    directory.mkdir(mode=0o700)
+    for name in sorted(q1_audit._ARTIFACT_FILENAMES):
+        path = directory / name
+        path.write_bytes(b"x")
+        os.chmod(path, 0o600)
+    q1_audit._validate_artifact_directory(directory)
+
+    os.chmod(directory / q1_audit.PRODUCER_AGGREGATE_FILENAME, 0o644)
+    with pytest.raises(q1_audit.Q1AuditError, match="exact private mode 0600"):
+        q1_audit._validate_artifact_directory(directory)
+
+
+def test_auditor_refuses_the_machine_generated_rehearsal_review(tmp_path: Path) -> None:
+    """The entry gate refuses this reviewer mark; the auditor must not accept it."""
+
+    from bench.active_acquisition.contracts import MACHINE_GENERATED_REVIEWER_MARK
+
+    review = _prospective_review()
+    review["reviewer"] = f"some-harness ({MACHINE_GENERATED_REVIEWER_MARK}; not independent)"
+    path = tmp_path / "review.json"
+    path.write_bytes(canonical_json_bytes(review, newline=True))
+    with pytest.raises(q1_audit.Q1AuditError, match="machine-generated rehearsal review"):
+        q1_audit._load_validated_prospective_review(
+            path,
+            protocol_sha256=_SHA_A,
+            implementation_sha256=_SHA_B,
+            reviewed_source_count=47,
+        )

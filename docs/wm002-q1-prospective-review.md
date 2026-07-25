@@ -1,8 +1,14 @@
 # WM-002 Q1 prospective implementation review
 
-Status: **Result-free review completed on 2026-07-25 with two findings fixed and
-four boundaries recorded. It is NOT the independent review the entry gate
-requires, because the reviewer wrote most of the reviewed code.**
+Status: **Superseded in part. This self-review missed three blocking defects
+that a non-author review then found at commit `52744be`; all three are fixed
+below. Q1 authorization remains refused, and a fresh non-author review over the
+changed implementation digest is required.**
+
+The independent reviewer's evidence is
+[`ara/evidence/wm002-q1-independent-review-2026-07-25.md`](../ara/evidence/wm002-q1-independent-review-2026-07-25.md).
+Its findings, and what they say about the value of self-review, are recorded in
+"What the independent review caught" below.
 
 | Field | Value |
 |---|---|
@@ -122,15 +128,79 @@ Each item was executed, not read.
 | Independent auditor recomputation and scale | Paired interval arithmetic against hand computation | Exact match |
 | Evidence and claim boundary | Rehearsal artifacts submitted to the independent auditor | Rejected at K0 on `execution_authorized`, plus K1, K3, K4, K5 |
 
+## What the independent review caught
+
+A non-author review of commit `52744be` returned three blocking findings this
+self-review missed, plus one defense-in-depth gap. All four are now fixed.
+
+### B1 — the auditor's frozen normalized-protocol digest was stale
+
+`q1_audit.py` still held `14d22a05…` after the Q0 rebinding moved the value to
+`e015c8b5…`. The auditor runs *after* the attempt, so an authorized run would
+have passed the execution boundary, consumed the sole one-shot attempt, and
+then deterministically failed Q1-K0 on a constant. This is the worst possible
+failure shape: unrecoverable, and invisible until it is too late.
+
+**How the self-review missed it.** When rebinding Q0 I grepped for
+`NORMALIZED_PROTOCOL_SHA256`. The auditor's copy is named
+`_NORMALIZED_Q1_PROTOCOL_SHA256` — the `Q1` sits in a different position, so the
+pattern did not match, and I read the empty result as "only one copy exists."
+The duplication is deliberate auditor independence, so the fix keeps both copies
+and adds a test asserting they agree with each other *and* with a live
+recomputation.
+
+### B2 — the auditor's real entrypoint failed its own selected-source closure
+
+`_validate_loaded_source_origins` demanded `bench.active_acquisition.q1_audit`
+in `sys.modules`, but `python -S -m bench.active_acquisition.q1_audit` runs it
+as `__main__`. The producer already handled this through `__main__.__spec__`;
+the auditor did not. It now binds the running entrypoint by origin.
+
+**How the self-review missed it.** I ran the auditor as a subprocess and *saw*
+this violation in the output. I attributed it to the rehearsal context and moved
+on, because my test asserted only that the rehearsal was rejected. An expected
+failure had become a place for unrelated failures to hide. The test now asserts
+that no entrypoint, source-origin, or interpreter violation appears among the
+rejections.
+
+### B3 — published-artifact custody was under-enforced
+
+The protocol requires all six artifacts at exact mode 0600; the auditor enforced
+it only for `private-audit.jsonl`, in both the directory check and the hashing
+path. A disposable `aggregate.json` at 0644 was accepted. Both paths now enforce
+0600 for all six.
+
+**How the self-review missed it.** The unit-test helper `_make_exact_publication`
+built five artifacts at 0644 and called the result an exact publication. I read
+the test suite as a specification of intended behavior instead of checking it
+against the protocol text, so a fixture encoding the defect read as
+confirmation. The fixture is corrected.
+
+### B4 — reviewer-mark parity
+
+The entry gate refused the machine-generated rehearsal reviewer mark; the
+auditor's review loader accepted it. I added the check in one place and did not
+mirror it in the independent recomputation. Now both refuse it.
+
+### What this says about self-review
+
+The self-review below executed a forgery attack, five leak injections, and
+several independent recomputations, and every one of those probes was sound.
+It still missed three blocking defects, and the pattern is consistent: each
+miss came from trusting an artifact of my own construction — my grep pattern, my
+test's assertion, my test's fixture. Adversarial effort does not substitute for
+a reviewer who does not share the author's mental model. **Do not treat a future
+self-review as satisfying the independent-review requirement.**
+
 ## Disposition
 
-No blocking finding. Two defects were found and fixed; four boundaries are
-recorded above and belong in any reading of a future Q1 result. The
-implementation digest changed with the fixes, so the canonical review artifact,
-entry qualification, and run identity must all be regenerated against the final
-bytes.
+**Q1 authorization refused at commit `52744be`.** Three blocking defects and one
+gap from the independent review are fixed, along with the two defects found
+here; six boundaries and misses are recorded. The implementation digest has
+changed again, so the canonical review artifact, entry qualification, and run
+identity must be regenerated, and a **fresh non-author review over the new
+digest is required before authorization**.
 
 This review does not authorize Q1. It does not establish that Prospect uses
 information value well, that any agent learned anything, or that any capability
-exists. It states only that the machinery for a single claim-ineligible attempt
-appears sound under adversarial probing by its own author.
+exists.

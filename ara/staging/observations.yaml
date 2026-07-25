@@ -425,3 +425,23 @@ observations:
     promoted_to: "logic/solution/architecture.md:A04"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O24
+    timestamp: "2026-07-25T12:12+02:00"
+    provenance: ai-suggested
+    content: >-
+      WM-002 Q1 at commit 52744be must remain execution-disabled until the
+      independent auditor's stale normalized-protocol digest, Python -m
+      self-origin handling, and all-six-artifact exact-0600 custody enforcement
+      are corrected and independently re-reviewed; prospective-review
+      machine-mark parity should be repaired in the same assurance pass.
+    context: >-
+      A non-author review passed the complete result-free rehearsal and full
+      test suite but found two deterministic post-attempt Q1-K0 failures, one
+      protocol-custody enforcement omission, and one defense-in-depth review
+      parity gap before any private Q1 draw or production interaction.
+    potential_type: constraint
+    bound_to: [N46]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

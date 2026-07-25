@@ -1095,4 +1095,78 @@ tree:
       - "make-check:516-passed"
     also_depends_on: [N42, N44]
     status: resolved
+    children:
+      - id: N46
+        type: dead_end
+        title: "Reject Q1 authorization at 52744be on independent review"
+        provenance: ai-executed
+        timestamp: "2026-07-25T12:20+02:00"
+        result: >-
+          A non-author review returned three blocking findings the self-review
+          missed. The auditor's frozen normalized-protocol digest was stale
+          after the Q0 rebinding, so an authorized run would have consumed the
+          sole one-shot attempt and then failed Q1-K0 on a constant. The
+          auditor's real python -S -m entrypoint failed its own selected-source
+          closure because it runs as __main__, a violation the self-review saw
+          in output and dismissed. Published-artifact custody enforced exact
+          0600 only for the private sidecar, in both the directory check and
+          the hashing path, with a unit fixture encoding the same mismatch. A
+          fourth nonblocking gap left the auditor accepting the
+          machine-generated reviewer mark the entry gate refuses. All four are
+          fixed with regressions, including a constants-parity test, a __main__
+          binding test, an all-artifact permission test, and a strengthened
+          rehearsal assertion that expected failures cannot mask unrelated
+          ones. make check passes at 520 tests and the auditor subprocess now
+          shows no entrypoint or hashing failure.
+        lesson: >-
+          Each self-review miss came from trusting an artifact of the author's
+          own construction: a grep pattern whose word order did not match, a
+          test that asserted only that a rehearsal was rejected, and a fixture
+          that encoded the defect it should have caught. Adversarial effort
+          does not substitute for a reviewer outside the author's mental model.
+        evidence:
+          - N45
+          - "ara/evidence/wm002-q1-independent-review-2026-07-25.md"
+          - "docs/wm002-q1-prospective-review.md"
+          - "bench/active_acquisition/q1_audit.py"
+          - "tests/test_active_acquisition_q1_audit.py"
+          - "tests/test_active_acquisition_rehearsal.py"
+          - "make-check:520-passed"
+        also_depends_on: [N44, N45]
+        status: resolved
+        children: []
+  - id: N46
+    type: experiment
+    title: "Independently reject WM-002 Q1 authorization at 52744be"
+    provenance: ai-executed
+    timestamp: "2026-07-25T12:12+02:00"
+    result: >-
+      A non-author review reproduced the clean 516-test check and the complete
+      56-episode result-free rehearsal, then exercised the independent auditor
+      through its real Python -S module entrypoint and mutation probes. The
+      review found two deterministic post-run Q1-K0 failures: the auditor's
+      frozen normalized protocol digest is 14d22a05 while the current exact
+      normalized protocol and qualification gate use e015c8b5, and module
+      execution leaves q1_audit under __main__ while its selected-source check
+      requires bench.active_acquisition.q1_audit in sys.modules. It also found
+      that the auditor accepts mode 0644 for five of the six artifacts despite
+      the protocol's exact-0600 rule for all six, and that its prospective
+      review loader accepts the machine-generated rehearsal reviewer mark that
+      the production entry gate rejects. The recent symlink-custody and
+      production review-marker fixes behaved as intended. Disposition: do not
+      authorize Q1 at this commit. No Q1 private draw, production interaction,
+      outcome, or attempt occurred.
+    evidence:
+      - N44
+      - N45
+      - "ara/evidence/wm002-q1-independent-review-2026-07-25.md"
+      - "bench/active_acquisition/q1_audit.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "bench/active_acquisition/q1_protocol.json"
+      - "tests/test_active_acquisition_q1_audit.py"
+      - "tests/test_active_acquisition_rehearsal.py"
+      - "make-check:516-passed"
+      - "result-free-q1-rehearsal:passed"
+    also_depends_on: [N44, N45]
+    status: resolved
     children: []

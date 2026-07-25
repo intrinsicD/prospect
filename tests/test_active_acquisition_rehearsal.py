@@ -220,6 +220,14 @@ def test_independent_auditor_rejects_the_rehearsal_as_q1_evidence(
     assert any("execution_authorized" in violation for violation in gates["Q1-K0"]["violations"])
     assert gates["Q1-K4"]["passed"] is False
 
+    # An expected failure must not become a place for unrelated failures to
+    # hide. A stale auditor entrypoint defect lived here precisely because this
+    # assertion used to stop at "the rehearsal is rejected".
+    for violation in gates["Q1-K0"]["violations"]:
+        assert "were not loaded" not in violation, violation
+        assert "origin differs from hashed source" not in violation, violation
+        assert "unoptimized Python interpreter" not in violation, violation
+
 
 def test_public_rehearsal_rows_carry_no_private_hidden_state(published: dict[str, Any]) -> None:
     public = json.dumps([published["raw"], published["index"], published["restored"], published["aggregate"]])

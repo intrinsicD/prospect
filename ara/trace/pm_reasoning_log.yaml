@@ -173,3 +173,20 @@ entries:
       - "Fixed both defects in place because each was small and in this turn's own surface; recorded the four unfixable boundaries as review content instead of pretending they were closed."
       - "Made review independence machine-checkable only in the direction that catches accidents: the gate refuses the harness's own mark and a rehearsal refuses an independent review."
       - "Opened reviewer independence as a standing thread; a second non-author reviewer is required before authorization, and the implementation digest changed with the fixes."
+  - turn: "2026-07-25_001#1"
+    notes:
+      - "Routed the completed non-author review and its executable probes directly as experiment N46."
+      - "Staged O24 as a current authorization constraint rather than crystallizing it: the user requested the review but has not yet affirmed or acted on its reject disposition."
+      - "Classified the stale normalized digest, Python -m self-origin failure, and all-artifact mode omission as blockers because each defeats or undercuts the mandatory post-run independent audit."
+      - "Classified reviewer-mark parity as nonblocking defense in depth because a legitimate production entry already rejects the machine-generated rehearsal mark."
+      - "Did not stage any Q1 capability claim: authorization remains false and no private Q1 draw, production interaction, outcome, or attempt occurred."
+      - "Found no contradiction with crystallized claims C01-C05 or architecture A03-A04; N46 supersedes only N45's historical no-blocker review disposition."
+
+  - turn: "2026-07-24_001#12"
+    notes:
+      - "Verified each independent finding against the source before accepting it rather than trusting the reviewer's report; all four reproduced exactly."
+      - "Routed the rejected authorization as dead end N46 because the disposition is a refusal, not a repair, even though every finding is now fixed."
+      - "Recorded the mechanism of each self-review miss—unmatched grep word order, an assertion that stopped at expected failure, a fixture encoding the defect—because the pattern is the transferable lesson, not the individual bugs."
+      - "Kept the auditor's duplicated protocol constant duplicated for independence and pinned it with a parity test instead of importing the producer's copy."
+      - "Did not stage or crystallize a capability claim: authorization remains false and no Q1 draw, interaction, attempt, or outcome occurred."
+      - "Left authorization blocked on a fresh non-author review because the implementation digest changed again with these fixes."
