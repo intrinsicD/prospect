@@ -55,3 +55,10 @@ sessions:
     events_count: 5
     claims_touched: []
     open_threads: 3
+  - id: "2026-07-28_001"
+    date: "2026-07-28"
+    summary: "The third non-author review attacked every previously unprobed Q1 surface and found nothing blocking; nine non-blocking findings were recorded and authorization stays a maintainer decision."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 3

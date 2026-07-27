@@ -1237,3 +1237,46 @@ tree:
     also_depends_on: [N45]
     status: resolved
     children: []
+  - id: N48
+    type: experiment
+    title: "Find nothing blocking in the third non-author Q1 review at 8e17bc1a"
+    provenance: ai-executed
+    timestamp: "2026-07-28T12:30+02:00"
+    result: >-
+      Reviewed runtime commit dbb8d4d at e41b22e against the exact 48-file
+      implementation digest 8e17bc1a1b1c4f77837eb710d308c6997d09ab04caa3cab1dc1085a8c3d255fb,
+      attacking the surface the handoff named as never probed. make check
+      passed 522 tests; the rehearsal auditor run was reclassified with the
+      violation cap lifted and all 145,218 violations fall into 48
+      rehearsal-explained classes. The F3 custody fix is pinned by a
+      regression that genuinely fails pre-fix, though a second claimed
+      regression cannot fail (it hard-codes private=True around the helpers).
+      Five parallel adversarial probes found no blocking defect: the producer
+      and auditor privacy scans agree on well-formed encodings with the
+      auditor strictly stronger in corpus scope and artifact coverage;
+      rehearsal-guard laundering fails on live-protocol-digest binding in
+      every direction; the relocated domain-graph codec is
+      semantics-preserving and cross-process deterministic; full-budget
+      frame-offset, row-bound, preflight, and watchdog arithmetic all hold
+      with at least 54x measured headroom; and every kill, hang, truncation,
+      and interleave scenario fails closed with structural lane isolation and
+      purely logical clocks. Nine non-blocking findings recorded, the
+      sharpest being the wasted-attempt asymmetries: per-episode producer scan
+      corpus, three never-producer-scanned artifacts, and an untrapped
+      parent SIGTERM that permanently consumes the attempt undocumented.
+      Disposition: nothing blocking found; authorization remains a separate
+      maintainer-owned decision. No Q1 private draw, production interaction,
+      outcome, or attempt occurred.
+    evidence:
+      - N47
+      - "ara/evidence/wm002-q1-third-review-2026-07-28.md"
+      - "docs/wm002-q1-review-handoff.md"
+      - "bench/active_acquisition/q1.py"
+      - "bench/active_acquisition/q1_audit.py"
+      - "bench/active_acquisition/q1_qualification.py"
+      - "src/prospect/storage/domain_graph.py"
+      - "make-check:522-passed"
+      - "result-free-q1-rehearsal:passed"
+    also_depends_on: [N45, N46]
+    status: resolved
+    children: []

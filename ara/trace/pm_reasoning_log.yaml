@@ -208,3 +208,12 @@ entries:
       - "Proved the regression non-vacuous by stashing the fix and observing the test fail, applying the earlier lesson that an assertion which cannot fail proves nothing."
       - "Did not stage or crystallize a capability claim: authorization remains false and no Q1 draw, interaction, attempt, or outcome occurred."
       - "Left authorization blocked on another fresh non-author review because the implementation digest changed again."
+  - turn: "2026-07-28_001#1"
+    notes:
+      - "Treated the author's handoff as untrusted input: regenerated every identity in its table and reproduced the one-file runtime delta before relying on either."
+      - "Discharged the expected-failure trap by lifting the auditor's report cap in-process and classifying all 145,218 rehearsal violations; every class is rehearsal- or budget-explained and episodes 0-1 of the true lane 0 are clean."
+      - "Ran the claimed regressions against the pre-fix auditor in a 03cd3fc worktree instead of trusting the commit message; one genuinely fails pre-fix, the other cannot fail and is recorded as finding R1."
+      - "Fanned five parallel adversarial agents over the never-attacked surface and re-verified every adopted claim against source or probe output before accepting it."
+      - "Calibrated severity against this project's own precedent: blocking means protocol-violating, deterministic post-attempt failure, or a falsely-reporting enforcement authority; the privacy-scan asymmetries are none of these because the auditor remains strictly stronger and structural lane isolation removes the transplant trigger."
+      - "Recorded a nothing-blocking disposition without authorizing anything: enabling execution_authorized stays maintainer-owned, and the staged O26 closure list is a recommendation, not a gate."
+      - "Did not stage or crystallize any capability claim: no Q1 private draw, production interaction, outcome, or attempt occurred."

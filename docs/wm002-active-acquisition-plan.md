@@ -4,8 +4,12 @@ Status: **Q0 is independently accepted for protocol completeness only and was
 rebound on 2026-07-24 after two bound sources changed. Q1 protocol
 `0.3.0-q1`, runtime, strict artifacts, entry gate, and independent auditor are
 implemented, and both blockers that reopened result-free qualification are
-closed. Execution authorization remains false, and no Q1 outcome or capability
-evidence exists.**
+closed. A third non-author review at implementation digest `8e17bc1a…` found
+nothing blocking across the previously unprobed surface and recorded nine
+non-blocking findings
+([evidence](../ara/evidence/wm002-q1-third-review-2026-07-28.md)). Execution
+authorization remains false, and no Q1 outcome or capability evidence
+exists.**
 
 The two closures are: causal private-input noninterference, now backed by five
 mutation controls that make the probe fail when a leak is injected; and the
@@ -23,7 +27,7 @@ one-shot tombstone, independent auditor validation of the exact prospective
 review, and descriptor-stable selected-source reads are implemented. The source
 binding covers bytes observed during the read, not already-loaded bytecode, and
 does not defend against a malicious coordinated same-account writer. The
-combined result-free suite is 512 tests; that is a test fact, not a readiness
+combined result-free suite is 522 tests; that is a test fact, not a readiness
 claim, and the remaining authorization steps are unchanged.
 
 WM-002 begins with one small question and one cheap killing fixture. It does

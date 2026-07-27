@@ -463,3 +463,25 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O26
+    timestamp: "2026-07-28T12:30+02:00"
+    provenance: ai-suggested
+    content: >-
+      Before flipping Q1 execution authorization, close the wasted-attempt
+      asymmetries the third review found: give the producer-side privacy scan
+      the global (or at least per-master) digest corpus, scan all six
+      published artifacts pre-publication, trap SIGTERM in the attempt parent
+      so hard-death does not silently consume the one-shot attempt, and fix or
+      delete the vacuous mode-drift unit regression that passes pre-fix.
+    context: >-
+      A third non-author review at implementation digest 8e17bc1a found
+      nothing blocking across five adversarially probed surfaces, but every
+      producer/auditor asymmetry it verified points in the same direction: a
+      defect elsewhere would be published by the producer, caught only by the
+      post-attempt auditor, and permanently burn the sole attempt.
+    potential_type: constraint
+    bound_to: [N48]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
