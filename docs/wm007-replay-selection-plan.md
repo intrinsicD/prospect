@@ -69,7 +69,11 @@ information value remain separate named quantities in records and reports.
    steps; a policy that silently buys extra work invalidates the comparison.
 3. Measure separately, never collapsed into one scalar: held-out negative log
    likelihood, calibration, transitions-to-target, optimizer-steps-to-target,
-   retention after interference, regime coverage, and worst-regime score.
+   retention after interference, regime coverage, worst-regime score,
+   duplicate-sampling concentration (how much probability mass repeated
+   transitions absorb under each policy), and — as a secondary executed-
+   behavior endpoint — external policy return from the frozen updated
+   snapshot under the evidence contract's disjoint-behavior standard.
 4. Bind every replayed sample to canonical experience ancestry; imagined
    evidence never enters the real-experience store.
 5. Fresh-process persistence parity: the frozen updated snapshot reproduces
@@ -97,6 +101,12 @@ before any work:
   member updates) with mandatory ensemble-collapse guards: pairwise prediction
   correlation, disagreement calibration, mixture NLL, and per-member data
   coverage;
+- adaptive ensemble evaluation for planning: a cheap member subset screens
+  all candidates, the full ensemble evaluates the top candidates and always
+  runs when the decision margin is small; the cheap stage is an approximation
+  and never canonical uncertainty, and its qualification must measure action
+  agreement with the full ensemble and failures specifically near decision
+  boundaries;
 - planner-only distillation of the ensemble into a compact screening student
   with teacher reranking of top candidates, keeping canonical belief,
   evidence, and formal uncertainty on the teacher ensemble;
