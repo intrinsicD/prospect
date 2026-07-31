@@ -38,6 +38,7 @@ the relevant `bench/**/results/` directory.
 | [WM-004](wm004-continual-scale-plan.md) | Queued | Does adaptive replay preserve plasticity and retention as task count grows under bounded memory? | terminal WM-003B |
 | [WM-005](wm005-partial-observability-plan.md) | Queued | Does a learned belief state improve long-horizon prediction and control under observation aliasing? | terminal WM-003B |
 | [WM-006](wm006-observation-regimes-plan.md) | Optional, queued | Does the lifecycle survive replacing privileged state vectors with learned observations? | terminal WM-005 |
+| [WM-007](wm007-replay-selection-plan.md) | Proposed, exploratory | Which replay-selection policy buys the most matched-budget learning efficiency on a fixed regime set? | accepted WM-001; informs WM-004's replay candidates |
 | [EXT-001](ext001-external-evaluation-plan.md) | Queued | Does a frozen accepted snapshot reproduce a bounded result in an independently operated evaluation? | accepted WM-003B or later; A-004 |
 
 ## Parallel assurance track
